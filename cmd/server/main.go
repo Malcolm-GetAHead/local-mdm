@@ -52,7 +52,11 @@ func main() {
 	logger.Info("Database connection established")
 
 	// Create API server
-	server := api.New(cfg, database, logger)
+	server, err := api.New(cfg, database, logger)
+	if err != nil {
+		logger.Error("Failed to create API server", "error", err)
+		os.Exit(1)
+	}
 
 	// Start server in a goroutine
 	go func() {

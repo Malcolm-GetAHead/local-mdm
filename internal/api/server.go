@@ -27,7 +27,7 @@ type Server struct {
 }
 
 // New creates a new API server
-func New(cfg *config.Config, database *db.DB, logger *slog.Logger) *Server {
+func New(cfg *config.Config, database *db.DB, logger *slog.Logger) (*Server, error) {
 	s := &Server{
 		router: mux.NewRouter(),
 		db:     database,
@@ -35,14 +35,12 @@ func New(cfg *config.Config, database *db.DB, logger *slog.Logger) *Server {
 		logger: logger,
 	}
 	
-	// Initialize auth middleware
+	// CRITICAL: Auth initialization must succeed
 	validator, err := auth.NewOIDCValidator(cfg.Keycloak.IssuerURL(), cfg.Keycloak.ClientID)
 	if err != nil {
-		logger.Error("Failed to initialize OIDC validator", "error", err)
-		// Continue without auth for now (will fail on protected routes)
-	} else {
-		s.authMiddleware = auth.NewMiddleware(validator, logger)
+		return nil, fmt.Errorf("CRITICAL: Cannot start server without authentication: %w", err)
 	}
+	s.authMiddleware = auth.NewMiddleware(validator, logger)
 	
 	s.setupRoutes()
 	s.setupMiddleware()
@@ -55,7 +53,7 @@ func New(cfg *config.Config, database *db.DB, logger *slog.Logger) *Server {
 		IdleTimeout:  cfg.Server.IdleTimeout,
 	}
 
-	return s
+	return s, nil
 }
 
 // setupRoutes configures all API routes
@@ -72,72 +70,70 @@ func (s *Server) setupRoutes() {
 	api.HandleFunc("/auth/refresh", s.handleRefresh).Methods("POST")
 	
 	// Protected routes (require auth)
-	if s.authMiddleware != nil {
-		// Enterprises
-		api.Handle("/enterprises", s.authMiddleware.RequireAuth(
-			s.authMiddleware.RequireRole("super_admin", "admin")(
-				http.HandlerFunc(s.handleListEnterprises),
-			),
-		)).Methods("GET")
-		
-		api.Handle("/enterprises", s.authMiddleware.RequireAuth(
-			s.authMiddleware.RequireRole("super_admin")(
-				http.HandlerFunc(s.handleCreateEnterprise),
-			),
-		)).Methods("POST")
-		
-		api.Handle("/enterprises/{id}", s.authMiddleware.RequireAuth(
-			http.HandlerFunc(s.handleGetEnterprise),
-		)).Methods("GET")
-		
-		// Devices
-		api.Handle("/devices", s.authMiddleware.RequireAuth(
-			http.HandlerFunc(s.handleListDevices),
-		)).Methods("GET")
-		
-		api.Handle("/devices/{id}", s.authMiddleware.RequireAuth(
-			http.HandlerFunc(s.handleGetDevice),
-		)).Methods("GET")
-		
-		api.Handle("/devices/{id}/lock", s.authMiddleware.RequireAuth(
-			s.authMiddleware.RequireRole("admin", "operator")(
-				http.HandlerFunc(s.handleLockDevice),
-			),
-		)).Methods("POST")
-		
-		api.Handle("/devices/{id}/wipe", s.authMiddleware.RequireAuth(
-			s.authMiddleware.RequireRole("admin")(
-				http.HandlerFunc(s.handleWipeDevice),
-			),
-		)).Methods("POST")
-		
-		// Policies
-		api.Handle("/policies", s.authMiddleware.RequireAuth(
-			http.HandlerFunc(s.handleListPolicies),
-		)).Methods("GET")
-		
-		api.Handle("/policies", s.authMiddleware.RequireAuth(
-			s.authMiddleware.RequireRole("admin", "operator")(
-				http.HandlerFunc(s.handleCreatePolicy),
-			),
-		)).Methods("POST")
-		
-		api.Handle("/policies/{id}", s.authMiddleware.RequireAuth(
-			http.HandlerFunc(s.handleGetPolicy),
-		)).Methods("GET")
-		
-		// Certificates
-		api.Handle("/certificates", s.authMiddleware.RequireAuth(
-			http.HandlerFunc(s.handleListCertificates),
-		)).Methods("GET")
-		
-		// Audit logs
-		api.Handle("/audit-logs", s.authMiddleware.RequireAuth(
-			s.authMiddleware.RequireRole("admin", "super_admin")(
-				http.HandlerFunc(s.handleListAuditLogs),
-			),
-		)).Methods("GET")
-	}
+	// Enterprises
+	api.Handle("/enterprises", s.authMiddleware.RequireAuth(
+		s.authMiddleware.RequireRole("super_admin", "admin")(
+			http.HandlerFunc(s.handleListEnterprises),
+		),
+	)).Methods("GET")
+	
+	api.Handle("/enterprises", s.authMiddleware.RequireAuth(
+		s.authMiddleware.RequireRole("super_admin")(
+			http.HandlerFunc(s.handleCreateEnterprise),
+		),
+	)).Methods("POST")
+	
+	api.Handle("/enterprises/{id}", s.authMiddleware.RequireAuth(
+		http.HandlerFunc(s.handleGetEnterprise),
+	)).Methods("GET")
+	
+	// Devices
+	api.Handle("/devices", s.authMiddleware.RequireAuth(
+		http.HandlerFunc(s.handleListDevices),
+	)).Methods("GET")
+	
+	api.Handle("/devices/{id}", s.authMiddleware.RequireAuth(
+		http.HandlerFunc(s.handleGetDevice),
+	)).Methods("GET")
+	
+	api.Handle("/devices/{id}/lock", s.authMiddleware.RequireAuth(
+		s.authMiddleware.RequireRole("admin", "operator")(
+			http.HandlerFunc(s.handleLockDevice),
+		),
+	)).Methods("POST")
+	
+	api.Handle("/devices/{id}/wipe", s.authMiddleware.RequireAuth(
+		s.authMiddleware.RequireRole("admin")(
+			http.HandlerFunc(s.handleWipeDevice),
+		),
+	)).Methods("POST")
+	
+	// Policies
+	api.Handle("/policies", s.authMiddleware.RequireAuth(
+		http.HandlerFunc(s.handleListPolicies),
+	)).Methods("GET")
+	
+	api.Handle("/policies", s.authMiddleware.RequireAuth(
+		s.authMiddleware.RequireRole("admin", "operator")(
+			http.HandlerFunc(s.handleCreatePolicy),
+		),
+	)).Methods("POST")
+	
+	api.Handle("/policies/{id}", s.authMiddleware.RequireAuth(
+		http.HandlerFunc(s.handleGetPolicy),
+	)).Methods("GET")
+	
+	// Certificates
+	api.Handle("/certificates", s.authMiddleware.RequireAuth(
+		http.HandlerFunc(s.handleListCertificates),
+	)).Methods("GET")
+	
+	// Audit logs
+	api.Handle("/audit-logs", s.authMiddleware.RequireAuth(
+		s.authMiddleware.RequireRole("admin", "super_admin")(
+			http.HandlerFunc(s.handleListAuditLogs),
+		),
+	)).Methods("GET")
 
 	// Platform-specific routes (implemented in Sprint 2)
 	s.router.HandleFunc("/windows/discovery", s.handleWindowsDiscovery).Methods("GET")

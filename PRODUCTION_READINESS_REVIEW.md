@@ -31,7 +31,8 @@ This Local MDM system is **NOT production-ready** and would face **critical secu
 ### C-01: Authentication Bypass via Nil Middleware Check
 **File**: `internal/api/server.go:38-46`  
 **Severity**: 🔴 **CRITICAL** - Complete authentication bypass  
-**CVSS Score**: 9.8 (Critical)
+**CVSS Score**: 9.8 (Critical)  
+**Status**: ✅ **FIXED** (2026-02-07)
 
 **Vulnerability**:
 ```go
@@ -45,60 +46,24 @@ if err != nil {
 }
 ```
 
-**Exploit Scenario**:
-1. Attacker provides invalid Keycloak URL in config or makes Keycloak unreachable during startup
-2. OIDC validator initialization fails, `authMiddleware` remains `nil`
-3. Protected routes check `if s.authMiddleware != nil` before applying auth
-4. All protected endpoints become accessible without authentication
-5. Attacker gains full admin access to all enterprises, devices, and policies
+**Fix Applied**:
+- Changed `api.New()` to return error if auth initialization fails
+- Removed nil check for `authMiddleware` in route setup
+- Server now refuses to start without valid authentication
+- Added comprehensive test suite (5 tests, all passing)
 
-**Impact**: Complete system compromise, data breach, unauthorized device management
+**Files Modified**:
+- `internal/api/server.go` - Made auth initialization mandatory
+- `cmd/server/main.go` - Handle error from api.New()
+- `internal/api/server_auth_test.go` - Added comprehensive tests
 
-**Fix**:
-```go
-// internal/api/server.go
-func New(cfg *config.Config, database *db.DB, logger *slog.Logger) *Server {
-    s := &Server{
-        router: mux.NewRouter(),
-        db:     database,
-        config: cfg,
-        logger: logger,
-    }
-    
-    // CRITICAL: Auth initialization must succeed
-    validator, err := auth.NewOIDCValidator(cfg.Keycloak.IssuerURL(), cfg.Keycloak.ClientID)
-    if err != nil {
-        logger.Error("Failed to initialize OIDC validator", "error", err)
-        panic(fmt.Sprintf("CRITICAL: Cannot start server without authentication: %v", err))
-    }
-    s.authMiddleware = auth.NewMiddleware(validator, logger)
-    
-    s.setupRoutes()
-    s.setupMiddleware()
-    return s
-}
-```
+**Verification**:
+- ✅ All tests pass with `-race` flag
+- ✅ Server refuses to start with invalid Keycloak URL
+- ✅ Protected routes return 401 without auth
+- ✅ No new security issues introduced
 
-**Test Case**:
-```go
-func TestServerStartupFailsWithoutAuth(t *testing.T) {
-    cfg := &config.Config{
-        Keycloak: config.KeycloakConfig{
-            URL:    "http://invalid-keycloak:9999",
-            Realm:  "test",
-            ClientID: "test",
-        },
-    }
-    
-    defer func() {
-        if r := recover(); r == nil {
-            t.Fatal("Expected panic when auth initialization fails")
-        }
-    }()
-    
-    _ = api.New(cfg, db, logger) // Should panic
-}
-```
+**Documentation**: See `reviews/PRD_RDY_REVIEW/1/C-01_AUTH_BYPASS_FIX.md`
 
 ---
 
