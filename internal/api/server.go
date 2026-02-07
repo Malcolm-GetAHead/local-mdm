@@ -11,6 +11,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/gorilla/mux"
+	"github.com/malcolm-getahead/local-mdm/internal/audit"
 	"github.com/malcolm-getahead/local-mdm/internal/auth"
 	"github.com/malcolm-getahead/local-mdm/internal/config"
 	"github.com/malcolm-getahead/local-mdm/internal/db"
@@ -23,16 +24,18 @@ type Server struct {
 	config         *config.Config
 	logger         *slog.Logger
 	authMiddleware *auth.Middleware
+	auditLogger    *audit.Logger
 	server         *http.Server
 }
 
 // New creates a new API server
 func New(cfg *config.Config, database *db.DB, logger *slog.Logger) (*Server, error) {
 	s := &Server{
-		router: mux.NewRouter(),
-		db:     database,
-		config: cfg,
-		logger: logger,
+		router:      mux.NewRouter(),
+		db:          database,
+		config:      cfg,
+		logger:      logger,
+		auditLogger: audit.NewLogger(database.DB),
 	}
 	
 	// CRITICAL: Auth initialization must succeed
@@ -41,6 +44,7 @@ func New(cfg *config.Config, database *db.DB, logger *slog.Logger) (*Server, err
 		return nil, fmt.Errorf("CRITICAL: Cannot start server without authentication: %w", err)
 	}
 	s.authMiddleware = auth.NewMiddleware(validator, logger)
+	s.authMiddleware.SetAuditLogger(s.auditLogger)
 	
 	s.setupRoutes()
 	s.setupMiddleware()
