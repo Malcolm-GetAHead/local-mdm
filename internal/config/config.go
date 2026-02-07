@@ -179,6 +179,9 @@ func (c *Config) overrideFromEnv() {
 	if jwtSecret := os.Getenv("JWT_SECRET"); jwtSecret != "" {
 		c.Auth.JWTSecret = jwtSecret
 	}
+	if keycloakSecret := os.Getenv("KEYCLOAK_CLIENT_SECRET"); keycloakSecret != "" {
+		c.Keycloak.ClientSecret = keycloakSecret
+	}
 }
 
 // Validate checks if the configuration is valid
@@ -192,5 +195,49 @@ func (c *Config) Validate() error {
 	if c.Server.Port == 0 {
 		return fmt.Errorf("server port is required")
 	}
+
+	// CRITICAL: Validate secrets are not using default/weak values
+	if err := c.validateSecrets(); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// validateSecrets ensures secrets are properly configured and not using defaults
+func (c *Config) validateSecrets() error {
+	// Validate JWT secret
+	if c.Auth.JWTSecret == "" {
+		return fmt.Errorf("CRITICAL: jwt_secret is required")
+	}
+	if c.Auth.JWTSecret == "change-me-in-production" {
+		return fmt.Errorf("CRITICAL: jwt_secret must be changed from default value")
+	}
+	if len(c.Auth.JWTSecret) < 32 {
+		return fmt.Errorf("CRITICAL: jwt_secret must be at least 32 characters (current: %d)", len(c.Auth.JWTSecret))
+	}
+
+	// Validate database password
+	if c.Database.Password == "" {
+		return fmt.Errorf("CRITICAL: database password is required")
+	}
+	if c.Database.Password == "postgres" {
+		return fmt.Errorf("CRITICAL: database password must be changed from default value 'postgres'")
+	}
+	if len(c.Database.Password) < 16 {
+		return fmt.Errorf("CRITICAL: database password must be at least 16 characters (current: %d)", len(c.Database.Password))
+	}
+
+	// Validate Keycloak client secret
+	if c.Keycloak.ClientSecret == "" {
+		return fmt.Errorf("CRITICAL: keycloak client_secret is required")
+	}
+	if c.Keycloak.ClientSecret == "localmdm-api-secret" {
+		return fmt.Errorf("CRITICAL: keycloak client_secret must be changed from default value")
+	}
+	if len(c.Keycloak.ClientSecret) < 16 {
+		return fmt.Errorf("CRITICAL: keycloak client_secret must be at least 16 characters (current: %d)", len(c.Keycloak.ClientSecret))
+	}
+
 	return nil
 }

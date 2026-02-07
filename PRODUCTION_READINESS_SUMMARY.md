@@ -36,10 +36,11 @@
 **Status**: ✅ Fixed on 2026-02-07  
 **Impact**: Server now refuses to start if OIDC validator fails to initialize, preventing authentication bypass
 
-### 2. Hardcoded Secrets (C-02)
+### 2. Hardcoded Secrets (C-02) ✅ FIXED
 **Risk**: Credential exposure  
 **Fix Time**: 4 hours  
-**Impact**: Database passwords, JWT secrets, OAuth secrets in version control
+**Status**: ✅ Fixed on 2026-02-07  
+**Impact**: All secrets now loaded from environment variables with validation to prevent weak/default values
 
 ### 3. No Audit Logging (C-06)
 **Risk**: Compliance failure, forensics impossible  

@@ -35,7 +35,7 @@ database:
   host: "localhost"
   port: 5432
   user: "postgres"
-  password: "postgres"
+  password: "REPLACE_WITH_ENV_VAR"  # CRITICAL: Set DB_PASSWORD environment variable
   database: "localmdm"
   sslmode: "disable"
   max_open_conns: 25
@@ -44,7 +44,7 @@ database:
   query_timeout: 10s  # Maximum time for database queries
 
 auth:
-  jwt_secret: "change-me-in-production"
+  jwt_secret: "REPLACE_WITH_ENV_VAR"  # CRITICAL: Set JWT_SECRET environment variable (min 32 chars)
   access_token_duration: 1h
   refresh_token_duration: 168h  # 7 days
 
@@ -52,7 +52,7 @@ keycloak:
   url: "http://localhost:8180"
   realm: "localmdm"
   client_id: "localmdm-api"
-  client_secret: "localmdm-api-secret"
+  client_secret: "REPLACE_WITH_ENV_VAR"  # CRITICAL: Set KEYCLOAK_CLIENT_SECRET environment variable
 
 certificates:
   ca_cert_path: "./certs/ca.crt"

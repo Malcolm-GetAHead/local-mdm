@@ -198,9 +198,9 @@ log.Info("Login attempt",
 ### Development
 ```bash
 # .env file (gitignored)
-export DB_PASSWORD="dev-password"
-export JWT_SECRET="dev-secret-at-least-32-chars"
-export KEYCLOAK_CLIENT_SECRET="dev-client-secret"
+export DB_PASSWORD="$(openssl rand -base64 24)"  # 16+ chars required
+export JWT_SECRET="$(openssl rand -base64 48)"   # 32+ chars required
+export KEYCLOAK_CLIENT_SECRET="<from-keycloak>" # 16+ chars required
 ```
 
 ### Production
@@ -211,21 +211,27 @@ aws secretsmanager get-secret-value --secret-id prod/mdm/db-password
 # Kubernetes Secrets
 kubectl create secret generic mdm-secrets \
   --from-literal=db-password='...' \
-  --from-literal=jwt-secret='...'
+  --from-literal=jwt-secret='...' \
+  --from-literal=keycloak-secret='...'
 ```
 
 ### Code
 ```go
-// Load from environment
-dbPassword := os.Getenv("DB_PASSWORD")
-if dbPassword == "" {
-    log.Fatal("DB_PASSWORD environment variable required")
-}
+// ✅ Secrets are automatically loaded from environment variables
+// ✅ Validation ensures secrets meet minimum requirements
+// ✅ Server refuses to start with default/weak secrets
 
-// Validate strength
-if len(dbPassword) < 16 {
-    log.Fatal("DB_PASSWORD must be at least 16 characters")
+// The config package handles this automatically:
+cfg, err := config.Load("config.yaml")
+if err != nil {
+    log.Fatal(err)  // Will fail if secrets are weak/default
 }
+```
+
+### Validation Rules (Enforced at Startup)
+- ✅ JWT_SECRET: minimum 32 characters, cannot be "change-me-in-production"
+- ✅ DB_PASSWORD: minimum 16 characters, cannot be "postgres"
+- ✅ KEYCLOAK_CLIENT_SECRET: minimum 16 characters, cannot be "localmdm-api-secret"
 ```
 
 ---
