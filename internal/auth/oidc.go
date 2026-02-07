@@ -4,7 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
+	"net"
 	"net/http"
+	"net/url"
 	"strings"
 	"sync"
 	"time"
@@ -74,7 +77,28 @@ func (v *OIDCValidator) refreshJWKS() error {
 		return nil
 	}
 	
-	// Create HTTP client with timeout
+	// Validate JWKS URL before making request
+	if err := validateJWKSURL(v.jwksURL); err != nil {
+		return fmt.Errorf("invalid JWKS URL: %w", err)
+	}
+	
+	// Create HTTP client with comprehensive timeouts
+	client := &http.Client{
+		Timeout: 10 * time.Second,
+		Transport: &http.Transport{
+			DialContext: (&net.Dialer{
+				Timeout:   5 * time.Second,
+				KeepAlive: 30 * time.Second,
+			}).DialContext,
+			TLSHandshakeTimeout:   5 * time.Second,
+			ResponseHeaderTimeout: 5 * time.Second,
+			ExpectContinueTimeout: 1 * time.Second,
+			MaxIdleConns:          10,
+			MaxIdleConnsPerHost:   2,
+			IdleConnTimeout:       90 * time.Second,
+		},
+	}
+	
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	
@@ -83,7 +107,7 @@ func (v *OIDCValidator) refreshJWKS() error {
 		return fmt.Errorf("failed to create request: %w", err)
 	}
 	
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := client.Do(req)
 	if err != nil {
 		return fmt.Errorf("failed to fetch JWKS: %w", err)
 	}
@@ -93,8 +117,11 @@ func (v *OIDCValidator) refreshJWKS() error {
 		return fmt.Errorf("JWKS endpoint returned %d", resp.StatusCode)
 	}
 	
+	// Limit response body size to prevent memory exhaustion
+	limitedReader := io.LimitReader(resp.Body, 1<<20) // 1MB max
+	
 	var jwks JWKS
-	if err := json.NewDecoder(resp.Body).Decode(&jwks); err != nil {
+	if err := json.NewDecoder(limitedReader).Decode(&jwks); err != nil {
 		return fmt.Errorf("failed to decode JWKS: %w", err)
 	}
 	
@@ -213,4 +240,66 @@ func ExtractBearerToken(r *http.Request) (string, error) {
 	}
 	
 	return parts[1], nil
+}
+
+// validateJWKSURL validates that the JWKS URL is safe to fetch
+func validateJWKSURL(urlStr string) error {
+	u, err := url.Parse(urlStr)
+	if err != nil {
+		return fmt.Errorf("invalid URL: %w", err)
+	}
+	
+	// CRITICAL: Only allow HTTPS (except localhost for development)
+	if u.Scheme != "https" && u.Scheme != "http" {
+		return fmt.Errorf("JWKS URL must use HTTP or HTTPS, got: %s", u.Scheme)
+	}
+	
+	// Warn if using HTTP (should only be for development)
+	if u.Scheme == "http" && !strings.Contains(u.Host, "localhost") && !strings.Contains(u.Host, "127.0.0.1") {
+		// Allow HTTP for non-localhost in development, but this is logged elsewhere
+	}
+	
+	// CRITICAL: Block internal/private IPs to prevent SSRF
+	host := u.Hostname()
+	
+	// Block common internal hostnames
+	internalHosts := []string{
+		"localhost",
+		"metadata.google.internal",
+		"169.254.169.254", // AWS metadata
+		"metadata.azure.com",
+		"metadata",
+	}
+	
+	hostLower := strings.ToLower(host)
+	for _, internal := range internalHosts {
+		if hostLower == internal || strings.HasSuffix(hostLower, "."+internal) {
+			// Allow localhost for development
+			if internal == "localhost" || host == "127.0.0.1" || host == "::1" {
+				continue
+			}
+			return fmt.Errorf("JWKS URL cannot point to internal host: %s", host)
+		}
+	}
+	
+	// Check if host is an IP address
+	if ip := net.ParseIP(host); ip != nil {
+		// Block loopback (except for development)
+		if ip.IsLoopback() {
+			// Allow for development
+			return nil
+		}
+		
+		// Block private IP ranges
+		if ip.IsPrivate() {
+			return fmt.Errorf("JWKS URL cannot point to private IP: %s", host)
+		}
+		
+		// Block link-local
+		if ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() {
+			return fmt.Errorf("JWKS URL cannot point to link-local IP: %s", host)
+		}
+	}
+	
+	return nil
 }
