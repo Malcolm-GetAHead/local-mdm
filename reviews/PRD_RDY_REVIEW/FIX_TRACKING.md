@@ -17,8 +17,8 @@
 | C-06 | No Audit Logging | 🔴 CRITICAL | ⏳ PENDING | - | - |
 | C-07 | Missing TLS Enforcement | 🔴 CRITICAL | ✅ FIXED | 2026-02-07 | [C-07_TLS_ENFORCEMENT_FIX.md](1/C-07_TLS_ENFORCEMENT_FIX.md) |
 | C-08 | SQL Injection Risk | 🔴 CRITICAL | ⏳ PENDING | - | - |
-| C-09 | HTTP Client Timeouts | 🔴 CRITICAL | ⏳ PENDING | - | - |
-| C-10 | DB Connection Limits | 🔴 CRITICAL | ⏳ PENDING | - | - |
+| C-09 | HTTP Client Timeouts | 🔴 CRITICAL | ✅ FIXED | 2026-02-07 | [C-09_HTTP_CLIENT_TIMEOUTS_FIX.md](1/C-09_HTTP_CLIENT_TIMEOUTS_FIX.md) |
+| C-10 | DB Connection Limits | 🔴 CRITICAL | ✅ FIXED | 2026-02-07 | [C-10_DB_CONNECTION_LIMITS_FIX.md](1/C-10_DB_CONNECTION_LIMITS_FIX.md) |
 
 ---
 
@@ -110,25 +110,52 @@ if err != nil {
 
 ---
 
+### C-09: HTTP Client Timeouts ✅ FIXED
+
+**Date**: 2026-02-07  
+**Effort**: 2 hours  
+**Test Coverage**: 14 new tests, 78.0% coverage  
+
+**Changes**:
+- Replaced `http.DefaultClient` with safe client with comprehensive timeouts
+- Added `validateJWKSURL()` to prevent SSRF attacks
+- Added 1MB response size limit
+- Blocks private IPs, metadata services, link-local addresses
+
+**Impact**: Eliminated DoS via slow requests and SSRF to internal services
+
+---
+
+### C-10: Database Connection Limits ✅ FIXED
+
+**Date**: 2026-02-07  
+**Effort**: 2 hours  
+**Test Coverage**: 8 new tests, 51.7% coverage  
+
+**Changes**:
+- Added `validateConnectionLimits()` function
+- Enforces MaxOpenConns: 1-100
+- Enforces MaxIdleConns: 1-MaxOpenConns
+- Enforces ConnMaxLifetime: >= 1 minute
+- Added ConnMaxIdleTime: 10 minutes
+- Fixed test utilities with invalid ConnMaxLifetime values
+
+**Impact**: Eliminated database connection exhaustion attacks
+
+---
+
 ## Remaining Work
 
 ### Week 1 Priority (Critical)
 
-**Estimated Time**: 16 hours remaining (of 30 hours total)
+**Estimated Time**: 12 hours remaining (of 30 hours total)  
+**Progress**: 18 hours completed (60%)
 
-1. **C-09: HTTP Client Timeouts** (2 hours)
-   - Add timeout to OIDC validator
-   - Add URL validation
-
-2. **C-10: DB Connection Limits** (2 hours)
-   - Validate connection pool settings
-   - Enforce reasonable limits
-
-3. **C-05: Rate Limiting** (6 hours)
+1. **C-05: Rate Limiting** (6 hours)
    - Implement Redis-based rate limiter
    - Add fallback for development
 
-4. **C-06: Audit Logging** (6 hours)
+2. **C-06: Audit Logging** (6 hours)
    - Implement audit logger
    - Add to authentication/authorization events
 
@@ -141,12 +168,14 @@ if err != nil {
 - **C-02**: 11 tests (secret validation)
 - **C-07**: 15 tests (TLS and environment validation)
 - **C-04**: 11 test functions with 20+ test cases (error handling patterns)
-- **Total**: 42+ new tests
+- **C-09**: 14 test functions with 30+ test cases (HTTP client timeouts, SSRF prevention)
+- **C-10**: 8 test functions with 30+ test cases (connection pool validation)
+- **Total**: 64+ new tests
 
 ### Test Results
 ```bash
 $ go test -race ./...
-ok      github.com/malcolm-getahead/local-mdm/internal/api      15.354s
+ok      github.com/malcolm-getahead/local-mdm/internal/api      (cached)
 ok      github.com/malcolm-getahead/local-mdm/internal/auth     (cached)
 ok      github.com/malcolm-getahead/local-mdm/internal/certs    3.810s
 ok      github.com/malcolm-getahead/local-mdm/internal/config   1.397s

@@ -200,61 +200,73 @@ internal/auth/context_test.go - Added 11 comprehensive test functions (NEW FILE)
 
 ---
 
-### Task 2.2: Fix HTTP Client Timeouts (C-09)
+### Task 2.2: Fix HTTP Client Timeouts (C-09) ✅ COMPLETED
 **Time**: 2 hours  
-**Priority**: 🔴 CRITICAL
+**Priority**: 🔴 CRITICAL  
+**Status**: ✅ COMPLETED (2026-02-07)
 
 **Steps**:
-1. Create `internal/auth/http_client.go` with safe client
-2. Update `internal/auth/oidc.go` to use safe client
-3. Add URL validation function
-4. Add test: `TestJWKSURLValidation`
+1. ✅ Replaced `http.DefaultClient` with safe client
+2. ✅ Added comprehensive timeouts (10s total, 5s connection, 5s TLS, 5s headers)
+3. ✅ Added `validateJWKSURL()` function to prevent SSRF
+4. ✅ Added 1MB response size limit
+5. ✅ Added test: `TestJWKSURLValidation` (14 test functions)
 
 **Code Changes**:
 ```bash
-# Files to modify
-internal/auth/oidc.go
-internal/auth/http_client.go (new)
-internal/auth/oidc_test.go
+# Files modified
+internal/auth/oidc.go - Safe HTTP client + URL validation
+internal/auth/http_client_test.go - Added 14 comprehensive tests (NEW FILE)
 ```
 
 **Verification**:
 ```bash
-# Test with slow endpoint
-go test -v -run TestOIDCValidatorTimeout ./internal/auth
-
-# Test with internal IP
-go test -v -run TestJWKSURLValidation ./internal/auth
+# All tests pass with 78.0% coverage
+✅ go test -race -cover ./internal/auth/...
+# PASS - coverage: 78.0% of statements
 ```
+
+**Documentation**: `reviews/PRD_RDY_REVIEW/1/C-09_HTTP_CLIENT_TIMEOUTS_FIX.md`
 
 ---
 
-### Task 2.3: Add Database Connection Limits (C-10)
+### Task 2.3: Add Database Connection Limits (C-10) ✅ COMPLETED
 **Time**: 2 hours  
-**Priority**: 🔴 CRITICAL
+**Priority**: 🔴 CRITICAL  
+**Status**: ✅ COMPLETED (2026-02-07)
 
 **Steps**:
-1. Update `internal/db/db.go:New()` to validate limits
-2. Add reasonable defaults if not specified
-3. Add connection pool metrics
-4. Add test: `TestDatabaseConnectionLimits`
+1. ✅ Added `validateConnectionLimits()` function
+2. ✅ Updated `internal/db/db.go:New()` to validate before opening connection
+3. ✅ Enforced MaxOpenConns: 1-100
+4. ✅ Enforced MaxIdleConns: 1-MaxOpenConns
+5. ✅ Enforced ConnMaxLifetime: >= 1 minute
+6. ✅ Added ConnMaxIdleTime: 10 minutes
+7. ✅ Fixed test utilities with invalid ConnMaxLifetime values
+8. ✅ Added test: `TestValidateConnectionLimits` (8 test functions)
 
 **Code Changes**:
 ```bash
-# Files to modify
-internal/db/db.go
-internal/db/db_test.go
+# Files modified
+internal/db/db.go - Added validation function
+internal/db/db_connection_test.go - Added 8 comprehensive tests (NEW FILE)
+internal/testutil/db.go - Fixed ConnMaxLifetime bug (300ns → 5 minutes)
+internal/repository/repository_test.go - Fixed ConnMaxLifetime bug
+internal/certs/certs_test.go - Fixed ConnMaxLifetime bug
 ```
 
 **Verification**:
 ```bash
-# Should reject invalid limits
-MAX_OPEN_CONNS=0 ./server
-MAX_OPEN_CONNS=10000 ./server
+# All tests pass with 51.7% coverage
+✅ go test -race -cover ./internal/db/...
+# PASS - coverage: 51.7% of statements
 
-# Should accept valid limits
-MAX_OPEN_CONNS=25 ./server
+# Full test suite passes
+✅ go test -race ./...
+# PASS - No race conditions
 ```
+
+**Documentation**: `reviews/PRD_RDY_REVIEW/1/C-10_DB_CONNECTION_LIMITS_FIX.md`
 
 ---
 

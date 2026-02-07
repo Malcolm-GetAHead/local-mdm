@@ -3,6 +3,7 @@ package repository_test
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/malcolm-getahead/local-mdm/internal/config"
@@ -21,7 +22,7 @@ func setupTestDB(t *testing.T) *db.DB {
 		SSLMode:         "disable",
 		MaxOpenConns:    5,
 		MaxIdleConns:    2,
-		ConnMaxLifetime: 300,
+		ConnMaxLifetime: 5 * time.Minute,
 	}
 	
 	database, err := db.New(cfg)

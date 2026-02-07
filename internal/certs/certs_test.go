@@ -39,7 +39,7 @@ func setupTestCerts(t *testing.T) (*certs.CAManager, *certs.CertificateService, 
 		SSLMode:         "disable",
 		MaxOpenConns:    5,
 		MaxIdleConns:    2,
-		ConnMaxLifetime: 300,
+		ConnMaxLifetime: 5 * time.Minute,
 	}
 	
 	database, err := db.New(cfg)

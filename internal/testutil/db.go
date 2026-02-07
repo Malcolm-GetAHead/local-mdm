@@ -3,6 +3,7 @@ package testutil
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/malcolm-getahead/local-mdm/internal/config"
 	"github.com/malcolm-getahead/local-mdm/internal/db"
@@ -21,7 +22,7 @@ func SetupTestDB(t *testing.T) *db.DB {
 		SSLMode:         "disable",
 		MaxOpenConns:    5,
 		MaxIdleConns:    2,
-		ConnMaxLifetime: 300,
+		ConnMaxLifetime: 5 * time.Minute,
 	}
 	
 	database, err := db.New(cfg)

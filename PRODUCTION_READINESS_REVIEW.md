@@ -882,7 +882,8 @@ func validateJWKSURL(urlStr string) error {
 ### C-10: No Database Connection Pool Limits
 **File**: `internal/db/db.go:23-40`  
 **Severity**: 🔴 **CRITICAL** - Resource exhaustion  
-**CVSS Score**: 7.5 (High)
+**CVSS Score**: 7.5 (High)  
+**Status**: ✅ **FIXED** (2026-02-07)
 
 **Vulnerability**:
 ```go
