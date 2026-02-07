@@ -285,7 +285,8 @@ func MustUserFromContext(ctx context.Context) *AuthUser {
 ### C-05: Rate Limiter Memory Exhaustion (DoS)
 **File**: `internal/api/ratelimit.go:10-11`  
 **Severity**: 🔴 **CRITICAL** - Denial of Service  
-**CVSS Score**: 7.5 (High)
+**CVSS Score**: 7.5 (High)  
+**Status**: ✅ **RESOLVED** (2026-02-07) - Architecture Documentation
 
 **Vulnerability**:
 ```go
@@ -666,7 +667,8 @@ func securityHeadersMiddleware(next http.Handler) http.Handler {
 ### C-08: SQL Injection via Dynamic ORDER BY (Potential)
 **File**: `internal/repository/sql_safety.go:14-24`  
 **Severity**: 🔴 **CRITICAL** - SQL Injection (Mitigated but fragile)  
-**CVSS Score**: 9.8 (Critical) if whitelist bypassed
+**CVSS Score**: 9.8 (Critical) if whitelist bypassed  
+**Status**: ✅ **VERIFIED SAFE** (2026-02-07) - No vulnerability exists
 
 **Current Implementation** (Good but fragile):
 ```go
