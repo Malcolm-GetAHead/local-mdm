@@ -1,0 +1,279 @@
+openapi: 3.0.0
+info:
+  version: 0.1.0
+  title: NanoDEP depserver API
+  description: |
+    Source: https://github.com/micromdm/nanodep/blob/main/docs/openapi.yaml
+    Authentication: HTTP Basic with username "depserver" and API key as password.
+servers:
+  - url: http://[::1]:9001/
+paths:
+  /version:
+    get:
+      description: Returns the running NanoDEP depserver version
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  version:
+                    type: string
+  /v1/dep_names:
+    get:
+      description: Query DEP names
+      security:
+        - basicAuth: []
+      parameters:
+        - in: query
+          name: dep_name
+          schema:
+            type: array
+            items:
+              type: string
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 100
+        - in: query
+          name: offset
+          schema:
+            type: integer
+        - in: query
+          name: cursor
+          schema:
+            type: string
+      responses:
+        '200':
+          description: DEP name query results
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  dep_names:
+                    type: array
+                    items:
+                      type: string
+                  next_cursor:
+                    type: string
+  /v1/tokenpki/{name}:
+    get:
+      description: Generate keypair, return X.509 certificate for Apple portal upload
+      security:
+        - basicAuth: []
+      parameters:
+        - $ref: '#/components/parameters/depName'
+        - in: query
+          name: cn
+          schema:
+            type: string
+        - in: query
+          name: validity_days
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: PEM certificate
+          content:
+            application/x-pem-file:
+              schema:
+                type: string
+    put:
+      description: Decrypt OAuth tokens from Apple portal .p7m file
+      security:
+        - basicAuth: []
+      parameters:
+        - $ref: '#/components/parameters/depName'
+        - in: query
+          name: force
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/pkcs7-mime:
+            schema:
+              type: string
+      responses:
+        '200':
+          description: Decrypted OAuth1 tokens
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OAuth1Tokens'
+  /v1/tokens/{name}:
+    get:
+      description: Return raw DEP OAuth1 tokens
+      security:
+        - basicAuth: []
+      parameters:
+        - $ref: '#/components/parameters/depName'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OAuth1Tokens'
+    put:
+      description: Store raw OAuth1 tokens (discouraged, use tokenpki instead)
+      security:
+        - basicAuth: []
+      parameters:
+        - $ref: '#/components/parameters/depName'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OAuth1Tokens'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OAuth1Tokens'
+  /v1/assigner/{name}:
+    get:
+      description: Return assigner profile UUID
+      security:
+        - basicAuth: []
+      parameters:
+        - $ref: '#/components/parameters/depName'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  profile_uuid:
+                    type: string
+    put:
+      description: Set assigner profile UUID
+      security:
+        - basicAuth: []
+      parameters:
+        - $ref: '#/components/parameters/depName'
+        - in: query
+          name: profile_uuid
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  profile_uuid:
+                    type: string
+  /v1/config/{name}:
+    get:
+      description: Return config for DEP name
+      security:
+        - basicAuth: []
+      parameters:
+        - $ref: '#/components/parameters/depName'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Config'
+    put:
+      description: Set config for DEP name
+      security:
+        - basicAuth: []
+      parameters:
+        - $ref: '#/components/parameters/depName'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Config'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Config'
+  /v1/maidjwt/{name}:
+    get:
+      description: Generate Managed Apple ID JWT
+      security:
+        - basicAuth: []
+      parameters:
+        - $ref: '#/components/parameters/depName'
+        - in: query
+          name: server_uuid
+          schema:
+            type: string
+      responses:
+        '200':
+          content:
+            application/jwt:
+              schema:
+                type: string
+  /v1/bypasscode:
+    get:
+      description: Generate or decode Activation Lock Bypass Code
+      security:
+        - basicAuth: []
+      parameters:
+        - in: query
+          name: code
+          schema:
+            type: string
+        - in: query
+          name: raw
+          schema:
+            type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  raw:
+                    type: string
+                  code:
+                    type: string
+                  hash:
+                    type: string
+components:
+  parameters:
+    depName:
+      name: name
+      in: path
+      required: true
+      schema:
+        type: string
+  securitySchemes:
+    basicAuth:
+      type: http
+      scheme: basic
+  schemas:
+    OAuth1Tokens:
+      type: object
+      properties:
+        consumer_key:
+          type: string
+        consumer_secret:
+          type: string
+        access_token:
+          type: string
+        access_secret:
+          type: string
+        access_token_expiry:
+          type: string
+          format: date-time
+    Config:
+      type: object
+      properties:
+        base_url:
+          type: string
+          format: url

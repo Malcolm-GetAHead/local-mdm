@@ -33,10 +33,10 @@ local-mdm/
 Created comprehensive documentation:
 
 - **[README.md](../README.md)** - Project overview and quick start
-- **[docs/SCOPE.md](SCOPE.md)** - Detailed project scope and requirements
-- **[docs/DATABASE.md](DATABASE.md)** - Complete database schema
-- **[docs/API.md](API.md)** - REST API documentation
-- **[docs/ARCHITECTURE.md](ARCHITECTURE.md)** - System architecture
+- **[docs/SCOPE.md](scope/SCOPE.md)** - Detailed project scope and requirements
+- **[docs/DATABASE.md](schemas/DATABASE.md)** - Complete database schema
+- **[docs/API.md](schemas/API.md)** - REST API documentation
+- **[docs/ARCHITECTURE.md](architecture/ARCHITECTURE.md)** - System architecture
 - **[docs/SETUP.md](SETUP.md)** - Development setup guide
 - **[docs/PROGRESS.md](PROGRESS.md)** - Implementation progress tracking
 

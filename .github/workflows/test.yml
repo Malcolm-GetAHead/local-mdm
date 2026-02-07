@@ -1,0 +1,86 @@
+name: Tests
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  test:
+    name: Run Tests
+    runs-on: ubuntu-latest
+    
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: localmdm
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      
+      keycloak:
+        image: quay.io/keycloak/keycloak:23.0
+        env:
+          KEYCLOAK_ADMIN: admin
+          KEYCLOAK_ADMIN_PASSWORD: admin
+          KC_DB: postgres
+          KC_DB_URL: jdbc:postgresql://postgres:5432/keycloak
+          KC_DB_USERNAME: postgres
+          KC_DB_PASSWORD: postgres
+          KC_HOSTNAME_STRICT: false
+          KC_HTTP_ENABLED: true
+        ports:
+          - 8180:8080
+        options: >-
+          --health-cmd "curl -f http://localhost:8080/health/ready || exit 1"
+          --health-interval 30s
+          --health-timeout 10s
+          --health-retries 5
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.21'
+
+    - name: Cache Go modules
+      uses: actions/cache@v4
+      with:
+        path: ~/go/pkg/mod
+        key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+        restore-keys: |
+          ${{ runner.os }}-go-
+
+    - name: Install dependencies
+      run: go mod download
+
+    - name: Install migrate tool
+      run: go install -tags 'postgres' github.com/golang-migrate/migrate/v4/cmd/migrate@latest
+
+    - name: Run migrations
+      run: ~/go/bin/migrate -path ./migrations -database "postgres://postgres:postgres@localhost:5432/localmdm?sslmode=disable" up
+
+    - name: Run tests
+      run: make test
+
+    - name: Generate coverage report
+      run: go tool cover -func=coverage.out
+
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v4
+      with:
+        file: ./coverage.out
+        flags: unittests
+        name: codecov-umbrella
+        fail_ci_if_error: false

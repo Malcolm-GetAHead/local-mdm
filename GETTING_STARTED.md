@@ -149,13 +149,13 @@ Expected response:
 ## 📚 Key Documentation
 
 ### For Development
-- **[QUICK_REFERENCE.md](docs/QUICK_REFERENCE.md)** - Commands and common tasks
-- **[SETUP.md](docs/SETUP.md)** - Detailed setup instructions
-- **[PROGRESS.md](docs/PROGRESS.md)** - Current status and next tasks
+- **[QUICK_REFERENCE.md](docs/dev/QUICK_REFERENCE.md)** - Commands and common tasks
+- **[SETUP.md](docs/dev/SETUP.md)** - Detailed setup instructions
+- **[PROGRESS.md](docs/tasks/PROGRESS.md)** - Current status and next tasks
 
 ### For Understanding
-- **[SCOPE.md](docs/SCOPE.md)** - What we're building and why
-- **[ARCHITECTURE.md](docs/ARCHITECTURE.md)** - How it's designed
+- **[SCOPE.md](docs/scope/SCOPE.md)** - What we're building and why
+- **[ARCHITECTURE.md](docs/architecture/ARCHITECTURE.md)** - How it's designed
 - **[DATABASE.md](docs/DATABASE.md)** - Data model details
 - **[API.md](docs/API.md)** - API endpoints and usage
 

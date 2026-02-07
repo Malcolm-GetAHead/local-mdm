@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"log"
 	"os"
 	"os/signal"
 	"syscall"
@@ -12,7 +11,10 @@ import (
 	"github.com/malcolm-getahead/local-mdm/internal/api"
 	"github.com/malcolm-getahead/local-mdm/internal/config"
 	"github.com/malcolm-getahead/local-mdm/internal/db"
+	"github.com/malcolm-getahead/local-mdm/internal/logging"
 )
+
+const version = "0.1.0"
 
 func main() {
 	// Load configuration
@@ -23,50 +25,71 @@ func main() {
 
 	cfg, err := config.Load(configPath)
 	if err != nil {
-		log.Fatalf("Failed to load config: %v", err)
+		fmt.Fprintf(os.Stderr, "Failed to load config: %v\n", err)
+		os.Exit(1)
 	}
+
+	// Initialize structured logger
+	logger := logging.New(cfg.Logging)
 
 	// Validate configuration
 	if err := cfg.Validate(); err != nil {
-		log.Fatalf("Invalid configuration: %v", err)
+		logger.Error("Invalid configuration", "error", err)
+		os.Exit(1)
 	}
+
+	// Print startup banner
+	printBanner(cfg)
 
 	// Connect to database
+	logger.Info("Connecting to database", "host", cfg.Database.Host, "port", cfg.Database.Port)
 	database, err := db.New(cfg.Database)
 	if err != nil {
-		log.Fatalf("Failed to connect to database: %v", err)
+		logger.Error("Failed to connect to database", "error", err)
+		os.Exit(1)
 	}
 	defer database.Close()
-
-	fmt.Println("Database connection established")
+	logger.Info("Database connection established")
 
 	// Create API server
-	server := api.New(cfg, database)
+	server := api.New(cfg, database, logger)
 
 	// Start server in a goroutine
 	go func() {
+		logger.Info("Starting HTTP server", "address", fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.Port))
 		if err := server.Start(); err != nil {
-			log.Fatalf("Server failed to start: %v", err)
+			logger.Error("Server failed to start", "error", err)
+			os.Exit(1)
 		}
 	}()
-
-	fmt.Printf("Local MDM server started on %s:%d\n", cfg.Server.Host, cfg.Server.Port)
-	fmt.Println("Press Ctrl+C to stop")
 
 	// Wait for interrupt signal
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
 
-	fmt.Println("\nShutting down server...")
+	logger.Info("Shutdown signal received")
 
 	// Graceful shutdown with timeout
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
 	if err := server.Shutdown(ctx); err != nil {
-		log.Fatalf("Server forced to shutdown: %v", err)
+		logger.Error("Server forced to shutdown", "error", err)
+		os.Exit(1)
 	}
 
-	fmt.Println("Server stopped")
+	logger.Info("Server stopped gracefully")
+}
+
+func printBanner(cfg *config.Config) {
+	fmt.Println("╔═══════════════════════════════════════════════════════╗")
+	fmt.Println("║              Local MDM Server                         ║")
+	fmt.Println("╠═══════════════════════════════════════════════════════╣")
+	fmt.Printf("║  Version:     %-40s║\n", version)
+	fmt.Printf("║  Listen:      %s:%-33d║\n", cfg.Server.Host, cfg.Server.Port)
+	fmt.Printf("║  Database:    %s:%-33d║\n", cfg.Database.Host, cfg.Database.Port)
+	fmt.Printf("║  Log Level:   %-40s║\n", cfg.Logging.Level)
+	fmt.Println("╚═══════════════════════════════════════════════════════╝")
+	fmt.Println()
 }

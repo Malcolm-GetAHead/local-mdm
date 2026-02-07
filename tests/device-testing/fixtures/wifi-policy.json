@@ -1,0 +1,14 @@
+{
+  "name": "Corporate WiFi Policy",
+  "description": "Standard corporate WiFi configuration",
+  "platform": "macos",
+  "policy_type": "wifi",
+  "policy_config": {
+    "ssid": "CorpNet",
+    "security": "wpa2-enterprise",
+    "eap_method": "PEAP",
+    "identity": "user@example.com",
+    "auto_join": true,
+    "hidden_network": false
+  }
+}

@@ -1,0 +1,7 @@
+# Python dependencies for device testing
+requests>=2.32.0
+pytest>=8.4.0
+selenium>=4.36.0
+Appium-Python-Client>=5.2.0
+qrcode>=8.0
+Pillow>=10.0.0

@@ -31,16 +31,17 @@ Unified Control Plane (Go)
 
 ## Project Status
 
-🚧 **In Development** - See [docs/PROGRESS.md](docs/PROGRESS.md) for current status
+🚧 **In Development** - See [docs/tasks/PROGRESS.md](docs/tasks/PROGRESS.md) for current status
 
 ## Documentation
 
-- [Project Scope](docs/SCOPE.md) - Detailed project requirements and goals
-- [Architecture](docs/ARCHITECTURE.md) - System design and component details
-- [API Documentation](docs/API.md) - REST API reference
-- [Database Schema](docs/DATABASE.md) - Data model and migrations
-- [Development Progress](docs/PROGRESS.md) - Implementation status and decisions
-- [Setup Guide](docs/SETUP.md) - Development environment setup
+- [Project Scope](docs/scope/SCOPE.md) - Detailed project requirements and goals
+- [Architecture](docs/architecture/ARCHITECTURE.md) - System design and component details
+- [API Documentation](docs/schemas/API.md) - REST API reference
+- [Database Schema](docs/schemas/DATABASE.md) - Data model and migrations
+- [External Dependencies](docs/dependencies/) - NanoMDM, NanoDEP, SCEP, NanoLIB docs
+- [Development Progress](docs/tasks/PROGRESS.md) - Implementation status and decisions
+- [Setup Guide](docs/dev/SETUP.md) - Development environment setup
 
 ## Quick Start
 

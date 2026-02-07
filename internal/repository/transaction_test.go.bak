@@ -1,0 +1,783 @@
+package repository
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"testing"
+
+	"github.com/google/uuid"
+	"github.com/malcolm-getahead/local-mdm/internal/models"
+	"github.com/malcolm-getahead/local-mdm/internal/testutil"
+)
+
+func TestTransactionCommit(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	defer db.Close()
+
+	transactor := NewTransactor(db)
+	deviceRepo := NewDeviceRepository(db)
+	enterpriseRepo := NewEnterpriseRepository(db)
+
+	ctx := context.Background()
+
+	// Create enterprise and device in a transaction
+	var enterpriseID, deviceID uuid.UUID
+	slug := "test-enterprise-" + uuid.New().String()[:8]
+	err := transactor.WithTransaction(ctx, func(txCtx context.Context) error {
+		// Create enterprise
+		enterprise := &models.Enterprise{
+			Name: "Test Enterprise",
+			Slug: slug,
+		}
+		if err := enterpriseRepo.Create(txCtx, enterprise); err != nil {
+			return err
+		}
+		enterpriseID = enterprise.ID
+
+		// Create device
+		device := &models.Device{
+			EnterpriseID: enterprise.ID,
+			Platform:     "macos",
+			DeviceID:     "test-device-id",
+			SerialNumber: "TEST123-" + uuid.New().String()[:8],
+			Name:         "Test Device",
+			Status:       "active",
+		}
+		if err := deviceRepo.Create(txCtx, device); err != nil {
+			return err
+		}
+		deviceID = device.ID
+
+		return nil
+	})
+
+	if err != nil {
+		t.Fatalf("Transaction failed: %v", err)
+	}
+
+	// Verify both records exist
+	enterprise, err := enterpriseRepo.GetByID(ctx, enterpriseID)
+	if err != nil {
+		t.Fatalf("Failed to get enterprise: %v", err)
+	}
+	if enterprise.Name != "Test Enterprise" {
+		t.Errorf("Expected enterprise name 'Test Enterprise', got '%s'", enterprise.Name)
+	}
+
+	device, err := deviceRepo.GetByID(ctx, deviceID)
+	if err != nil {
+		t.Fatalf("Failed to get device: %v", err)
+	}
+	if device.Name != "Test Device" {
+		t.Errorf("Expected device name 'Test Device', got '%s'", device.Name)
+	}
+}
+
+func TestTransactionRollback(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	defer db.Close()
+
+	transactor := NewTransactor(db)
+	deviceRepo := NewDeviceRepository(db)
+	enterpriseRepo := NewEnterpriseRepository(db)
+
+	ctx := context.Background()
+
+	// Create enterprise first (outside transaction)
+	enterprise := &models.Enterprise{
+		Name: "Test Enterprise",
+		Slug: "test-enterprise-rollback-" + uuid.New().String()[:8],
+	}
+	if err := enterpriseRepo.Create(ctx, enterprise); err != nil {
+		t.Fatalf("Failed to create enterprise: %v", err)
+	}
+
+	// Try to create device in transaction that will fail
+	testError := errors.New("intentional error")
+	err := transactor.WithTransaction(ctx, func(txCtx context.Context) error {
+		// Create device
+		device := &models.Device{
+			EnterpriseID: enterprise.ID,
+			Platform:     "macos",
+			DeviceID:     "test-device-id",
+			SerialNumber: "ROLLBACK123",
+			Name:         "Test Device",
+			Status:       "active",
+		}
+		if err := deviceRepo.Create(txCtx, device); err != nil {
+			return err
+		}
+
+		// Return error to trigger rollback
+		return testError
+	})
+
+	if err != testError {
+		t.Fatalf("Expected error %v, got %v", testError, err)
+	}
+
+	// Verify device was NOT created
+	_, err = deviceRepo.GetBySerial(ctx, enterprise.ID, "ROLLBACK123")
+	if err == nil {
+		t.Fatal("Expected device to not exist after rollback, but it does")
+	}
+}
+
+func TestTransactionRollbackOnPanic(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	defer db.Close()
+
+	transactor := NewTransactor(db)
+	deviceRepo := NewDeviceRepository(db)
+	enterpriseRepo := NewEnterpriseRepository(db)
+
+	ctx := context.Background()
+
+	// Create enterprise first
+	enterprise := &models.Enterprise{
+		Name: "Test Enterprise",
+		Slug: "test-enterprise-panic-" + uuid.New().String()[:8],
+	}
+	if err := enterpriseRepo.Create(ctx, enterprise); err != nil {
+		t.Fatalf("Failed to create enterprise: %v", err)
+	}
+
+	// Try to create device in transaction that will panic
+	defer func() {
+		if r := recover(); r == nil {
+			t.Fatal("Expected panic, but didn't get one")
+		}
+	}()
+
+	_ = transactor.WithTransaction(ctx, func(txCtx context.Context) error {
+		// Create device
+		device := &models.Device{
+			EnterpriseID: enterprise.ID,
+			Platform:     "macos",
+			DeviceID:     "test-device-id",
+			SerialNumber: "PANIC123",
+			Name:         "Test Device",
+			Status:       "active",
+		}
+		if err := deviceRepo.Create(txCtx, device); err != nil {
+			return err
+		}
+
+		// Panic to trigger rollback
+		panic("intentional panic")
+	})
+
+	// This code should not be reached due to panic
+	// But if it is, verify device was NOT created
+	_, err := deviceRepo.GetBySerial(ctx, enterprise.ID, "PANIC123")
+	if err == nil {
+		t.Fatal("Expected device to not exist after panic rollback, but it does")
+	}
+}
+
+func TestNestedTransactions(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	defer db.Close()
+
+	transactor := NewTransactor(db)
+	deviceRepo := NewDeviceRepository(db)
+	enterpriseRepo := NewEnterpriseRepository(db)
+
+	ctx := context.Background()
+
+	// Nested transactions should use the same transaction
+	var enterpriseID, deviceID uuid.UUID
+	err := transactor.WithTransaction(ctx, func(txCtx context.Context) error {
+		// Create enterprise
+		enterprise := &models.Enterprise{
+			Name: "Test Enterprise",
+			Slug: "test-enterprise-nested-" + uuid.New().String()[:8],
+		}
+		if err := enterpriseRepo.Create(txCtx, enterprise); err != nil {
+			return err
+		}
+		enterpriseID = enterprise.ID
+
+		// Nested transaction (should reuse same tx)
+		return transactor.WithTransaction(txCtx, func(nestedCtx context.Context) error {
+			device := &models.Device{
+				EnterpriseID: enterprise.ID,
+				Platform:     "macos",
+				DeviceID:     "test-device-id",
+				SerialNumber: "NESTED123",
+				Name:         "Test Device",
+				Status:       "active",
+			}
+			if err := deviceRepo.Create(nestedCtx, device); err != nil {
+				return err
+			}
+			deviceID = device.ID
+			return nil
+		})
+	})
+
+	if err != nil {
+		t.Fatalf("Nested transaction failed: %v", err)
+	}
+
+	// Verify both records exist
+	_, err = enterpriseRepo.GetByID(ctx, enterpriseID)
+	if err != nil {
+		t.Fatalf("Failed to get enterprise: %v", err)
+	}
+
+	_, err = deviceRepo.GetByID(ctx, deviceID)
+	if err != nil {
+		t.Fatalf("Failed to get device: %v", err)
+	}
+}
+
+func TestTransactionWithMultipleOperations(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	defer db.Close()
+
+	transactor := NewTransactor(db)
+	deviceRepo := NewDeviceRepository(db)
+	enterpriseRepo := NewEnterpriseRepository(db)
+	policyRepo := NewPolicyRepository(db)
+
+	ctx := context.Background()
+
+	// Complex transaction with multiple operations
+	var enterpriseID, deviceID, policyID uuid.UUID
+	err := transactor.WithTransaction(ctx, func(txCtx context.Context) error {
+		// Create enterprise
+		enterprise := &models.Enterprise{
+			Name: "Test Enterprise",
+			Slug: "test-enterprise-multi-" + uuid.New().String()[:8],
+		}
+		if err := enterpriseRepo.Create(txCtx, enterprise); err != nil {
+			return err
+		}
+		enterpriseID = enterprise.ID
+
+		// Create device
+		device := &models.Device{
+			EnterpriseID: enterprise.ID,
+			Platform:     "macos",
+			DeviceID:     "test-device-id",
+			SerialNumber: "MULTI123",
+			Name:         "Test Device",
+			Status:       "active",
+		}
+		if err := deviceRepo.Create(txCtx, device); err != nil {
+			return err
+		}
+		deviceID = device.ID
+
+		// Create policy
+		policy := &models.Policy{
+			EnterpriseID: enterprise.ID,
+			Name:         "Test Policy",
+			Platform:     "macos",
+			PolicyType:   "security",
+			PolicyConfig: models.JSONB{"test": true},
+			IsActive:     true,
+		}
+		if err := policyRepo.Create(txCtx, policy); err != nil {
+			return err
+		}
+		policyID = policy.ID
+
+		// Assign policy to device
+		if err := policyRepo.AssignToDevice(txCtx, device.ID, policy.ID); err != nil {
+			return err
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		t.Fatalf("Multi-operation transaction failed: %v", err)
+	}
+
+	// Verify all records exist
+	_, err = enterpriseRepo.GetByID(ctx, enterpriseID)
+	if err != nil {
+		t.Fatalf("Failed to get enterprise: %v", err)
+	}
+
+	_, err = deviceRepo.GetByID(ctx, deviceID)
+	if err != nil {
+		t.Fatalf("Failed to get device: %v", err)
+	}
+
+	_, err = policyRepo.GetByID(ctx, policyID)
+	if err != nil {
+		t.Fatalf("Failed to get policy: %v", err)
+	}
+}
+
+func TestGetExecutor(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	defer db.Close()
+
+	ctx := context.Background()
+
+	// Without transaction, should return db
+	exec := getExecutor(ctx, db)
+	if exec != db {
+		t.Error("Expected executor to be db when no transaction in context")
+	}
+
+	// With transaction, should return tx
+	tx, err := db.Begin()
+	if err != nil {
+		t.Fatalf("Failed to begin transaction: %v", err)
+	}
+	defer tx.Rollback()
+
+	txCtx := context.WithValue(ctx, txKey{}, tx)
+	exec = getExecutor(txCtx, db)
+	if exec != tx {
+		t.Error("Expected executor to be tx when transaction in context")
+	}
+}
+
+func TestGetTx(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	defer db.Close()
+
+	ctx := context.Background()
+
+	// Without transaction
+	tx := getTx(ctx)
+	if tx != nil {
+		t.Error("Expected nil when no transaction in context")
+	}
+
+	// With transaction
+	dbTx, err := db.Begin()
+	if err != nil {
+		t.Fatalf("Failed to begin transaction: %v", err)
+	}
+	defer dbTx.Rollback()
+
+	txCtx := context.WithValue(ctx, txKey{}, dbTx)
+	tx = getTx(txCtx)
+	if tx != dbTx {
+		t.Error("Expected to get transaction from context")
+	}
+}
+
+func TestTransactionUpdateOperations(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	defer db.Close()
+
+	transactor := NewTransactor(db)
+	deviceRepo := NewDeviceRepository(db)
+	enterpriseRepo := NewEnterpriseRepository(db)
+
+	ctx := context.Background()
+
+	// Create enterprise and device first
+	enterprise := &models.Enterprise{
+		Name: "Test Enterprise",
+		Slug: "test-update-" + uuid.New().String()[:8],
+	}
+	if err := enterpriseRepo.Create(ctx, enterprise); err != nil {
+		t.Fatalf("Failed to create enterprise: %v", err)
+	}
+
+	device := &models.Device{
+		EnterpriseID: enterprise.ID,
+		Platform:     "macos",
+		DeviceID:     "test-device-id",
+		SerialNumber: "UPDATE123-" + uuid.New().String()[:8],
+		Name:         "Original Name",
+		Status:       "active",
+	}
+	if err := deviceRepo.Create(ctx, device); err != nil {
+		t.Fatalf("Failed to create device: %v", err)
+	}
+
+	// Update in transaction
+	err := transactor.WithTransaction(ctx, func(txCtx context.Context) error {
+		device.Name = "Updated Name"
+		if err := deviceRepo.Update(txCtx, device); err != nil {
+			return err
+		}
+
+		enterprise.Name = "Updated Enterprise"
+		if err := enterpriseRepo.Update(txCtx, enterprise); err != nil {
+			return err
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		t.Fatalf("Transaction failed: %v", err)
+	}
+
+	// Verify updates
+	updatedDevice, err := deviceRepo.GetByID(ctx, device.ID)
+	if err != nil {
+		t.Fatalf("Failed to get device: %v", err)
+	}
+	if updatedDevice.Name != "Updated Name" {
+		t.Errorf("Expected name 'Updated Name', got '%s'", updatedDevice.Name)
+	}
+
+	updatedEnterprise, err := enterpriseRepo.GetByID(ctx, enterprise.ID)
+	if err != nil {
+		t.Fatalf("Failed to get enterprise: %v", err)
+	}
+	if updatedEnterprise.Name != "Updated Enterprise" {
+		t.Errorf("Expected name 'Updated Enterprise', got '%s'", updatedEnterprise.Name)
+	}
+}
+
+func TestTransactionUpdateRollback(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	defer db.Close()
+
+	transactor := NewTransactor(db)
+	deviceRepo := NewDeviceRepository(db)
+	enterpriseRepo := NewEnterpriseRepository(db)
+
+	ctx := context.Background()
+
+	// Create enterprise and device
+	enterprise := &models.Enterprise{
+		Name: "Test Enterprise",
+		Slug: "test-update-rollback-" + uuid.New().String()[:8],
+	}
+	if err := enterpriseRepo.Create(ctx, enterprise); err != nil {
+		t.Fatalf("Failed to create enterprise: %v", err)
+	}
+
+	device := &models.Device{
+		EnterpriseID: enterprise.ID,
+		Platform:     "macos",
+		DeviceID:     "test-device-id",
+		SerialNumber: "ROLLBACK-UPDATE-" + uuid.New().String()[:8],
+		Name:         "Original Name",
+		Status:       "active",
+	}
+	if err := deviceRepo.Create(ctx, device); err != nil {
+		t.Fatalf("Failed to create device: %v", err)
+	}
+
+	originalName := device.Name
+
+	// Try to update in transaction that fails
+	testError := errors.New("update failed")
+	err := transactor.WithTransaction(ctx, func(txCtx context.Context) error {
+		device.Name = "Should Not Persist"
+		if err := deviceRepo.Update(txCtx, device); err != nil {
+			return err
+		}
+		return testError
+	})
+
+	if err != testError {
+		t.Fatalf("Expected error %v, got %v", testError, err)
+	}
+
+	// Verify update was rolled back
+	device, err = deviceRepo.GetByID(ctx, device.ID)
+	if err != nil {
+		t.Fatalf("Failed to get device: %v", err)
+	}
+	if device.Name != originalName {
+		t.Errorf("Expected name '%s', got '%s' - update should have been rolled back", originalName, device.Name)
+	}
+}
+
+func TestTransactionDeleteOperations(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	defer db.Close()
+
+	transactor := NewTransactor(db)
+	deviceRepo := NewDeviceRepository(db)
+	policyRepo := NewPolicyRepository(db)
+	enterpriseRepo := NewEnterpriseRepository(db)
+
+	ctx := context.Background()
+
+	// Create test data
+	enterprise := &models.Enterprise{
+		Name: "Test Enterprise",
+		Slug: "test-delete-" + uuid.New().String()[:8],
+	}
+	if err := enterpriseRepo.Create(ctx, enterprise); err != nil {
+		t.Fatalf("Failed to create enterprise: %v", err)
+	}
+
+	device := &models.Device{
+		EnterpriseID: enterprise.ID,
+		Platform:     "macos",
+		DeviceID:     "test-device-id",
+		SerialNumber: "DELETE123-" + uuid.New().String()[:8],
+		Name:         "Test Device",
+		Status:       "active",
+	}
+	if err := deviceRepo.Create(ctx, device); err != nil {
+		t.Fatalf("Failed to create device: %v", err)
+	}
+
+	policy := &models.Policy{
+		EnterpriseID: enterprise.ID,
+		Name:         "Test Policy",
+		Platform:     "macos",
+		PolicyType:   "security",
+		PolicyConfig: models.JSONB{"test": true},
+		IsActive:     true,
+	}
+	if err := policyRepo.Create(ctx, policy); err != nil {
+		t.Fatalf("Failed to create policy: %v", err)
+	}
+
+	// Delete in transaction
+	err := transactor.WithTransaction(ctx, func(txCtx context.Context) error {
+		if err := deviceRepo.Delete(txCtx, device.ID); err != nil {
+			return err
+		}
+		if err := policyRepo.Delete(txCtx, policy.ID); err != nil {
+			return err
+		}
+		return nil
+	})
+
+	if err != nil {
+		t.Fatalf("Transaction failed: %v", err)
+	}
+
+	// Verify deletions (soft delete)
+	_, err = deviceRepo.GetByID(ctx, device.ID)
+	if err == nil {
+		t.Error("Expected device to be deleted")
+	}
+
+	_, err = policyRepo.GetByID(ctx, policy.ID)
+	if err == nil {
+		t.Error("Expected policy to be deleted")
+	}
+}
+
+func TestTransactionDeleteRollback(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	defer db.Close()
+
+	transactor := NewTransactor(db)
+	deviceRepo := NewDeviceRepository(db)
+	enterpriseRepo := NewEnterpriseRepository(db)
+
+	ctx := context.Background()
+
+	// Create test data
+	enterprise := &models.Enterprise{
+		Name: "Test Enterprise",
+		Slug: "test-delete-rollback-" + uuid.New().String()[:8],
+	}
+	if err := enterpriseRepo.Create(ctx, enterprise); err != nil {
+		t.Fatalf("Failed to create enterprise: %v", err)
+	}
+
+	device := &models.Device{
+		EnterpriseID: enterprise.ID,
+		Platform:     "macos",
+		DeviceID:     "test-device-id",
+		SerialNumber: "DELETE-ROLLBACK-" + uuid.New().String()[:8],
+		Name:         "Test Device",
+		Status:       "active",
+	}
+	if err := deviceRepo.Create(ctx, device); err != nil {
+		t.Fatalf("Failed to create device: %v", err)
+	}
+
+	// Try to delete in transaction that fails
+	testError := errors.New("delete failed")
+	err := transactor.WithTransaction(ctx, func(txCtx context.Context) error {
+		if err := deviceRepo.Delete(txCtx, device.ID); err != nil {
+			return err
+		}
+		return testError
+	})
+
+	if err != testError {
+		t.Fatalf("Expected error %v, got %v", testError, err)
+	}
+
+	// Verify device still exists
+	_, err = deviceRepo.GetByID(ctx, device.ID)
+	if err != nil {
+		t.Errorf("Device should still exist after rollback: %v", err)
+	}
+}
+
+func TestTransactionErrorPaths(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	defer db.Close()
+
+	transactor := NewTransactor(db)
+	deviceRepo := NewDeviceRepository(db)
+
+	ctx := context.Background()
+
+	t.Run("update_nonexistent_device", func(t *testing.T) {
+		err := transactor.WithTransaction(ctx, func(txCtx context.Context) error {
+			device := &models.Device{
+				Name: "Nonexistent",
+			}
+			device.ID = uuid.New()
+			return deviceRepo.Update(txCtx, device)
+		})
+
+		if err == nil {
+			t.Error("Expected error when updating nonexistent device")
+		}
+	})
+
+	t.Run("delete_nonexistent_device", func(t *testing.T) {
+		err := transactor.WithTransaction(ctx, func(txCtx context.Context) error {
+			return deviceRepo.Delete(txCtx, uuid.New())
+		})
+
+		if err == nil {
+			t.Error("Expected error when deleting nonexistent device")
+		}
+	})
+
+	t.Run("get_nonexistent_device", func(t *testing.T) {
+		err := transactor.WithTransaction(ctx, func(txCtx context.Context) error {
+			_, err := deviceRepo.GetByID(txCtx, uuid.New())
+			return err
+		})
+
+		if err == nil {
+			t.Error("Expected error when getting nonexistent device")
+		}
+	})
+}
+
+func TestNewTransactorWithInvalidType(t *testing.T) {
+	defer func() {
+		if r := recover(); r == nil {
+			t.Error("Expected panic when creating transactor with invalid type")
+		}
+	}()
+
+	NewTransactor("invalid type")
+}
+
+func TestNewRepositoryWithInvalidType(t *testing.T) {
+	t.Run("device_repository", func(t *testing.T) {
+		defer func() {
+			if r := recover(); r == nil {
+				t.Error("Expected panic when creating device repository with invalid type")
+			}
+		}()
+		NewDeviceRepository("invalid type")
+	})
+
+	t.Run("enterprise_repository", func(t *testing.T) {
+		defer func() {
+			if r := recover(); r == nil {
+				t.Error("Expected panic when creating enterprise repository with invalid type")
+			}
+		}()
+		NewEnterpriseRepository("invalid type")
+	})
+
+	t.Run("policy_repository", func(t *testing.T) {
+		defer func() {
+			if r := recover(); r == nil {
+				t.Error("Expected panic when creating policy repository with invalid type")
+			}
+		}()
+		NewPolicyRepository("invalid type")
+	})
+}
+
+func TestGetExecutorWithInvalidType(t *testing.T) {
+	defer func() {
+		if r := recover(); r == nil {
+			t.Error("Expected panic when getting executor with invalid type")
+		}
+	}()
+
+	ctx := context.Background()
+	getExecutor(ctx, "invalid type")
+}
+
+func TestTransactionWithCancelledContext(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	defer db.Close()
+
+	transactor := NewTransactor(db)
+	enterpriseRepo := NewEnterpriseRepository(db)
+
+	// Create cancelled context
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel() // Cancel immediately
+
+	// Try to start transaction with cancelled context
+	err := transactor.WithTransaction(ctx, func(txCtx context.Context) error {
+		enterprise := &models.Enterprise{
+			Name: "Test Enterprise",
+			Slug: "test-cancelled-" + uuid.New().String()[:8],
+		}
+		return enterpriseRepo.Create(txCtx, enterprise)
+	})
+
+	// Should fail due to cancelled context
+	if err == nil {
+		t.Error("Expected error when using cancelled context")
+	}
+}
+
+func TestTransactionWithTimeout(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	defer db.Close()
+
+	transactor := NewTransactor(db)
+	deviceRepo := NewDeviceRepository(db)
+	enterpriseRepo := NewEnterpriseRepository(db)
+
+	// Create enterprise first
+	ctx := context.Background()
+	enterprise := &models.Enterprise{
+		Name: "Test Enterprise",
+		Slug: "test-timeout-" + uuid.New().String()[:8],
+	}
+	if err := enterpriseRepo.Create(ctx, enterprise); err != nil {
+		t.Fatalf("Failed to create enterprise: %v", err)
+	}
+
+	// Create context with very short timeout
+	ctx, cancel := context.WithTimeout(context.Background(), 1)
+	defer cancel()
+
+	// Transaction should respect context timeout
+	err := transactor.WithTransaction(ctx, func(txCtx context.Context) error {
+		// Create many devices to potentially exceed timeout
+		for i := 0; i < 100; i++ {
+			device := &models.Device{
+				EnterpriseID: enterprise.ID,
+				Platform:     "macos",
+				DeviceID:     fmt.Sprintf("device-%d", i),
+				SerialNumber: fmt.Sprintf("TIMEOUT-%d-%s", i, uuid.New().String()[:8]),
+				Name:         fmt.Sprintf("Device %d", i),
+				Status:       "active",
+			}
+			if err := deviceRepo.Create(txCtx, device); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+
+	// May or may not timeout depending on system speed
+	// Just verify it handles the context properly (no panic)
+	if err != nil {
+		t.Logf("Transaction failed as expected with timeout: %v", err)
+	}
+}

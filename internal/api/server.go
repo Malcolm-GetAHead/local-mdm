@@ -4,30 +4,46 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"net/http"
+	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/gorilla/mux"
+	"github.com/malcolm-getahead/local-mdm/internal/auth"
 	"github.com/malcolm-getahead/local-mdm/internal/config"
 	"github.com/malcolm-getahead/local-mdm/internal/db"
 )
 
 // Server represents the HTTP server
 type Server struct {
-	router *mux.Router
-	db     *db.DB
-	config *config.Config
-	server *http.Server
+	router         *mux.Router
+	db             *db.DB
+	config         *config.Config
+	logger         *slog.Logger
+	authMiddleware *auth.Middleware
+	server         *http.Server
 }
 
 // New creates a new API server
-func New(cfg *config.Config, database *db.DB) *Server {
+func New(cfg *config.Config, database *db.DB, logger *slog.Logger) *Server {
 	s := &Server{
 		router: mux.NewRouter(),
 		db:     database,
 		config: cfg,
+		logger: logger,
 	}
-
+	
+	// Initialize auth middleware
+	validator, err := auth.NewOIDCValidator(cfg.Keycloak.IssuerURL(), cfg.Keycloak.ClientID)
+	if err != nil {
+		logger.Error("Failed to initialize OIDC validator", "error", err)
+		// Continue without auth for now (will fail on protected routes)
+	} else {
+		s.authMiddleware = auth.NewMiddleware(validator, logger)
+	}
+	
 	s.setupRoutes()
 	s.setupMiddleware()
 
@@ -44,57 +60,128 @@ func New(cfg *config.Config, database *db.DB) *Server {
 
 // setupRoutes configures all API routes
 func (s *Server) setupRoutes() {
-	// Health check
+	// Public routes (no auth)
 	s.router.HandleFunc("/health", s.handleHealth).Methods("GET")
+	s.router.HandleFunc("/version", s.handleVersion).Methods("GET")
 
-	// API v1
+	// API v1 routes
 	api := s.router.PathPrefix("/api/v1").Subrouter()
-
-	// Auth routes
+	
+	// Auth routes (no auth required)
 	api.HandleFunc("/auth/login", s.handleLogin).Methods("POST")
 	api.HandleFunc("/auth/refresh", s.handleRefresh).Methods("POST")
+	
+	// Protected routes (require auth)
+	if s.authMiddleware != nil {
+		// Enterprises
+		api.Handle("/enterprises", s.authMiddleware.RequireAuth(
+			s.authMiddleware.RequireRole("super_admin", "admin")(
+				http.HandlerFunc(s.handleListEnterprises),
+			),
+		)).Methods("GET")
+		
+		api.Handle("/enterprises", s.authMiddleware.RequireAuth(
+			s.authMiddleware.RequireRole("super_admin")(
+				http.HandlerFunc(s.handleCreateEnterprise),
+			),
+		)).Methods("POST")
+		
+		api.Handle("/enterprises/{id}", s.authMiddleware.RequireAuth(
+			http.HandlerFunc(s.handleGetEnterprise),
+		)).Methods("GET")
+		
+		// Devices
+		api.Handle("/devices", s.authMiddleware.RequireAuth(
+			http.HandlerFunc(s.handleListDevices),
+		)).Methods("GET")
+		
+		api.Handle("/devices/{id}", s.authMiddleware.RequireAuth(
+			http.HandlerFunc(s.handleGetDevice),
+		)).Methods("GET")
+		
+		api.Handle("/devices/{id}/lock", s.authMiddleware.RequireAuth(
+			s.authMiddleware.RequireRole("admin", "operator")(
+				http.HandlerFunc(s.handleLockDevice),
+			),
+		)).Methods("POST")
+		
+		api.Handle("/devices/{id}/wipe", s.authMiddleware.RequireAuth(
+			s.authMiddleware.RequireRole("admin")(
+				http.HandlerFunc(s.handleWipeDevice),
+			),
+		)).Methods("POST")
+		
+		// Policies
+		api.Handle("/policies", s.authMiddleware.RequireAuth(
+			http.HandlerFunc(s.handleListPolicies),
+		)).Methods("GET")
+		
+		api.Handle("/policies", s.authMiddleware.RequireAuth(
+			s.authMiddleware.RequireRole("admin", "operator")(
+				http.HandlerFunc(s.handleCreatePolicy),
+			),
+		)).Methods("POST")
+		
+		api.Handle("/policies/{id}", s.authMiddleware.RequireAuth(
+			http.HandlerFunc(s.handleGetPolicy),
+		)).Methods("GET")
+		
+		// Certificates
+		api.Handle("/certificates", s.authMiddleware.RequireAuth(
+			http.HandlerFunc(s.handleListCertificates),
+		)).Methods("GET")
+		
+		// Audit logs
+		api.Handle("/audit-logs", s.authMiddleware.RequireAuth(
+			s.authMiddleware.RequireRole("admin", "super_admin")(
+				http.HandlerFunc(s.handleListAuditLogs),
+			),
+		)).Methods("GET")
+	}
 
-	// Device routes (will be protected with auth middleware)
-	api.HandleFunc("/devices", s.handleListDevices).Methods("GET")
-	api.HandleFunc("/devices/{id}", s.handleGetDevice).Methods("GET")
-	api.HandleFunc("/devices/enroll", s.handleCreateEnrollment).Methods("POST")
-	api.HandleFunc("/devices/{id}", s.handleUnenrollDevice).Methods("DELETE")
-	api.HandleFunc("/devices/{id}/lock", s.handleLockDevice).Methods("POST")
-	api.HandleFunc("/devices/{id}/wipe", s.handleWipeDevice).Methods("POST")
-
-	// Policy routes
-	api.HandleFunc("/policies", s.handleListPolicies).Methods("GET")
-	api.HandleFunc("/policies", s.handleCreatePolicy).Methods("POST")
-	api.HandleFunc("/policies/{id}", s.handleGetPolicy).Methods("GET")
-	api.HandleFunc("/policies/{id}", s.handleUpdatePolicy).Methods("PUT")
-	api.HandleFunc("/policies/{id}", s.handleDeletePolicy).Methods("DELETE")
-	api.HandleFunc("/policies/{id}/assign", s.handleAssignPolicy).Methods("POST")
-
-	// Platform-specific routes
-	windows := s.router.PathPrefix("/windows").Subrouter()
-	windows.HandleFunc("/discovery", s.handleWindowsDiscovery).Methods("GET")
-	windows.HandleFunc("/enrollment", s.handleWindowsEnrollment).Methods("POST")
-	windows.HandleFunc("/management", s.handleWindowsManagement).Methods("POST")
-
-	macos := s.router.PathPrefix("/macos").Subrouter()
-	macos.HandleFunc("/enroll/{token}", s.handleMacOSEnroll).Methods("GET")
-	macos.HandleFunc("/checkin", s.handleMacOSCheckin).Methods("PUT")
-
-	android := s.router.PathPrefix("/android").Subrouter()
-	android.HandleFunc("/enroll/{token}/qr", s.handleAndroidQR).Methods("GET")
-	android.HandleFunc("/webhook", s.handleAndroidWebhook).Methods("POST")
+	// Platform-specific routes (implemented in Sprint 2)
+	s.router.HandleFunc("/windows/discovery", s.handleWindowsDiscovery).Methods("GET")
+	s.router.HandleFunc("/macos/enroll/{token}", s.handleMacOSEnroll).Methods("GET")
+	s.router.HandleFunc("/android/enroll/{token}/qr", s.handleAndroidQR).Methods("GET")
 }
 
 // setupMiddleware configures middleware
 func (s *Server) setupMiddleware() {
-	s.router.Use(loggingMiddleware)
-	s.router.Use(corsMiddleware)
+	// Request timeout - apply first to enforce on all requests
+	timeout := s.config.Server.RequestTimeout
+	if timeout == 0 {
+		timeout = 30 * time.Second // Default
+	}
+	s.router.Use(timeoutMiddleware(timeout))
+	
+	// Rate limiting - apply early to protect all endpoints
+	if s.config.Server.RateLimit.Enabled {
+		limit := s.config.Server.RateLimit.RequestsPerMin
+		if limit == 0 {
+			limit = 100 // Default
+		}
+		window := s.config.Server.RateLimit.Window
+		if window == 0 {
+			window = time.Minute // Default
+		}
+		
+		globalLimiter := newRateLimiter(limit, window)
+		s.router.Use(rateLimitMiddleware(globalLimiter))
+		s.logger.Info("Rate limiting enabled", "limit", limit, "window", window)
+	}
+	
+	// Request size limiting
+	s.router.Use(requestSizeLimitMiddleware(1 << 20)) // 1MB limit
+	
+	s.router.Use(requestIDMiddleware)
+	s.router.Use(s.loggingMiddleware)
+	s.router.Use(recoveryMiddleware(s.logger))
+	s.router.Use(securityHeadersMiddleware)
+	s.router.Use(corsMiddleware(s.config.Server.CORS))
 }
 
 // Start starts the HTTP server
 func (s *Server) Start() error {
-	fmt.Printf("Starting server on %s\n", s.server.Addr)
-	
 	if s.config.Server.TLS.Enabled {
 		return s.server.ListenAndServeTLS(
 			s.config.Server.TLS.CertFile,
@@ -108,6 +195,181 @@ func (s *Server) Start() error {
 // Shutdown gracefully shuts down the server
 func (s *Server) Shutdown(ctx context.Context) error {
 	return s.server.Shutdown(ctx)
+}
+
+// Middleware
+
+type contextKey string
+
+const requestIDKey contextKey = "request_id"
+
+func requestIDMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requestID := uuid.New().String()
+		ctx := context.WithValue(r.Context(), requestIDKey, requestID)
+		w.Header().Set("X-Request-ID", requestID)
+		next.ServeHTTP(w, r.WithContext(ctx))
+	})
+}
+
+func timeoutMiddleware(timeout time.Duration) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			ctx, cancel := context.WithTimeout(r.Context(), timeout)
+			defer cancel()
+			
+			r = r.WithContext(ctx)
+			next.ServeHTTP(w, r)
+		})
+	}
+}
+
+func requestSizeLimitMiddleware(maxBytes int64) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			r.Body = http.MaxBytesReader(w, r.Body, maxBytes)
+			next.ServeHTTP(w, r)
+		})
+	}
+}
+
+func (s *Server) loggingMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		start := time.Now()
+		
+		// Wrap response writer to capture status code
+		wrapped := &responseWriter{ResponseWriter: w, statusCode: http.StatusOK}
+		
+		next.ServeHTTP(wrapped, r)
+		
+		duration := time.Since(start)
+		requestID, _ := r.Context().Value(requestIDKey).(string)
+		
+		s.logger.Info("HTTP request",
+			"method", r.Method,
+			"path", r.RequestURI,
+			"status", wrapped.statusCode,
+			"duration_ms", duration.Milliseconds(),
+			"remote_addr", r.RemoteAddr,
+			"request_id", requestID,
+		)
+	})
+}
+
+type responseWriter struct {
+	http.ResponseWriter
+	statusCode int
+}
+
+func (rw *responseWriter) WriteHeader(code int) {
+	rw.statusCode = code
+	rw.ResponseWriter.WriteHeader(code)
+}
+
+func recoveryMiddleware(logger *slog.Logger) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			defer func() {
+				if err := recover(); err != nil {
+					requestID, _ := r.Context().Value(requestIDKey).(string)
+					logger.Error("Panic recovered",
+						"error", err,
+						"path", r.URL.Path,
+						"request_id", requestID,
+					)
+					http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+				}
+			}()
+			next.ServeHTTP(w, r)
+		})
+	}
+}
+
+func corsMiddleware(cfg config.CORSConfig) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			origin := r.Header.Get("Origin")
+			
+			// Check if origin is allowed
+			if origin != "" && isAllowedOrigin(origin, cfg.AllowedOrigins) {
+				w.Header().Set("Access-Control-Allow-Origin", origin)
+				w.Header().Set("Vary", "Origin")
+				
+				if cfg.AllowCredentials {
+					w.Header().Set("Access-Control-Allow-Credentials", "true")
+				}
+			}
+			
+			// Set allowed methods
+			if len(cfg.AllowedMethods) > 0 {
+				w.Header().Set("Access-Control-Allow-Methods", joinStrings(cfg.AllowedMethods))
+			}
+			
+			// Set allowed headers
+			if len(cfg.AllowedHeaders) > 0 {
+				w.Header().Set("Access-Control-Allow-Headers", joinStrings(cfg.AllowedHeaders))
+			}
+			
+			// Set max age
+			if cfg.MaxAge > 0 {
+				w.Header().Set("Access-Control-Max-Age", fmt.Sprintf("%d", cfg.MaxAge))
+			}
+			
+			// Handle preflight
+			if r.Method == "OPTIONS" {
+				w.WriteHeader(http.StatusOK)
+				return
+			}
+			
+			next.ServeHTTP(w, r)
+		})
+	}
+}
+
+func isAllowedOrigin(origin string, allowed []string) bool {
+	for _, o := range allowed {
+		if o == "*" || o == origin {
+			return true
+		}
+		// Support wildcard subdomains: *.example.com
+		if strings.HasPrefix(o, "*.") {
+			domain := strings.TrimPrefix(o, "*")
+			if strings.HasSuffix(origin, domain) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func joinStrings(strs []string) string {
+	return strings.Join(strs, ", ")
+}
+
+func securityHeadersMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Prevent MIME type sniffing
+		w.Header().Set("X-Content-Type-Options", "nosniff")
+		
+		// Prevent clickjacking
+		w.Header().Set("X-Frame-Options", "DENY")
+		
+		// XSS protection
+		w.Header().Set("X-XSS-Protection", "1; mode=block")
+		
+		// Content Security Policy
+		w.Header().Set("Content-Security-Policy", "default-src 'self'")
+		
+		// Referrer policy
+		w.Header().Set("Referrer-Policy", "strict-origin-when-cross-origin")
+		
+		// HSTS (only if TLS is enabled)
+		if r.TLS != nil {
+			w.Header().Set("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
+		}
+		
+		next.ServeHTTP(w, r)
+	})
 }
 
 // Response helpers
@@ -126,29 +388,35 @@ type ErrorInfo struct {
 
 type MetaInfo struct {
 	Timestamp  time.Time `json:"timestamp"`
+	RequestID  string    `json:"request_id,omitempty"`
 	Page       int       `json:"page,omitempty"`
 	PerPage    int       `json:"per_page,omitempty"`
 	Total      int       `json:"total,omitempty"`
 	TotalPages int       `json:"total_pages,omitempty"`
 }
 
-func respondJSON(w http.ResponseWriter, status int, data interface{}) {
+func respondJSON(w http.ResponseWriter, r *http.Request, status int, data interface{}) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
+	
+	requestID, _ := r.Context().Value(requestIDKey).(string)
 	
 	response := Response{
 		Data: data,
 		Meta: &MetaInfo{
 			Timestamp: time.Now(),
+			RequestID: requestID,
 		},
 	}
 	
 	json.NewEncoder(w).Encode(response)
 }
 
-func respondError(w http.ResponseWriter, status int, code, message string) {
+func respondError(w http.ResponseWriter, r *http.Request, status int, code, message string) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
+	
+	requestID, _ := r.Context().Value(requestIDKey).(string)
 	
 	response := Response{
 		Error: &ErrorInfo{
@@ -157,33 +425,13 @@ func respondError(w http.ResponseWriter, status int, code, message string) {
 		},
 		Meta: &MetaInfo{
 			Timestamp: time.Now(),
+			RequestID: requestID,
 		},
 	}
 	
 	json.NewEncoder(w).Encode(response)
 }
 
-// Middleware
-
-func loggingMiddleware(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		start := time.Now()
-		next.ServeHTTP(w, r)
-		fmt.Printf("%s %s %s\n", r.Method, r.RequestURI, time.Since(start))
-	})
-}
-
-func corsMiddleware(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Access-Control-Allow-Origin", "*")
-		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
-		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
-		
-		if r.Method == "OPTIONS" {
-			w.WriteHeader(http.StatusOK)
-			return
-		}
-		
-		next.ServeHTTP(w, r)
-	})
+func respondNotImplemented(w http.ResponseWriter, r *http.Request) {
+	respondError(w, r, http.StatusNotImplemented, "not_implemented", "This endpoint is not yet implemented")
 }

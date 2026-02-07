@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "NanoMDM Webhook Event",
+  "description": "MicroMDM-compatible webhook event schema. Source: https://github.com/micromdm/nanomdm/blob/main/service/webhook/event.json",
+  "type": "object",
+  "required": ["topic", "created_at"],
+  "properties": {
+    "topic": {
+      "description": "The event topic name.",
+      "enum": [
+        "mdm.Authenticate",
+        "mdm.TokenUpdate",
+        "mdm.CheckOut",
+        "mdm.UserAuthenticate",
+        "mdm.SetBootstrapToken",
+        "mdm.GetBootstrapToken",
+        "mdm.Connect",
+        "mdm.DeclarativeManagement",
+        "mdm.GetToken"
+      ]
+    },
+    "event_id": { "type": "string" },
+    "created_at": { "type": "string", "format": "date-time" },
+    "acknowledge_event": {
+      "description": "Present for mdm.Connect events.",
+      "type": "object",
+      "properties": {
+        "status": { "type": "string" },
+        "command_uuid": { "type": "string" },
+        "udid": { "type": "string" },
+        "enrollment_id": { "type": "string" },
+        "raw_payload": { "type": "string", "contentEncoding": "base64" }
+      }
+    },
+    "checkin_event": {
+      "description": "Present for check-in events.",
+      "type": "object",
+      "properties": {
+        "udid": { "type": "string" },
+        "enrollment_id": { "type": "string" },
+        "token_update_tally": { "type": "integer" },
+        "raw_payload": { "type": "string", "contentEncoding": "base64" }
+      }
+    }
+  }
+}

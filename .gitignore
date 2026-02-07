@@ -49,3 +49,24 @@ temp/
 # Environment
 .env
 .env.local
+
+# VM Images and ISOs
+tests/device-testing/images/*.iso
+tests/device-testing/images/*.ipsw
+tests/device-testing/images/*.dmg
+tests/device-testing/images/*.img
+*.iso
+*.ipsw
+*.vmdk
+*.qcow2
+
+# UTM VMs
+*.utm/
+
+# Test artifacts
+tests/device-testing/**/*.png
+tests/device-testing/**/*.jpg
+tests/device-testing/**/*.mp4
+tests/device-testing/**/*.log
+tests/device-testing/results/
+tests/device-testing/.vm_config

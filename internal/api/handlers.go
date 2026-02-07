@@ -1,110 +1,171 @@
 package api
 
 import (
+	"context"
+	"encoding/json"
 	"net/http"
+	"time"
+
+	"github.com/malcolm-getahead/local-mdm/internal/auth"
 )
 
 // Health check handler
 func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
-	// Check database connectivity
-	if err := s.db.Health(r.Context()); err != nil {
-		respondError(w, http.StatusServiceUnavailable, "UNHEALTHY", "Database connection failed")
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
+	
+	// Check database
+	if err := s.db.Health(ctx); err != nil {
+		respondError(w, r, http.StatusServiceUnavailable, "unhealthy", "Database connection failed")
 		return
 	}
-
-	respondJSON(w, http.StatusOK, map[string]interface{}{
+	
+	respondJSON(w, r, http.StatusOK, map[string]string{
 		"status":   "healthy",
-		"version":  "1.0.0",
 		"database": "connected",
+		"version":  "1.0.0",
 	})
 }
 
-// Auth handlers (stubs for now)
+// Version handler
+func (s *Server) handleVersion(w http.ResponseWriter, r *http.Request) {
+	respondJSON(w, r, http.StatusOK, map[string]string{
+		"version": "1.0.0",
+		"build":   "dev",
+	})
+}
+
+// Auth handlers
 func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
-	respondError(w, http.StatusNotImplemented, "NOT_IMPLEMENTED", "Login not yet implemented")
+	var req auth.LoginRequest
+	if err := parseJSONBody(r, &req); err != nil {
+		respondError(w, r, http.StatusBadRequest, "invalid_request", err.Error())
+		return
+	}
+	
+	// Validate input
+	if err := req.Validate(); err != nil {
+		respondError(w, r, http.StatusBadRequest, "validation_failed", err.Error())
+		return
+	}
+	
+	kc := auth.NewKeycloakClient(
+		s.config.Keycloak.IssuerURL(),
+		s.config.Keycloak.ClientID,
+		s.config.Keycloak.ClientSecret,
+	)
+	
+	tokenResp, err := kc.Login(req.Username, req.Password)
+	if err != nil {
+		respondError(w, r, http.StatusUnauthorized, "login_failed", "Invalid credentials")
+		return
+	}
+	
+	respondJSON(w, r, http.StatusOK, tokenResp)
 }
 
 func (s *Server) handleRefresh(w http.ResponseWriter, r *http.Request) {
-	respondError(w, http.StatusNotImplemented, "NOT_IMPLEMENTED", "Token refresh not yet implemented")
+	var req struct {
+		RefreshToken string `json:"refresh_token"`
+	}
+	if err := parseJSONBody(r, &req); err != nil {
+		respondError(w, r, http.StatusBadRequest, "invalid_request", err.Error())
+		return
+	}
+	
+	// Validate input
+	if req.RefreshToken == "" {
+		respondError(w, r, http.StatusBadRequest, "validation_failed", "refresh_token is required")
+		return
+	}
+	if len(req.RefreshToken) > 2048 {
+		respondError(w, r, http.StatusBadRequest, "validation_failed", "refresh_token too long")
+		return
+	}
+	
+	kc := auth.NewKeycloakClient(
+		s.config.Keycloak.IssuerURL(),
+		s.config.Keycloak.ClientID,
+		s.config.Keycloak.ClientSecret,
+	)
+	
+	tokenResp, err := kc.RefreshToken(req.RefreshToken)
+	if err != nil {
+		respondError(w, r, http.StatusUnauthorized, "refresh_failed", "Invalid refresh token")
+		return
+	}
+	
+	respondJSON(w, r, http.StatusOK, tokenResp)
 }
 
-// Device handlers (stubs for now)
+// Enterprise handlers
+func (s *Server) handleListEnterprises(w http.ResponseWriter, r *http.Request) {
+	respondNotImplemented(w, r)
+}
+
+func (s *Server) handleCreateEnterprise(w http.ResponseWriter, r *http.Request) {
+	respondNotImplemented(w, r)
+}
+
+func (s *Server) handleGetEnterprise(w http.ResponseWriter, r *http.Request) {
+	respondNotImplemented(w, r)
+}
+
+// Device handlers
 func (s *Server) handleListDevices(w http.ResponseWriter, r *http.Request) {
-	respondJSON(w, http.StatusOK, []interface{}{})
+	respondNotImplemented(w, r)
 }
 
 func (s *Server) handleGetDevice(w http.ResponseWriter, r *http.Request) {
-	respondError(w, http.StatusNotImplemented, "NOT_IMPLEMENTED", "Get device not yet implemented")
-}
-
-func (s *Server) handleCreateEnrollment(w http.ResponseWriter, r *http.Request) {
-	respondError(w, http.StatusNotImplemented, "NOT_IMPLEMENTED", "Create enrollment not yet implemented")
-}
-
-func (s *Server) handleUnenrollDevice(w http.ResponseWriter, r *http.Request) {
-	respondError(w, http.StatusNotImplemented, "NOT_IMPLEMENTED", "Unenroll device not yet implemented")
+	respondNotImplemented(w, r)
 }
 
 func (s *Server) handleLockDevice(w http.ResponseWriter, r *http.Request) {
-	respondError(w, http.StatusNotImplemented, "NOT_IMPLEMENTED", "Lock device not yet implemented")
+	respondNotImplemented(w, r)
 }
 
 func (s *Server) handleWipeDevice(w http.ResponseWriter, r *http.Request) {
-	respondError(w, http.StatusNotImplemented, "NOT_IMPLEMENTED", "Wipe device not yet implemented")
+	respondNotImplemented(w, r)
 }
 
-// Policy handlers (stubs for now)
+// Policy handlers
 func (s *Server) handleListPolicies(w http.ResponseWriter, r *http.Request) {
-	respondJSON(w, http.StatusOK, []interface{}{})
+	respondNotImplemented(w, r)
 }
 
 func (s *Server) handleCreatePolicy(w http.ResponseWriter, r *http.Request) {
-	respondError(w, http.StatusNotImplemented, "NOT_IMPLEMENTED", "Create policy not yet implemented")
+	respondNotImplemented(w, r)
 }
 
 func (s *Server) handleGetPolicy(w http.ResponseWriter, r *http.Request) {
-	respondError(w, http.StatusNotImplemented, "NOT_IMPLEMENTED", "Get policy not yet implemented")
+	respondNotImplemented(w, r)
 }
 
-func (s *Server) handleUpdatePolicy(w http.ResponseWriter, r *http.Request) {
-	respondError(w, http.StatusNotImplemented, "NOT_IMPLEMENTED", "Update policy not yet implemented")
+// Certificate handlers
+func (s *Server) handleListCertificates(w http.ResponseWriter, r *http.Request) {
+	respondNotImplemented(w, r)
 }
 
-func (s *Server) handleDeletePolicy(w http.ResponseWriter, r *http.Request) {
-	respondError(w, http.StatusNotImplemented, "NOT_IMPLEMENTED", "Delete policy not yet implemented")
+// Audit log handlers
+func (s *Server) handleListAuditLogs(w http.ResponseWriter, r *http.Request) {
+	respondNotImplemented(w, r)
 }
 
-func (s *Server) handleAssignPolicy(w http.ResponseWriter, r *http.Request) {
-	respondError(w, http.StatusNotImplemented, "NOT_IMPLEMENTED", "Assign policy not yet implemented")
-}
-
-// Windows handlers (stubs for now)
+// Platform-specific handlers (Sprint 2)
 func (s *Server) handleWindowsDiscovery(w http.ResponseWriter, r *http.Request) {
-	respondError(w, http.StatusNotImplemented, "NOT_IMPLEMENTED", "Windows discovery not yet implemented")
+	respondNotImplemented(w, r)
 }
 
-func (s *Server) handleWindowsEnrollment(w http.ResponseWriter, r *http.Request) {
-	respondError(w, http.StatusNotImplemented, "NOT_IMPLEMENTED", "Windows enrollment not yet implemented")
-}
-
-func (s *Server) handleWindowsManagement(w http.ResponseWriter, r *http.Request) {
-	respondError(w, http.StatusNotImplemented, "NOT_IMPLEMENTED", "Windows management not yet implemented")
-}
-
-// macOS handlers (stubs for now)
 func (s *Server) handleMacOSEnroll(w http.ResponseWriter, r *http.Request) {
-	respondError(w, http.StatusNotImplemented, "NOT_IMPLEMENTED", "macOS enrollment not yet implemented")
+	respondNotImplemented(w, r)
 }
 
-func (s *Server) handleMacOSCheckin(w http.ResponseWriter, r *http.Request) {
-	respondError(w, http.StatusNotImplemented, "NOT_IMPLEMENTED", "macOS checkin not yet implemented")
-}
-
-// Android handlers (stubs for now)
 func (s *Server) handleAndroidQR(w http.ResponseWriter, r *http.Request) {
-	respondError(w, http.StatusNotImplemented, "NOT_IMPLEMENTED", "Android QR not yet implemented")
+	respondNotImplemented(w, r)
 }
 
-func (s *Server) handleAndroidWebhook(w http.ResponseWriter, r *http.Request) {
-	respondError(w, http.StatusNotImplemented, "NOT_IMPLEMENTED", "Android webhook not yet implemented")
+// Helper functions
+func parseJSONBody(r *http.Request, v interface{}) error {
+	defer r.Body.Close()
+	return json.NewDecoder(r.Body).Decode(v)
 }

@@ -1,0 +1,82 @@
+{
+  "realm": "localmdm",
+  "enabled": true,
+  "displayName": "Local MDM",
+  "accessTokenLifespan": 3600,
+  "ssoSessionIdleTimeout": 1800,
+  "ssoSessionMaxLifespan": 36000,
+  "roles": {
+    "realm": [
+      {
+        "name": "super_admin",
+        "description": "Super administrator with all permissions"
+      },
+      {
+        "name": "admin",
+        "description": "Administrator with full enterprise access"
+      },
+      {
+        "name": "operator",
+        "description": "Operator with read/write device and policy access"
+      },
+      {
+        "name": "viewer",
+        "description": "Viewer with read-only access"
+      }
+    ]
+  },
+  "clients": [
+    {
+      "clientId": "localmdm-api",
+      "name": "Local MDM API",
+      "enabled": true,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "localmdm-api-secret",
+      "redirectUris": ["http://localhost:8080/*"],
+      "webOrigins": ["http://localhost:8080"],
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": true,
+      "serviceAccountsEnabled": true,
+      "publicClient": false,
+      "protocol": "openid-connect",
+      "attributes": {
+        "access.token.lifespan": "3600"
+      }
+    },
+    {
+      "clientId": "localmdm-dashboard",
+      "name": "Local MDM Dashboard",
+      "enabled": true,
+      "publicClient": true,
+      "redirectUris": ["http://localhost:3000/*"],
+      "webOrigins": ["http://localhost:3000"],
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "protocol": "openid-connect",
+      "attributes": {
+        "pkce.code.challenge.method": "S256"
+      }
+    }
+  ],
+  "users": [
+    {
+      "username": "admin",
+      "enabled": true,
+      "email": "admin@localmdm.dev",
+      "emailVerified": true,
+      "firstName": "Admin",
+      "lastName": "User",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "admin123",
+          "temporary": false
+        }
+      ],
+      "realmRoles": ["super_admin"],
+      "attributes": {
+        "enterprise_id": ["00000000-0000-0000-0000-000000000001"]
+      }
+    }
+  ]
+}

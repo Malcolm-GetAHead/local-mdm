@@ -24,6 +24,22 @@ test: ## Run tests
 	@echo "Running tests..."
 	@go test -v -race -coverprofile=coverage.out ./...
 
+test-unit: ## Run unit tests only
+	@echo "Running unit tests..."
+	@go test -v -race -short ./...
+
+test-integration: ## Run integration tests only
+	@echo "Running integration tests..."
+	@go test -v -race -run Integration ./...
+
+test-coverage: test ## Run tests with coverage report
+	@go tool cover -html=coverage.out -o coverage.html
+	@go tool cover -func=coverage.out
+	@echo "Coverage report generated: coverage.html"
+
+test-coverage-summary: test ## Show coverage summary
+	@go tool cover -func=coverage.out | grep total | awk '{print "Total coverage: " $$3}'
+
 test-coverage: test ## Run tests with coverage report
 	@go tool cover -html=coverage.out
 

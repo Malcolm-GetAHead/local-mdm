@@ -13,6 +13,7 @@ type Config struct {
 	Server       ServerConfig       `yaml:"server"`
 	Database     DatabaseConfig     `yaml:"database"`
 	Auth         AuthConfig         `yaml:"auth"`
+	Keycloak     KeycloakConfig     `yaml:"keycloak"`
 	Certificates CertificatesConfig `yaml:"certificates"`
 	Windows      WindowsConfig      `yaml:"windows"`
 	MacOS        MacOSConfig        `yaml:"macos"`
@@ -21,14 +22,33 @@ type Config struct {
 	Features     FeaturesConfig     `yaml:"features"`
 }
 
+// CORSConfig holds CORS configuration
+type CORSConfig struct {
+	AllowedOrigins   []string      `yaml:"allowed_origins"`
+	AllowedMethods   []string      `yaml:"allowed_methods"`
+	AllowedHeaders   []string      `yaml:"allowed_headers"`
+	AllowCredentials bool          `yaml:"allow_credentials"`
+	MaxAge           int           `yaml:"max_age"`
+}
+
 // ServerConfig holds HTTP server configuration
 type ServerConfig struct {
-	Host         string        `yaml:"host"`
-	Port         int           `yaml:"port"`
-	TLS          TLSConfig     `yaml:"tls"`
-	ReadTimeout  time.Duration `yaml:"read_timeout"`
-	WriteTimeout time.Duration `yaml:"write_timeout"`
-	IdleTimeout  time.Duration `yaml:"idle_timeout"`
+	Host           string           `yaml:"host"`
+	Port           int              `yaml:"port"`
+	TLS            TLSConfig        `yaml:"tls"`
+	ReadTimeout    time.Duration    `yaml:"read_timeout"`
+	WriteTimeout   time.Duration    `yaml:"write_timeout"`
+	IdleTimeout    time.Duration    `yaml:"idle_timeout"`
+	RequestTimeout time.Duration    `yaml:"request_timeout"`
+	RateLimit      RateLimitConfig  `yaml:"rate_limit"`
+	CORS           CORSConfig       `yaml:"cors"`
+}
+
+// RateLimitConfig holds rate limiting configuration
+type RateLimitConfig struct {
+	Enabled       bool          `yaml:"enabled"`
+	RequestsPerMin int          `yaml:"requests_per_min"`
+	Window        time.Duration `yaml:"window"`
 }
 
 // TLSConfig holds TLS configuration
@@ -49,6 +69,7 @@ type DatabaseConfig struct {
 	MaxOpenConns    int           `yaml:"max_open_conns"`
 	MaxIdleConns    int           `yaml:"max_idle_conns"`
 	ConnMaxLifetime time.Duration `yaml:"conn_max_lifetime"`
+	QueryTimeout    time.Duration `yaml:"query_timeout"`
 }
 
 // DSN returns the database connection string
@@ -62,6 +83,18 @@ type AuthConfig struct {
 	JWTSecret            string        `yaml:"jwt_secret"`
 	AccessTokenDuration  time.Duration `yaml:"access_token_duration"`
 	RefreshTokenDuration time.Duration `yaml:"refresh_token_duration"`
+}
+
+// KeycloakConfig holds Keycloak OIDC configuration
+type KeycloakConfig struct {
+	URL          string `yaml:"url"`
+	Realm        string `yaml:"realm"`
+	ClientID     string `yaml:"client_id"`
+	ClientSecret string `yaml:"client_secret"`
+}
+
+func (c KeycloakConfig) IssuerURL() string {
+	return fmt.Sprintf("%s/realms/%s", c.URL, c.Realm)
 }
 
 // CertificatesConfig holds certificate configuration
@@ -150,11 +183,14 @@ func (c *Config) overrideFromEnv() {
 
 // Validate checks if the configuration is valid
 func (c *Config) Validate() error {
-	if c.Auth.JWTSecret == "" || c.Auth.JWTSecret == "change-me-in-production" {
-		return fmt.Errorf("JWT secret must be set and not use default value")
-	}
 	if c.Database.Host == "" {
 		return fmt.Errorf("database host is required")
+	}
+	if c.Database.Port == 0 {
+		return fmt.Errorf("database port is required")
+	}
+	if c.Server.Port == 0 {
+		return fmt.Errorf("server port is required")
 	}
 	return nil
 }
