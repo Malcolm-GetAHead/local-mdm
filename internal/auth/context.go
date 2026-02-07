@@ -51,10 +51,3 @@ func UserFromContext(ctx context.Context) (*AuthUser, error) {
 	return user, nil
 }
 
-func MustUserFromContext(ctx context.Context) *AuthUser {
-	user, err := UserFromContext(ctx)
-	if err != nil {
-		panic(err)
-	}
-	return user
-}
