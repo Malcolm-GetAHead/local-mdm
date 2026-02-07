@@ -426,3 +426,222 @@ func TestKeycloakSecretEnvironmentOverride(t *testing.T) {
 	// Verify override
 	assert.Equal(t, "env-override-secret-value", cfg.Keycloak.ClientSecret)
 }
+
+func TestEnvironmentValidation(t *testing.T) {
+	tests := []struct {
+		name        string
+		environment string
+		tlsEnabled  bool
+		certFile    string
+		keyFile     string
+		wantErr     bool
+		errMsg      string
+	}{
+		{
+			name:        "valid development",
+			environment: "development",
+			tlsEnabled:  false,
+			wantErr:     false,
+		},
+		{
+			name:        "valid staging with TLS",
+			environment: "staging",
+			tlsEnabled:  true,
+			certFile:    "/path/to/cert.pem",
+			keyFile:     "/path/to/key.pem",
+			wantErr:     false,
+		},
+		{
+			name:        "valid production with TLS",
+			environment: "production",
+			tlsEnabled:  true,
+			certFile:    "/path/to/cert.pem",
+			keyFile:     "/path/to/key.pem",
+			wantErr:     false,
+		},
+		{
+			name:        "empty defaults to development",
+			environment: "",
+			tlsEnabled:  false,
+			wantErr:     false,
+		},
+		{
+			name:        "invalid environment",
+			environment: "invalid",
+			tlsEnabled:  false,
+			wantErr:     true,
+			errMsg:      "invalid environment",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := &config.Config{
+				Environment: tt.environment,
+				Server: config.ServerConfig{
+					Port: 8080,
+					TLS: config.TLSConfig{
+						Enabled:  tt.tlsEnabled,
+						CertFile: tt.certFile,
+						KeyFile:  tt.keyFile,
+					},
+				},
+				Database: config.DatabaseConfig{
+					Host:     "localhost",
+					Port:     5432,
+					Password: "strong-password-at-least-16-chars",
+				},
+				Auth: config.AuthConfig{
+					JWTSecret: "strong-jwt-secret-at-least-32-characters-long",
+				},
+				Keycloak: config.KeycloakConfig{
+					ClientSecret: "strong-keycloak-secret",
+				},
+			}
+
+			err := cfg.Validate()
+			if tt.wantErr {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.errMsg)
+			} else {
+				assert.NoError(t, err)
+				// If empty, should default to development
+				if tt.environment == "" {
+					assert.Equal(t, "development", cfg.Environment)
+				}
+			}
+		})
+	}
+}
+
+func TestTLSValidation(t *testing.T) {
+	tests := []struct {
+		name        string
+		environment string
+		tlsEnabled  bool
+		certFile    string
+		keyFile     string
+		wantErr     bool
+		errMsg      string
+	}{
+		{
+			name:        "development without TLS - allowed",
+			environment: "development",
+			tlsEnabled:  false,
+			wantErr:     false,
+		},
+		{
+			name:        "development with TLS - allowed",
+			environment: "development",
+			tlsEnabled:  true,
+			certFile:    "/path/to/cert.pem",
+			keyFile:     "/path/to/key.pem",
+			wantErr:     false,
+		},
+		{
+			name:        "production without TLS - rejected",
+			environment: "production",
+			tlsEnabled:  false,
+			wantErr:     true,
+			errMsg:      "TLS must be enabled in production",
+		},
+		{
+			name:        "staging without TLS - rejected",
+			environment: "staging",
+			tlsEnabled:  false,
+			wantErr:     true,
+			errMsg:      "TLS must be enabled in staging",
+		},
+		{
+			name:        "production with TLS - allowed",
+			environment: "production",
+			tlsEnabled:  true,
+			certFile:    "/path/to/cert.pem",
+			keyFile:     "/path/to/key.pem",
+			wantErr:     false,
+		},
+		{
+			name:        "TLS enabled without cert file",
+			environment: "development",
+			tlsEnabled:  true,
+			certFile:    "",
+			keyFile:     "/path/to/key.pem",
+			wantErr:     true,
+			errMsg:      "cert_file is required when TLS is enabled",
+		},
+		{
+			name:        "TLS enabled without key file",
+			environment: "development",
+			tlsEnabled:  true,
+			certFile:    "/path/to/cert.pem",
+			keyFile:     "",
+			wantErr:     true,
+			errMsg:      "key_file is required when TLS is enabled",
+		},
+		{
+			name:        "production with TLS but no cert file",
+			environment: "production",
+			tlsEnabled:  true,
+			certFile:    "",
+			keyFile:     "/path/to/key.pem",
+			wantErr:     true,
+			errMsg:      "cert_file is required",
+		},
+		{
+			name:        "production with TLS but no key file",
+			environment: "production",
+			tlsEnabled:  true,
+			certFile:    "/path/to/cert.pem",
+			keyFile:     "",
+			wantErr:     true,
+			errMsg:      "key_file is required",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := &config.Config{
+				Environment: tt.environment,
+				Server: config.ServerConfig{
+					Port: 8080,
+					TLS: config.TLSConfig{
+						Enabled:  tt.tlsEnabled,
+						CertFile: tt.certFile,
+						KeyFile:  tt.keyFile,
+					},
+				},
+				Database: config.DatabaseConfig{
+					Host:     "localhost",
+					Port:     5432,
+					Password: "strong-password-at-least-16-chars",
+				},
+				Auth: config.AuthConfig{
+					JWTSecret: "strong-jwt-secret-at-least-32-characters-long",
+				},
+				Keycloak: config.KeycloakConfig{
+					ClientSecret: "strong-keycloak-secret",
+				},
+			}
+
+			err := cfg.Validate()
+			if tt.wantErr {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.errMsg)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestEnvironmentOverrideFromEnv(t *testing.T) {
+	// Set environment variable
+	os.Setenv("ENVIRONMENT", "production")
+	defer os.Unsetenv("ENVIRONMENT")
+
+	cfg, err := config.Load("../../configs/config.example.yaml")
+	require.NoError(t, err)
+
+	// Verify override
+	assert.Equal(t, "production", cfg.Environment)
+}

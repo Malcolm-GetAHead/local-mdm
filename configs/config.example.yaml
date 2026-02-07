@@ -1,5 +1,9 @@
 # Local MDM Configuration
 
+# Environment: development, staging, or production
+# CRITICAL: TLS is required for staging and production
+environment: "development"
+
 server:
   host: "0.0.0.0"
   port: 8080

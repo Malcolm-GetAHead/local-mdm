@@ -10,6 +10,7 @@ import (
 
 // Config holds all application configuration
 type Config struct {
+	Environment  string             `yaml:"environment"`  // development, staging, production
 	Server       ServerConfig       `yaml:"server"`
 	Database     DatabaseConfig     `yaml:"database"`
 	Auth         AuthConfig         `yaml:"auth"`
@@ -161,6 +162,9 @@ func Load(path string) (*Config, error) {
 
 // overrideFromEnv overrides config values with environment variables
 func (c *Config) overrideFromEnv() {
+	if env := os.Getenv("ENVIRONMENT"); env != "" {
+		c.Environment = env
+	}
 	if dbHost := os.Getenv("DB_HOST"); dbHost != "" {
 		c.Database.Host = dbHost
 	}
@@ -196,9 +200,70 @@ func (c *Config) Validate() error {
 		return fmt.Errorf("server port is required")
 	}
 
+	// Validate environment
+	if err := c.validateEnvironment(); err != nil {
+		return err
+	}
+
 	// CRITICAL: Validate secrets are not using default/weak values
 	if err := c.validateSecrets(); err != nil {
 		return err
+	}
+
+	// CRITICAL: Validate TLS configuration
+	if err := c.validateTLS(); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// validateEnvironment ensures environment is set to a valid value
+func (c *Config) validateEnvironment() error {
+	// Default to development if not set
+	if c.Environment == "" {
+		c.Environment = "development"
+	}
+
+	// Validate environment value
+	validEnvs := map[string]bool{
+		"development": true,
+		"staging":     true,
+		"production":  true,
+	}
+
+	if !validEnvs[c.Environment] {
+		return fmt.Errorf("invalid environment: %s (must be: development, staging, or production)", c.Environment)
+	}
+
+	return nil
+}
+
+// validateTLS ensures TLS is properly configured for the environment
+func (c *Config) validateTLS() error {
+	// CRITICAL: Production and staging MUST use TLS
+	if c.Environment == "production" || c.Environment == "staging" {
+		if !c.Server.TLS.Enabled {
+			return fmt.Errorf("CRITICAL: TLS must be enabled in %s environment (set server.tls.enabled=true)", c.Environment)
+		}
+
+		// Validate TLS certificate files are specified
+		if c.Server.TLS.CertFile == "" {
+			return fmt.Errorf("CRITICAL: TLS cert_file is required when TLS is enabled")
+		}
+		if c.Server.TLS.KeyFile == "" {
+			return fmt.Errorf("CRITICAL: TLS key_file is required when TLS is enabled")
+		}
+	}
+
+	// If TLS is enabled, validate certificate files are specified
+	if c.Server.TLS.Enabled {
+		if c.Server.TLS.CertFile == "" {
+			return fmt.Errorf("TLS cert_file is required when TLS is enabled")
+		}
+		if c.Server.TLS.KeyFile == "" {
+			return fmt.Errorf("TLS key_file is required when TLS is enabled")
+		}
 	}
 
 	return nil

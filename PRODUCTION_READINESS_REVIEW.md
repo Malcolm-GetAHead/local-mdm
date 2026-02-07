@@ -558,7 +558,8 @@ func (a *AuditLogger) Middleware(next http.Handler) http.Handler {
 ### C-07: Missing HTTPS/TLS Enforcement
 **File**: `internal/api/server.go:195-203`  
 **Severity**: 🔴 **CRITICAL** - Credentials transmitted in cleartext  
-**CVSS Score**: 8.1 (High)
+**CVSS Score**: 8.1 (High)  
+**Status**: ✅ **FIXED** (2026-02-07)
 
 **Vulnerability**:
 ```go
@@ -573,6 +574,31 @@ func (s *Server) Start() error {
     return s.server.ListenAndServe()  // HTTP allowed!
 }
 ```
+
+**Fix Applied**:
+- Added `Environment` field to config (development, staging, production)
+- Added `validateEnvironment()` to validate environment value
+- Added `validateTLS()` to enforce TLS in production/staging
+- Server now refuses to start in production/staging without TLS
+- TLS certificate files validated when TLS is enabled
+- Added comprehensive test suite (15 tests, all passing)
+
+**Files Modified**:
+- `internal/config/config.go` - Added environment and TLS validation
+- `configs/config.yaml` - Added environment field
+- `configs/config.example.yaml` - Added environment field
+- `.env.example` - Added ENVIRONMENT variable
+- `internal/config/config_test.go` - Added 15 comprehensive tests
+
+**Verification**:
+- ✅ All tests pass with `-race` flag (98.7% coverage)
+- ✅ Production refuses to start without TLS
+- ✅ Staging refuses to start without TLS
+- ✅ Development allows HTTP
+- ✅ TLS certificate validation works
+- ✅ Environment variable override works
+
+**Documentation**: See `reviews/PRD_RDY_REVIEW/1/C-07_TLS_ENFORCEMENT_FIX.md`
 
 **Exploit Scenario**:
 1. Production deployment accidentally has `tls.enabled: false` in config

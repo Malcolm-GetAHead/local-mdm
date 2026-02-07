@@ -42,20 +42,21 @@
 **Status**: ✅ Fixed on 2026-02-07  
 **Impact**: All secrets now loaded from environment variables with validation to prevent weak/default values
 
-### 3. No Audit Logging (C-06)
+### 3. Missing TLS Enforcement (C-07) ✅ FIXED
+**Risk**: Credentials transmitted in cleartext  
+**Fix Time**: 2 hours  
+**Status**: ✅ Fixed on 2026-02-07  
+**Impact**: TLS now required in production/staging environments, preventing man-in-the-middle attacks
+
+### 4. No Audit Logging (C-06)
 **Risk**: Compliance failure, forensics impossible  
 **Fix Time**: 8 hours  
 **Impact**: Cannot detect breaches, investigate incidents, or meet SOC 2/HIPAA requirements
 
-### 4. Rate Limiter DoS (C-05)
+### 5. Rate Limiter DoS (C-05)
 **Risk**: Service disruption  
 **Fix Time**: 6 hours  
 **Impact**: In-memory rate limiter exhausts memory with 10K+ unique IPs
-
-### 5. Panic-Based Error Handling (C-04)
-**Risk**: Server crashes  
-**Fix Time**: 4 hours  
-**Impact**: `MustUserFromContext` panics crash entire server
 
 ---
 

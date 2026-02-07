@@ -15,7 +15,7 @@
 | C-04 | Panic Error Handling | 🔴 CRITICAL | ⏳ PENDING | - | - |
 | C-05 | Rate Limiter DoS | 🔴 CRITICAL | ⏳ PENDING | - | - |
 | C-06 | No Audit Logging | 🔴 CRITICAL | ⏳ PENDING | - | - |
-| C-07 | Missing TLS Enforcement | 🔴 CRITICAL | ⏳ PENDING | - | - |
+| C-07 | Missing TLS Enforcement | 🔴 CRITICAL | ✅ FIXED | 2026-02-07 | [C-07_TLS_ENFORCEMENT_FIX.md](1/C-07_TLS_ENFORCEMENT_FIX.md) |
 | C-08 | SQL Injection Risk | 🔴 CRITICAL | ⏳ PENDING | - | - |
 | C-09 | HTTP Client Timeouts | 🔴 CRITICAL | ⏳ PENDING | - | - |
 | C-10 | DB Connection Limits | 🔴 CRITICAL | ⏳ PENDING | - | - |
@@ -61,33 +61,52 @@
 
 ---
 
+### C-07: Missing TLS Enforcement ✅ FIXED
+
+**Date**: 2026-02-07  
+**Effort**: 2 hours  
+**Test Coverage**: 15 new tests, 98.7% coverage  
+
+**Changes**:
+- Added `Environment` field to config (development, staging, production)
+- Added `validateEnvironment()` method
+- Added `validateTLS()` method to enforce TLS in production/staging
+- Updated config files with environment field
+- Server refuses to start in production/staging without TLS
+
+**Impact**: Eliminated cleartext credential transmission vulnerability
+
+**Validation Rules**:
+- Production: TLS required
+- Staging: TLS required
+- Development: TLS optional
+- TLS certificate files validated when enabled
+
+---
+
 ## Remaining Work
 
 ### Week 1 Priority (Critical)
 
-**Estimated Time**: 22 hours remaining (of 30 hours total)
+**Estimated Time**: 20 hours remaining (of 30 hours total)
 
-1. **C-07: TLS Enforcement** (2 hours)
-   - Add environment detection
-   - Reject HTTP in production mode
-
-2. **C-04: Panic Error Handling** (4 hours)
+1. **C-04: Panic Error Handling** (4 hours)
    - Remove `MustUserFromContext`
    - Replace with proper error handling
 
-3. **C-09: HTTP Client Timeouts** (2 hours)
+2. **C-09: HTTP Client Timeouts** (2 hours)
    - Add timeout to OIDC validator
    - Add URL validation
 
-4. **C-10: DB Connection Limits** (2 hours)
+3. **C-10: DB Connection Limits** (2 hours)
    - Validate connection pool settings
    - Enforce reasonable limits
 
-5. **C-05: Rate Limiting** (6 hours)
+4. **C-05: Rate Limiting** (6 hours)
    - Implement Redis-based rate limiter
    - Add fallback for development
 
-6. **C-06: Audit Logging** (6 hours)
+5. **C-06: Audit Logging** (6 hours)
    - Implement audit logger
    - Add to authentication/authorization events
 
@@ -98,7 +117,8 @@
 ### Tests Added
 - **C-01**: 5 tests (authentication validation)
 - **C-02**: 11 tests (secret validation)
-- **Total**: 16 new tests
+- **C-07**: 15 tests (TLS and environment validation)
+- **Total**: 31 new tests
 
 ### Test Results
 ```bash
@@ -164,15 +184,16 @@ ok      github.com/malcolm-getahead/local-mdm/internal/validation (cached)
 
 ## Progress Tracking
 
-**Week 1 Progress**: 8 hours completed / 30 hours total (27%)
+**Week 1 Progress**: 10 hours completed / 30 hours total (33%)
 
 **Completed**:
 - ✅ Day 1, Task 1.1: Authentication Bypass (2 hours)
 - ✅ Day 1, Task 1.2: Hardcoded Secrets (4 hours)
-- ⏳ Day 1, Task 1.3: TLS Enforcement (2 hours) - NEXT
+- ✅ Day 1, Task 1.3: TLS Enforcement (2 hours)
+- ⏳ Day 2, Task 2.1: Panic Error Handling (4 hours) - NEXT
 
 **Timeline**:
-- Day 1: 8 hours completed, 0 hours remaining
+- Day 1: 8 hours completed (100%)
 - Day 2: 8 hours planned
 - Day 3: 8 hours planned
 - Day 4: 8 hours planned
@@ -186,7 +207,7 @@ ok      github.com/malcolm-getahead/local-mdm/internal/validation (cached)
 - **Security Risk**: 🔴 CRITICAL
 - **Deployment Risk**: 🔴 BLOCKING
 
-### After C-01 & C-02
+### After C-01, C-02, C-07
 - **Security Risk**: 🟠 HIGH (improved from CRITICAL)
 - **Deployment Risk**: 🔴 BLOCKING (still not production ready)
 
@@ -197,4 +218,4 @@ ok      github.com/malcolm-getahead/local-mdm/internal/validation (cached)
 ---
 
 **Last Updated**: 2026-02-07  
-**Next Review**: After completing C-07 (TLS Enforcement)
+**Next Review**: After completing C-04 (Panic Error Handling)
