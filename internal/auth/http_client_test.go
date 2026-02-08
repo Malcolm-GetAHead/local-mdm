@@ -28,7 +28,7 @@ func TestHTTPClientTimeout(t *testing.T) {
 	defer slowServer.Close()
 
 	// Create validator with slow server - should timeout
-	_, err := auth.NewOIDCValidator(slowServer.URL, "test-client")
+	_, err := auth.NewOIDCValidator(slowServer.URL, "test-client", "", 5, 30*time.Second, 5*time.Minute, nil)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to fetch JWKS")
 }
@@ -45,7 +45,7 @@ func TestHTTPClientWithValidResponse(t *testing.T) {
 	defer validServer.Close()
 
 	// Should succeed
-	validator, err := auth.NewOIDCValidator(validServer.URL, "test-client")
+	validator, err := auth.NewOIDCValidator(validServer.URL, "test-client", "", 5, 30*time.Second, 5*time.Minute, nil)
 	require.NoError(t, err)
 	assert.NotNil(t, validator)
 }
@@ -63,7 +63,7 @@ func TestHTTPClientResponseSizeLimit(t *testing.T) {
 	defer largeServer.Close()
 
 	// Should fail due to size limit or JSON decode error
-	_, err := auth.NewOIDCValidator(largeServer.URL, "test-client")
+	_, err := auth.NewOIDCValidator(largeServer.URL, "test-client", "", 5, 30*time.Second, 5*time.Minute, nil)
 	require.Error(t, err)
 }
 
@@ -102,7 +102,7 @@ func TestJWKSURLValidation_ValidURLs(t *testing.T) {
 			defer server.Close()
 
 			// Use the test server URL instead
-			_, err := auth.NewOIDCValidator(server.URL, "test-client")
+			_, err := auth.NewOIDCValidator(server.URL, "test-client", "", 5, 30*time.Second, 5*time.Minute, nil)
 			assert.NoError(t, err)
 		})
 	}
@@ -150,7 +150,7 @@ func TestJWKSURLValidation_InvalidURLs(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// These should fail during URL validation
-			_, err := auth.NewOIDCValidator(tt.url, "test-client")
+			_, err := auth.NewOIDCValidator(tt.url, "test-client", "", 5, 30*time.Second, 5*time.Minute, nil)
 			require.Error(t, err)
 			assert.Contains(t, err.Error(), tt.errMsg)
 		})
@@ -167,7 +167,7 @@ func TestJWKSURLValidation_MetadataServices(t *testing.T) {
 
 	for _, url := range metadataURLs {
 		t.Run(url, func(t *testing.T) {
-			_, err := auth.NewOIDCValidator(url, "test-client")
+			_, err := auth.NewOIDCValidator(url, "test-client", "", 5, 30*time.Second, 5*time.Minute, nil)
 			require.Error(t, err)
 			assert.Contains(t, err.Error(), "internal host")
 		})
@@ -182,7 +182,7 @@ func TestHTTPClientConnectionTimeout(t *testing.T) {
 
 	// Use a non-routable IP to test connection timeout
 	// 192.0.2.1 is from TEST-NET-1 (RFC 5737) - reserved for documentation
-	_, err := auth.NewOIDCValidator("http://192.0.2.1:9999/jwks", "test-client")
+	_, err := auth.NewOIDCValidator("http://192.0.2.1:9999/jwks", "test-client", "", 5, 30*time.Second, 5*time.Minute, nil)
 	require.Error(t, err)
 	// Should timeout or fail to connect
 	assert.Contains(t, err.Error(), "failed to fetch JWKS")
@@ -207,7 +207,7 @@ func TestHTTPClientNon200Response(t *testing.T) {
 			}))
 			defer server.Close()
 
-			_, err := auth.NewOIDCValidator(server.URL, "test-client")
+			_, err := auth.NewOIDCValidator(server.URL, "test-client", "", 5, 30*time.Second, 5*time.Minute, nil)
 			require.Error(t, err)
 			assert.Contains(t, err.Error(), "returned")
 		})
@@ -223,7 +223,7 @@ func TestHTTPClientMalformedJSON(t *testing.T) {
 	}))
 	defer server.Close()
 
-	_, err := auth.NewOIDCValidator(server.URL, "test-client")
+	_, err := auth.NewOIDCValidator(server.URL, "test-client", "", 5, 30*time.Second, 5*time.Minute, nil)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to decode JWKS")
 }
@@ -237,7 +237,7 @@ func TestHTTPClientEmptyKeys(t *testing.T) {
 	}))
 	defer server.Close()
 
-	_, err := auth.NewOIDCValidator(server.URL, "test-client")
+	_, err := auth.NewOIDCValidator(server.URL, "test-client", "", 5, 30*time.Second, 5*time.Minute, nil)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "no keys")
 }
@@ -254,7 +254,7 @@ func TestHTTPClientConcurrentRequests(t *testing.T) {
 	}))
 	defer server.Close()
 
-	validator, err := auth.NewOIDCValidator(server.URL, "test-client")
+	validator, err := auth.NewOIDCValidator(server.URL, "test-client", "", 5, 30*time.Second, 5*time.Minute, nil)
 	require.NoError(t, err)
 
 	// Simulate concurrent token validations
@@ -294,7 +294,7 @@ func TestHTTPClientRedirect(t *testing.T) {
 	defer redirectServer.Close()
 
 	// Should follow redirect and succeed
-	validator, err := auth.NewOIDCValidator(redirectServer.URL, "test-client")
+	validator, err := auth.NewOIDCValidator(redirectServer.URL, "test-client", "", 5, 30*time.Second, 5*time.Minute, nil)
 	assert.NoError(t, err)
 	assert.NotNil(t, validator)
 }

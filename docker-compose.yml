@@ -56,5 +56,20 @@ services:
     environment:
       ADMINER_DEFAULT_SERVER: postgres
 
+  redis:
+    image: redis:7-alpine
+    container_name: localmdm-redis
+    ports:
+      - "6379:6379"
+    command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - redis_data:/data
+
 volumes:
   postgres_data:
+  redis_data:

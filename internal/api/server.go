@@ -41,7 +41,15 @@ func New(cfg *config.Config, database *db.DB, logger *slog.Logger) (*Server, err
 	}
 	
 	// CRITICAL: Auth initialization must succeed
-	validator, err := auth.NewOIDCValidator(cfg.Keycloak.IssuerURL(), cfg.Keycloak.ClientID)
+	validator, err := auth.NewOIDCValidator(
+		cfg.Keycloak.IssuerURL(), 
+		cfg.Keycloak.ClientID, 
+		cfg.Redis.Addr(), 
+		cfg.Auth.CircuitBreaker.MaxFailures,
+		cfg.Auth.CircuitBreaker.Timeout,
+		cfg.Auth.TokenCache.TTL,
+		logger,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("CRITICAL: Cannot start server without authentication: %w", err)
 	}

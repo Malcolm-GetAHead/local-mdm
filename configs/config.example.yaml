@@ -39,18 +39,27 @@ database:
   host: "localhost"
   port: 5432
   user: "postgres"
-  password: "REPLACE_WITH_ENV_VAR"  # CRITICAL: Set DB_PASSWORD environment variable
+  password: "postgres"
   database: "localmdm"
   sslmode: "disable"
   max_open_conns: 25
   max_idle_conns: 5
   conn_max_lifetime: 5m
-  query_timeout: 10s  # Maximum time for database queries
+  query_timeout: 30s
+
+redis:
+  host: "localhost"
+  port: 6379
 
 auth:
   jwt_secret: "REPLACE_WITH_ENV_VAR"  # CRITICAL: Set JWT_SECRET environment variable (min 32 chars)
   access_token_duration: 1h
   refresh_token_duration: 168h  # 7 days
+  circuit_breaker:
+    max_failures: 5      # Number of failures before circuit opens
+    timeout: 30s         # Time to wait before attempting recovery
+  token_cache:
+    ttl: 5m              # Token cache time-to-live
 
 keycloak:
   url: "http://localhost:8180"

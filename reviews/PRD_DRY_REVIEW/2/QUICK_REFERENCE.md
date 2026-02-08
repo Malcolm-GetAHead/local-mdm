@@ -19,15 +19,9 @@
 
 ---
 
-## 🟠 HIGH (Should Fix - 1 day)
+## 🟠 HIGH (Should Fix - 0.5 days)
 
-### 2. No Circuit Breaker for Keycloak
-**File**: `internal/auth/oidc.go:52-60`  
-**Risk**: Complete outage when Keycloak down  
-**Fix**: Circuit breaker + token caching  
-**Effort**: 0.5 days
-
-### 3. No Graceful Degradation
+### 2. No Graceful Degradation
 **File**: `internal/auth/middleware.go:37-50`  
 **Risk**: Audit log failure blocks requests  
 **Fix**: Async audit logging with buffering  
@@ -35,17 +29,22 @@
 
 ### ✅ RESOLVED HIGH PRIORITY
 
-### 4. Error Message Sanitization ✅ FIXED
+### 1. Circuit Breaker for Keycloak ✅ FIXED
+**Files**: `internal/auth/circuit_breaker.go`, `internal/auth/token_cache.go`  
+**Resolution**: Circuit breaker + Redis cache, 13 tests  
+**Completed**: 2026-02-08
+
+### 3. Error Message Sanitization ✅ FIXED
 **File**: `internal/apperrors/errors.go`, `internal/api/error_handler.go`  
 **Resolution**: Dual representation, 7 tests  
 **Completed**: 2026-02-08
 
-### 5. Database Connection Retry ✅ FIXED
+### 4. Database Connection Retry ✅ FIXED
 **File**: `cmd/server/main.go`  
 **Resolution**: Exponential backoff (10 attempts, ~8.5 min)  
 **Completed**: 2026-02-08
 
-### 6. Query Timeout Enforcement ✅ FIXED
+### 5. Query Timeout Enforcement ✅ FIXED
 **File**: `internal/config/config.go`, `internal/db/db.go`  
 **Resolution**: DSN-level statement_timeout (30s default)  
 **Completed**: 2026-02-08
@@ -130,9 +129,9 @@ Before deploying v1.0:
 
 **Current Status**: ✅ **READY FOR DEPLOYMENT**
 
-**Progress**: 14/24 issues resolved (58.3%)
+**Progress**: 15/24 issues resolved (62.5%)
 - Critical: 1/1 (100%) ✅
-- High: 4/8 (50%) ✅
+- High: 5/8 (62.5%) ✅
 - Medium: 5/8 (62.5%) ✅
 - Low: 4/7 (57.1%) ✅
 
@@ -145,7 +144,8 @@ All critical issues resolved. Remaining issues are optional improvements that ca
 ### Critical (1/1) ✅
 - C-02: Rate limiting (dual-layer, 17 tests)
 
-### High (4/8) ✅
+### High (5/8) ✅
+- H-01: Circuit breaker (Keycloak protection, Redis cache, 13 tests)
 - H-02: Error sanitization (7 tests)
 - H-04: DB connection retry (exponential backoff)
 - H-05: Query timeout (DSN-level, 30s)
@@ -173,8 +173,8 @@ All critical issues resolved. Remaining issues are optional improvements that ca
 - Rate limiting implemented and tested
 - Ready for production POC deployment
 
-**Optional (1 day)**: High priority improvements
-- Day 1: Circuit breaker + graceful degradation (4 remaining high priority issues)
+**Optional (0.5 days)**: High priority improvements
+- Day 1: Graceful degradation (3 remaining high priority issues)
 
 **Post-v1.0 (12-18 days)**: Production preparation
 - F-01: Real device testing

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"net"
 	"net/http"
 	"net/url"
@@ -18,14 +19,17 @@ import (
 )
 
 type OIDCValidator struct {
-	issuerURL     string
-	clientID      string
-	jwksURL       string
-	jwks          *JWKS
-	jwksMutex     sync.RWMutex
-	lastRefresh   time.Time
-	refreshEvery  time.Duration
-	refreshMutex  sync.Mutex
+	issuerURL      string
+	clientID       string
+	jwksURL        string
+	jwks           *JWKS
+	jwksMutex      sync.RWMutex
+	lastRefresh    time.Time
+	refreshEvery   time.Duration
+	refreshMutex   sync.Mutex
+	circuitBreaker *CircuitBreaker
+	tokenCache     *TokenCache
+	logger         *slog.Logger
 }
 
 type JWKS struct {
@@ -50,12 +54,43 @@ type TokenClaims struct {
 	EnterpriseID string                 `json:"enterprise_id,omitempty"`
 }
 
-func NewOIDCValidator(issuerURL, clientID string) (*OIDCValidator, error) {
+func NewOIDCValidator(issuerURL, clientID, redisAddr string, maxFailures int, timeout, cacheTTL time.Duration, logger *slog.Logger) (*OIDCValidator, error) {
+	// Initialize circuit breaker
+	circuitBreaker := NewCircuitBreaker(maxFailures, timeout, logger)
+	
+	// Initialize token cache (optional - if Redis unavailable, circuit breaker won't use cache)
+	var tokenCache *TokenCache
+	if redisAddr != "" {
+		cache, err := NewTokenCache(redisAddr, cacheTTL)
+		if err != nil {
+			if logger != nil {
+				logger.Warn("Failed to initialize token cache - circuit breaker will work without cache",
+					"error", err,
+					"redis_addr", redisAddr,
+				)
+			}
+			tokenCache = nil
+		} else {
+			tokenCache = cache
+			if logger != nil {
+				logger.Info("Token cache initialized", 
+					"redis_addr", redisAddr, 
+					"ttl", cacheTTL,
+					"max_failures", maxFailures,
+					"timeout", timeout,
+				)
+			}
+		}
+	}
+	
 	v := &OIDCValidator{
-		issuerURL:    issuerURL,
-		clientID:     clientID,
-		jwksURL:      fmt.Sprintf("%s/protocol/openid-connect/certs", issuerURL),
-		refreshEvery: 1 * time.Hour,
+		issuerURL:      issuerURL,
+		clientID:       clientID,
+		jwksURL:        fmt.Sprintf("%s/protocol/openid-connect/certs", issuerURL),
+		refreshEvery:   1 * time.Hour,
+		circuitBreaker: circuitBreaker,
+		tokenCache:     tokenCache,
+		logger:         logger,
 	}
 	
 	if err := v.refreshJWKS(); err != nil {
@@ -140,6 +175,47 @@ func (v *OIDCValidator) refreshJWKS() error {
 }
 
 func (v *OIDCValidator) ValidateToken(tokenString string) (*AuthUser, error) {
+	ctx := context.Background()
+	
+	// Try to validate with Keycloak through circuit breaker
+	var user *AuthUser
+	
+	err := v.circuitBreaker.Call(func() error {
+		var err error
+		user, err = v.validateWithKeycloak(tokenString)
+		return err
+	})
+	
+	if err == nil {
+		// Success - cache the token if cache is available
+		if v.tokenCache != nil {
+			if cacheErr := v.tokenCache.Set(ctx, tokenString, user); cacheErr != nil {
+				if v.logger != nil {
+					v.logger.Warn("Failed to cache token", "error", cacheErr, "user_id", user.ID)
+				}
+			}
+		}
+		return user, nil
+	}
+	
+	// Validation failed - check if circuit is open and try cache
+	if err == ErrCircuitOpen && v.tokenCache != nil {
+		cachedUser, cacheErr := v.tokenCache.Get(ctx, tokenString)
+		if cacheErr == nil {
+			if v.logger != nil {
+				v.logger.Info("Using cached token during circuit breaker open", "user_id", cachedUser.ID)
+			}
+			return cachedUser, nil
+		}
+		if cacheErr != ErrCacheMiss && v.logger != nil {
+			v.logger.Warn("Failed to get cached token", "error", cacheErr)
+		}
+	}
+	
+	return nil, err
+}
+
+func (v *OIDCValidator) validateWithKeycloak(tokenString string) (*AuthUser, error) {
 	// Check if JWKS refresh is needed (lock-free read)
 	v.jwksMutex.RLock()
 	needsRefresh := time.Since(v.lastRefresh) > v.refreshEvery

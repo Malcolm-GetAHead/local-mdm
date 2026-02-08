@@ -14,6 +14,7 @@ type Config struct {
 	Environment  string             `yaml:"environment"`  // development, staging, production
 	Server       ServerConfig       `yaml:"server"`
 	Database     DatabaseConfig     `yaml:"database"`
+	Redis        RedisConfig        `yaml:"redis"`
 	Auth         AuthConfig         `yaml:"auth"`
 	Keycloak     KeycloakConfig     `yaml:"keycloak"`
 	Certificates CertificatesConfig `yaml:"certificates"`
@@ -85,11 +86,35 @@ func (c DatabaseConfig) DSN() string {
 		c.Host, c.Port, c.User, c.Password, c.Database, c.SSLMode, timeout.Milliseconds())
 }
 
+// RedisConfig holds Redis configuration
+type RedisConfig struct {
+	Host string `yaml:"host"`
+	Port int    `yaml:"port"`
+}
+
+// Addr returns the Redis address
+func (c RedisConfig) Addr() string {
+	return fmt.Sprintf("%s:%d", c.Host, c.Port)
+}
+
 // AuthConfig holds authentication configuration
 type AuthConfig struct {
 	JWTSecret            string        `yaml:"jwt_secret"`
 	AccessTokenDuration  time.Duration `yaml:"access_token_duration"`
 	RefreshTokenDuration time.Duration `yaml:"refresh_token_duration"`
+	CircuitBreaker       CircuitBreakerConfig `yaml:"circuit_breaker"`
+	TokenCache           TokenCacheConfig     `yaml:"token_cache"`
+}
+
+// CircuitBreakerConfig holds circuit breaker configuration
+type CircuitBreakerConfig struct {
+	MaxFailures int           `yaml:"max_failures"`
+	Timeout     time.Duration `yaml:"timeout"`
+}
+
+// TokenCacheConfig holds token cache configuration
+type TokenCacheConfig struct {
+	TTL time.Duration `yaml:"ttl"`
 }
 
 // KeycloakConfig holds Keycloak OIDC configuration
