@@ -60,6 +60,9 @@ auth:
     timeout: 30s         # Time to wait before attempting recovery
   token_cache:
     ttl: 5m              # Token cache time-to-live
+  audit_log:
+    buffer_size: 1000    # Async audit log queue size
+    worker_count: 3      # Number of background workers
 
 keycloak:
   url: "http://localhost:8180"

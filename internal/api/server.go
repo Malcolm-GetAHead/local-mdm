@@ -25,19 +25,29 @@ type Server struct {
 	config          *config.Config
 	logger          *slog.Logger
 	authMiddleware  *auth.Middleware
-	auditLogger     *audit.Logger
+	auditLogger     audit.AuditLogger
 	server          *http.Server
 	authRateLimiter *authRateLimiter
 }
 
 // New creates a new API server
 func New(cfg *config.Config, database *db.DB, logger *slog.Logger) (*Server, error) {
+	// Get audit log config with defaults
+	bufferSize := cfg.Auth.AuditLog.BufferSize
+	if bufferSize == 0 {
+		bufferSize = 1000 // Default
+	}
+	workerCount := cfg.Auth.AuditLog.WorkerCount
+	if workerCount == 0 {
+		workerCount = 3 // Default
+	}
+
 	s := &Server{
 		router:      mux.NewRouter(),
 		db:          database,
 		config:      cfg,
 		logger:      logger,
-		auditLogger: audit.NewLogger(database.DB),
+		auditLogger: audit.NewAsyncLogger(database.DB, bufferSize, workerCount, logger),
 	}
 	
 	// CRITICAL: Auth initialization must succeed
@@ -217,6 +227,14 @@ func (s *Server) Shutdown(ctx context.Context) error {
 	if s.authRateLimiter != nil {
 		s.authRateLimiter.Stop()
 	}
+	
+	// Gracefully shutdown async audit logger (drain queue)
+	if asyncLogger, ok := s.auditLogger.(*audit.AsyncLogger); ok {
+		if err := asyncLogger.Close(); err != nil {
+			s.logger.Error("Failed to close audit logger", "error", err)
+		}
+	}
+	
 	return s.server.Shutdown(ctx)
 }
 

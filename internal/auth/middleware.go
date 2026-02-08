@@ -13,7 +13,7 @@ import (
 type Middleware struct {
 	validator   *OIDCValidator
 	logger      *slog.Logger
-	auditLogger *audit.Logger
+	auditLogger audit.AuditLogger
 }
 
 func NewMiddleware(validator *OIDCValidator, logger *slog.Logger) *Middleware {
@@ -23,7 +23,7 @@ func NewMiddleware(validator *OIDCValidator, logger *slog.Logger) *Middleware {
 	}
 }
 
-func (m *Middleware) SetAuditLogger(auditLogger *audit.Logger) {
+func (m *Middleware) SetAuditLogger(auditLogger audit.AuditLogger) {
 	m.auditLogger = auditLogger
 }
 

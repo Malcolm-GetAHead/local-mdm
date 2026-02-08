@@ -99,11 +99,12 @@ func (c RedisConfig) Addr() string {
 
 // AuthConfig holds authentication configuration
 type AuthConfig struct {
-	JWTSecret            string        `yaml:"jwt_secret"`
-	AccessTokenDuration  time.Duration `yaml:"access_token_duration"`
-	RefreshTokenDuration time.Duration `yaml:"refresh_token_duration"`
+	JWTSecret            string               `yaml:"jwt_secret"`
+	AccessTokenDuration  time.Duration        `yaml:"access_token_duration"`
+	RefreshTokenDuration time.Duration        `yaml:"refresh_token_duration"`
 	CircuitBreaker       CircuitBreakerConfig `yaml:"circuit_breaker"`
 	TokenCache           TokenCacheConfig     `yaml:"token_cache"`
+	AuditLog             AuditLogConfig       `yaml:"audit_log"`
 }
 
 // CircuitBreakerConfig holds circuit breaker configuration
@@ -115,6 +116,12 @@ type CircuitBreakerConfig struct {
 // TokenCacheConfig holds token cache configuration
 type TokenCacheConfig struct {
 	TTL time.Duration `yaml:"ttl"`
+}
+
+// AuditLogConfig holds audit log configuration
+type AuditLogConfig struct {
+	BufferSize  int `yaml:"buffer_size"`
+	WorkerCount int `yaml:"worker_count"`
 }
 
 // KeycloakConfig holds Keycloak OIDC configuration

@@ -282,7 +282,7 @@ func TestLogger_Log_ConcurrentWrites(t *testing.T) {
 	for i := 0; i < 10; i++ {
 		go func(n int) {
 			event := Event{
-				Action:       "concurrent.test",
+				Action:       "sync.concurrent.test",
 				ResourceType: "test",
 				Details: map[string]interface{}{
 					"iteration": n,
@@ -300,12 +300,12 @@ func TestLogger_Log_ConcurrentWrites(t *testing.T) {
 
 	// Verify all 10 were written
 	var count int
-	err := database.QueryRowContext(ctx, "SELECT COUNT(*) FROM audit_logs WHERE action = $1", "concurrent.test").Scan(&count)
+	err := database.QueryRowContext(ctx, "SELECT COUNT(*) FROM audit_logs WHERE action = $1", "sync.concurrent.test").Scan(&count)
 	require.NoError(t, err)
 	assert.Equal(t, 10, count)
 
 	// Cleanup
-	_, _ = database.ExecContext(ctx, "DELETE FROM audit_logs WHERE action = $1", "concurrent.test")
+	_, _ = database.ExecContext(ctx, "DELETE FROM audit_logs WHERE action = $1", "sync.concurrent.test")
 }
 
 func TestLogger_Log_ContextCancellation(t *testing.T) {

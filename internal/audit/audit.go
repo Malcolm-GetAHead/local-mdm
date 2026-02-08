@@ -13,6 +13,11 @@ import (
 	"github.com/malcolm-getahead/local-mdm/internal/constants"
 )
 
+// AuditLogger is the interface for logging audit events
+type AuditLogger interface {
+	Log(ctx context.Context, event Event) error
+}
+
 // Logger writes audit events to the database
 type Logger struct {
 	db     *sql.DB
