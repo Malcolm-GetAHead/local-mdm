@@ -98,56 +98,32 @@ func (r *enterpriseRepository) List(ctx context.Context, limit, offset int) ([]*
 		return nil, 0, fmt.Errorf("invalid pagination: %w", err)
 	}
 
-	select {
-	case <-ctx.Done():
-		return nil, 0, ctx.Err()
-	default:
-	}
-
-	var total int
 	countQuery := `SELECT COUNT(*) FROM enterprises WHERE deleted_at IS NULL`
-	if err := getExecutor(ctx, r.db).QueryRowContext(ctx, countQuery).Scan(&total); err != nil {
-		return nil, 0, err
-	}
-	
-	select {
-	case <-ctx.Done():
-		return nil, 0, ctx.Err()
-	default:
-	}
-	
-	query := `
+	dataQuery := `
 		SELECT id, name, slug, settings, created_at, updated_at, deleted_at
 		FROM enterprises
 		WHERE deleted_at IS NULL
 		ORDER BY created_at DESC
 		LIMIT $1 OFFSET $2`
-	
-	rows, err := getExecutor(ctx, r.db).QueryContext(ctx, query, limit, offset)
-	if err != nil {
-		return nil, 0, err
-	}
-	defer rows.Close()
-	
-	enterprises := []*models.Enterprise{}
-	for rows.Next() {
-		select {
-		case <-ctx.Done():
-			return nil, 0, ctx.Err()
-		default:
-		}
-		
+
+	scanFn := func(rows *sql.Rows) (*models.Enterprise, error) {
 		enterprise := &models.Enterprise{}
-		if err := rows.Scan(
+		err := rows.Scan(
 			&enterprise.ID, &enterprise.Name, &enterprise.Slug, &enterprise.Settings,
 			&enterprise.CreatedAt, &enterprise.UpdatedAt, &enterprise.DeletedAt,
-		); err != nil {
-			return nil, 0, err
-		}
-		enterprises = append(enterprises, enterprise)
+		)
+		return enterprise, err
 	}
-	
-	return enterprises, total, rows.Err()
+
+	return ExecutePaginatedQuery(
+		ctx,
+		getExecutor(ctx, r.db),
+		countQuery,
+		nil, // no count args
+		dataQuery,
+		[]interface{}{limit, offset},
+		scanFn,
+	)
 }
 
 func (r *enterpriseRepository) Update(ctx context.Context, enterprise *models.Enterprise) error {

@@ -85,58 +85,34 @@ func (r *policyRepository) List(ctx context.Context, enterpriseID uuid.UUID, lim
 		return nil, 0, fmt.Errorf("invalid pagination: %w", err)
 	}
 
-	select {
-	case <-ctx.Done():
-		return nil, 0, ctx.Err()
-	default:
-	}
-
-	var total int
 	countQuery := `SELECT COUNT(*) FROM policies WHERE enterprise_id = $1 AND deleted_at IS NULL`
-	if err := getExecutor(ctx, r.db).QueryRowContext(ctx, countQuery, enterpriseID).Scan(&total); err != nil {
-		return nil, 0, err
-	}
-	
-	select {
-	case <-ctx.Done():
-		return nil, 0, ctx.Err()
-	default:
-	}
-	
-	query := `
+	dataQuery := `
 		SELECT id, enterprise_id, name, description, platform, policy_type, policy_config, is_active,
 		       created_at, updated_at, deleted_at
 		FROM policies
 		WHERE enterprise_id = $1 AND deleted_at IS NULL
 		ORDER BY created_at DESC
 		LIMIT $2 OFFSET $3`
-	
-	rows, err := getExecutor(ctx, r.db).QueryContext(ctx, query, enterpriseID, limit, offset)
-	if err != nil {
-		return nil, 0, err
-	}
-	defer rows.Close()
-	
-	policies := []*models.Policy{}
-	for rows.Next() {
-		select {
-		case <-ctx.Done():
-			return nil, 0, ctx.Err()
-		default:
-		}
-		
+
+	scanFn := func(rows *sql.Rows) (*models.Policy, error) {
 		policy := &models.Policy{}
-		if err := rows.Scan(
+		err := rows.Scan(
 			&policy.ID, &policy.EnterpriseID, &policy.Name, &policy.Description,
 			&policy.Platform, &policy.PolicyType, &policy.PolicyConfig, &policy.IsActive,
 			&policy.CreatedAt, &policy.UpdatedAt, &policy.DeletedAt,
-		); err != nil {
-			return nil, 0, err
-		}
-		policies = append(policies, policy)
+		)
+		return policy, err
 	}
-	
-	return policies, total, rows.Err()
+
+	return ExecutePaginatedQuery(
+		ctx,
+		getExecutor(ctx, r.db),
+		countQuery,
+		[]interface{}{enterpriseID},
+		dataQuery,
+		[]interface{}{enterpriseID, limit, offset},
+		scanFn,
+	)
 }
 
 func (r *policyRepository) Update(ctx context.Context, policy *models.Policy) error {

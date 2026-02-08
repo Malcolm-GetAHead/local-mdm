@@ -109,63 +109,35 @@ func (r *deviceRepository) List(ctx context.Context, enterpriseID uuid.UUID, lim
 		return nil, 0, fmt.Errorf("invalid pagination: %w", err)
 	}
 
-	select {
-	case <-ctx.Done():
-		return nil, 0, ctx.Err()
-	default:
-	}
-
-	exec := getExecutor(ctx, r.db)
-	
-	// Get total count
-	var total int
 	countQuery := `SELECT COUNT(*) FROM devices WHERE enterprise_id = $1 AND deleted_at IS NULL`
-	if err := exec.QueryRowContext(ctx, countQuery, enterpriseID).Scan(&total); err != nil {
-		return nil, 0, err
-	}
-	
-	select {
-	case <-ctx.Done():
-		return nil, 0, ctx.Err()
-	default:
-	}
-	
-	// Get devices
-	query := `
+	dataQuery := `
 		SELECT id, enterprise_id, platform, device_id, serial_number, name, model, os_version,
 		       enrollment_date, last_seen, status, platform_data, created_at, updated_at, deleted_at
 		FROM devices
 		WHERE enterprise_id = $1 AND deleted_at IS NULL
 		ORDER BY created_at DESC
 		LIMIT $2 OFFSET $3`
-	
-	rows, err := exec.QueryContext(ctx, query, enterpriseID, limit, offset)
-	if err != nil {
-		return nil, 0, err
-	}
-	defer rows.Close()
-	
-	devices := []*models.Device{}
-	for rows.Next() {
-		select {
-		case <-ctx.Done():
-			return nil, 0, ctx.Err()
-		default:
-		}
-		
+
+	scanFn := func(rows *sql.Rows) (*models.Device, error) {
 		device := &models.Device{}
-		if err := rows.Scan(
+		err := rows.Scan(
 			&device.ID, &device.EnterpriseID, &device.Platform, &device.DeviceID,
 			&device.SerialNumber, &device.Name, &device.Model, &device.OSVersion,
 			&device.EnrollmentDate, &device.LastSeen, &device.Status, &device.PlatformData,
 			&device.CreatedAt, &device.UpdatedAt, &device.DeletedAt,
-		); err != nil {
-			return nil, 0, err
-		}
-		devices = append(devices, device)
+		)
+		return device, err
 	}
-	
-	return devices, total, rows.Err()
+
+	return ExecutePaginatedQuery(
+		ctx,
+		getExecutor(ctx, r.db),
+		countQuery,
+		[]interface{}{enterpriseID},
+		dataQuery,
+		[]interface{}{enterpriseID, limit, offset},
+		scanFn,
+	)
 }
 
 func (r *deviceRepository) Update(ctx context.Context, device *models.Device) error {

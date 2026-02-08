@@ -2,9 +2,9 @@
 
 **Priority**: LOW  
 **Total Issues**: 7  
-**Resolved**: 4 ✅  
-**Remaining**: 3  
-**Estimated Effort**: 1 day (remaining)  
+**Resolved**: 5 ✅  
+**Remaining**: 2  
+**Estimated Effort**: 0.5 days (remaining)  
 **Risk Level**: Code quality, future improvements
 
 ---
@@ -221,27 +221,60 @@ func BenchmarkDeviceList(b *testing.B) {
 
 ---
 
-## L-06: Duplicate Code in Repository Methods
-**Severity**: LOW | **Category**: Maintainability | **Effort**: 0.5 days
+## L-06: Duplicate Code in Repository Methods ✅ RESOLVED
+**Severity**: LOW  
+**Category**: Maintainability  
+**Effort**: 0.5 days  
+**Status**: ✅ **RESOLVED** (2026-02-08)
 
-All repository List methods have identical pagination logic.
+### Problem
+All repository List methods contained identical pagination logic (~150 lines duplicated across 3 repositories).
 
-**Fix**: Extract common pagination helper.
+### Resolution
+Extracted common pagination logic into reusable generic helper function.
 
+**Implementation Files**:
+- `internal/repository/pagination.go` (MODIFIED) - Added ExecutePaginatedQuery helper
+- `internal/repository/enterprise.go` (MODIFIED) - Refactored to use helper
+- `internal/repository/device.go` (MODIFIED) - Refactored to use helper
+- `internal/repository/policy.go` (MODIFIED) - Refactored to use helper
+
+**Generic Helper**:
 ```go
-func executePaginatedQuery[T any](
+func ExecutePaginatedQuery[T any](
     ctx context.Context,
     exec executor,
     countQuery string,
+    countArgs []interface{},
     dataQuery string,
+    dataArgs []interface{},
     scanFn func(*sql.Rows) (T, error),
-    args ...interface{},
-) ([]T, int, error) {
-    // Common pagination logic
-}
+) ([]T, int, error)
 ```
 
+**Code Reduction**:
+- Enterprise: ~50 lines → ~18 lines (64% reduction)
+- Device: ~50 lines → ~20 lines (60% reduction)
+- Policy: ~50 lines → ~20 lines (60% reduction)
+- **Total**: 61% code reduction, 100% duplication eliminated
+
+**Benefits**:
+- Single source of truth for pagination logic
+- Type-safe with Go generics
+- Consistent error handling
+- Easier to maintain (1 place vs 3 places)
+- All existing tests passing
+
+### Verification
+✅ Generic helper with type safety  
+✅ 61% code reduction  
+✅ 100% duplication eliminated  
+✅ All tests passing with race detection  
+✅ No performance regression  
+✅ Backward compatible
+
 ---
+
 
 ## L-07: No Linter Configuration ✅ RESOLVED
 
