@@ -93,6 +93,16 @@
 **Resolution**: 52-143x faster, DoS protection  
 **Completed**: 2026-02-08
 
+### 13. Graceful Worker Shutdown ✅ FIXED
+**File**: `internal/audit/async_logger.go`, `internal/audit/shutdown_test.go`  
+**Resolution**: Context-aware shutdown, 9 tests  
+**Completed**: 2026-02-08
+
+### 14. Certificate Expiration Monitoring ✅ FIXED
+**Files**: `internal/certs/expiration_monitor.go`, `internal/api/server.go`  
+**Resolution**: Background monitor, 17 tests, full server integration  
+**Completed**: 2026-02-08
+
 ---
 
 ## ⚪ Items Deferred to Post-v1.0 (NOT Blockers)
@@ -128,10 +138,10 @@ Before deploying v1.0:
 
 **Current Status**: ✅ **READY FOR DEPLOYMENT**
 
-**Progress**: 17/24 issues resolved (70.8%)
+**Progress**: 18/24 issues resolved (75%)
 - Critical: 1/1 (100%) ✅
 - High: 6/8 (75%) ✅
-- Medium: 6/8 (75%) ✅
+- Medium: 7/8 (87.5%) ✅
 - Low: 4/7 (57.1%) ✅
 
 All critical issues resolved. Remaining issues are optional improvements that can be addressed post-deployment.
@@ -151,13 +161,14 @@ All critical issues resolved. Remaining issues are optional improvements that ca
 - H-05: Query timeout (DSN-level, 30s)
 - H-08: Pagination limits (max 1000, DoS protection)
 
-### Medium (6/8) ✅
+### Medium (7/8) ✅
 - M-02: Compression (gzip, >50% savings, 6 tests)
 - M-04: Health checks (DB + Keycloak, 10 tests)
 - M-06: Request ID (UUID middleware, 8 tests)
 - M-08: JSONB optimization (52-143x faster, 3 tests)
 - M-09: Graceful worker shutdown (context-aware, 9 tests)
 - M-10: Index verification (already in schema)
+- M-11: Certificate expiration monitoring (background monitor, 17 tests)
 
 ### Low (4/7) ✅
 - L-01: Error wrapping (rollback priority, 6 tests)

@@ -138,9 +138,17 @@ func (c KeycloakConfig) IssuerURL() string {
 
 // CertificatesConfig holds certificate configuration
 type CertificatesConfig struct {
-	CACertPath          string        `yaml:"ca_cert_path"`
-	CAKeyPath           string        `yaml:"ca_key_path"`
-	DeviceCertValidity  time.Duration `yaml:"device_cert_validity"`
+	CACertPath          string                      `yaml:"ca_cert_path"`
+	CAKeyPath           string                      `yaml:"ca_key_path"`
+	DeviceCertValidity  time.Duration               `yaml:"device_cert_validity"`
+	ExpirationMonitor   CertExpirationMonitorConfig `yaml:"expiration_monitor"`
+}
+
+// CertExpirationMonitorConfig holds certificate expiration monitor configuration
+type CertExpirationMonitorConfig struct {
+	Enabled          bool          `yaml:"enabled"`
+	CheckInterval    time.Duration `yaml:"check_interval"`
+	WarningThreshold time.Duration `yaml:"warning_threshold"`
 }
 
 // WindowsConfig holds Windows MDM configuration

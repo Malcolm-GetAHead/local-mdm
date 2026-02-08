@@ -74,6 +74,10 @@ certificates:
   ca_cert_path: "./certs/ca.crt"
   ca_key_path: "./certs/ca.key"
   device_cert_validity: 8760h  # 1 year
+  expiration_monitor:
+    enabled: true
+    check_interval: 24h        # How often to check for expiring certificates
+    warning_threshold: 720h    # Warn when certificates expire within 30 days
 
 windows:
   discovery_url: "https://localhost:8080/windows/discovery"

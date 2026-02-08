@@ -13,6 +13,7 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/malcolm-getahead/local-mdm/internal/audit"
 	"github.com/malcolm-getahead/local-mdm/internal/auth"
+	"github.com/malcolm-getahead/local-mdm/internal/certs"
 	"github.com/malcolm-getahead/local-mdm/internal/config"
 	"github.com/malcolm-getahead/local-mdm/internal/constants"
 	"github.com/malcolm-getahead/local-mdm/internal/db"
@@ -28,6 +29,7 @@ type Server struct {
 	auditLogger     audit.AuditLogger
 	server          *http.Server
 	authRateLimiter *authRateLimiter
+	certMonitor     *certs.ExpirationMonitor
 }
 
 // New creates a new API server
@@ -48,6 +50,24 @@ func New(cfg *config.Config, database *db.DB, logger *slog.Logger) (*Server, err
 		config:      cfg,
 		logger:      logger,
 		auditLogger: audit.NewAsyncLogger(database.DB, bufferSize, workerCount, logger),
+	}
+	
+	// Create certificate expiration monitor if enabled
+	if cfg.Certificates.ExpirationMonitor.Enabled {
+		checkInterval := cfg.Certificates.ExpirationMonitor.CheckInterval
+		if checkInterval == 0 {
+			checkInterval = 24 * time.Hour // Default: check daily
+		}
+		warningThreshold := cfg.Certificates.ExpirationMonitor.WarningThreshold
+		if warningThreshold == 0 {
+			warningThreshold = 30 * 24 * time.Hour // Default: warn 30 days before
+		}
+		
+		s.certMonitor = certs.NewExpirationMonitor(database.DB, logger, checkInterval, warningThreshold)
+		logger.Info("Certificate expiration monitor configured",
+			"check_interval", checkInterval,
+			"warning_threshold", warningThreshold,
+		)
 	}
 	
 	// CRITICAL: Auth initialization must succeed
@@ -211,6 +231,12 @@ func (s *Server) setupMiddleware() {
 
 // Start starts the HTTP server
 func (s *Server) Start() error {
+	// Start certificate expiration monitor if configured
+	if s.certMonitor != nil {
+		s.certMonitor.Start()
+		s.logger.Info("Certificate expiration monitor started")
+	}
+	
 	if s.config.Server.TLS.Enabled {
 		return s.server.ListenAndServeTLS(
 			s.config.Server.TLS.CertFile,
@@ -223,6 +249,12 @@ func (s *Server) Start() error {
 
 // Shutdown gracefully shuts down the server
 func (s *Server) Shutdown(ctx context.Context) error {
+	// Stop certificate expiration monitor
+	if s.certMonitor != nil {
+		s.certMonitor.Stop()
+		s.logger.Info("Certificate expiration monitor stopped")
+	}
+	
 	// Stop auth rate limiter background goroutines
 	if s.authRateLimiter != nil {
 		s.authRateLimiter.Stop()

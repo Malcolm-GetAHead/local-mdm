@@ -2,9 +2,9 @@
 
 **Priority**: MEDIUM  
 **Total Issues**: 12  
-**Resolved**: 5 ✅  
-**Remaining**: 7  
-**Estimated Effort**: 2.75 days (remaining)  
+**Resolved**: 6 ✅  
+**Remaining**: 6  
+**Estimated Effort**: 2.25 days (remaining)  
 **Risk Level**: Moderate performance, maintainability concerns
 
 ---
@@ -394,33 +394,80 @@ Audit log queries by date range are slow without index.
 
 ---
 
-## M-11: No Certificate Expiration Monitoring
-**Severity**: MEDIUM | **Category**: Reliability | **Effort**: 0.5 days
+## M-11: No Certificate Expiration Monitoring ✅ RESOLVED
+**Severity**: MEDIUM  
+**Category**: Reliability  
+**Effort**: 0.5 days  
+**Status**: ✅ **RESOLVED** (2026-02-08)
 
-Device certificates can expire without warning.
+### Problem
+Device certificates can expire without warning, causing service disruption and authentication failures.
 
-**Fix**: Add background job to check expiring certificates.
+### Resolution
+Implemented background certificate expiration monitor with full server integration and configuration support.
 
-```go
-func (s *CertService) CheckExpiringCerts(ctx context.Context) error {
-    threshold := time.Now().Add(30 * 24 * time.Hour)
-    
-    certs, err := s.repo.GetExpiringBefore(ctx, threshold)
-    if err != nil {
-        return err
-    }
-    
-    for _, cert := range certs {
-        s.logger.Warn("Certificate expiring soon",
-            "device_id", cert.DeviceID,
-            "expires_at", cert.ExpiresAt,
-        )
-        // Send alert
-    }
-    
-    return nil
-}
-```
+**Implementation Files**:
+- `internal/certs/expiration_monitor.go` (NEW) - Monitor implementation (175 lines)
+- `internal/certs/expiration_monitor_test.go` (NEW) - Unit tests (484 lines, 15 tests)
+- `internal/api/cert_monitor_integration_test.go` (NEW) - Integration tests (180 lines, 2 tests)
+- `internal/api/server.go` (MODIFIED) - Server lifecycle integration
+- `internal/config/config.go` (MODIFIED) - Configuration structure
+- `configs/config.example.yaml` (MODIFIED) - Configuration example
+
+**Features**:
+1. **Background Monitoring**
+   - Runs in separate goroutine with ticker
+   - Configurable check interval (default: 24 hours)
+   - Immediate check on startup
+
+2. **Smart Filtering**
+   - Only active certificates (excludes revoked)
+   - Only future expirations (excludes already expired)
+   - Ordered by expiration date (soonest first)
+
+3. **Full Configuration**
+   ```yaml
+   certificates:
+     expiration_monitor:
+       enabled: true
+       check_interval: 24h
+       warning_threshold: 720h  # 30 days
+   ```
+
+4. **Server Integration**
+   - Created in NewServer() with configuration
+   - Started in Server.Start()
+   - Stopped in Server.Shutdown()
+   - Proper lifecycle management
+
+5. **Structured Logging**
+   ```go
+   logger.Warn("Certificate expiring soon",
+       "certificate_id", cert.ID,
+       "device_id", cert.DeviceID,
+       "subject", cert.Subject,
+       "serial_number", cert.SerialNumber,
+       "expires_at", cert.ExpiresAt,
+       "days_remaining", daysRemaining,
+   )
+   ```
+
+**Test Coverage**: 17 comprehensive tests
+- 15 unit tests (lifecycle, detection, filtering, edge cases)
+- 2 integration tests (server lifecycle, enabled/disabled)
+- All tests passing with race detection
+
+### Verification
+✅ Background monitoring with configurable intervals  
+✅ Smart certificate filtering (active, not expired)  
+✅ Structured logging with all details  
+✅ Full server integration  
+✅ Configuration support (enabled flag, intervals)  
+✅ Graceful lifecycle (Start/Stop)  
+✅ Thread-safe implementation  
+✅ 17 comprehensive tests passing  
+✅ Race detection clean  
+✅ Production-ready
 
 ---
 

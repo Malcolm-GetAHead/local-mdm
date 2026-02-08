@@ -1,9 +1,9 @@
 # Issue Tracking - v1.0 POC Readiness
 
-**Last Updated**: 2026-02-08 08:01 EST  
+**Last Updated**: 2026-02-08 08:27 EST  
 **Scope**: v1.0 POC (local development)  
 **Total Issues**: 24 (6 deferred to post-v1.0)  
-**Resolved**: 17 ✅  
+**Resolved**: 18 ✅  
 **In Progress**: 0  
 **Blocked**: 0  
 **Status**: ✅ **READY FOR DEPLOYMENT**
@@ -43,7 +43,7 @@
 | M-08 | Inefficient JSONB Validation | MEDIUM | ✅ Done | - | 0.5 days | 2026-02-08 | 52-143x faster |
 | M-09 | No Graceful Worker Shutdown | MEDIUM | ✅ Done | - | 0.5 days | 2026-02-08 | Context-aware shutdown, 9 tests |
 | M-10 | Missing Index (verified exists) | MEDIUM | ✅ Done | - | 0 days | - | Already in schema |
-| M-11 | No Cert Expiration Monitoring | MEDIUM | 🔴 Open | - | 0.5 days | - | Background job |
+| M-11 | No Cert Expiration Monitoring | MEDIUM | ✅ Done | - | 0.5 days | 2026-02-08 | Background monitor, 17 tests |
 | M-12 | No IP Allowlisting | MEDIUM | 🔴 Open | - | 0.5 days | - | Admin ops only |
 
 ---
@@ -95,19 +95,19 @@ These are **intentionally deferred** to future tasks and NOT blockers for v1.0:
 ### By Priority
 - **Critical**: 1/1 (100%) ✅ **COMPLETE**
 - **High**: 6/8 (75%) ✅ **H-01, H-02, H-03, H-04, H-05, H-08 DONE**
-- **Medium**: 6/8 (75%) ✅ **M-02, M-04, M-06, M-08, M-09, M-10 DONE**
+- **Medium**: 7/8 (87.5%) ✅ **M-02, M-04, M-06, M-08, M-09, M-10, M-11 DONE**
 - **Low**: 4/7 (57.1%) ✅ **L-01, L-03, L-04, L-07 DONE**
-- **Overall**: 17/24 (70.8%)
+- **Overall**: 18/24 (75%)
 
 ### By Effort
 - **Total Effort**: 7.5 days
-- **Completed**: 5.75 days
-- **Remaining**: 1.75 days (all optional for v1.0)
+- **Completed**: 6.25 days
+- **Remaining**: 1.25 days (all optional for v1.0)
 
 ### By Timeline
 - **v1.0 Critical**: ✅ **COMPLETE** (1 issue resolved)
 - **v1.0 High**: 8 issues (6 done, 2 remaining = 0 days) - Optional
-- **v1.0 Medium**: 8 issues (6 done, 2 remaining = 1.25 days) - Optional
+- **v1.0 Medium**: 8 issues (7 done, 1 remaining = 0.75 days) - Optional
 - **v1.0 Low**: 7 issues (4 done, 3 remaining = 1 day) - Optional
 - **v1.0 Low**: 7 issues (4 done, 3 remaining = 1 day) - Optional
 - **v1.0 Low**: 7 issues (2 days) - Optional
@@ -129,9 +129,9 @@ These are **intentionally deferred** to future tasks and NOT blockers for v1.0:
 **Status**: 6/8 high priority issues resolved (75%)
 
 ### Milestone 3: v1.0 POC Complete (All v1.0 issues)
-**Target**: Optional - 1.75 days (remaining effort)  
+**Target**: Optional - 1.25 days (remaining effort)  
 **Issues**: All 24 v1.0 issues  
-**Completed**: 17/24 (70.8%)  
+**Completed**: 18/24 (75%)  
 **Status**: Can be done incrementally
 
 ### Milestone 4: Production Ready (Post-v1.0)
@@ -174,6 +174,15 @@ These are **intentionally deferred** to future tasks and NOT blockers for v1.0:
 ---
 
 ## Notes
+
+### 2026-02-08 08:27 EST
+- ✅ M-11 (Certificate expiration monitoring) implemented with full server integration
+- Background monitor: Configurable intervals (24h check, 30d warning)
+- Server integration: Created in NewServer(), started in Start(), stopped in Shutdown()
+- Configuration: Enabled flag, check_interval, warning_threshold
+- Smart filtering: Active certs only, excludes revoked and expired
+- Test coverage: 15 unit tests + 2 integration tests, all passing with race detection
+- **Progress**: 18/24 issues resolved (75%)
 
 ### 2026-02-08 08:01 EST
 - ✅ M-09 (Graceful worker shutdown) implemented with context-aware shutdown
