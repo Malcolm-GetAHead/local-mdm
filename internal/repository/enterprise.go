@@ -92,6 +92,12 @@ func (r *enterpriseRepository) GetBySlug(ctx context.Context, slug string) (*mod
 }
 
 func (r *enterpriseRepository) List(ctx context.Context, limit, offset int) ([]*models.Enterprise, int, error) {
+	// Validate pagination parameters
+	limit, offset, err := ValidatePagination(limit, offset)
+	if err != nil {
+		return nil, 0, fmt.Errorf("invalid pagination: %w", err)
+	}
+
 	select {
 	case <-ctx.Done():
 		return nil, 0, ctx.Err()

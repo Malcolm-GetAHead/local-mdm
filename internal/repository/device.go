@@ -103,6 +103,12 @@ func (r *deviceRepository) GetBySerial(ctx context.Context, enterpriseID uuid.UU
 }
 
 func (r *deviceRepository) List(ctx context.Context, enterpriseID uuid.UUID, limit, offset int) ([]*models.Device, int, error) {
+	// Validate pagination parameters
+	limit, offset, err := ValidatePagination(limit, offset)
+	if err != nil {
+		return nil, 0, fmt.Errorf("invalid pagination: %w", err)
+	}
+
 	select {
 	case <-ctx.Done():
 		return nil, 0, ctx.Err()

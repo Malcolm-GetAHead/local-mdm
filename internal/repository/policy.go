@@ -79,6 +79,12 @@ func (r *policyRepository) GetByID(ctx context.Context, id uuid.UUID) (*models.P
 }
 
 func (r *policyRepository) List(ctx context.Context, enterpriseID uuid.UUID, limit, offset int) ([]*models.Policy, int, error) {
+	// Validate pagination parameters
+	limit, offset, err := ValidatePagination(limit, offset)
+	if err != nil {
+		return nil, 0, fmt.Errorf("invalid pagination: %w", err)
+	}
+
 	select {
 	case <-ctx.Done():
 		return nil, 0, ctx.Err()

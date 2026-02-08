@@ -75,8 +75,13 @@ type DatabaseConfig struct {
 
 // DSN returns the database connection string
 func (c DatabaseConfig) DSN() string {
-	return fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=%s",
-		c.Host, c.Port, c.User, c.Password, c.Database, c.SSLMode)
+	timeout := c.QueryTimeout
+	if timeout == 0 {
+		timeout = 30 * time.Second
+	}
+
+	return fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=%s statement_timeout=%d",
+		c.Host, c.Port, c.User, c.Password, c.Database, c.SSLMode, timeout.Milliseconds())
 }
 
 // AuthConfig holds authentication configuration

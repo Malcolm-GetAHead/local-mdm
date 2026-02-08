@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"os"
 	"os/signal"
 	"syscall"
@@ -41,9 +42,9 @@ func main() {
 	// Print startup banner
 	printBanner(cfg)
 
-	// Connect to database
+	// Connect to database with retry
 	logger.Info("Connecting to database", "host", cfg.Database.Host, "port", cfg.Database.Port)
-	database, err := db.New(cfg.Database)
+	database, err := connectDatabaseWithRetry(cfg.Database, logger)
 	if err != nil {
 		logger.Error("Failed to connect to database", "error", err)
 		os.Exit(1)
@@ -84,6 +85,42 @@ func main() {
 	}
 
 	logger.Info("Server stopped gracefully")
+}
+
+func connectDatabaseWithRetry(cfg config.DatabaseConfig, logger *slog.Logger) (*db.DB, error) {
+	maxRetries := 10
+	baseDelay := 1 * time.Second
+	maxDelay := 30 * time.Second
+
+	for attempt := 0; attempt < maxRetries; attempt++ {
+		database, err := db.New(cfg)
+		if err == nil {
+			if attempt > 0 {
+				logger.Info("Database connection established", "attempt", attempt+1)
+			}
+			return database, nil
+		}
+
+		if attempt == maxRetries-1 {
+			return nil, fmt.Errorf("failed to connect after %d attempts: %w", maxRetries, err)
+		}
+
+		delay := time.Duration(1<<uint(attempt)) * baseDelay
+		if delay > maxDelay {
+			delay = maxDelay
+		}
+
+		logger.Warn("Database connection failed, retrying",
+			"attempt", attempt+1,
+			"max_retries", maxRetries,
+			"retry_in", delay,
+			"error", err,
+		)
+
+		time.Sleep(delay)
+	}
+
+	return nil, fmt.Errorf("unreachable")
 }
 
 func printBanner(cfg *config.Config) {
