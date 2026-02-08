@@ -106,6 +106,13 @@ tracing:
   service: "local-mdm"
   version: "0.1.0"
 
+admin:
+  allowed_ips: []  # IP allowlist for admin operations (empty = allow all)
+  # Examples:
+  # - "192.168.1.0/24"      # Local network
+  # - "10.0.0.0/8"          # Corporate network
+  # - "203.0.113.5"         # Single IP (auto-converts to /32)
+
 features:
   enable_audit_log: true
   enable_webhooks: false

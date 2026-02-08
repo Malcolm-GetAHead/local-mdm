@@ -129,7 +129,9 @@ func (s *Server) setupRoutes() {
 	
 	api.Handle("/enterprises", s.authMiddleware.RequireAuth(
 		s.authMiddleware.RequireRole("super_admin")(
-			http.HandlerFunc(s.handleCreateEnterprise),
+			ipAllowlistMiddleware(s.config.Admin.AllowedIPs)(
+				http.HandlerFunc(s.handleCreateEnterprise),
+			),
 		),
 	)).Methods("POST")
 	
@@ -154,7 +156,9 @@ func (s *Server) setupRoutes() {
 	
 	api.Handle("/devices/{id}/wipe", s.authMiddleware.RequireAuth(
 		s.authMiddleware.RequireRole("admin")(
-			http.HandlerFunc(s.handleWipeDevice),
+			ipAllowlistMiddleware(s.config.Admin.AllowedIPs)(
+				http.HandlerFunc(s.handleWipeDevice),
+			),
 		),
 	)).Methods("POST")
 	

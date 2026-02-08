@@ -353,3 +353,34 @@ func BenchmarkAsyncLogger_Shutdown(b *testing.B) {
 		}
 	})
 }
+
+func TestAsyncLogger_Shutdown_NilContext(t *testing.T) {
+	db := setupTestDB(t)
+	defer db.Close()
+
+	logger := NewAsyncLogger(db.DB, 100, 2, nil)
+
+	// Create test enterprise and user
+	enterpriseID := createTestEnterprise(t, db)
+	userID := createTestUser(t, db, enterpriseID)
+
+	// Log an event
+	err := logger.Log(context.Background(), Event{
+		EnterpriseID: enterpriseID,
+		UserID:       userID,
+		Action:       "test.action",
+		ResourceType: "test",
+		ResourceID:   uuid.New(),
+	})
+	require.NoError(t, err)
+
+	// Shutdown with nil context should not panic
+	err = logger.Shutdown(nil)
+	assert.NoError(t, err)
+
+	// Verify event was logged
+	var count int
+	err = db.DB.QueryRow("SELECT COUNT(*) FROM audit_logs WHERE action = 'test.action' AND user_id = $1", userID).Scan(&count)
+	require.NoError(t, err)
+	assert.Equal(t, 1, count)
+}

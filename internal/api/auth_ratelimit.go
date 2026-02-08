@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"strings"
 	"sync"
@@ -30,6 +31,7 @@ func (arl *authRateLimiter) Stop() {
 }
 
 // getClientIP extracts the real client IP from the request
+// Handles IPv4, IPv6, X-Forwarded-For, and X-Real-IP headers
 func getClientIP(r *http.Request) string {
 	// Check X-Forwarded-For header (set by proxies/load balancers)
 	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
@@ -46,12 +48,13 @@ func getClientIP(r *http.Request) string {
 	}
 	
 	// Fall back to RemoteAddr
-	// Remove port if present
-	ip := r.RemoteAddr
-	if idx := strings.LastIndex(ip, ":"); idx != -1 {
-		ip = ip[:idx]
+	// Use SplitHostPort to handle both IPv4 and IPv6 with ports
+	host, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		// If SplitHostPort fails, return as-is (might be IP without port)
+		return r.RemoteAddr
 	}
-	return ip
+	return host
 }
 
 // authRateLimitMiddleware creates middleware for authentication endpoints

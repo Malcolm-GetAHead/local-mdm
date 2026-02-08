@@ -24,6 +24,12 @@ type Config struct {
 	Logging      LoggingConfig      `yaml:"logging"`
 	Features     FeaturesConfig     `yaml:"features"`
 	Tracing      TracingConfig      `yaml:"tracing"`
+	Admin        AdminConfig        `yaml:"admin"`
+}
+
+// AdminConfig holds admin operation security configuration
+type AdminConfig struct {
+	AllowedIPs []string `yaml:"allowed_ips"`
 }
 
 // TracingConfig holds distributed tracing configuration

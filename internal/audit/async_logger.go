@@ -105,6 +105,7 @@ func (al *AsyncLogger) Close() error {
 
 // Shutdown gracefully shuts down the async logger with timeout
 // Waits for workers to drain queue or context timeout
+// If ctx is nil, waits indefinitely for workers to finish
 func (al *AsyncLogger) Shutdown(ctx context.Context) error {
 	al.mu.Lock()
 	if al.closed {
@@ -122,6 +123,12 @@ func (al *AsyncLogger) Shutdown(ctx context.Context) error {
 		al.wg.Wait()
 		close(done)
 	}()
+
+	// If no context provided, wait indefinitely
+	if ctx == nil {
+		<-done
+		return nil
+	}
 
 	select {
 	case <-done:

@@ -1,12 +1,11 @@
 # Issue Tracking - v1.0 POC Readiness
 
-**Last Updated**: 2026-02-08 13:20 EST  
+**Last Updated**: 2026-02-08 13:25 EST  
 **Scope**: v1.0 POC (local development)  
 **Total Issues**: 24  
-**Resolved**: 22 ✅  
+**Resolved**: 23 ✅  
 **Deferred**: 1 (H-06 to post-v1.0)  
-**Optional**: 1 (M-12)  
-**Status**: ✅ **100% COMPLETE - All Critical, High, and Low Priority Done**
+**Status**: ✅ **95.8% Complete - Only 1 Issue Deferred (Production Scaling)**
 
 ---
 
@@ -44,7 +43,7 @@
 | M-09 | No Graceful Worker Shutdown | MEDIUM | ✅ Done | - | 0.5 days | 2026-02-08 | Context-aware shutdown, 9 tests |
 | M-10 | Missing Index (verified exists) | MEDIUM | ✅ Done | - | 0 days | - | Already in schema |
 | M-11 | No Cert Expiration Monitoring | MEDIUM | ✅ Done | - | 0.5 days | 2026-02-08 | Background monitor, 17 tests |
-| M-12 | No IP Allowlisting | MEDIUM | 🔴 Open | - | 0.5 days | - | Admin ops only |
+| M-12 | No IP Allowlisting | MEDIUM | ✅ Done | - | 0.5 days | 2026-02-08 | IP allowlist for admin ops, 11 tests |
 
 ---
 
@@ -94,10 +93,10 @@ These are **intentionally deferred** to future tasks and NOT blockers for v1.0:
 
 ### By Priority
 - **Critical**: 1/1 (100%) ✅ **COMPLETE**
-- **High**: 7/8 (87.5%) ✅ **H-01, H-02, H-03, H-04, H-05, H-07, H-08 DONE** (H-06 deferred to post-v1.0)
-- **Medium**: 7/8 (87.5%) ✅ **M-02, M-04, M-06, M-08, M-09, M-10, M-11 DONE** (M-12 optional)
+- **High**: 6/8 (75%) ✅ **H-01, H-02, H-03, H-04, H-05, H-07, H-08 DONE** (H-06 deferred to post-v1.0)
+- **Medium**: 8/8 (100%) ✅ **ALL COMPLETE** (M-02, M-04, M-06, M-08, M-09, M-10, M-11, M-12)
 - **Low**: 7/7 (100%) ✅ **ALL COMPLETE** (L-01, L-02, L-03, L-04, L-05, L-06, L-07)
-- **Overall**: 22/24 (91.7%) - **All critical, 87.5% high, and all low priority complete**
+- **Overall**: 23/24 (95.8%) - **All critical + all medium + all low priority complete**
 
 ### By Effort
 - **Total Effort**: 7.5 days
