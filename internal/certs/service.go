@@ -12,11 +12,15 @@ import (
 	"github.com/malcolm-getahead/local-mdm/internal/models"
 )
 
+// CertificateService provides certificate management operations for device enrollment.
+// It handles certificate issuance, storage, retrieval, and expiration tracking.
 type CertificateService struct {
 	ca *CAManager
 	db *sql.DB
 }
 
+// NewCertificateService creates a new certificate service instance.
+// The service handles certificate issuance, storage, and retrieval for device enrollment.
 func NewCertificateService(ca *CAManager, db *sql.DB) *CertificateService {
 	return &CertificateService{
 		ca: ca,

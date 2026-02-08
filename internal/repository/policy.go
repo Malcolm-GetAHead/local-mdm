@@ -10,6 +10,8 @@ import (
 	"github.com/malcolm-getahead/local-mdm/internal/validation"
 )
 
+// PolicyRepository provides data access operations for policy management.
+// It handles policy CRUD operations and device-policy assignments.
 type PolicyRepository interface {
 	Create(ctx context.Context, policy *models.Policy) error
 	GetByID(ctx context.Context, id uuid.UUID) (*models.Policy, error)

@@ -10,6 +10,8 @@ import (
 	"github.com/malcolm-getahead/local-mdm/internal/validation"
 )
 
+// DeviceRepository provides data access operations for device management.
+// It handles CRUD operations and queries for device resources across all platforms.
 type DeviceRepository interface {
 	Create(ctx context.Context, device *models.Device) error
 	GetByID(ctx context.Context, id uuid.UUID) (*models.Device, error)

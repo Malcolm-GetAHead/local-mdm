@@ -9,6 +9,8 @@ import (
 	"strings"
 )
 
+// TokenResponse represents the OAuth2 token response from Keycloak.
+// It contains the access token, refresh token, and expiration information.
 type TokenResponse struct {
 	AccessToken  string `json:"access_token"`
 	RefreshToken string `json:"refresh_token"`
@@ -16,6 +18,7 @@ type TokenResponse struct {
 	TokenType    string `json:"token_type"`
 }
 
+// LoginRequest represents a user login request with username and password.
 type LoginRequest struct {
 	Username string `json:"username"`
 	Password string `json:"password"`
@@ -41,6 +44,8 @@ func (r *LoginRequest) Validate() error {
 	return nil
 }
 
+// KeycloakClient provides methods for interacting with Keycloak authentication server.
+// It supports login, token refresh, and token introspection operations.
 type KeycloakClient struct {
 	issuerURL string
 	clientID  string

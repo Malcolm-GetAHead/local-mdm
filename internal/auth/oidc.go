@@ -18,6 +18,8 @@ import (
 	"github.com/malcolm-getahead/local-mdm/internal/constants"
 )
 
+// OIDCValidator validates OIDC JWT tokens with circuit breaker protection and caching.
+// It fetches public keys from the OIDC provider and verifies token signatures.
 type OIDCValidator struct {
 	issuerURL      string
 	clientID       string
@@ -32,10 +34,12 @@ type OIDCValidator struct {
 	logger         *slog.Logger
 }
 
+// JWKS represents a JSON Web Key Set containing public keys for token verification.
 type JWKS struct {
 	Keys []JWK `json:"keys"`
 }
 
+// JWK represents a JSON Web Key used for verifying JWT signatures.
 type JWK struct {
 	Kid string   `json:"kid"`
 	Kty string   `json:"kty"`
@@ -46,6 +50,8 @@ type JWK struct {
 	X5c []string `json:"x5c,omitempty"`
 }
 
+// TokenClaims represents the claims contained in an OIDC JWT token.
+// It includes standard JWT claims plus custom claims for roles and enterprise context.
 type TokenClaims struct {
 	jwt.RegisteredClaims
 	Email        string                 `json:"email"`
@@ -54,6 +60,10 @@ type TokenClaims struct {
 	EnterpriseID string                 `json:"enterprise_id,omitempty"`
 }
 
+// NewOIDCValidator creates a new OIDC token validator with circuit breaker and caching.
+// The validator verifies JWT tokens against the OIDC provider and caches valid tokens in Redis.
+// If Redis is unavailable, the validator operates without caching but with circuit breaker protection.
+// Returns an error if the OIDC provider configuration cannot be fetched.
 func NewOIDCValidator(issuerURL, clientID, redisAddr string, maxFailures int, timeout, cacheTTL time.Duration, logger *slog.Logger) (*OIDCValidator, error) {
 	// Initialize circuit breaker
 	circuitBreaker := NewCircuitBreaker(maxFailures, timeout, logger)
@@ -305,6 +315,8 @@ func parseRSAPublicKey(key JWK) (interface{}, error) {
 	return nil, fmt.Errorf("JWK without x5c not supported yet")
 }
 
+// ExtractBearerToken extracts the bearer token from the Authorization header.
+// Returns an error if the header is missing or malformed.
 func ExtractBearerToken(r *http.Request) (string, error) {
 	authHeader := r.Header.Get("Authorization")
 	if authHeader == "" {

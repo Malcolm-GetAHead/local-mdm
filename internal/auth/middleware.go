@@ -10,6 +10,8 @@ import (
 	"github.com/malcolm-getahead/local-mdm/internal/audit"
 )
 
+// Middleware provides HTTP middleware for authentication and authorization.
+// It validates OIDC tokens, enforces role-based access control, and logs audit events.
 type Middleware struct {
 	validator   *OIDCValidator
 	logger      *slog.Logger

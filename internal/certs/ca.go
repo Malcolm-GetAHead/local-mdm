@@ -13,6 +13,8 @@ import (
 	"time"
 )
 
+// CAManager manages the Certificate Authority for signing device certificates.
+// It handles CA certificate generation, loading, and device certificate signing.
 type CAManager struct {
 	caCert    *x509.Certificate
 	caKey     *rsa.PrivateKey
@@ -20,6 +22,9 @@ type CAManager struct {
 	keyPath   string
 }
 
+// NewCAManager creates a new CA manager for signing device certificates.
+// It loads an existing CA from the specified paths or generates a new one if not found.
+// Returns an error if the CA cannot be loaded or generated.
 func NewCAManager(certPath, keyPath string) (*CAManager, error) {
 	manager := &CAManager{
 		certPath: certPath,

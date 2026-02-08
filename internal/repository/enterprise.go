@@ -10,6 +10,8 @@ import (
 	"github.com/malcolm-getahead/local-mdm/internal/validation"
 )
 
+// EnterpriseRepository provides data access operations for enterprise management.
+// It handles multi-tenant organization data and supports enterprise isolation.
 type EnterpriseRepository interface {
 	Create(ctx context.Context, enterprise *models.Enterprise) error
 	GetByID(ctx context.Context, id uuid.UUID) (*models.Enterprise, error)

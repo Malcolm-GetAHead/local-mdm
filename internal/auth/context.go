@@ -14,6 +14,8 @@ const (
 	requestIDKey   contextKey = "request_id"
 )
 
+// AuthUser represents an authenticated user with their roles and enterprise context.
+// It is stored in the request context after successful authentication.
 type AuthUser struct {
 	ID           string
 	Email        string
