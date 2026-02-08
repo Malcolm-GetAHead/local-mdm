@@ -23,6 +23,9 @@ type enterpriseRepository struct {
 	db executor
 }
 
+// NewEnterpriseRepository creates a new enterprise repository instance.
+// The db parameter must be either *sql.DB or an executor interface.
+// Returns an error if db is nil or of an unsupported type.
 func NewEnterpriseRepository(db interface{}) (EnterpriseRepository, error) {
 	if db == nil {
 		return nil, fmt.Errorf("database cannot be nil")

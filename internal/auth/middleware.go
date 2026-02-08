@@ -16,6 +16,8 @@ type Middleware struct {
 	auditLogger audit.AuditLogger
 }
 
+// NewMiddleware creates a new authentication middleware instance.
+// The middleware validates OIDC tokens and enforces role-based access control.
 func NewMiddleware(validator *OIDCValidator, logger *slog.Logger) *Middleware {
 	return &Middleware{
 		validator: validator,
@@ -23,6 +25,8 @@ func NewMiddleware(validator *OIDCValidator, logger *slog.Logger) *Middleware {
 	}
 }
 
+// SetAuditLogger sets the audit logger for the middleware.
+// This should be called after creating the middleware to enable audit logging.
 func (m *Middleware) SetAuditLogger(auditLogger audit.AuditLogger) {
 	m.auditLogger = auditLogger
 }

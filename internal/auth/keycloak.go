@@ -47,6 +47,8 @@ type KeycloakClient struct {
 	clientSecret string
 }
 
+// NewKeycloakClient creates a new Keycloak client for authentication operations.
+// The client can be used to perform login, token refresh, and token introspection.
 func NewKeycloakClient(issuerURL, clientID, clientSecret string) *KeycloakClient {
 	return &KeycloakClient{
 		issuerURL: issuerURL,

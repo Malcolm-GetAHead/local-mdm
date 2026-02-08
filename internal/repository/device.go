@@ -23,6 +23,9 @@ type deviceRepository struct {
 	db executor
 }
 
+// NewDeviceRepository creates a new device repository instance.
+// The db parameter must be either *sql.DB or an executor interface.
+// Returns an error if db is nil or of an unsupported type.
 func NewDeviceRepository(db interface{}) (DeviceRepository, error) {
 	if db == nil {
 		return nil, fmt.Errorf("database cannot be nil")

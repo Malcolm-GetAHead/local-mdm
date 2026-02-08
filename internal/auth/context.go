@@ -42,10 +42,14 @@ func (u *AuthUser) HasAnyRole(roles ...string) bool {
 	return false
 }
 
+// WithUser returns a new context with the authenticated user attached.
+// The user can be retrieved later using UserFromContext.
 func WithUser(ctx context.Context, user *AuthUser) context.Context {
 	return context.WithValue(ctx, userContextKey, user)
 }
 
+// UserFromContext retrieves the authenticated user from the context.
+// Returns an error if no user is found in the context.
 func UserFromContext(ctx context.Context) (*AuthUser, error) {
 	user, ok := ctx.Value(userContextKey).(*AuthUser)
 	if !ok || user == nil {

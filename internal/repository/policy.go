@@ -24,6 +24,9 @@ type policyRepository struct {
 	db executor
 }
 
+// NewPolicyRepository creates a new policy repository instance.
+// The db parameter must be either *sql.DB or an executor interface.
+// Returns an error if db is nil or of an unsupported type.
 func NewPolicyRepository(db interface{}) (PolicyRepository, error) {
 	if db == nil {
 		return nil, fmt.Errorf("database cannot be nil")
