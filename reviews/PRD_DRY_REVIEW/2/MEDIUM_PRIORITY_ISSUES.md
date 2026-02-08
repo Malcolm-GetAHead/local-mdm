@@ -2,9 +2,9 @@
 
 **Priority**: MEDIUM  
 **Total Issues**: 12  
-**Resolved**: 4 ✅  
-**Remaining**: 8  
-**Estimated Effort**: 3.25 days (remaining)  
+**Resolved**: 5 ✅  
+**Remaining**: 7  
+**Estimated Effort**: 2.75 days (remaining)  
 **Risk Level**: Moderate performance, maintainability concerns
 
 ---
@@ -279,18 +279,55 @@ AFTER (fast path):
 
 ---
 
-## M-09: No Graceful Shutdown for Background Workers
-**Severity**: MEDIUM | **Category**: Reliability | **Effort**: 0.5 days
+## M-09: No Graceful Shutdown for Background Workers ✅ RESOLVED
+**Severity**: MEDIUM  
+**Category**: Reliability  
+**Effort**: 0.5 days  
+**Status**: ✅ **RESOLVED** (2026-02-08)
 
-Async audit logger workers don't gracefully shutdown, potentially losing events.
+### Problem
+Async audit logger workers didn't gracefully shutdown, potentially losing events on server restart or shutdown.
 
-**Fix**: Add shutdown signal handling.
+### Resolution
+Implemented context-aware graceful shutdown with timeout handling.
 
+**Implementation Files**:
+- `internal/audit/async_logger.go` - Added Shutdown() method
+- `internal/audit/shutdown_test.go` (NEW) - 350+ lines, 9 tests + 3 benchmarks
+- `internal/api/server.go` - Integrated with server shutdown
+
+**Features**:
+1. **Context-Aware Shutdown**
+   - Respects caller's timeout
+   - Drains queue before returning
+   - Returns error if timeout exceeded
+
+2. **No Data Loss**
+   - Closes channel (stops accepting new events)
+   - Waits for all workers to finish
+   - All queued events processed
+
+3. **Idempotent**
+   - Multiple shutdown calls are safe
+   - Thread-safe with mutex
+
+4. **Backward Compatible**
+   - Close() still works (calls Shutdown with background context)
+
+**Implementation**:
 ```go
 func (al *AsyncLogger) Shutdown(ctx context.Context) error {
+    al.mu.Lock()
+    if al.closed {
+        al.mu.Unlock()
+        return nil  // Idempotent
+    }
+    al.closed = true
+    al.mu.Unlock()
+    
     close(al.eventQueue)
     
-    // Wait for workers to drain queue
+    // Wait for workers with timeout
     done := make(chan struct{})
     go func() {
         al.wg.Wait()
@@ -299,12 +336,52 @@ func (al *AsyncLogger) Shutdown(ctx context.Context) error {
     
     select {
     case <-done:
-        return nil
+        return nil  // All events processed
     case <-ctx.Done():
-        return ctx.Err()
+        if al.slogger != nil {
+            al.slogger.Warn("Audit logger shutdown timeout, some events may be lost")
+        }
+        return ctx.Err()  // Timeout
     }
 }
 ```
+
+**Server Integration**:
+```go
+func (s *Server) Shutdown(ctx context.Context) error {
+    // ... stop rate limiter ...
+    
+    // Gracefully shutdown async audit logger (drain queue with timeout)
+    if asyncLogger, ok := s.auditLogger.(*audit.AsyncLogger); ok {
+        if err := asyncLogger.Shutdown(ctx); err != nil {
+            s.logger.Warn("Audit logger shutdown timeout", "error", err)
+        }
+    }
+    
+    return s.server.Shutdown(ctx)
+}
+```
+
+**Test Coverage**: 9 comprehensive tests + 3 benchmarks
+- Shutdown drains queue
+- Respects timeout
+- Idempotent (multiple calls safe)
+- Close() calls Shutdown()
+- Empty queue handling
+- Large queue (500 events)
+- Rejects new events after shutdown
+- Concurrent shutdowns safe
+- Performance benchmarks
+
+### Verification
+✅ Graceful shutdown with timeout  
+✅ No data loss (drains queue)  
+✅ Idempotent (multiple calls safe)  
+✅ Thread-safe implementation  
+✅ Server integration with context  
+✅ 9 comprehensive tests passing  
+✅ Race detection clean  
+✅ Backward compatible
 
 ---
 

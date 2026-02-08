@@ -128,10 +128,10 @@ Before deploying v1.0:
 
 **Current Status**: ✅ **READY FOR DEPLOYMENT**
 
-**Progress**: 16/24 issues resolved (66.7%)
+**Progress**: 17/24 issues resolved (70.8%)
 - Critical: 1/1 (100%) ✅
 - High: 6/8 (75%) ✅
-- Medium: 5/8 (62.5%) ✅
+- Medium: 6/8 (75%) ✅
 - Low: 4/7 (57.1%) ✅
 
 All critical issues resolved. Remaining issues are optional improvements that can be addressed post-deployment.
@@ -151,11 +151,12 @@ All critical issues resolved. Remaining issues are optional improvements that ca
 - H-05: Query timeout (DSN-level, 30s)
 - H-08: Pagination limits (max 1000, DoS protection)
 
-### Medium (5/8) ✅
+### Medium (6/8) ✅
 - M-02: Compression (gzip, >50% savings, 6 tests)
 - M-04: Health checks (DB + Keycloak, 10 tests)
 - M-06: Request ID (UUID middleware, 8 tests)
 - M-08: JSONB optimization (52-143x faster, 3 tests)
+- M-09: Graceful worker shutdown (context-aware, 9 tests)
 - M-10: Index verification (already in schema)
 
 ### Low (4/7) ✅

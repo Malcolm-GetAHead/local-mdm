@@ -13,7 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func setupTestDB(t *testing.T) *db.DB {
+func setupTestDB(t testing.TB) *db.DB {
 	t.Helper()
 
 	cfg := config.DatabaseConfig{

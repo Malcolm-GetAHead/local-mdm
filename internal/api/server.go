@@ -228,10 +228,10 @@ func (s *Server) Shutdown(ctx context.Context) error {
 		s.authRateLimiter.Stop()
 	}
 	
-	// Gracefully shutdown async audit logger (drain queue)
+	// Gracefully shutdown async audit logger (drain queue with timeout)
 	if asyncLogger, ok := s.auditLogger.(*audit.AsyncLogger); ok {
-		if err := asyncLogger.Close(); err != nil {
-			s.logger.Error("Failed to close audit logger", "error", err)
+		if err := asyncLogger.Shutdown(ctx); err != nil {
+			s.logger.Warn("Audit logger shutdown timeout", "error", err)
 		}
 	}
 	

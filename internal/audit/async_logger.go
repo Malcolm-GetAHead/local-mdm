@@ -100,6 +100,12 @@ func (al *AsyncLogger) worker(id int) {
 // Close gracefully shuts down the async logger
 // Waits for all queued events to be processed
 func (al *AsyncLogger) Close() error {
+	return al.Shutdown(context.Background())
+}
+
+// Shutdown gracefully shuts down the async logger with timeout
+// Waits for workers to drain queue or context timeout
+func (al *AsyncLogger) Shutdown(ctx context.Context) error {
 	al.mu.Lock()
 	if al.closed {
 		al.mu.Unlock()
@@ -109,6 +115,21 @@ func (al *AsyncLogger) Close() error {
 	al.mu.Unlock()
 
 	close(al.eventQueue)
-	al.wg.Wait() // Wait for workers to drain queue
-	return nil
+
+	// Wait for workers with timeout
+	done := make(chan struct{})
+	go func() {
+		al.wg.Wait()
+		close(done)
+	}()
+
+	select {
+	case <-done:
+		return nil
+	case <-ctx.Done():
+		if al.slogger != nil {
+			al.slogger.Warn("Audit logger shutdown timeout, some events may be lost")
+		}
+		return ctx.Err()
+	}
 }
