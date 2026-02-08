@@ -1,6 +1,9 @@
 package api
 
 import (
+	"bytes"
+	"encoding/json"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
@@ -271,4 +274,197 @@ func setupTestServer(t *testing.T) *Server {
 	require.NoError(t, err, "Failed to create test server")
 
 	return server
+}
+
+// TestAuthEndpointRateLimiting verifies that authentication endpoints have strict rate limiting
+func TestAuthEndpointRateLimiting(t *testing.T) {
+	t.Run("IP-based rate limiting on login", func(t *testing.T) {
+		server := setupTestServer(t)
+		defer server.Shutdown(nil)
+
+		// Use different usernames to avoid account-based limit
+		// IP limit is 10 per minute
+
+		for i := 0; i < 10; i++ {
+			loginReq := map[string]string{
+				"username": fmt.Sprintf("user%d@example.com", i),
+				"password": "password123",
+			}
+			body, _ := json.Marshal(loginReq)
+			req := httptest.NewRequest("POST", "/api/v1/auth/login", bytes.NewReader(body))
+			req.RemoteAddr = "192.168.1.100:12345"
+			w := httptest.NewRecorder()
+
+			server.router.ServeHTTP(w, req)
+
+			// Should not be rate limited yet
+			if w.Code == http.StatusTooManyRequests {
+				t.Fatalf("request %d should not be rate limited (IP limit is 10), got status %d", i+1, w.Code)
+			}
+		}
+
+		// 11th request should be rate limited (IP-based)
+		loginReq := map[string]string{
+			"username": "user11@example.com",
+			"password": "password123",
+		}
+		body, _ := json.Marshal(loginReq)
+		req := httptest.NewRequest("POST", "/api/v1/auth/login", bytes.NewReader(body))
+		req.RemoteAddr = "192.168.1.100:12345"
+		w := httptest.NewRecorder()
+
+		server.router.ServeHTTP(w, req)
+
+		assert.Equal(t, http.StatusTooManyRequests, w.Code, "11th request should be rate limited")
+		assert.NotEmpty(t, w.Header().Get("Retry-After"), "Retry-After header should be set")
+
+		var response struct {
+			Error *struct {
+				Code    string `json:"code"`
+				Message string `json:"message"`
+			} `json:"error"`
+		}
+		err := json.NewDecoder(w.Body).Decode(&response)
+		require.NoError(t, err)
+		require.NotNil(t, response.Error)
+		assert.Equal(t, "rate_limit_exceeded", response.Error.Code)
+		assert.Contains(t, response.Error.Message, "IP", "error message should mention IP-based limit")
+	})
+
+	t.Run("Account-based rate limiting on login", func(t *testing.T) {
+		server := setupTestServer(t)
+		defer server.Shutdown(nil)
+
+		loginReq := map[string]string{
+			"username": "limited@example.com",
+			"password": "password123",
+		}
+
+		// Make requests up to account limit (5 per 5 minutes) from different IPs
+		for i := 0; i < 5; i++ {
+			body, _ := json.Marshal(loginReq)
+			req := httptest.NewRequest("POST", "/api/v1/auth/login", bytes.NewReader(body))
+			req.RemoteAddr = fmt.Sprintf("192.168.2.%d:12345", i+1)
+			w := httptest.NewRecorder()
+
+			server.router.ServeHTTP(w, req)
+
+			// Should not be rate limited yet
+			if w.Code == http.StatusTooManyRequests {
+				t.Fatalf("request %d should not be rate limited (account limit is 5), got status %d", i+1, w.Code)
+			}
+		}
+
+		// 6th request should be rate limited (account-based)
+		body, _ := json.Marshal(loginReq)
+		req := httptest.NewRequest("POST", "/api/v1/auth/login", bytes.NewReader(body))
+		req.RemoteAddr = "192.168.2.100:12345" // Different IP
+		w := httptest.NewRecorder()
+
+		server.router.ServeHTTP(w, req)
+
+		assert.Equal(t, http.StatusTooManyRequests, w.Code, "6th request should be rate limited (account)")
+		
+		var response struct {
+			Error *struct {
+				Code    string `json:"code"`
+				Message string `json:"message"`
+			} `json:"error"`
+		}
+		err := json.NewDecoder(w.Body).Decode(&response)
+		require.NoError(t, err)
+		require.NotNil(t, response.Error)
+		assert.Equal(t, "rate_limit_exceeded", response.Error.Code)
+		assert.Contains(t, response.Error.Message, "account", "error message should mention account-based limit")
+	})
+
+	t.Run("Different IPs have independent limits", func(t *testing.T) {
+		server := setupTestServer(t)
+		defer server.Shutdown(nil)
+
+		loginReq := map[string]string{
+			"username": "test@example.com",
+			"password": "password123",
+		}
+
+		// Each IP should be able to make requests independently
+		for i := 0; i < 5; i++ {
+			body, _ := json.Marshal(loginReq)
+			req := httptest.NewRequest("POST", "/api/v1/auth/login", bytes.NewReader(body))
+			req.RemoteAddr = fmt.Sprintf("10.0.0.%d:12345", i+1)
+			w := httptest.NewRecorder()
+
+			server.router.ServeHTTP(w, req)
+
+			// Should not be rate limited (different IPs)
+			if w.Code == http.StatusTooManyRequests {
+				t.Errorf("request from IP %d should not be rate limited, got status %d", i+1, w.Code)
+			}
+		}
+	})
+
+	t.Run("Refresh endpoint has rate limiting", func(t *testing.T) {
+		server := setupTestServer(t)
+		defer server.Shutdown(nil)
+
+		refreshReq := map[string]string{
+			"refresh_token": "fake-token",
+		}
+
+		// Make requests up to IP limit
+		for i := 0; i < 10; i++ {
+			body, _ := json.Marshal(refreshReq)
+			req := httptest.NewRequest("POST", "/api/v1/auth/refresh", bytes.NewReader(body))
+			req.RemoteAddr = "192.168.3.100:12345"
+			w := httptest.NewRecorder()
+
+			server.router.ServeHTTP(w, req)
+
+			// Should not be rate limited yet
+			if w.Code == http.StatusTooManyRequests {
+				t.Fatalf("refresh request %d should not be rate limited, got status %d", i+1, w.Code)
+			}
+		}
+
+		// 11th request should be rate limited
+		body, _ := json.Marshal(refreshReq)
+		req := httptest.NewRequest("POST", "/api/v1/auth/refresh", bytes.NewReader(body))
+		req.RemoteAddr = "192.168.3.100:12345"
+		w := httptest.NewRecorder()
+
+		server.router.ServeHTTP(w, req)
+
+		assert.Equal(t, http.StatusTooManyRequests, w.Code, "11th refresh request should be rate limited")
+	})
+
+	t.Run("Rate limit stricter than global limit", func(t *testing.T) {
+		server := setupTestServer(t)
+		defer server.Shutdown(nil)
+
+		// Auth endpoints should have 10 req/min IP limit and 5 req/5min account limit
+		// The account limit (5) will be hit first when using same username
+		// This test verifies auth-specific limits are enforced
+
+		loginReq := map[string]string{
+			"username": "test@example.com",
+			"password": "password123",
+		}
+
+		successCount := 0
+		for i := 0; i < 20; i++ {
+			body, _ := json.Marshal(loginReq)
+			req := httptest.NewRequest("POST", "/api/v1/auth/login", bytes.NewReader(body))
+			req.RemoteAddr = "192.168.4.100:12345"
+			w := httptest.NewRecorder()
+
+			server.router.ServeHTTP(w, req)
+
+			if w.Code != http.StatusTooManyRequests {
+				successCount++
+			}
+		}
+
+		// Should allow exactly 5 requests (account limit), not 10 (IP limit) or 20 (would be global limit)
+		assert.Equal(t, 5, successCount, "should enforce auth-specific account limit of 5")
+	})
 }

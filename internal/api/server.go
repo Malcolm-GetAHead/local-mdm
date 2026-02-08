@@ -19,13 +19,14 @@ import (
 
 // Server represents the HTTP server
 type Server struct {
-	router         *mux.Router
-	db             *db.DB
-	config         *config.Config
-	logger         *slog.Logger
-	authMiddleware *auth.Middleware
-	auditLogger    *audit.Logger
-	server         *http.Server
+	router          *mux.Router
+	db              *db.DB
+	config          *config.Config
+	logger          *slog.Logger
+	authMiddleware  *auth.Middleware
+	auditLogger     *audit.Logger
+	server          *http.Server
+	authRateLimiter *authRateLimiter
 }
 
 // New creates a new API server
@@ -45,6 +46,11 @@ func New(cfg *config.Config, database *db.DB, logger *slog.Logger) (*Server, err
 	}
 	s.authMiddleware = auth.NewMiddleware(validator, logger)
 	s.authMiddleware.SetAuditLogger(s.auditLogger)
+	
+	// Initialize strict rate limiter for auth endpoints
+	// IP-based: 10 attempts per minute
+	// Account-based: 5 attempts per 5 minutes
+	s.authRateLimiter = newAuthRateLimiter(10, time.Minute, 5, 5*time.Minute)
 	
 	s.setupRoutes()
 	s.setupMiddleware()
@@ -69,9 +75,10 @@ func (s *Server) setupRoutes() {
 	// API v1 routes
 	api := s.router.PathPrefix("/api/v1").Subrouter()
 	
-	// Auth routes (no auth required)
-	api.HandleFunc("/auth/login", s.handleLogin).Methods("POST")
-	api.HandleFunc("/auth/refresh", s.handleRefresh).Methods("POST")
+	// Auth routes (no auth required, but strict rate limiting)
+	authLimiter := authRateLimitMiddleware(s.authRateLimiter)
+	api.Handle("/auth/login", authLimiter(http.HandlerFunc(s.handleLogin))).Methods("POST")
+	api.Handle("/auth/refresh", authLimiter(http.HandlerFunc(s.handleRefresh))).Methods("POST")
 	
 	// Protected routes (require auth)
 	// Enterprises
@@ -194,6 +201,10 @@ func (s *Server) Start() error {
 
 // Shutdown gracefully shuts down the server
 func (s *Server) Shutdown(ctx context.Context) error {
+	// Stop auth rate limiter background goroutines
+	if s.authRateLimiter != nil {
+		s.authRateLimiter.Stop()
+	}
 	return s.server.Shutdown(ctx)
 }
 
