@@ -193,10 +193,13 @@ func (s *Server) setupRoutes() {
 
 // setupMiddleware configures middleware
 func (s *Server) setupMiddleware() {
-	// Request size limit - apply first to reject large requests early
+	// Tracing - apply first to capture all requests
+	s.router.Use(tracingMiddleware)
+
+	// Request size limit - apply second to reject large requests early
 	s.router.Use(requestSizeLimitMiddleware(constants.MaxRequestBodySize))
 
-	// Compression - apply second for maximum benefit
+	// Compression - apply third for maximum benefit
 	s.router.Use(compressionMiddleware)
 
 	// Request timeout - apply early to enforce on all requests

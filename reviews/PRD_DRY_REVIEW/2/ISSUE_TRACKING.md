@@ -1,12 +1,12 @@
 # Issue Tracking - v1.0 POC Readiness
 
-**Last Updated**: 2026-02-08 11:35 EST  
+**Last Updated**: 2026-02-08 11:40 EST  
 **Scope**: v1.0 POC (local development)  
 **Total Issues**: 24  
-**Resolved**: 20 ✅  
-**Deferred**: 2 high priority (H-06, H-07 to post-v1.0)  
+**Resolved**: 21 ✅  
+**Deferred**: 1 (H-06 to post-v1.0)  
 **Optional**: 2 (M-12, L-05)  
-**Status**: 🟡 **83.3% Complete - Need to assess H-06 & H-07**
+**Status**: ✅ **87.5% Complete - All Critical + 6/8 High Priority Done**
 
 ---
 
@@ -28,7 +28,7 @@
 | H-04 | No DB Connection Retry | HIGH | ✅ Done | - | 0.25 days | 2026-02-08 | Exponential backoff retry |
 | H-05 | No Query Timeout | HIGH | ✅ Done | - | 0.25 days | 2026-02-08 | DSN-level statement timeout |
 | H-06 | Audit Logs Unbounded | HIGH | ⏸️ Deferred | - | 0.5 days | - | Post-v1.0 (F-04) |
-| H-07 | No Distributed Tracing | HIGH | ⏸️ Deferred | - | 1 day | - | Post-v1.0 (F-05) OpenTelemetry |
+| H-07 | No Distributed Tracing | HIGH | ✅ Done | - | 1 day | 2026-02-08 | OpenTelemetry + stdout exporter, 4 tests |
 | H-08 | No Pagination Limits | HIGH | ✅ Done | - | 0.25 days | 2026-02-08 | Max 1000, default 100 |
 
 ---
@@ -94,10 +94,10 @@ These are **intentionally deferred** to future tasks and NOT blockers for v1.0:
 
 ### By Priority
 - **Critical**: 1/1 (100%) ✅ **COMPLETE**
-- **High**: 5/8 (62.5%) ✅ **H-01, H-02, H-03, H-04, H-05, H-08 DONE** (H-06, H-07 deferred to post-v1.0)
+- **High**: 6/8 (75%) ✅ **H-01, H-02, H-03, H-04, H-05, H-07, H-08 DONE** (H-06 deferred to post-v1.0)
 - **Medium**: 7/8 (87.5%) ✅ **M-02, M-04, M-06, M-08, M-09, M-10, M-11 DONE** (M-12 optional)
 - **Low**: 6/7 (85.7%) ✅ **L-01, L-02, L-03, L-04, L-06, L-07 DONE** (L-05 optional)
-- **Overall**: 20/24 (83.3%) - **All critical complete, 5/8 high priority for v1.0**
+- **Overall**: 21/24 (87.5%) - **All critical + 6/8 high priority complete**
 
 ### By Effort
 - **Total Effort**: 7.5 days

@@ -13,6 +13,7 @@ import (
 	"github.com/malcolm-getahead/local-mdm/internal/config"
 	"github.com/malcolm-getahead/local-mdm/internal/db"
 	"github.com/malcolm-getahead/local-mdm/internal/logging"
+	"github.com/malcolm-getahead/local-mdm/internal/tracing"
 )
 
 const version = "0.1.0"
@@ -51,6 +52,33 @@ func main() {
 	}
 	defer database.Close()
 	logger.Info("Database connection established")
+
+	// Initialize tracing if enabled
+	var tracerProvider interface{ Shutdown(context.Context) error }
+	if cfg.Tracing.Enabled {
+		serviceName := cfg.Tracing.Service
+		if serviceName == "" {
+			serviceName = "local-mdm"
+		}
+		serviceVersion := cfg.Tracing.Version
+		if serviceVersion == "" {
+			serviceVersion = version
+		}
+
+		tp, err := tracing.InitTracer(serviceName, serviceVersion, logger)
+		if err != nil {
+			logger.Warn("Failed to initialize tracing", "error", err)
+		} else {
+			tracerProvider = tp
+			defer func() {
+				ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+				defer cancel()
+				if err := tracerProvider.Shutdown(ctx); err != nil {
+					logger.Error("Failed to shutdown tracer", "error", err)
+				}
+			}()
+		}
+	}
 
 	// Create API server
 	server, err := api.New(cfg, database, logger)

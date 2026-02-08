@@ -23,6 +23,14 @@ type Config struct {
 	Android      AndroidConfig      `yaml:"android"`
 	Logging      LoggingConfig      `yaml:"logging"`
 	Features     FeaturesConfig     `yaml:"features"`
+	Tracing      TracingConfig      `yaml:"tracing"`
+}
+
+// TracingConfig holds distributed tracing configuration
+type TracingConfig struct {
+	Enabled bool   `yaml:"enabled"`
+	Service string `yaml:"service"`
+	Version string `yaml:"version"`
 }
 
 // CORSConfig holds CORS configuration

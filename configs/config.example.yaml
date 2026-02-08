@@ -101,6 +101,11 @@ logging:
   output: "stdout"  # stdout, file
   file_path: "./logs/app.log"
 
+tracing:
+  enabled: false  # Enable distributed tracing (stdout exporter)
+  service: "local-mdm"
+  version: "0.1.0"
+
 features:
   enable_audit_log: true
   enable_webhooks: false
