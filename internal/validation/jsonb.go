@@ -16,6 +16,25 @@ func ValidateJSONB(data interface{}, maxDepth int) error {
 		return nil
 	}
 
+	// For json.RawMessage, check size before parsing (fast path)
+	if raw, ok := data.(json.RawMessage); ok {
+		if len(raw) > MaxJSONBSize {
+			return fmt.Errorf("JSON exceeds maximum size of %d bytes", MaxJSONBSize)
+		}
+
+		var obj interface{}
+		if err := json.Unmarshal(raw, &obj); err != nil {
+			return fmt.Errorf("invalid JSON: %w", err)
+		}
+
+		if depth := calculateDepth(obj); depth > maxDepth {
+			return fmt.Errorf("JSON nesting depth %d exceeds maximum of %d", depth, maxDepth)
+		}
+
+		return nil
+	}
+
+	// For other types, marshal first
 	bytes, err := json.Marshal(data)
 	if err != nil {
 		return fmt.Errorf("invalid JSON: %w", err)

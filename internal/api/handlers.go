@@ -13,18 +13,48 @@ import (
 func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
-	
+
+	type healthCheck struct {
+		Status   string            `json:"status"`
+		Version  string            `json:"version"`
+		Checks   map[string]string `json:"checks"`
+		Timestamp time.Time        `json:"timestamp"`
+	}
+
+	checks := make(map[string]string)
+	allHealthy := true
+
 	// Check database
 	if err := s.db.Health(ctx); err != nil {
-		respondError(w, r, http.StatusServiceUnavailable, "unhealthy", "Database connection failed")
-		return
+		checks["database"] = "unhealthy: " + err.Error()
+		allHealthy = false
+	} else {
+		checks["database"] = "healthy"
 	}
-	
-	respondJSON(w, r, http.StatusOK, map[string]string{
-		"status":   "healthy",
-		"database": "connected",
-		"version":  "1.0.0",
-	})
+
+	// Check Keycloak
+	if err := s.authMiddleware.HealthCheck(ctx); err != nil {
+		checks["keycloak"] = "degraded: " + err.Error()
+		// Don't mark as unhealthy - Keycloak issues shouldn't fail health check
+	} else {
+		checks["keycloak"] = "healthy"
+	}
+
+	status := "healthy"
+	httpStatus := http.StatusOK
+	if !allHealthy {
+		status = "unhealthy"
+		httpStatus = http.StatusServiceUnavailable
+	}
+
+	health := healthCheck{
+		Status:    status,
+		Version:   "1.0.0",
+		Checks:    checks,
+		Timestamp: time.Now(),
+	}
+
+	respondJSON(w, r, httpStatus, health)
 }
 
 // Version handler

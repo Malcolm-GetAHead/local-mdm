@@ -303,3 +303,23 @@ func validateJWKSURL(urlStr string) error {
 	
 	return nil
 }
+
+// HealthCheck verifies Keycloak connectivity by fetching JWKS
+func (v *OIDCValidator) HealthCheck(ctx context.Context) error {
+	req, err := http.NewRequestWithContext(ctx, "GET", v.jwksURL, nil)
+	if err != nil {
+		return fmt.Errorf("failed to create health check request: %w", err)
+	}
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("keycloak unreachable: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("keycloak returned status %d", resp.StatusCode)
+	}
+
+	return nil
+}

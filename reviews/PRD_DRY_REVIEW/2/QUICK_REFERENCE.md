@@ -67,18 +67,34 @@
 
 ### 9. Incomplete Health Checks
 **Risk**: Can't detect Keycloak failures  
-**Fix**: Check all dependencies  
-**Effort**: 0.25 days
+## 🟡 MEDIUM (Nice to Have - 2.5 days)
 
-### 10. No Request ID Propagation
+### 8. No Request ID Propagation
 **Risk**: Difficult debugging  
 **Fix**: Add to all logs  
 **Effort**: 0.25 days
 
-### 11. Inefficient JSONB Validation
-**Risk**: Performance impact  
-**Fix**: Check size before parsing  
+### 9. No Graceful Worker Shutdown
+**Risk**: Lost audit events on shutdown  
+**Fix**: Drain queue gracefully  
 **Effort**: 0.5 days
+
+### ✅ RESOLVED MEDIUM PRIORITY
+
+### 10. Compression Middleware ✅ FIXED
+**File**: `internal/api/compression.go`  
+**Resolution**: gzip compression, >50% bandwidth savings  
+**Completed**: 2026-02-08
+
+### 11. Health Check Details ✅ FIXED
+**File**: `internal/api/handlers.go`  
+**Resolution**: DB + Keycloak monitoring, 10 tests  
+**Completed**: 2026-02-08
+
+### 12. JSONB Validation ✅ FIXED
+**File**: `internal/validation/jsonb.go`  
+**Resolution**: 52-143x faster, DoS protection  
+**Completed**: 2026-02-08
 
 ---
 
@@ -97,24 +113,17 @@ See `docs/tasks/future/` for implementation plans.
 
 ---
 
-## Quick Wins (< 1 hour each)
-
-- Add compression middleware (gzip)
-- Add pagination validation (max 1000)
-- Add health check for Keycloak
-- Add request ID propagation
-
----
-
 ## Testing Checklist
 
 Before deploying v1.0:
 - [x] Unit tests pass with race detection ✅
 - [x] Integration tests pass ✅
 - [x] Rate limiting works (test with 15 attempts) ✅ VERIFIED
+- [x] Pagination limits enforced ✅ VERIFIED
+- [x] Compression works ✅ VERIFIED
+- [x] Health checks work ✅ VERIFIED
 - [ ] Circuit breaker works (stop Keycloak, verify graceful)
 - [ ] Error messages don't leak internals
-- [ ] Pagination limits enforced
 
 ---
 

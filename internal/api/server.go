@@ -154,7 +154,10 @@ func (s *Server) setupRoutes() {
 
 // setupMiddleware configures middleware
 func (s *Server) setupMiddleware() {
-	// Request timeout - apply first to enforce on all requests
+	// Compression - apply first for maximum benefit
+	s.router.Use(compressionMiddleware)
+
+	// Request timeout - apply early to enforce on all requests
 	timeout := s.config.Server.RequestTimeout
 	if timeout == 0 {
 		timeout = 30 * time.Second // Default

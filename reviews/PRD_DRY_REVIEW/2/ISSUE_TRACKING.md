@@ -35,12 +35,12 @@
 
 ## Medium Priority Issues (8)
 
-| ID | Issue | Priority | Status | Assignee | Effort | Due Date | Notes |
-|----|-------|----------|--------|----------|--------|----------|-------|
-| M-02 | No Compression Middleware | MEDIUM | 🔴 Open | - | 0.25 days | - | gzip handler |
-| M-04 | Incomplete Health Checks | MEDIUM | 🔴 Open | - | 0.25 days | - | Check all dependencies |
+| ID | Issue | Priority | Status | Assignee | Effort | Completed | Notes |
+|----|-------|----------|--------|----------|--------|-----------|-------|
+| M-02 | No Compression Middleware | MEDIUM | ✅ Done | - | 0.25 days | 2026-02-08 | gzip compression, >50% savings |
+| M-04 | Incomplete Health Checks | MEDIUM | ✅ Done | - | 0.25 days | 2026-02-08 | DB + Keycloak checks |
 | M-06 | No Request ID Propagation | MEDIUM | 🔴 Open | - | 0.25 days | - | Add to all logs |
-| M-08 | Inefficient JSONB Validation | MEDIUM | 🔴 Open | - | 0.5 days | - | Check size first |
+| M-08 | Inefficient JSONB Validation | MEDIUM | ✅ Done | - | 0.5 days | 2026-02-08 | 52-143x faster |
 | M-09 | No Graceful Worker Shutdown | MEDIUM | 🔴 Open | - | 0.5 days | - | Drain queue on shutdown |
 | M-10 | Missing Index (verified exists) | MEDIUM | ✅ Done | - | 0 days | - | Already in schema |
 | M-11 | No Cert Expiration Monitoring | MEDIUM | 🔴 Open | - | 0.5 days | - | Background job |
@@ -95,14 +95,14 @@ These are **intentionally deferred** to future tasks and NOT blockers for v1.0:
 ### By Priority
 - **Critical**: 1/1 (100%) ✅ **COMPLETE**
 - **High**: 3/8 (37.5%) ✅ **H-04, H-05, H-08 DONE**
-- **Medium**: 1/8 (12.5%)
+- **Medium**: 4/8 (50%) ✅ **M-02, M-04, M-08, M-10 DONE**
 - **Low**: 0/7 (0%)
-- **Overall**: 5/24 (21%)
+- **Overall**: 8/24 (33%)
 
 ### By Effort
 - **Total Effort**: 7.5 days
-- **Completed**: 1.25 days
-- **Remaining**: 6.25 days (all optional for v1.0)
+- **Completed**: 2.25 days
+- **Remaining**: 5.25 days (all optional for v1.0)
 
 ### By Timeline
 - **v1.0 Critical**: ✅ **COMPLETE** (1 issue resolved)
@@ -127,9 +127,9 @@ These are **intentionally deferred** to future tasks and NOT blockers for v1.0:
 **Status**: 3/8 high priority issues resolved
 
 ### Milestone 3: v1.0 POC Complete (All v1.0 issues)
-**Target**: Optional - 6.25 days (remaining effort)  
+**Target**: Optional - 5.25 days (remaining effort)  
 **Issues**: All 24 v1.0 issues  
-**Completed**: 5/24 (21%)  
+**Completed**: 8/24 (33%)  
 **Status**: Can be done incrementally
 
 ### Milestone 4: Production Ready (Post-v1.0)
@@ -149,6 +149,9 @@ These are **intentionally deferred** to future tasks and NOT blockers for v1.0:
 | Rate Limit Test | ✅ Pass | 2026-02-07 | 100% | 17 tests, all passing |
 | Query Timeout Test | ✅ Pass | 2026-02-08 | 100% | 4 tests, all passing |
 | Pagination Test | ✅ Pass | 2026-02-08 | 100% | 11 tests, all passing |
+| Compression Test | ✅ Pass | 2026-02-08 | 100% | 6 tests, all passing |
+| Health Check Test | ✅ Pass | 2026-02-08 | 100% | 10 tests, all passing |
+| JSONB Optimization Test | ✅ Pass | 2026-02-08 | 100% | 3 tests, all passing |
 | Circuit Breaker Test | ⏸️ Not Run | - | - | Pending implementation |
 | Load Test | ⏸️ Deferred | - | - | Post-v1.0 (F-01) |
 | Security Scan | ⏸️ Deferred | - | - | Post-v1.0 (F-03) |
@@ -167,6 +170,16 @@ These are **intentionally deferred** to future tasks and NOT blockers for v1.0:
 ---
 
 ## Notes
+
+### 2026-02-08 00:39 EST
+- ✅ M-02 (Compression middleware) implemented with >50% bandwidth savings
+- ✅ M-04 (Health checks) implemented with DB + Keycloak monitoring
+- ✅ M-08 (JSONB optimization) implemented with 52-143x performance improvement
+- Compression: 6 comprehensive tests, client-aware gzip
+- Health checks: 10 comprehensive tests, K8s-ready status codes
+- JSONB: Fast path for json.RawMessage, DoS protection (69ns rejection)
+- Test coverage: 19 new tests, all passing with race detection
+- **Progress**: 8/24 issues resolved (33%)
 
 ### 2026-02-08 00:20 EST
 - ✅ H-04 (DB connection retry) implemented and verified

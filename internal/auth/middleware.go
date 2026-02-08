@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"context"
 	"log/slog"
 	"net"
 	"net/http"
@@ -151,6 +152,11 @@ func (m *Middleware) OptionalAuth(next http.Handler) http.Handler {
 		// Continue without auth
 		next.ServeHTTP(w, r)
 	})
+}
+
+// HealthCheck verifies Keycloak connectivity
+func (m *Middleware) HealthCheck(ctx context.Context) error {
+	return m.validator.HealthCheck(ctx)
 }
 
 // getIP extracts the client IP address from the request

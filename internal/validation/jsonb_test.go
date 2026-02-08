@@ -1,8 +1,12 @@
 package validation
 
 import (
+	"encoding/json"
+	"fmt"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestValidateJSONB(t *testing.T) {
@@ -238,4 +242,73 @@ func TestCalculateDepth(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestValidateJSONB_RawMessage(t *testing.T) {
+	t.Run("fast path for json.RawMessage", func(t *testing.T) {
+		raw := json.RawMessage(`{"key":"value"}`)
+		err := ValidateJSONB(raw, 10)
+		assert.NoError(t, err)
+	})
+
+	t.Run("rejects oversized json.RawMessage before parsing", func(t *testing.T) {
+		// Create a large JSON that exceeds MaxJSONBSize
+		large := make([]byte, MaxJSONBSize+1)
+		for i := range large {
+			large[i] = 'a'
+		}
+		raw := json.RawMessage(large)
+
+		err := ValidateJSONB(raw, 10)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "exceeds maximum size")
+	})
+
+	t.Run("validates depth for json.RawMessage", func(t *testing.T) {
+		deep := `{"a":{"b":{"c":{"d":{"e":{"f":"too deep"}}}}}}`
+		raw := json.RawMessage(deep)
+
+		err := ValidateJSONB(raw, 5)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "nesting depth")
+	})
+}
+
+func BenchmarkValidateJSONB(b *testing.B) {
+	smallJSON := json.RawMessage(`{"key":"value"}`)
+	mediumJSON := json.RawMessage(`{"users":[{"id":1,"name":"test","email":"test@example.com"}]}`)
+	
+	// Create large JSON
+	largeData := make(map[string]interface{})
+	for i := 0; i < 100; i++ {
+		largeData[fmt.Sprintf("key%d", i)] = fmt.Sprintf("value%d", i)
+	}
+	largeBytes, _ := json.Marshal(largeData)
+	largeJSON := json.RawMessage(largeBytes)
+
+	b.Run("small json.RawMessage", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			_ = ValidateJSONB(smallJSON, 10)
+		}
+	})
+
+	b.Run("medium json.RawMessage", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			_ = ValidateJSONB(mediumJSON, 10)
+		}
+	})
+
+	b.Run("large json.RawMessage", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			_ = ValidateJSONB(largeJSON, 10)
+		}
+	})
+
+	b.Run("oversized json.RawMessage (fast rejection)", func(b *testing.B) {
+		oversized := make([]byte, MaxJSONBSize+1)
+		raw := json.RawMessage(oversized)
+		for i := 0; i < b.N; i++ {
+			_ = ValidateJSONB(raw, 10)
+		}
+	})
 }
