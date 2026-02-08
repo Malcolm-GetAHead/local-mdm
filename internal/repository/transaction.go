@@ -127,7 +127,7 @@ func (t *transactor) WithTransactionIsolation(ctx context.Context, isolation Iso
 	if err != nil {
 		// Rollback on error
 		if rbErr := tx.Rollback(); rbErr != nil {
-			return fmt.Errorf("rollback failed: %v (original error: %w)", rbErr, err)
+			return fmt.Errorf("rollback failed: %w (original error: %v)", rbErr, err)
 		}
 		return err
 	}
