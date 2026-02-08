@@ -60,9 +60,9 @@ func TestLogger_Log_Success(t *testing.T) {
 	err := logger.Log(ctx, event)
 	require.NoError(t, err)
 
-	// Verify the log was written
+	// Verify the log was written (use resource_id for uniqueness)
 	var count int
-	err = database.QueryRowContext(ctx, "SELECT COUNT(*) FROM audit_logs WHERE action = $1", "device.create").Scan(&count)
+	err = database.QueryRowContext(ctx, "SELECT COUNT(*) FROM audit_logs WHERE resource_id = $1", resourceID).Scan(&count)
 	require.NoError(t, err)
 	assert.Equal(t, 1, count)
 

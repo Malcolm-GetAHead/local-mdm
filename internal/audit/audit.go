@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"net"
 	"time"
 
@@ -14,7 +15,8 @@ import (
 
 // Logger writes audit events to the database
 type Logger struct {
-	db *sql.DB
+	db     *sql.DB
+	logger *slog.Logger
 }
 
 // Event represents an audit log entry
@@ -31,7 +33,17 @@ type Event struct {
 
 // NewLogger creates a new audit logger
 func NewLogger(db *sql.DB) *Logger {
-	return &Logger{db: db}
+	return &Logger{
+		db:     db,
+		logger: slog.Default(),
+	}
+}
+
+// SetLogger sets a custom structured logger
+func (l *Logger) SetLogger(logger *slog.Logger) {
+	if logger != nil {
+		l.logger = logger
+	}
 }
 
 // Log writes an audit event to the database
@@ -67,7 +79,30 @@ func (l *Logger) Log(ctx context.Context, event Event) error {
 	)
 
 	if err != nil {
+		// Log error with structured fields
+		if l.logger != nil {
+			l.logger.Error("Failed to write audit log",
+				"error", err,
+				"enterprise_id", event.EnterpriseID,
+				"user_id", event.UserID,
+				"action", event.Action,
+				"resource_type", event.ResourceType,
+				"resource_id", event.ResourceID,
+			)
+		}
 		return fmt.Errorf("failed to insert audit log: %w", err)
+	}
+
+	// Log successful audit event with structured fields
+	if l.logger != nil {
+		l.logger.Info("Audit event logged",
+			"enterprise_id", event.EnterpriseID,
+			"user_id", event.UserID,
+			"action", event.Action,
+			"resource_type", event.ResourceType,
+			"resource_id", event.ResourceID,
+			"ip_address", event.IPAddress,
+		)
 	}
 
 	return nil

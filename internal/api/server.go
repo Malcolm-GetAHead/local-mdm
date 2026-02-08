@@ -163,7 +163,10 @@ func (s *Server) setupRoutes() {
 
 // setupMiddleware configures middleware
 func (s *Server) setupMiddleware() {
-	// Compression - apply first for maximum benefit
+	// Request size limit - apply first to reject large requests early
+	s.router.Use(requestSizeLimitMiddleware(constants.MaxRequestBodySize))
+
+	// Compression - apply second for maximum benefit
 	s.router.Use(compressionMiddleware)
 
 	// Request timeout - apply early to enforce on all requests
@@ -188,9 +191,6 @@ func (s *Server) setupMiddleware() {
 		s.router.Use(rateLimitMiddleware(globalLimiter))
 		s.logger.Info("Rate limiting enabled", "limit", limit, "window", window)
 	}
-	
-	// Request size limiting
-	s.router.Use(requestSizeLimitMiddleware(constants.MaxRequestBodySize))
 	
 	s.router.Use(requestIDMiddleware)
 	s.router.Use(s.loggingMiddleware)

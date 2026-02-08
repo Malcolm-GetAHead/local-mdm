@@ -155,27 +155,43 @@ tracing:
 
 ---
 
-### M-07: No Structured Logging for Audit Events
-**Effort**: 0.25 days | **Impact**: Difficult to query audit logs
+### M-07: No Structured Logging for Audit Events ✅ RESOLVED
+**Effort**: 0.25 days | **Impact**: Difficult to query audit logs  
+**Status**: ✅ **COMPLETE** (2026-02-08)
 
 **Problem**: Audit logs stored as JSONB but not structured in application logs.
 
-**Solution**: Structured audit logging
-- Log audit events with structured fields
-- Include enterprise_id, user_id, action, resource_type
+**Solution Implemented**: Structured audit logging
+- Added slog integration to audit logger
+- Log audit events with structured fields (enterprise_id, user_id, action, resource_type, resource_id, ip_address)
+- Log both success and failure events
 - Searchable in log aggregation tools
+
+**Files Modified**:
+- `internal/audit/audit.go` - Added logger field and structured logging
+- `internal/audit/structured_logging_test.go` (NEW) - 237 lines of tests
 
 ---
 
-### M-08: Missing Index on audit_logs.created_at
-**Effort**: 0.1 days | **Impact**: Slow audit log queries
+### M-08: Missing Index on audit_logs.created_at ✅ RESOLVED
+**Effort**: 0.1 days | **Impact**: Slow audit log queries  
+**Status**: ✅ **COMPLETE** (2026-02-08)
 
-**Problem**: Queries by date range are slow.
+**Problem**: Queries by date range with `ORDER BY created_at DESC` are slow.
 
-**Solution**: Add index
+**Solution Implemented**: Add optimized descending index
 ```sql
-CREATE INDEX idx_audit_logs_created_at ON audit_logs(created_at DESC);
+CREATE INDEX idx_audit_logs_created_at_desc ON audit_logs(created_at DESC);
 ```
+
+**Benefits**:
+- Optimized for `ORDER BY created_at DESC` queries
+- Faster pagination through recent logs
+- Better query planner decisions
+
+**Files Created**:
+- `migrations/000002_audit_log_index_optimization.up.sql` (NEW)
+- `migrations/000002_audit_log_index_optimization.down.sql` (NEW)
 
 ---
 
