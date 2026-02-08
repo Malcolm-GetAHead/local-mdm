@@ -2,9 +2,9 @@
 
 **Priority**: MEDIUM  
 **Total Issues**: 12  
-**Resolved**: 3 ✅  
-**Remaining**: 9  
-**Estimated Effort**: 3.5 days (remaining)  
+**Resolved**: 4 ✅  
+**Remaining**: 8  
+**Estimated Effort**: 3.25 days (remaining)  
 **Risk Level**: Moderate performance, maintainability concerns
 
 ---
@@ -144,12 +144,59 @@ s.router.Handle("/metrics", promhttp.Handler())
 
 ---
 
-## M-06: Missing Request ID Propagation
-**Severity**: MEDIUM | **Category**: Observability | **Effort**: 0.25 days
+## M-06: Missing Request ID Propagation ✅ RESOLVED
 
+**Severity**: MEDIUM  
+**Category**: Observability  
+**Effort**: 0.25 days  
+**Status**: ✅ **RESOLVED** (2026-02-08)
+
+### Problem
 Request IDs are generated but not propagated to database queries or external calls.
 
-**Fix**: Add request ID to context and log it in all operations.
+### Resolution
+Implemented comprehensive request ID middleware with full propagation.
+
+**Implementation**:
+- `internal/api/server.go` - `requestIDMiddleware()` generates UUIDs
+- `internal/api/request_id.go` - `GetRequestID(ctx)` helper
+- `internal/auth/context.go` - `requestIDKey` constant
+- `internal/auth/middleware.go` - Request ID propagated to all auth logs
+
+**Key Features**:
+```go
+func requestIDMiddleware(next http.Handler) http.Handler {
+    return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+        requestID := uuid.New().String()
+        ctx := context.WithValue(r.Context(), requestIDKey, requestID)
+        w.Header().Set("X-Request-ID", requestID)
+        next.ServeHTTP(w, r.WithContext(ctx))
+    })
+}
+```
+
+- UUID generation: Each request gets unique ID
+- Context propagation: ID stored in context, accessible everywhere
+- Response header: `X-Request-ID` returned to client
+- Helper functions: `api.GetRequestID(ctx)` and `auth.GetRequestID(ctx)`
+- Integrated in middleware chain: Applied first for all requests
+- Propagated to logs: All auth middleware logs include request_id
+
+**Test Coverage**: `internal/api/request_id_test.go` + `internal/auth/request_id_unit_test.go` (8 tests)
+```
+✅ Returns empty string when not set (api + auth)
+✅ Returns request ID when set (api + auth)
+✅ Returns empty string for wrong type (api + auth)
+✅ Returns empty string for nil value (api + auth)
+```
+
+### Verification
+✅ UUID generated for each request  
+✅ Propagated through context  
+✅ Returned in X-Request-ID header  
+✅ Included in all auth logs  
+✅ Helper functions in both packages  
+✅ All tests passing
 
 ---
 

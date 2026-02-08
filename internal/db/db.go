@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/malcolm-getahead/local-mdm/internal/config"
+	"github.com/malcolm-getahead/local-mdm/internal/constants"
 	_ "github.com/lib/pq"
 )
 
@@ -51,8 +52,8 @@ func validateConnectionLimits(cfg config.DatabaseConfig) error {
 	if cfg.MaxOpenConns <= 0 {
 		return fmt.Errorf("max_open_conns must be positive, got: %d", cfg.MaxOpenConns)
 	}
-	if cfg.MaxOpenConns > 100 {
-		return fmt.Errorf("max_open_conns must not exceed 100 (PostgreSQL default limit), got: %d", cfg.MaxOpenConns)
+	if cfg.MaxOpenConns > constants.MaxDatabaseConnections {
+		return fmt.Errorf("max_open_conns must not exceed %d (PostgreSQL default limit), got: %d", constants.MaxDatabaseConnections, cfg.MaxOpenConns)
 	}
 
 	// Validate MaxIdleConns

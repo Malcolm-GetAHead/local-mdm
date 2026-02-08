@@ -14,6 +14,7 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
+	"github.com/malcolm-getahead/local-mdm/internal/constants"
 )
 
 type OIDCValidator struct {
@@ -88,7 +89,7 @@ func (v *OIDCValidator) refreshJWKS() error {
 		Transport: &http.Transport{
 			DialContext: (&net.Dialer{
 				Timeout:   5 * time.Second,
-				KeepAlive: 30 * time.Second,
+				KeepAlive: constants.DefaultRequestTimeout * time.Second,
 			}).DialContext,
 			TLSHandshakeTimeout:   5 * time.Second,
 			ResponseHeaderTimeout: 5 * time.Second,
@@ -118,7 +119,7 @@ func (v *OIDCValidator) refreshJWKS() error {
 	}
 	
 	// Limit response body size to prevent memory exhaustion
-	limitedReader := io.LimitReader(resp.Body, 1<<20) // 1MB max
+	limitedReader := io.LimitReader(resp.Body, constants.MaxJWKSResponseSize)
 	
 	var jwks JWKS
 	if err := json.NewDecoder(limitedReader).Decode(&jwks); err != nil {

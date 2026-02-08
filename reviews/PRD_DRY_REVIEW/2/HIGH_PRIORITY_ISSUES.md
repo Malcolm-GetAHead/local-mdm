@@ -2,9 +2,9 @@
 
 **Priority**: HIGH  
 **Total Issues**: 8  
-**Resolved**: 3 ✅  
-**Remaining**: 5  
-**Estimated Effort**: 1.5 days (remaining)  
+**Resolved**: 4 ✅  
+**Remaining**: 4  
+**Estimated Effort**: 1 day (remaining)  
 **Risk Level**: Moderate operational concerns
 
 ---
@@ -225,129 +225,60 @@ func (tc *TokenCache) Set(token string, user *AuthUser) {
 
 ---
 
-## H-02: Error Messages Leak Internal Details
+## H-02: Error Messages Leak Internal Details ✅ RESOLVED
 
 **Severity**: HIGH  
 **Category**: Security  
 **Impact**: Information disclosure aids attackers  
-**Effort**: 0.5 days
+**Effort**: 0.5 days  
+**Status**: ✅ **RESOLVED** (2026-02-08)
 
 ### Problem
 Error messages expose internal implementation details, database structure, and file paths.
 
-**Examples**:
-```go
-// internal/repository/device.go:45
-return nil, fmt.Errorf("failed to get device %s: %w", id, err)
-// Exposes: "failed to get device <uuid>: pq: relation "devices" does not exist"
+### Resolution
+Implemented comprehensive error sanitization with dual representation (internal vs external).
 
-// internal/config/config.go:195
-return fmt.Errorf("failed to read config file: %w", err)
-// Exposes: "failed to read config file: open /etc/local-mdm/config.yaml: permission denied"
+**Implementation**:
+- `internal/apperrors/errors.go` - AppError type with sanitized messages
+- `internal/api/error_handler.go` - HandleError function with secure logging
+
+**Key Features**:
+- Sanitized messages: "An internal error occurred" instead of database details
+- Secure logging: Internal details logged with request ID, never sent to client
+- Error codes: Machine-readable codes (not_found, internal_error, validation_failed, etc.)
+- Proper error chain: Unwrap() support for errors.Is() and errors.As()
+- Request ID integration: All error logs include request_id for correlation
+
+**Example**:
+```go
+// Internal error with sensitive details
+internal := errors.New("pq: relation \"devices\" does not exist at /internal/repository/device.go:42")
+err := apperrors.NewInternal(internal)
+
+// Client receives: "An internal error occurred"
+// Logs contain: Full internal error + request ID + path + method
 ```
 
-### Fix
-Sanitize error messages for external responses.
-
-```go
-// internal/api/errors.go
-package api
-
-import (
-    "errors"
-    "fmt"
-    "log/slog"
-    "net/http"
-)
-
-type ErrorCode string
-
-const (
-    ErrCodeNotFound        ErrorCode = "not_found"
-    ErrCodeUnauthorized    ErrorCode = "unauthorized"
-    ErrCodeForbidden       ErrorCode = "forbidden"
-    ErrCodeValidation      ErrorCode = "validation_failed"
-    ErrCodeInternal        ErrorCode = "internal_error"
-    ErrCodeServiceUnavailable ErrorCode = "service_unavailable"
-)
-
-type AppError struct {
-    Code       ErrorCode
-    Message    string
-    Internal   error
-    StatusCode int
-}
-
-func (e *AppError) Error() string {
-    return e.Message
-}
-
-func NewNotFoundError(resource string) *AppError {
-    return &AppError{
-        Code:       ErrCodeNotFound,
-        Message:    fmt.Sprintf("%s not found", resource),
-        StatusCode: http.StatusNotFound,
-    }
-}
-
-func NewValidationError(message string) *AppError {
-    return &AppError{
-        Code:       ErrCodeValidation,
-        Message:    message,
-        StatusCode: http.StatusBadRequest,
-    }
-}
-
-func NewInternalError(err error) *AppError {
-    return &AppError{
-        Code:       ErrCodeInternal,
-        Message:    "An internal error occurred",
-        Internal:   err,
-        StatusCode: http.StatusInternalServerError,
-    }
-}
-
-func HandleError(w http.ResponseWriter, r *http.Request, err error, logger *slog.Logger) {
-    var appErr *AppError
-    if !errors.As(err, &appErr) {
-        appErr = NewInternalError(err)
-    }
-    
-    // Log internal error details
-    if appErr.Internal != nil {
-        requestID, _ := r.Context().Value(requestIDKey).(string)
-        logger.Error("Request failed",
-            "request_id", requestID,
-            "error", appErr.Internal,
-            "path", r.URL.Path,
-        )
-    }
-    
-    // Return sanitized error to client
-    respondError(w, r, appErr.StatusCode, string(appErr.Code), appErr.Message)
-}
+**Test Coverage**: `internal/api/error_handler_test.go` + `internal/apperrors/errors_test.go` (7 tests)
 ```
-
-**Update repository methods**:
-```go
-// internal/repository/device.go
-func (r *deviceRepository) GetByID(ctx context.Context, id uuid.UUID) (*models.Device, error) {
-    // ... query code ...
-    
-    if err == sql.ErrNoRows {
-        return nil, NewNotFoundError("device")
-    }
-    if err != nil {
-        return nil, NewInternalError(fmt.Errorf("database query failed: %w", err))
-    }
-    
-    return device, nil
-}
+✅ Handles AppError correctly
+✅ Sanitizes internal errors (verifies no database details leaked)
+✅ Logs internal error details
+✅ Does not log when no internal error
+✅ Wraps standard errors as internal errors
+✅ Handles nil error gracefully
+✅ Includes request ID in logs
 ```
 
 ### Verification
-1. Trigger various error conditions
-2. Verify external responses don't leak internals
+✅ No information disclosure (error messages sanitized)  
+✅ Internal details logged securely  
+✅ Request ID correlation  
+✅ All tests passing  
+✅ Production-ready security implementation
+
+---
 3. Verify internal errors are logged
 4. Test with invalid UUIDs, missing resources, etc.
 

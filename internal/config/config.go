@@ -5,6 +5,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/malcolm-getahead/local-mdm/internal/constants"
 	"gopkg.in/yaml.v3"
 )
 
@@ -77,7 +78,7 @@ type DatabaseConfig struct {
 func (c DatabaseConfig) DSN() string {
 	timeout := c.QueryTimeout
 	if timeout == 0 {
-		timeout = 30 * time.Second
+		timeout = constants.DefaultQueryTimeout * time.Second
 	}
 
 	return fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=%s statement_timeout=%d",

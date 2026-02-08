@@ -14,6 +14,7 @@ import (
 	"github.com/malcolm-getahead/local-mdm/internal/audit"
 	"github.com/malcolm-getahead/local-mdm/internal/auth"
 	"github.com/malcolm-getahead/local-mdm/internal/config"
+	"github.com/malcolm-getahead/local-mdm/internal/constants"
 	"github.com/malcolm-getahead/local-mdm/internal/db"
 )
 
@@ -160,7 +161,7 @@ func (s *Server) setupMiddleware() {
 	// Request timeout - apply early to enforce on all requests
 	timeout := s.config.Server.RequestTimeout
 	if timeout == 0 {
-		timeout = 30 * time.Second // Default
+		timeout = constants.DefaultRequestTimeout * time.Second
 	}
 	s.router.Use(timeoutMiddleware(timeout))
 	
@@ -168,7 +169,7 @@ func (s *Server) setupMiddleware() {
 	if s.config.Server.RateLimit.Enabled {
 		limit := s.config.Server.RateLimit.RequestsPerMin
 		if limit == 0 {
-			limit = 100 // Default
+			limit = constants.DefaultRateLimit
 		}
 		window := s.config.Server.RateLimit.Window
 		if window == 0 {
@@ -181,7 +182,7 @@ func (s *Server) setupMiddleware() {
 	}
 	
 	// Request size limiting
-	s.router.Use(requestSizeLimitMiddleware(1 << 20)) // 1MB limit
+	s.router.Use(requestSizeLimitMiddleware(constants.MaxRequestBodySize))
 	
 	s.router.Use(requestIDMiddleware)
 	s.router.Use(s.loggingMiddleware)

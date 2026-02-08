@@ -5,10 +5,8 @@ import (
 	"net/http"
 	"sync"
 	"time"
-)
 
-const (
-	maxRateLimiterEntries = 10000 // Maximum number of tracked IPs
+	"github.com/malcolm-getahead/local-mdm/internal/constants"
 )
 
 // Simple in-memory rate limiter with LRU eviction
@@ -25,7 +23,7 @@ type rateLimiter struct {
 }
 
 func newRateLimiter(limit int, window time.Duration) *rateLimiter {
-	return newRateLimiterWithSize(limit, window, maxRateLimiterEntries)
+	return newRateLimiterWithSize(limit, window, constants.MaxRateLimiterEntries)
 }
 
 func newRateLimiterWithSize(limit int, window time.Duration, maxSize int) *rateLimiter {

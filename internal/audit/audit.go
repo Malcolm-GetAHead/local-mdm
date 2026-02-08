@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/malcolm-getahead/local-mdm/internal/constants"
 )
 
 // Logger writes audit events to the database
@@ -80,8 +81,8 @@ func validateEvent(event Event) error {
 	if event.ResourceType == "" {
 		return fmt.Errorf("resource_type is required")
 	}
-	if len(event.Action) > 100 {
-		return fmt.Errorf("action exceeds 100 characters")
+	if len(event.Action) > constants.MaxActionLength {
+		return fmt.Errorf("action exceeds %d characters", constants.MaxActionLength)
 	}
 	if len(event.ResourceType) > 50 {
 		return fmt.Errorf("resource_type exceeds 50 characters")

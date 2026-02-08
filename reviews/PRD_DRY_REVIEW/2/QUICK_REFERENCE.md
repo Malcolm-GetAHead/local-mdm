@@ -19,7 +19,7 @@
 
 ---
 
-## 🟠 HIGH (Should Fix - 1.5 days)
+## 🟠 HIGH (Should Fix - 1 day)
 
 ### 2. No Circuit Breaker for Keycloak
 **File**: `internal/auth/oidc.go:52-60`  
@@ -27,19 +27,18 @@
 **Fix**: Circuit breaker + token caching  
 **Effort**: 0.5 days
 
-### 3. Error Messages Leak Internal Details
-**File**: Multiple repository files  
-**Risk**: Information disclosure aids attackers  
-**Fix**: Sanitize all error responses  
-**Effort**: 0.5 days
-
-### 4. No Graceful Degradation
+### 3. No Graceful Degradation
 **File**: `internal/auth/middleware.go:37-50`  
 **Risk**: Audit log failure blocks requests  
 **Fix**: Async audit logging with buffering  
 **Effort**: 0.5 days
 
 ### ✅ RESOLVED HIGH PRIORITY
+
+### 4. Error Message Sanitization ✅ FIXED
+**File**: `internal/apperrors/errors.go`, `internal/api/error_handler.go`  
+**Resolution**: Dual representation, 7 tests  
+**Completed**: 2026-02-08
 
 ### 5. Database Connection Retry ✅ FIXED
 **File**: `cmd/server/main.go`  
@@ -67,28 +66,28 @@
 
 ### 9. Incomplete Health Checks
 **Risk**: Can't detect Keycloak failures  
-## 🟡 MEDIUM (Nice to Have - 2.5 days)
+## 🟡 MEDIUM (Nice to Have - 2 days)
 
-### 8. No Request ID Propagation
-**Risk**: Difficult debugging  
-**Fix**: Add to all logs  
-**Effort**: 0.25 days
-
-### 9. No Graceful Worker Shutdown
+### 8. No Graceful Worker Shutdown
 **Risk**: Lost audit events on shutdown  
 **Fix**: Drain queue gracefully  
 **Effort**: 0.5 days
 
 ### ✅ RESOLVED MEDIUM PRIORITY
 
-### 10. Compression Middleware ✅ FIXED
+### 9. Compression Middleware ✅ FIXED
 **File**: `internal/api/compression.go`  
 **Resolution**: gzip compression, >50% bandwidth savings  
 **Completed**: 2026-02-08
 
-### 11. Health Check Details ✅ FIXED
+### 10. Health Check Details ✅ FIXED
 **File**: `internal/api/handlers.go`  
 **Resolution**: DB + Keycloak monitoring, 10 tests  
+**Completed**: 2026-02-08
+
+### 11. Request ID Propagation ✅ FIXED
+**File**: `internal/api/request_id.go`, `internal/api/server.go`  
+**Resolution**: UUID middleware + X-Request-ID header  
 **Completed**: 2026-02-08
 
 ### 12. JSONB Validation ✅ FIXED
@@ -142,8 +141,8 @@ All critical issues resolved. High priority issues are optional improvements tha
 - Rate limiting implemented and tested
 - Ready for production POC deployment
 
-**Optional (1.5 days)**: High priority improvements
-- Day 1: Circuit breaker + error sanitization + graceful degradation
+**Optional (1 day)**: High priority improvements
+- Day 1: Circuit breaker + graceful degradation
 
 **Post-v1.0 (12-18 days)**: Production preparation
 - F-01: Real device testing
