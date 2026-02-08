@@ -29,10 +29,12 @@ func (m *Middleware) SetAuditLogger(auditLogger *audit.Logger) {
 
 func (m *Middleware) RequireAuth(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requestID := GetRequestID(r.Context())
+		
 		// Extract token
 		tokenString, err := ExtractBearerToken(r)
 		if err != nil {
-			m.logger.Warn("Missing or invalid authorization header", "error", err, "path", r.URL.Path)
+			m.logger.Warn("Missing or invalid authorization header", "error", err, "path", r.URL.Path, "request_id", requestID)
 			
 			// Log authentication failure
 			if m.auditLogger != nil {
@@ -55,7 +57,7 @@ func (m *Middleware) RequireAuth(next http.Handler) http.Handler {
 		// Validate token
 		user, err := m.validator.ValidateToken(tokenString)
 		if err != nil {
-			m.logger.Warn("Token validation failed", "error", err, "path", r.URL.Path)
+			m.logger.Warn("Token validation failed", "error", err, "path", r.URL.Path, "request_id", requestID)
 			
 			// Log authentication failure
 			if m.auditLogger != nil {
@@ -78,7 +80,7 @@ func (m *Middleware) RequireAuth(next http.Handler) http.Handler {
 		// Add user to context
 		ctx := WithUser(r.Context(), user)
 		
-		m.logger.Debug("Authenticated request", "user_id", user.ID, "email", user.Email, "roles", user.Roles)
+		m.logger.Debug("Authenticated request", "user_id", user.ID, "email", user.Email, "roles", user.Roles, "request_id", requestID)
 		
 		// Log successful authentication
 		if m.auditLogger != nil {
@@ -102,15 +104,16 @@ func (m *Middleware) RequireAuth(next http.Handler) http.Handler {
 func (m *Middleware) RequireRole(roles ...string) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			requestID := GetRequestID(r.Context())
 			user, err := UserFromContext(r.Context())
 			if err != nil {
-				m.logger.Warn("No user in context", "path", r.URL.Path)
+				m.logger.Warn("No user in context", "path", r.URL.Path, "request_id", requestID)
 				http.Error(w, "Unauthorized", http.StatusUnauthorized)
 				return
 			}
 			
 			if !user.HasAnyRole(roles...) {
-				m.logger.Warn("Insufficient permissions", "user_id", user.ID, "required_roles", roles, "user_roles", user.Roles)
+				m.logger.Warn("Insufficient permissions", "user_id", user.ID, "required_roles", roles, "user_roles", user.Roles, "request_id", requestID)
 				
 				// Log authorization failure
 				if m.auditLogger != nil {
@@ -157,6 +160,14 @@ func (m *Middleware) OptionalAuth(next http.Handler) http.Handler {
 // HealthCheck verifies Keycloak connectivity
 func (m *Middleware) HealthCheck(ctx context.Context) error {
 	return m.validator.HealthCheck(ctx)
+}
+
+// GetRequestID extracts the request ID from the context
+func GetRequestID(ctx context.Context) string {
+	if requestID, ok := ctx.Value(requestIDKey).(string); ok {
+		return requestID
+	}
+	return ""
 }
 
 // getIP extracts the client IP address from the request

@@ -9,7 +9,10 @@ import (
 
 type contextKey string
 
-const userContextKey contextKey = "auth_user"
+const (
+	userContextKey contextKey = "auth_user"
+	requestIDKey   contextKey = "request_id"
+)
 
 type AuthUser struct {
 	ID           string
