@@ -1,14 +1,25 @@
-# v1.0 POC Implementation Documentation
+# Sprint 1 Implementation Documentation
 
-Implementation documentation for all v1.0 POC features and fixes.
+Implementation documentation for all Sprint 1 features and fixes.
 
 ## Quick Reference
 
 **Status**: 23/24 issues resolved (95.8%)
 - Critical: 1/1 (100%) ✅
-- High: 7/8 (87.5%) ✅ (H-06 deferred to post-v1.0)
+- High: 7/8 (87.5%) ✅ (H-06 deferred to future sprint)
 - Medium: 8/8 (100%) ✅
 - Low: 7/7 (100%) ✅
+
+## Sprint 1 Scope
+
+**Sprint 1: Foundation** - Database, auth, API, PKI, security, testing
+- S1-01: Database & repository layer
+- S1-02: Configuration & server setup
+- S1-03: Certificate & PKI management
+- S1-04: Keycloak OIDC authentication
+- S1-05: API framework & middleware
+- S1-06: Security hardening
+- S1-07: Testing framework
 
 ## Directory Structure
 
@@ -60,6 +71,6 @@ Progress tracking across implementation sessions:
 
 ## Related Documentation
 
-- **Code Review**: `docs/reviews/v1.0-poc/` - Review findings and tracking
+- **Code Review**: `docs/reviews/sprint-1/` - Review findings and tracking
 - **Architecture**: `docs/architecture/` - Design decisions
 - **Testing**: `docs/TESTING.md` - Testing guidelines

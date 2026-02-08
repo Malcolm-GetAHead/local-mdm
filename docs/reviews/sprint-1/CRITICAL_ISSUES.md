@@ -32,7 +32,7 @@ The CA private key is stored on the filesystem in `secrets/ca.key` with only fil
 - Timeline: Post-v1.0 (before production deployment)
 
 ### Recommendation
-**No action required for v1.0 POC**. This is intentionally deferred to F-03 (Advanced Security) which includes:
+**No action required for Sprint 1**. This is intentionally deferred to F-03 (Advanced Security) which includes:
 - HSM integration (AWS CloudHSM or PKCS#11)
 - AWS Secrets Manager integration
 - Key rotation procedures
@@ -262,7 +262,7 @@ There are no documented or automated database backup procedures.
 - Timeline: Post-v1.0 (before production deployment)
 
 ### Recommendation
-**No action required for v1.0 POC**. This is intentionally deferred to F-04 (Disaster Recovery) which includes:
+**No action required for Sprint 1**. This is intentionally deferred to F-04 (Disaster Recovery) which includes:
 - Automated backup scripts with S3 upload
 - Point-in-time recovery procedures
 - Backup verification and testing

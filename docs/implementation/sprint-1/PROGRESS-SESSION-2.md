@@ -344,7 +344,7 @@ After:  "An internal error occurred" (client sees this)
 - Quick wins available (L-01, L-03, L-04, L-07 = 1.25 days)
 
 **Arguments for pausing**:
-- v1.0 POC is deployable (critical issues resolved)
+- Sprint 1 is deployable (critical issues resolved)
 - Remaining issues are optional for v1.0
 - Could focus on feature development
 
@@ -354,14 +354,14 @@ After:  "An internal error occurred" (client sees this)
 
 ## Deployment Readiness
 
-### v1.0 POC Status
+### Sprint 1 Status
 - ✅ Critical issues resolved (C-02)
 - ✅ Core reliability improved (H-04, H-05, H-08)
 - ✅ Security hardened (C-02, H-02)
 - ✅ Observability enhanced (M-06, M-04)
 - ✅ Performance optimized (M-02, M-08)
 
-**Verdict**: ✅ READY FOR v1.0 POC DEPLOYMENT
+**Verdict**: ✅ READY FOR Sprint 1 DEPLOYMENT
 
 Remaining issues are enhancements, not blockers.
 

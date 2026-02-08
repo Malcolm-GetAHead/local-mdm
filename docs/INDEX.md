@@ -5,8 +5,8 @@ Complete guide to Local MDM documentation.
 ## Quick Links
 
 - **Getting Started**: [Setup Guide](dev/SETUP.md) | [Quick Reference](dev/QUICK_REFERENCE.md)
-- **Current Status**: [v1.0 POC Review](reviews/v1.0-poc/README.md) - 95.8% complete
-- **Implementation**: [v1.0 POC Implementations](implementation/v1.0-poc/README.md)
+- **Current Status**: [Sprint 1 Review](reviews/sprint-1/README.md) - 95.8% complete
+- **Implementation**: [Sprint 1 Implementations](implementation/sprint-1/README.md)
 - **Future Plans**: [Post-v1.0 Roadmap](planning/future/README.md)
 
 ## Documentation Structure
@@ -15,7 +15,7 @@ Complete guide to Local MDM documentation.
 - **README.md** (root) - Project overview
 - **TESTING.md** - Testing guidelines
 - **SECURITY.md** - Security guidelines
-- **V1-POC-COMPLETION.md** - v1.0 POC completion summary
+- **V1-POC-COMPLETION.md** - Sprint 1 completion summary
 
 ### 🏗️ Architecture & Design
 **Location**: `architecture/`
@@ -41,7 +41,7 @@ Complete guide to Local MDM documentation.
 ### 🔧 Implementation Documentation
 **Location**: `implementation/`
 
-#### v1.0 POC (`implementation/v1.0-poc/`)
+#### Sprint 1 (`implementation/sprint-1/`)
 - **critical/** - Critical fixes (C-01, C-02)
   - Rate limiting implementation
 - **high/** - High priority (H-01 to H-08)
@@ -56,7 +56,7 @@ Complete guide to Local MDM documentation.
 ### 🔍 Code Reviews
 **Location**: `reviews/`
 
-#### v1.0 POC Review (`reviews/v1.0-poc/`)
+#### Sprint 1 Review (`reviews/sprint-1/`)
 - `README.md` - Review overview (23/24 resolved)
 - `ISSUE_TRACKING.md` - Master issue tracking
 - `EXECUTIVE_SUMMARY.md` - High-level findings
@@ -129,16 +129,16 @@ Post-v1.0 roadmap (F-01 to F-08):
 → [Setup Guide](dev/SETUP.md)
 
 ### "What's the current status?"
-→ [v1.0 POC Review](reviews/v1.0-poc/README.md)
+→ [Sprint 1 Review](reviews/sprint-1/README.md)
 
 ### "How was feature X implemented?"
-→ [Implementation Docs](implementation/v1.0-poc/README.md)
+→ [Implementation Docs](implementation/sprint-1/README.md)
 
 ### "What's planned for the future?"
 → [Future Roadmap](planning/future/README.md)
 
 ### "What are the code review findings?"
-→ [v1.0 POC Review](reviews/v1.0-poc/ISSUE_TRACKING.md)
+→ [Sprint 1 Review](reviews/sprint-1/ISSUE_TRACKING.md)
 
 ### "How do I run tests?"
 → [Testing Guide](TESTING.md)

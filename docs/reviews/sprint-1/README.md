@@ -1,6 +1,6 @@
-# v1.0 POC Code Review
+# Sprint 1 Code Review
 
-Comprehensive code review for v1.0 POC production readiness.
+Comprehensive code review for Sprint 1 production readiness.
 
 ## Review Status
 
@@ -13,7 +13,7 @@ Comprehensive code review for v1.0 POC production readiness.
 | Medium | 8 | 8 | 100% ✅ |
 | Low | 7 | 7 | 100% ✅ |
 
-**Remaining**: H-06 (Audit logs unbounded) - Deferred to post-v1.0 / F-04
+**Remaining**: H-06 (Audit logs unbounded) - Deferred to future sprint / F-04
 
 ## Review Documents
 
@@ -73,7 +73,7 @@ Comprehensive code review for v1.0 POC production readiness.
 
 ## Implementation Documentation
 
-All implementations documented in `docs/implementation/v1.0-poc/`:
+All implementations documented in `docs/implementation/sprint-1/`:
 - **critical/** - Critical fixes
 - **high/** - High priority implementations
 - **medium/** - Medium priority implementations
@@ -82,7 +82,7 @@ All implementations documented in `docs/implementation/v1.0-poc/`:
 
 ## Deployment Readiness
 
-**Status**: ✅ **READY FOR v1.0 POC DEPLOYMENT**
+**Status**: ✅ **READY FOR Sprint 1 DEPLOYMENT**
 
 - All critical issues resolved
 - All high priority issues resolved (except H-06 deferred)
@@ -103,7 +103,7 @@ All implementations documented in `docs/implementation/v1.0-poc/`:
 
 ## Related Documentation
 
-- **Implementation**: `docs/implementation/v1.0-poc/` - All fix implementations
+- **Implementation**: `docs/implementation/sprint-1/` - All fix implementations
 - **Planning**: `docs/planning/future/` - Post-v1.0 enhancements (F-01 to F-08)
 - **Architecture**: `docs/architecture/` - Design decisions
 - **Historical**: `reviews/historical/` - Previous review cycles

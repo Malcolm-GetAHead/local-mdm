@@ -4,8 +4,8 @@ This directory contains detailed implementation documentation for all features, 
 
 ## Structure
 
-### v1.0-poc/
-Implementation documentation for the v1.0 POC release, organized by priority:
+### sprint-1/
+Implementation documentation for the Sprint 1 release, organized by priority:
 
 - **critical/** - Critical security and stability fixes (C-01, C-02, etc.)
 - **high/** - High priority features and fixes (H-01, H-02, etc.)
@@ -23,19 +23,19 @@ Each implementation document includes:
 ## Finding Documentation
 
 ### By Issue ID
-- Critical: `v1.0-poc/critical/C-XX-*.md`
-- High: `v1.0-poc/high/H-XX-*.md`
-- Medium: `v1.0-poc/medium/M-XX-*.md`
-- Low: `v1.0-poc/low/L-XX-*.md`
+- Critical: `sprint-1/critical/C-XX-*.md`
+- High: `sprint-1/high/H-XX-*.md`
+- Medium: `sprint-1/medium/M-XX-*.md`
+- Low: `sprint-1/low/L-XX-*.md`
 
 ### Session Summaries
-Session progress summaries are in `v1.0-poc/` root:
+Session progress summaries are in `sprint-1/` root:
 - `SESSION-X-SUMMARY.md` - Session completion summaries
 - `PROGRESS-SESSION-X.md` - Detailed progress tracking
 - `QUICK_WINS_COMPLETE.md` - Quick wins summary
 
 ## Related Documentation
 
-- **Reviews**: See `docs/reviews/v1.0-poc/` for code review findings
+- **Reviews**: See `docs/reviews/sprint-1/` for code review findings
 - **Planning**: See `docs/planning/` for sprint and future planning
 - **Architecture**: See `docs/architecture/` for design decisions

@@ -34,7 +34,7 @@
 - **Status**: ⏸️ **DEFERRED to Post-v1.0** (F-04)
 
 **Why Defer**: 
-- Not critical for v1.0 POC (local dev)
+- Not critical for Sprint 1 (local dev)
 - Requires production-grade archival strategy
 - Can be addressed when scaling becomes concern
 
@@ -76,7 +76,7 @@
 **Cons**:
 - ⚠️ Requires background job management
 - ⚠️ Alerting mechanism needed (email/Slack)
-- ⚠️ Not critical for v1.0 POC (manual monitoring OK)
+- ⚠️ Not critical for Sprint 1 (manual monitoring OK)
 
 ---
 
@@ -102,7 +102,7 @@
 **Cons**:
 - ⚠️ Requires IP configuration management
 - ⚠️ Can be bypassed with VPN/proxy
-- ⚠️ Not critical for v1.0 POC (local dev only)
+- ⚠️ Not critical for Sprint 1 (local dev only)
 - ⚠️ OIDC auth already provides strong security
 
 ---
@@ -116,7 +116,7 @@
 - **Complexity**: Low (documentation)
 - **Value**: LOW (nice to have)
 
-**Why Low Priority**: Documentation is important but not blocking for v1.0 POC.
+**Why Low Priority**: Documentation is important but not blocking for Sprint 1.
 
 ---
 
@@ -127,7 +127,7 @@
 - **Complexity**: Low (add benchmarks)
 - **Value**: LOW (optimization later)
 
-**Why Low Priority**: Performance is adequate for v1.0 POC. Benchmarks useful for optimization phase.
+**Why Low Priority**: Performance is adequate for Sprint 1. Benchmarks useful for optimization phase.
 
 ---
 
@@ -188,7 +188,7 @@
 - Less critical with OIDC auth already in place
 - Requires IP configuration management
 - Can be bypassed (VPN/proxy)
-- Not essential for v1.0 POC (local dev)
+- Not essential for Sprint 1 (local dev)
 
 ---
 
@@ -274,11 +274,11 @@ Complete L-02, L-05, L-06 (1.5 days total):
 **After M-11**:
 - Consider M-12 (IP allowlisting) if security is priority
 - Or complete low priority issues for code quality
-- Or declare v1.0 POC complete (17/24 = 70.8% done)
+- Or declare Sprint 1 complete (17/24 = 70.8% done)
 
 ---
 
-## v1.0 POC Readiness
+## Sprint 1 Readiness
 
 **Current State**: ✅ **READY FOR DEPLOYMENT**
 
@@ -288,6 +288,6 @@ All critical and most high-priority issues resolved:
 - ✅ Medium: 6/8 (75%)
 - ✅ Low: 4/7 (57%)
 
-**Remaining issues are optional enhancements**, not blockers for v1.0 POC.
+**Remaining issues are optional enhancements**, not blockers for Sprint 1.
 
 M-11 would be excellent addition for production readiness, but not required for local development POC.

@@ -13,15 +13,15 @@ The documentation structure has been reorganized for better clarity, scalability
 
 | Old Location | New Location | Purpose |
 |-------------|--------------|---------|
-| `docs/fixes/` | `docs/implementation/v1.0-poc/` | Implementation documentation |
+| `docs/fixes/` | `docs/implementation/sprint-1/` | Implementation documentation |
 | `docs/tasks/` | `docs/planning/` | Planning and task tracking |
 | `reviews/PRD_RDY_REVIEW/` | `reviews/historical/prd-rdy-review/` | Historical review |
 | `reviews/PRD_DRY_REVIEW/` | `reviews/historical/prd-dry-review/` | Historical review |
-| N/A | `docs/reviews/v1.0-poc/` | Current consolidated review |
+| N/A | `docs/reviews/sprint-1/` | Current consolidated review |
 
 ### Implementation Files
 
-All implementation docs from `docs/fixes/` moved to `docs/implementation/v1.0-poc/`:
+All implementation docs from `docs/fixes/` moved to `docs/implementation/sprint-1/`:
 
 - **Critical fixes** → `critical/`
   - `C-02-auth-rate-limiting.md`
@@ -60,7 +60,7 @@ All implementation docs from `docs/fixes/` moved to `docs/implementation/v1.0-po
   - `IPv6-SUPPORT-ENHANCEMENT.md`
   - `ISSUE_NUMBERING_CORRECTION.md`
 
-- **Session summaries** → `v1.0-poc/` (root)
+- **Session summaries** → `sprint-1/` (root)
   - `SESSION-2-CORRECTED-SUMMARY.md`
   - `SESSION-3-SUMMARY.md`
   - `PROGRESS-SESSION-2.md`
@@ -100,7 +100,7 @@ All planning docs from `docs/tasks/` moved to `docs/planning/`:
 
 Review structure consolidated:
 
-- **Current review** → `docs/reviews/v1.0-poc/`
+- **Current review** → `docs/reviews/sprint-1/`
   - All files from `reviews/PRD_DRY_REVIEW/2/` copied here
   - Added comprehensive `README.md`
 
@@ -114,9 +114,9 @@ Review structure consolidated:
 ### Documentation Indexes
 - ✅ `docs/INDEX.md` - Complete documentation index
 - ✅ `docs/implementation/README.md` - Implementation overview
-- ✅ `docs/implementation/v1.0-poc/README.md` - v1.0 POC overview
+- ✅ `docs/implementation/sprint-1/README.md` - Sprint 1 overview
 - ✅ `docs/reviews/README.md` - Reviews overview
-- ✅ `docs/reviews/v1.0-poc/README.md` - v1.0 POC review overview
+- ✅ `docs/reviews/sprint-1/README.md` - Sprint 1 review overview
 - ✅ `docs/planning/README.md` - Planning overview
 
 ### Updated Files
@@ -126,11 +126,11 @@ Review structure consolidated:
 
 ### "Where are the implementation docs?"
 **Old**: `docs/fixes/H-01-CIRCUIT-BREAKER.md`  
-**New**: `docs/implementation/v1.0-poc/high/H-01-CIRCUIT-BREAKER.md`
+**New**: `docs/implementation/sprint-1/high/H-01-CIRCUIT-BREAKER.md`
 
 ### "Where are the code review findings?"
 **Old**: `reviews/PRD_DRY_REVIEW/2/HIGH_PRIORITY_ISSUES.md`  
-**New**: `docs/reviews/v1.0-poc/HIGH_PRIORITY_ISSUES.md`
+**New**: `docs/reviews/sprint-1/HIGH_PRIORITY_ISSUES.md`
 
 ### "Where is sprint planning?"
 **Old**: `docs/tasks/sprint-1-foundation/`  
@@ -152,7 +152,7 @@ Review structure consolidated:
 
 ### 2. Better Organization
 - Implementation docs organized by priority (critical/high/medium/low)
-- Reviews consolidated into single v1.0-poc directory
+- Reviews consolidated into single sprint-1 directory
 - Planning separated into sprints and future enhancements
 - Each major section has README.md for navigation
 
@@ -177,12 +177,12 @@ Review structure consolidated:
 | Need | Location |
 |------|----------|
 | Getting started | `docs/dev/SETUP.md` |
-| Current status | `docs/reviews/v1.0-poc/README.md` |
-| Implementation details | `docs/implementation/v1.0-poc/README.md` |
+| Current status | `docs/reviews/sprint-1/README.md` |
+| Implementation details | `docs/implementation/sprint-1/README.md` |
 | Future plans | `docs/planning/future/README.md` |
 | Complete index | `docs/INDEX.md` |
 | Sprint planning | `docs/planning/sprints/` |
-| Code review findings | `docs/reviews/v1.0-poc/ISSUE_TRACKING.md` |
+| Code review findings | `docs/reviews/sprint-1/ISSUE_TRACKING.md` |
 | Architecture | `docs/architecture/ARCHITECTURE.md` |
 | API reference | `docs/schemas/API.md` |
 

@@ -93,7 +93,7 @@ Used OpenTelemetry's `tracetest.NewInMemoryExporter()` to:
 **Decision:** NOT IMPLEMENTED (by design)
 
 **Rationale:**
-- v1.0 POC has low traffic
+- Sprint 1 has low traffic
 - Want full visibility for debugging
 - Sampling adds complexity without benefit
 - Can add later when needed:
@@ -133,7 +133,7 @@ trace.WithSampler(trace.TraceIDRatioBased(cfg.Tracing.SamplingRate))
 - All tests passing with race detection
 
 ⏸️ **Sampling configuration deferred**
-- Intentional decision for v1.0 POC
+- Intentional decision for Sprint 1
 - Easy to add when needed
 - No impact on current implementation
 

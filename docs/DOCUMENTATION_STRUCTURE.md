@@ -37,8 +37,8 @@ local-mdm/
 ```
 implementation/
 ├── README.md                       # Implementation overview
-└── v1.0-poc/                       # v1.0 POC implementations
-    ├── README.md                   # v1.0 POC overview (23/24 resolved)
+└── sprint-1/                       # Sprint 1 implementations
+    ├── README.md                   # Sprint 1 overview (23/24 resolved)
     ├── critical/                   # Critical fixes (C-01, C-02)
     ├── high/                       # High priority (H-01 to H-08)
     ├── medium/                     # Medium priority (M-01 to M-12)
@@ -61,7 +61,7 @@ implementation/
 ```
 reviews/
 ├── README.md                       # Reviews overview
-└── v1.0-poc/                       # v1.0 POC review (95.8% complete)
+└── sprint-1/                       # Sprint 1 review (95.8% complete)
     ├── README.md                   # Review overview
     ├── ISSUE_TRACKING.md           # Master tracking (23/24 resolved)
     ├── EXECUTIVE_SUMMARY.md        # High-level findings
@@ -167,12 +167,12 @@ Archived reviews from previous development phases:
 | I want to... | Go to... |
 |-------------|----------|
 | Get started | `docs/dev/SETUP.md` |
-| See current status | `docs/reviews/v1.0-poc/README.md` |
-| Find implementation details | `docs/implementation/v1.0-poc/README.md` |
+| See current status | `docs/reviews/sprint-1/README.md` |
+| Find implementation details | `docs/implementation/sprint-1/README.md` |
 | See future plans | `docs/planning/future/README.md` |
 | Understand architecture | `docs/architecture/ARCHITECTURE.md` |
 | Use the API | `docs/schemas/API.md` |
-| Review code findings | `docs/reviews/v1.0-poc/ISSUE_TRACKING.md` |
+| Review code findings | `docs/reviews/sprint-1/ISSUE_TRACKING.md` |
 | See sprint plans | `docs/planning/sprints/` |
 | Find everything | `docs/INDEX.md` |
 
@@ -180,19 +180,19 @@ Archived reviews from previous development phases:
 
 | Priority | Implementation | Review |
 |----------|---------------|--------|
-| Critical | `implementation/v1.0-poc/critical/` | `reviews/v1.0-poc/CRITICAL_ISSUES.md` |
-| High | `implementation/v1.0-poc/high/` | `reviews/v1.0-poc/HIGH_PRIORITY_ISSUES.md` |
-| Medium | `implementation/v1.0-poc/medium/` | `reviews/v1.0-poc/MEDIUM_PRIORITY_ISSUES.md` |
-| Low | `implementation/v1.0-poc/low/` | `reviews/v1.0-poc/LOW_PRIORITY_ISSUES.md` |
+| Critical | `implementation/sprint-1/critical/` | `reviews/sprint-1/CRITICAL_ISSUES.md` |
+| High | `implementation/sprint-1/high/` | `reviews/sprint-1/HIGH_PRIORITY_ISSUES.md` |
+| Medium | `implementation/sprint-1/medium/` | `reviews/sprint-1/MEDIUM_PRIORITY_ISSUES.md` |
+| Low | `implementation/sprint-1/low/` | `reviews/sprint-1/LOW_PRIORITY_ISSUES.md` |
 
 ### By Issue ID
 
 | Issue | Implementation | Review |
 |-------|---------------|--------|
-| C-XX | `implementation/v1.0-poc/critical/C-XX-*.md` | `reviews/v1.0-poc/CRITICAL_ISSUES.md` |
-| H-XX | `implementation/v1.0-poc/high/H-XX-*.md` | `reviews/v1.0-poc/HIGH_PRIORITY_ISSUES.md` |
-| M-XX | `implementation/v1.0-poc/medium/M-XX-*.md` | `reviews/v1.0-poc/MEDIUM_PRIORITY_ISSUES.md` |
-| L-XX | `implementation/v1.0-poc/low/L-XX-*.md` | `reviews/v1.0-poc/LOW_PRIORITY_ISSUES.md` |
+| C-XX | `implementation/sprint-1/critical/C-XX-*.md` | `reviews/sprint-1/CRITICAL_ISSUES.md` |
+| H-XX | `implementation/sprint-1/high/H-XX-*.md` | `reviews/sprint-1/HIGH_PRIORITY_ISSUES.md` |
+| M-XX | `implementation/sprint-1/medium/M-XX-*.md` | `reviews/sprint-1/MEDIUM_PRIORITY_ISSUES.md` |
+| L-XX | `implementation/sprint-1/low/L-XX-*.md` | `reviews/sprint-1/LOW_PRIORITY_ISSUES.md` |
 
 ## Key Features
 
@@ -227,9 +227,9 @@ Archived reviews from previous development phases:
 ## Quick Start
 
 1. **New to the project?** → Start with `docs/dev/SETUP.md`
-2. **Want to see progress?** → Check `docs/reviews/v1.0-poc/README.md`
+2. **Want to see progress?** → Check `docs/reviews/sprint-1/README.md`
 3. **Looking for something specific?** → Use `docs/INDEX.md`
-4. **Need implementation details?** → Browse `docs/implementation/v1.0-poc/`
+4. **Need implementation details?** → Browse `docs/implementation/sprint-1/`
 5. **Planning future work?** → See `docs/planning/future/`
 
 ---

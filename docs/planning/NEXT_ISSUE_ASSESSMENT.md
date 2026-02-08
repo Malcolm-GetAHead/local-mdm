@@ -227,7 +227,7 @@ defer func() {
 ### Option 2: H-06 - Audit Log Archival
 - **Effort**: 0.5 days
 - **Why Not**: Deferred to F-04 (Post-v1.0)
-- **Reason**: Not blocking for v1.0 POC
+- **Reason**: Not blocking for Sprint 1
 
 ### Option 3: M-09 - Graceful Worker Shutdown
 - **Effort**: 0.5 days

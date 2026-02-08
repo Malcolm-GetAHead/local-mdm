@@ -4,8 +4,8 @@ This directory contains comprehensive code review documentation.
 
 ## Structure
 
-### v1.0-poc/
-Complete code review for v1.0 POC readiness:
+### sprint-1/
+Complete code review for Sprint 1 readiness:
 - `README.md` - Review overview and methodology
 - `ISSUE_TRACKING.md` - Master issue tracking (23/24 resolved)
 - `EXECUTIVE_SUMMARY.md` - High-level findings
@@ -34,13 +34,13 @@ Archived reviews from previous development phases:
 
 ## Current Status
 
-**v1.0 POC Review**: 95.8% complete (23/24 issues resolved)
+**Sprint 1 Review**: 95.8% complete (23/24 issues resolved)
 - Only H-06 (Audit logs unbounded) deferred to post-v1.0
 - All critical, high (except deferred), medium, and low priorities resolved
-- Ready for v1.0 POC deployment
+- Ready for Sprint 1 deployment
 
 ## Related Documentation
 
-- **Implementation**: `docs/implementation/v1.0-poc/` - Fix implementations
+- **Implementation**: `docs/implementation/sprint-1/` - Fix implementations
 - **Planning**: `docs/planning/` - Future enhancements
 - **Architecture**: `docs/architecture/` - Design decisions

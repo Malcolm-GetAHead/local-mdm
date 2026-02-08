@@ -651,7 +651,7 @@ done
 No distributed tracing made it difficult to debug production issues, track requests, and identify slow operations.
 
 ### Resolution
-Implemented OpenTelemetry distributed tracing with stdout exporter (perfect for v1.0 POC).
+Implemented OpenTelemetry distributed tracing with stdout exporter (perfect for Sprint 1).
 
 **Implementation Files**:
 - `internal/tracing/tracing.go` (NEW) - Tracing initialization (67 lines)
@@ -669,7 +669,7 @@ Implemented OpenTelemetry distributed tracing with stdout exporter (perfect for 
    - Easy migration to production exporters (Jaeger, Tempo, etc.)
    - Proper resource attributes (service name, version)
 
-2. **Stdout Exporter** (Perfect for v1.0 POC)
+2. **Stdout Exporter** (Perfect for Sprint 1)
    - No external infrastructure required
    - No network dependencies
    - Easy to debug (just read logs)
