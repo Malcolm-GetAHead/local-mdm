@@ -31,17 +31,31 @@ Unified Control Plane (Go)
 
 ## Project Status
 
-🚧 **In Development** - See [docs/tasks/PROGRESS.md](docs/tasks/PROGRESS.md) for current status
+✅ **v1.0 POC Ready** - 23/24 issues resolved (95.8%)
+- See [v1.0 POC Review](docs/reviews/v1.0-poc/) for deployment readiness
+- See [Implementation Docs](docs/implementation/v1.0-poc/) for completed features
 
 ## Documentation
 
-- [Project Scope](docs/scope/SCOPE.md) - Detailed project requirements and goals
-- [Architecture](docs/architecture/ARCHITECTURE.md) - System design and component details
+### Getting Started
+- [Setup Guide](docs/dev/SETUP.md) - Development environment setup
+- [Quick Reference](docs/dev/QUICK_REFERENCE.md) - Common commands and workflows
+- [Testing Guide](docs/TESTING.md) - Testing guidelines and best practices
+
+### Architecture & Design
+- [Architecture](docs/architecture/ARCHITECTURE.md) - System design and components
+- [Project Scope](docs/scope/SCOPE.md) - Requirements and goals
 - [API Documentation](docs/schemas/API.md) - REST API reference
 - [Database Schema](docs/schemas/DATABASE.md) - Data model and migrations
-- [External Dependencies](docs/dependencies/) - NanoMDM, NanoDEP, SCEP, NanoLIB docs
-- [Development Progress](docs/tasks/PROGRESS.md) - Implementation status and decisions
-- [Setup Guide](docs/dev/SETUP.md) - Development environment setup
+
+### Development
+- [Implementation Docs](docs/implementation/) - Feature implementations and fixes
+- [Code Reviews](docs/reviews/) - Code review findings and tracking
+- [Sprint Planning](docs/planning/sprints/) - Sprint-based development plans
+- [Future Roadmap](docs/planning/future/) - Post-v1.0 enhancements
+
+### Dependencies
+- [External Dependencies](docs/dependencies/) - NanoMDM, NanoDEP, SCEP, Keycloak docs
 
 ## Quick Start
 
