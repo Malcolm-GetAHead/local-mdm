@@ -189,10 +189,30 @@ func (s *Server) setupRoutes() {
 		),
 	)).Methods("GET")
 
-	// Platform-specific routes (implemented in Sprint 2)
-	s.router.HandleFunc("/windows/discovery", s.handleWindowsDiscovery).Methods("GET")
-	s.router.HandleFunc("/macos/enroll/{token}", s.handleMacOSEnroll).Methods("GET")
-	s.router.HandleFunc("/android/enroll/{token}/qr", s.handleAndroidQR).Methods("GET")
+	// Platform-specific routes (Sprint 2)
+	
+	// macOS MDM endpoints
+	api.HandleFunc("/macos/enroll/{enterprise_id}", s.handleMacOSEnrollmentProfile).Methods("GET")
+	s.router.HandleFunc("/mdm", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// NanoMDM command handler - will be wired up with actual handler
+		w.WriteHeader(http.StatusOK)
+	})).Methods("PUT")
+	s.router.HandleFunc("/checkin", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// NanoMDM checkin handler - will be wired up with actual handler
+		w.WriteHeader(http.StatusOK)
+	})).Methods("PUT")
+	
+	// Windows MDM endpoints
+	s.router.HandleFunc("/EnrollmentServer/Discovery.svc", s.handleWindowsDiscoveryService).Methods("GET", "POST")
+	s.router.HandleFunc("/EnrollmentServer/Policy.svc", s.handleWindowsPolicyService).Methods("POST")
+	s.router.HandleFunc("/EnrollmentServer/Enrollment.svc", s.handleWindowsEnrollmentService).Methods("POST")
+	
+	// Android MDM endpoints
+	api.Handle("/android/enrollment-token/{enterprise_id}", s.authMiddleware.RequireAuth(
+		http.HandlerFunc(s.handleAndroidEnrollmentToken),
+	)).Methods("POST")
+	api.HandleFunc("/android/enrollment-token/{token_id}/qr", s.handleAndroidEnrollmentQR).Methods("GET")
+	api.HandleFunc("/android/webhook", s.handleAndroidWebhook).Methods("POST")
 }
 
 // setupMiddleware configures middleware
