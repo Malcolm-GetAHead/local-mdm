@@ -1,11 +1,13 @@
 package windows
 
 import (
+	"crypto/rand"
 	"crypto/x509"
 	"encoding/base64"
 	"encoding/xml"
 	"fmt"
-	"strings"
+
+	"github.com/google/uuid"
 )
 
 // SOAPEnvelope represents a SOAP envelope
@@ -209,16 +211,10 @@ func GenerateProvisioningXML(serverURL, certThumbprint string) string {
 }
 
 func generateUUID() string {
-	// Simple UUID generation for message IDs
-	return strings.ReplaceAll(fmt.Sprintf("%x-%x-%x-%x-%x",
-		randomBytes(4), randomBytes(2), randomBytes(2), randomBytes(2), randomBytes(6)), " ", "")
-}
-
-func randomBytes(n int) []byte {
-	b := make([]byte, n)
-	// In production, use crypto/rand
-	for i := range b {
-		b[i] = byte(i)
+	b := make([]byte, 16)
+	if _, err := rand.Read(b); err != nil {
+		// Fallback to google/uuid if crypto/rand fails
+		return uuid.New().String()
 	}
-	return b
+	return fmt.Sprintf("%x-%x-%x-%x-%x", b[0:4], b[4:6], b[6:8], b[8:10], b[10:16])
 }

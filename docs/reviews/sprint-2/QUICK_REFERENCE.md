@@ -1,9 +1,10 @@
-# Quick Reference - Issues for Sprint 2
+# Quick Reference - Sprint 2 Enrollment Issues
 
 **For**: Engineering team  
-**Purpose**: Quick action list for Sprint 2 Platform Core  
-**Scope**: Core MDM platform functionality  
-**Status**: 🔴 **NOT STARTED** - 0/20 issues resolved (0%)
+**Purpose**: Quick action list for Sprint 2 Platform Enrollment  
+**Scope**: macOS, Windows, Android enrollment endpoints  
+**Status**: ⚠️ **IN PROGRESS** - 4/20 issues resolved (20%)  
+**Last Updated**: 2026-02-09
 
 ---
 
@@ -11,143 +12,170 @@
 
 | ID | Title | Priority | Effort | Status |
 |----|-------|----------|--------|--------|
-| C-01 | No Device Authentication | CRITICAL | 2d | 🔴 Open |
-| C-02 | No Policy Enforcement | CRITICAL | 3d | 🔴 Open |
-| C-03 | No Certificate Management | CRITICAL | 2d | 🔴 Open |
-| C-04 | No Device Enrollment | CRITICAL | 3d | 🔴 Open |
-| C-05 | No Command Dispatch | CRITICAL | 2d | 🔴 Open |
-| C-06 | No Platform Abstraction | CRITICAL | 2d | 🔴 Open |
-| C-07 | No Device State Tracking | CRITICAL | 1.5d | 🔴 Open |
-| H-01 | No Bulk Operations | HIGH | 1.5d | 🔴 Open |
-| H-02 | No Policy Validation | HIGH | 1d | 🔴 Open |
-| H-03 | No Device Groups | HIGH | 2d | 🔴 Open |
-| H-04 | No Compliance Reporting | HIGH | 1.5d | 🔴 Open |
-| H-05 | No Event Notifications | HIGH | 1d | 🔴 Open |
-| M-01 | No Device Search | MEDIUM | 1d | 🔴 Open |
-| M-02 | No Policy Templates | MEDIUM | 1d | 🔴 Open |
-| M-03 | No Device History | MEDIUM | 1.5d | 🔴 Open |
-| M-04 | No Certificate Rotation | MEDIUM | 1.5d | 🔴 Open |
-| M-05 | No Command Scheduling | MEDIUM | 1d | 🔴 Open |
-| L-01 | No Device Tagging | LOW | 0.5d | 🔴 Open |
-| L-02 | No Export Functionality | LOW | 0.5d | 🔴 Open |
-| L-03 | No Device Statistics | LOW | 0.5d | 🔴 Open |
+| C-01 | DoS via Unbounded Body | CRITICAL | 0.5d | ✅ Done (Sprint 1) |
+| C-02 | Hardcoded SCEP Challenge | CRITICAL | 0.5d | ✅ Done (2026-02-09) |
+| C-03 | Weak Random Generation | CRITICAL | 0.5d | ✅ Done (2026-02-09) |
+| C-04 | No Authentication | CRITICAL | 1d | 🔴 Open |
+| C-05 | No Webhook Verification | CRITICAL | 0.5d | 🔴 Open |
+| C-06 | No Input Validation | CRITICAL | 1d | 🔴 Open |
+| C-07 | No Rate Limiting | CRITICAL | 1d | ⚠️ Partial |
+| H-01 | Incomplete Error Handling | HIGH | 0.5d | ✅ Done (2026-02-09) |
+| H-03 | Missing Audit Logging | HIGH | 0.5d | 🔴 Open |
+| H-04 | Placeholder Implementations | HIGH | 1d | 🔴 Open |
+| H-05 | Missing TLS Validation | HIGH | 0.25d | 🔴 Open |
+| M-01 | Low Test Coverage | MEDIUM | 4d | 🔴 Open |
+| M-02 | Missing Observability | MEDIUM | 2d | 🔴 Open |
+| M-03 | Missing Config Validation | MEDIUM | 1d | 🔴 Open |
+| M-04 | Inefficient XML Generation | MEDIUM | 2d | 🔴 Open |
+| M-05 | Missing Idempotency | MEDIUM | 2d | 🔴 Open |
+| L-01 | Inconsistent Error Messages | LOW | 0.25d | 🔴 Open |
+| L-02 | Missing Request ID | LOW | 0.25d | 🔴 Open |
+| L-03 | Hardcoded Timeouts | LOW | 0.25d | 🔴 Open |
 
-**Total**: 28 days effort, 0% complete
+**Progress**: 4/20 complete (20%)  
+**Remaining Effort**: 8-10 days
 
 ---
 
 ## Common Patterns
 
-### Request Body Reading
+### ✅ Secure Body Reading (FIXED)
 ```go
-// Bounded body reading
-func readRequestBody(w http.ResponseWriter, r *http.Request, maxBytes int64) ([]byte, error) {
-    r.Body = http.MaxBytesReader(w, r.Body, maxBytes)
-    defer r.Body.Close()
-    return io.ReadAll(r.Body)
+// Use io.ReadAll with io.LimitReader
+body, err := io.ReadAll(io.LimitReader(r.Body, 1<<20)) // 1MB limit
+if err != nil {
+    s.logger.Error("failed to read request", "error", err)
+    respondError(w, r, http.StatusBadRequest, "read_failed", "Failed to read request")
+    return
+}
+
+if len(body) == 0 {
+    respondError(w, r, http.StatusBadRequest, "empty_body", "Request body is empty")
+    return
 }
 ```
 
-### Error Handling
+### ✅ Secure Challenge Generation (FIXED)
 ```go
-// Consistent error responses
-func handleError(w http.ResponseWriter, err error, code int) {
-    log.Error().Err(err).Msg("operation failed")
-    http.Error(w, apperrors.UserMessage(err), code)
+// Use ChallengeManager with crypto/rand
+challenge, err := s.challengeManager.GenerateChallenge(enterpriseID.String(), 5*time.Minute)
+if err != nil {
+    s.logger.Error("failed to generate challenge", "error", err)
+    respondError(w, r, http.StatusInternalServerError, "challenge_failed", "Failed to generate challenge")
+    return
 }
 ```
 
-### Device Authentication
+### ✅ Secure Random Generation (FIXED)
 ```go
-// Certificate validation
-func validateDeviceCert(cert *x509.Certificate) error {
-    if time.Now().After(cert.NotAfter) {
-        return errors.New("certificate expired")
+import "crypto/rand"
+
+func generateUUID() string {
+    b := make([]byte, 16)
+    if _, err := rand.Read(b); err != nil {
+        return uuid.New().String() // Fallback
     }
-    return nil
+    return fmt.Sprintf("%x-%x-%x-%x-%x", b[0:4], b[4:6], b[6:8], b[8:10], b[10:16])
 }
 ```
 
-### Policy Enforcement
+### ❌ Authentication (TODO)
 ```go
-// Policy application
-func applyPolicy(device *Device, policy *Policy) error {
-    for _, rule := range policy.Rules {
-        if err := enforceRule(device, rule); err != nil {
-            return fmt.Errorf("rule %s failed: %w", rule.ID, err)
-        }
-    }
-    return nil
+// Add enrollment token middleware
+api.Handle("/macos/enroll/{token}", 
+    s.authMiddleware.RequireEnrollmentToken(
+        http.HandlerFunc(s.handleMacOSEnrollmentProfile),
+    )).Methods("GET")
+```
+
+### ❌ Webhook Verification (TODO)
+```go
+// Verify webhook signature
+signature := r.Header.Get("X-Webhook-Signature")
+if !h.verifySignature(body, signature) {
+    h.logger.Warn("invalid webhook signature")
+    http.Error(w, "unauthorized", http.StatusUnauthorized)
+    return
+}
+```
+
+### ❌ Input Validation (TODO)
+```go
+// Verify enterprise exists
+enterprise, err := s.enterpriseRepo.GetByID(ctx, enterpriseID)
+if err != nil {
+    respondError(w, r, http.StatusNotFound, "not_found", "Enterprise not found")
+    return
 }
 ```
 
 ---
 
-## Code Snippets for Frequent Fixes
+## Code Snippets for Remaining Fixes
 
-### Device Enrollment Flow
+### C-04: Add Authentication
 ```go
-func enrollDevice(w http.ResponseWriter, r *http.Request) {
-    // 1. Validate enrollment request
-    req, err := parseEnrollmentRequest(r)
-    if err != nil {
-        handleError(w, err, http.StatusBadRequest)
-        return
-    }
-    
-    // 2. Generate device certificate
-    cert, err := generateDeviceCert(req.CSR)
-    if err != nil {
-        handleError(w, err, http.StatusInternalServerError)
-        return
-    }
-    
-    // 3. Store device record
-    device := &Device{
-        ID:          generateDeviceID(),
-        Certificate: cert,
-        Platform:    req.Platform,
-        Status:      "enrolled",
-    }
-    
-    if err := deviceRepo.Create(device); err != nil {
-        handleError(w, err, http.StatusInternalServerError)
-        return
-    }
-    
-    writeJSON(w, device)
+// internal/api/middleware/enrollment_token.go
+func (m *Middleware) RequireEnrollmentToken(next http.Handler) http.Handler {
+    return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+        token := mux.Vars(r)["token"]
+        
+        // Validate token
+        enterpriseID, valid := m.tokenManager.ValidateToken(token)
+        if !valid {
+            http.Error(w, "invalid token", http.StatusUnauthorized)
+            return
+        }
+        
+        // Add to context
+        ctx := context.WithValue(r.Context(), "enterprise_id", enterpriseID)
+        next.ServeHTTP(w, r.WithContext(ctx))
+    })
 }
 ```
 
-### Command Dispatch
+### C-05: Webhook Signature Verification
 ```go
-func dispatchCommand(deviceID string, cmd *Command) error {
-    device, err := deviceRepo.GetByID(deviceID)
-    if err != nil {
-        return fmt.Errorf("device not found: %w", err)
-    }
-    
-    // Platform-specific dispatch
-    dispatcher := getDispatcher(device.Platform)
-    return dispatcher.Send(device, cmd)
+func (h *WebhookHandler) verifySignature(body []byte, signature string) bool {
+    mac := hmac.New(sha256.New, []byte(h.webhookSecret))
+    mac.Write(body)
+    expectedMAC := mac.Sum(nil)
+    expectedSignature := hex.EncodeToString(expectedMAC)
+    return hmac.Equal([]byte(signature), []byte(expectedSignature))
 }
 ```
 
-### Policy Validation
+### C-06: Input Validation
 ```go
-func validatePolicy(policy *Policy) error {
-    if policy.Name == "" {
-        return errors.New("policy name required")
+func (s *Server) validateEnrollmentRequest(ctx context.Context, enterpriseID uuid.UUID) error {
+    // Check enterprise exists
+    _, err := s.enterpriseRepo.GetByID(ctx, enterpriseID)
+    if err != nil {
+        return fmt.Errorf("enterprise not found: %w", err)
     }
     
-    for _, rule := range policy.Rules {
-        if err := validateRule(rule); err != nil {
-            return fmt.Errorf("invalid rule %s: %w", rule.ID, err)
+    // Check user authorization (if authenticated)
+    if userID := auth.GetUserID(ctx); userID != uuid.Nil {
+        if !s.authz.CanEnrollDevices(ctx, userID, enterpriseID) {
+            return fmt.Errorf("access denied")
         }
     }
     
     return nil
 }
+```
+
+### H-03: Audit Logging
+```go
+s.auditLogger.Log(ctx, audit.Event{
+    Action:       "enrollment.profile.download",
+    ActorID:      auth.GetUserID(ctx),
+    ResourceType: "enrollment_profile",
+    ResourceID:   enterpriseID.String(),
+    IPAddress:    r.RemoteAddr,
+    UserAgent:    r.UserAgent(),
+    Status:       "success",
+})
 ```
 
 ---
@@ -157,98 +185,149 @@ func validatePolicy(policy *Policy) error {
 ### Unit Tests
 ```bash
 # Run all tests
-make test
+go test ./...
 
-# Test specific package
-go test ./internal/device/...
-
-# Test with race detection
+# Test with race detector
 go test -race ./...
 
 # Test with coverage
-go test -cover ./internal/...
+go test -cover ./internal/platform/...
+
+# Test specific package
+go test -v ./internal/scep/...
 ```
 
 ### Integration Tests
 ```bash
-# Device enrollment
-make test-enrollment
+# Test enrollment endpoints
+go test -v ./internal/api/... -run TestEnrollment
 
-# Policy enforcement
-make test-policies
+# Test challenge manager
+go test -v ./internal/scep/... -run TestChallenge
 
-# Certificate management
-make test-certs
-
-# Command dispatch
-make test-commands
+# Test webhook handlers
+go test -v ./internal/platform/.../webhook_test.go
 ```
 
-### Load Testing
+### Security Tests
 ```bash
-# Device enrollment load test
-go run cmd/loadtest/enrollment.go -devices=1000
+# Test DoS protection
+curl -X POST http://localhost:8080/EnrollmentServer/Discovery.svc \
+  -H "Content-Length: 10485760" \
+  -d "small body"
 
-# Policy application test
-go run cmd/loadtest/policies.go -concurrent=50
+# Test challenge uniqueness
+go test -v ./internal/scep/... -run TestChallengeUniqueness
 
-# Command dispatch test
-go run cmd/loadtest/commands.go -rate=100
+# Test random generation
+go test -v ./internal/platform/windows/... -run TestUUIDUniqueness
 ```
 
 ---
 
 ## Verification Checklist
 
-### Core Platform
-- [ ] Device enrollment works for all platforms
-- [ ] Certificate generation and validation
-- [ ] Policy creation and enforcement
-- [ ] Command dispatch to devices
-- [ ] Device state synchronization
-- [ ] Platform abstraction layer
+### ✅ Completed
+- [x] C-01: Request size limits enforced
+- [x] C-02: Challenge manager with crypto/rand
+- [x] C-03: Secure UUID generation
+- [x] H-01: Robust error handling
 
-### Security
-- [ ] Device authentication required
-- [ ] Certificate validation enforced
-- [ ] Policy permissions checked
-- [ ] Command authorization verified
-- [ ] Audit logging enabled
+### ❌ Remaining Critical
+- [ ] C-04: Authentication on enrollment endpoints
+- [ ] C-05: Webhook signature verification
+- [ ] C-06: Input validation (enterprise checks)
+- [ ] C-07: Rate limiting on enrollment endpoints
 
-### Performance
-- [ ] Bulk operations handle 1000+ devices
-- [ ] Policy enforcement under 100ms
-- [ ] Command dispatch under 500ms
-- [ ] Certificate operations under 200ms
-- [ ] Database queries optimized
+### ❌ Remaining High
+- [ ] H-03: Audit logging for enrollment
+- [ ] H-04: Complete placeholder implementations
+- [ ] H-05: TLS validation for Google API
 
-### Reliability
-- [ ] Graceful error handling
-- [ ] Transaction rollbacks work
-- [ ] Connection retry logic
-- [ ] Circuit breaker protection
-- [ ] Health checks pass
+### ❌ Remaining Medium
+- [ ] M-01: Test coverage > 80%
+- [ ] M-02: Metrics and observability
+- [ ] M-03: Configuration validation
+- [ ] M-05: Idempotency checks
+
+---
+
+## Quick Commands
+
+### Check Current Status
+```bash
+# View resolved issues
+grep -r "✅ Done" docs/reviews/sprint-2/
+
+# View remaining critical issues
+grep -r "🔴 Open" docs/reviews/sprint-2/CRITICAL_ISSUES.md
+
+# Check test coverage
+go test -cover ./internal/platform/...
+```
+
+### Run Validation
+```bash
+# Run all tests with race detector
+go test -race ./...
+
+# Check for security issues
+go vet ./...
+
+# Verify challenge manager
+go test -v ./internal/scep/... -run TestChallenge
+```
+
+### Update Documentation
+```bash
+# After fixing an issue, update:
+# 1. docs/reviews/sprint-2/ISSUE_TRACKING.md
+# 2. docs/reviews/sprint-2/[PRIORITY]_ISSUES.md
+# 3. docs/reviews/sprint-2/README.md
+# 4. Create docs/implementation/sprint-2/[priority]/[ISSUE-ID]-[name].md
+```
 
 ---
 
 ## Links to Detailed Documents
 
 ### Sprint 2 Reviews
-- [Executive Summary](EXECUTIVE_SUMMARY.md) - Sprint 2 overview
-- [Critical Issues](CRITICAL_ISSUES.md) - Must-fix security issues
-- [High Priority Issues](HIGH_PRIORITY_ISSUES.md) - Important features
-- [Medium Priority Issues](MEDIUM_PRIORITY_ISSUES.md) - Nice-to-have features
-- [Low Priority Issues](LOW_PRIORITY_ISSUES.md) - Optional enhancements
-- [Issue Tracking](ISSUE_TRACKING.md) - Progress tracking
-- [Action Items](ACTION_ITEMS.md) - Implementation tasks
+- [README](README.md) - Review overview and workflow
+- [Executive Summary](EXECUTIVE_SUMMARY.md) - High-level findings
+- [Critical Issues](CRITICAL_ISSUES.md) - 7 critical security issues (3 done)
+- [High Priority Issues](HIGH_PRIORITY_ISSUES.md) - 5 high priority issues (1 done)
+- [Medium Priority Issues](MEDIUM_PRIORITY_ISSUES.md) - 5 medium priority issues
+- [Low Priority Issues](LOW_PRIORITY_ISSUES.md) - 3 low priority issues
+- [Issue Tracking](ISSUE_TRACKING.md) - Master tracking table
+- [Security Analysis](SECURITY_ANALYSIS.md) - Threat model and vulnerabilities
+- [Remediation Plan](REMEDIATION_PLAN.md) - Phased fix approach
+- [Test Gaps](TEST_GAPS.md) - Coverage analysis
+
+### Validation Reports
+- [Validation 2026-02-09](VALIDATION_2026-02-09.md) - Latest validation
+- [Validation Report](VALIDATION_REPORT.md) - Initial review validation
 
 ### Implementation Docs
-- `docs/implementation/sprint-2/` - Feature implementations (TBD)
-- `docs/architecture/PLATFORM_CORE.md` - Core platform design
-- `docs/schemas/DEVICE.md` - Device data models
-- `docs/schemas/POLICY.md` - Policy definitions
+- `docs/implementation/sprint-2/TEMPLATE.md` - Implementation template
+- `docs/implementation/sprint-2/critical/` - Critical fixes
+- `docs/implementation/sprint-2/high/` - High priority fixes
+- `docs/implementation/sprint-2/medium/` - Medium priority fixes
+- `docs/implementation/sprint-2/low/` - Low priority fixes
 
-### Testing & Deployment
-- `docs/TESTING.md` - Testing guidelines
-- `docs/dev/SETUP.md` - Development setup
-- `docs/dev/QUICK_REFERENCE.md` - Common commands
+---
+
+## Progress Summary
+
+**Overall**: 4/20 issues resolved (20%)  
+**Critical**: 3/7 resolved (42.9%)  
+**High**: 1/5 resolved (20%)  
+**Medium**: 0/5 resolved (0%)  
+**Low**: 0/3 resolved (0%)
+
+**Remaining Effort**: 8-10 days  
+**Next Milestone**: Complete all critical issues (5-6 days)
+
+---
+
+**Last Updated**: 2026-02-09  
+**Next Review**: After C-04, C-05, C-06, C-07 completion

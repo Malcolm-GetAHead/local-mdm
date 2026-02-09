@@ -2,7 +2,9 @@ package api
 
 import (
 	"fmt"
+	"io"
 	"net/http"
+	"time"
 
 	"github.com/gorilla/mux"
 	"github.com/google/uuid"
@@ -29,11 +31,18 @@ func (s *Server) handleMacOSEnrollmentProfile(w http.ResponseWriter, r *http.Req
 		return
 	}
 
+	// Generate unique SCEP challenge with 5 minute expiration
+	challenge, err := s.challengeManager.GenerateChallenge(enterpriseID.String(), 5*time.Minute)
+	if err != nil {
+		s.logger.Error("failed to generate SCEP challenge", "error", err)
+		respondError(w, r, http.StatusInternalServerError, "challenge_generation_failed", "Failed to generate enrollment challenge")
+		return
+	}
+
 	// Generate enrollment profile
 	serverURL := fmt.Sprintf("https://%s", r.Host)
 	scepURL := serverURL + "/scep"
 	topic := s.config.MacOS.PushTopic
-	challenge := "enrollment-challenge" // In production, generate unique challenge
 	orgName := "Local MDM" // Default organization name
 
 	// Generate profile
@@ -52,6 +61,11 @@ func (s *Server) handleMacOSEnrollmentProfile(w http.ResponseWriter, r *http.Req
 		return
 	}
 
+	s.logger.Info("generated enrollment profile",
+		"enterprise_id", enterpriseID,
+		"challenge_expires", time.Now().Add(5*time.Minute),
+	)
+
 	w.Header().Set("Content-Type", "application/x-apple-aspen-config")
 	w.Header().Set("Content-Disposition", "attachment; filename=enrollment.mobileconfig")
 	w.WriteHeader(http.StatusOK)
@@ -60,10 +74,15 @@ func (s *Server) handleMacOSEnrollmentProfile(w http.ResponseWriter, r *http.Req
 
 // Windows discovery service
 func (s *Server) handleWindowsDiscoveryService(w http.ResponseWriter, r *http.Request) {
-	// Parse discovery request
-	body := make([]byte, r.ContentLength)
-	if _, err := r.Body.Read(body); err != nil && err.Error() != "EOF" {
-		respondError(w, r, http.StatusBadRequest, "invalid_request", "Failed to read request")
+	body, err := io.ReadAll(io.LimitReader(r.Body, 1<<20)) // 1MB limit
+	if err != nil {
+		s.logger.Error("failed to read discovery request", "error", err)
+		respondError(w, r, http.StatusBadRequest, "read_failed", "Failed to read request")
+		return
+	}
+
+	if len(body) == 0 {
+		respondError(w, r, http.StatusBadRequest, "empty_body", "Request body is empty")
 		return
 	}
 
@@ -98,10 +117,15 @@ func (s *Server) handleWindowsDiscoveryService(w http.ResponseWriter, r *http.Re
 
 // Windows enrollment service
 func (s *Server) handleWindowsEnrollmentService(w http.ResponseWriter, r *http.Request) {
-	// Parse enrollment request
-	body := make([]byte, r.ContentLength)
-	if _, err := r.Body.Read(body); err != nil && err.Error() != "EOF" {
-		respondError(w, r, http.StatusBadRequest, "invalid_request", "Failed to read request")
+	body, err := io.ReadAll(io.LimitReader(r.Body, 1<<20)) // 1MB limit
+	if err != nil {
+		s.logger.Error("failed to read enrollment request", "error", err)
+		respondError(w, r, http.StatusBadRequest, "read_failed", "Failed to read request")
+		return
+	}
+
+	if len(body) == 0 {
+		respondError(w, r, http.StatusBadRequest, "empty_body", "Request body is empty")
 		return
 	}
 

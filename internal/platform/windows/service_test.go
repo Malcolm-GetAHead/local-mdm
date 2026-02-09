@@ -215,3 +215,21 @@ func BenchmarkGenerateDiscoverResponse(b *testing.B) {
 		}
 	}
 }
+
+func TestGenerateUUID(t *testing.T) {
+	t.Run("generates unique UUIDs", func(t *testing.T) {
+		uuids := make(map[string]bool)
+		for i := 0; i < 1000; i++ {
+			uuid := generateUUID()
+			assert.NotEmpty(t, uuid)
+			assert.False(t, uuids[uuid], "duplicate UUID generated")
+			uuids[uuid] = true
+		}
+	})
+
+	t.Run("generates valid UUID format", func(t *testing.T) {
+		uuid := generateUUID()
+		// Should match UUID format: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+		assert.Regexp(t, `^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`, uuid)
+	})
+}

@@ -17,19 +17,21 @@ import (
 	"github.com/malcolm-getahead/local-mdm/internal/config"
 	"github.com/malcolm-getahead/local-mdm/internal/constants"
 	"github.com/malcolm-getahead/local-mdm/internal/db"
+	"github.com/malcolm-getahead/local-mdm/internal/scep"
 )
 
 // Server represents the HTTP server
 type Server struct {
-	router          *mux.Router
-	db              *db.DB
-	config          *config.Config
-	logger          *slog.Logger
-	authMiddleware  *auth.Middleware
-	auditLogger     audit.AuditLogger
-	server          *http.Server
-	authRateLimiter *authRateLimiter
-	certMonitor     *certs.ExpirationMonitor
+	router           *mux.Router
+	db               *db.DB
+	config           *config.Config
+	logger           *slog.Logger
+	authMiddleware   *auth.Middleware
+	auditLogger      audit.AuditLogger
+	server           *http.Server
+	authRateLimiter  *authRateLimiter
+	certMonitor      *certs.ExpirationMonitor
+	challengeManager *scep.ChallengeManager
 }
 
 // New creates a new API server
@@ -45,11 +47,12 @@ func New(cfg *config.Config, database *db.DB, logger *slog.Logger) (*Server, err
 	}
 
 	s := &Server{
-		router:      mux.NewRouter(),
-		db:          database,
-		config:      cfg,
-		logger:      logger,
-		auditLogger: audit.NewAsyncLogger(database.DB, bufferSize, workerCount, logger),
+		router:           mux.NewRouter(),
+		db:               database,
+		config:           cfg,
+		logger:           logger,
+		auditLogger:      audit.NewAsyncLogger(database.DB, bufferSize, workerCount, logger),
+		challengeManager: scep.NewChallengeManager(),
 	}
 	
 	// Create certificate expiration monitor if enabled
