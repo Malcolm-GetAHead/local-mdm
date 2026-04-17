@@ -33,6 +33,8 @@ certs/*.key
 certs/*.crt
 certs/*.p12
 certs/*.pem
+**/certs/*.key
+**/certs/*.crt
 
 # Logs
 logs/

@@ -17,6 +17,7 @@ import (
 	"github.com/malcolm-getahead/local-mdm/internal/config"
 	"github.com/malcolm-getahead/local-mdm/internal/constants"
 	"github.com/malcolm-getahead/local-mdm/internal/db"
+	"github.com/malcolm-getahead/local-mdm/internal/repository"
 	"github.com/malcolm-getahead/local-mdm/internal/scep"
 )
 
@@ -30,8 +31,17 @@ type Server struct {
 	auditLogger      audit.AuditLogger
 	server           *http.Server
 	authRateLimiter  *authRateLimiter
+	enrollmentLimiter *rateLimiter
 	certMonitor      *certs.ExpirationMonitor
 	challengeManager *scep.ChallengeManager
+	deviceRepo       repository.DeviceRepository
+	enterpriseRepo   repository.EnterpriseRepository
+	policyRepo       repository.PolicyRepository
+	transactor       repository.Transactor
+	certService      *certs.CertificateService
+	certRepo         repository.CertificateRepository
+	auditLogRepo     repository.AuditLogRepository
+	cmdRepo          repository.CommandRepository
 }
 
 // New creates a new API server
@@ -53,6 +63,57 @@ func New(cfg *config.Config, database *db.DB, logger *slog.Logger) (*Server, err
 		logger:           logger,
 		auditLogger:      audit.NewAsyncLogger(database.DB, bufferSize, workerCount, logger),
 		challengeManager: scep.NewChallengeManager(),
+	}
+
+	// Initialize repositories
+	deviceRepo, err := repository.NewDeviceRepository(database.DB)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create device repository: %w", err)
+	}
+	s.deviceRepo = deviceRepo
+
+	enterpriseRepo, err := repository.NewEnterpriseRepository(database.DB)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create enterprise repository: %w", err)
+	}
+	s.enterpriseRepo = enterpriseRepo
+
+	policyRepo, err := repository.NewPolicyRepository(database.DB)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create policy repository: %w", err)
+	}
+	s.policyRepo = policyRepo
+
+	transactor, err := repository.NewTransactor(database.DB)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create transactor: %w", err)
+	}
+	s.transactor = transactor
+
+	certRepo, err := repository.NewCertificateRepository(database.DB)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create certificate repository: %w", err)
+	}
+	s.certRepo = certRepo
+
+	auditLogRepo, err := repository.NewAuditLogRepository(database.DB)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create audit log repository: %w", err)
+	}
+	s.auditLogRepo = auditLogRepo
+
+	cmdRepo, err := repository.NewCommandRepository(database.DB)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create command repository: %w", err)
+	}
+	s.cmdRepo = cmdRepo
+
+	// Initialize certificate service
+	caManager, err := certs.NewCAManager(cfg.Certificates.CACertPath, cfg.Certificates.CAKeyPath)
+	if err != nil {
+		logger.Warn("CA manager not available, certificate operations disabled", "error", err)
+	} else {
+		s.certService = certs.NewCertificateService(caManager, database.DB)
 	}
 	
 	// Create certificate expiration monitor if enabled
@@ -93,6 +154,9 @@ func New(cfg *config.Config, database *db.DB, logger *slog.Logger) (*Server, err
 	// IP-based: 10 attempts per minute
 	// Account-based: 5 attempts per 5 minutes
 	s.authRateLimiter = newAuthRateLimiter(10, time.Minute, 5, 5*time.Minute)
+	
+	// Enrollment rate limiter: 10 requests per minute per IP
+	s.enrollmentLimiter = newRateLimiter(10, time.Minute)
 	
 	s.setupRoutes()
 	s.setupMiddleware()
@@ -193,9 +257,10 @@ func (s *Server) setupRoutes() {
 	)).Methods("GET")
 
 	// Platform-specific routes (Sprint 2)
+	enrollLimiter := rateLimitMiddleware(s.enrollmentLimiter)
 	
 	// macOS MDM endpoints
-	api.HandleFunc("/macos/enroll/{enterprise_id}", s.handleMacOSEnrollmentProfile).Methods("GET")
+	api.Handle("/macos/enroll/{enterprise_id}", enrollLimiter(http.HandlerFunc(s.handleMacOSEnrollmentProfile))).Methods("GET")
 	s.router.HandleFunc("/mdm", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// NanoMDM command handler - will be wired up with actual handler
 		w.WriteHeader(http.StatusOK)
@@ -208,14 +273,15 @@ func (s *Server) setupRoutes() {
 	// Windows MDM endpoints
 	s.router.HandleFunc("/EnrollmentServer/Discovery.svc", s.handleWindowsDiscoveryService).Methods("GET", "POST")
 	s.router.HandleFunc("/EnrollmentServer/Policy.svc", s.handleWindowsPolicyService).Methods("POST")
-	s.router.HandleFunc("/EnrollmentServer/Enrollment.svc", s.handleWindowsEnrollmentService).Methods("POST")
+	s.router.Handle("/EnrollmentServer/Enrollment.svc", enrollLimiter(http.HandlerFunc(s.handleWindowsEnrollmentService))).Methods("POST")
+	s.router.HandleFunc("/ManagementServer/MDM.svc", s.handleWindowsManagementSync).Methods("POST")
 	
 	// Android MDM endpoints
 	api.Handle("/android/enrollment-token/{enterprise_id}", s.authMiddleware.RequireAuth(
 		http.HandlerFunc(s.handleAndroidEnrollmentToken),
 	)).Methods("POST")
 	api.HandleFunc("/android/enrollment-token/{token_id}/qr", s.handleAndroidEnrollmentQR).Methods("GET")
-	api.HandleFunc("/android/webhook", s.handleAndroidWebhook).Methods("POST")
+	api.Handle("/android/webhook", enrollLimiter(http.HandlerFunc(s.handleAndroidWebhook))).Methods("POST")
 }
 
 // setupMiddleware configures middleware
@@ -288,6 +354,11 @@ func (s *Server) Shutdown(ctx context.Context) error {
 	// Stop auth rate limiter background goroutines
 	if s.authRateLimiter != nil {
 		s.authRateLimiter.Stop()
+	}
+	
+	// Stop enrollment rate limiter
+	if s.enrollmentLimiter != nil {
+		s.enrollmentLimiter.Stop()
 	}
 	
 	// Gracefully shutdown async audit logger (drain queue with timeout)

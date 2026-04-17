@@ -185,6 +185,7 @@ type AndroidConfig struct {
 	ProjectID          string `yaml:"project_id"`
 	ServiceAccountJSON string `yaml:"service_account_json"`
 	WebhookURL         string `yaml:"webhook_url"`
+	WebhookSecret      string `yaml:"webhook_secret"`
 }
 
 // LoggingConfig holds logging configuration

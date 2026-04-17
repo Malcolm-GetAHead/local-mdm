@@ -43,6 +43,13 @@
 - App removal
 - Files: `internal/platform/windows/csp/app.go`
 
+### 7. Windows Notification Service (WNS) Push
+- WNS channel registration during OMA-DM sync (DMClient CSP)
+- Store WNS channel URI per device
+- Push notification to trigger immediate device check-in
+- Fallback to poll-based delivery if WNS unavailable
+- Files: `internal/platform/windows/wns/client.go`, `internal/platform/windows/wns/push.go`
+
 ## Acceptance Criteria
 
 - [ ] Password policy deployed and enforced on Windows device
@@ -50,3 +57,5 @@
 - [ ] VPN profile deployed
 - [ ] Remote lock command locks Windows device
 - [ ] App inventory returned via CSP query
+- [ ] WNS push triggers immediate device check-in
+- [ ] Graceful fallback to polling when WNS is unavailable

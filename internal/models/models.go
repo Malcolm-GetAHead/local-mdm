@@ -178,3 +178,30 @@ const (
 	CertTypeDevice = "device"
 	CertTypeAPNS   = "apns"
 )
+
+// DeviceCommand represents a pending or completed management command
+type DeviceCommand struct {
+	BaseModel
+	DeviceID     uuid.UUID  `json:"device_id" db:"device_id"`
+	CommandType  string     `json:"command_type" db:"command_type"`
+	CommandData  JSONB      `json:"command_data" db:"command_data"`
+	Status       string     `json:"status" db:"status"`
+	SentAt       *time.Time `json:"sent_at,omitempty" db:"sent_at"`
+	CompletedAt  *time.Time `json:"completed_at,omitempty" db:"completed_at"`
+	ErrorMessage string     `json:"error_message,omitempty" db:"error_message"`
+}
+
+// Command type constants
+const (
+	CommandTypeDeviceInfo = "device_info"
+	CommandTypeLock       = "lock"
+	CommandTypeWipe       = "wipe"
+)
+
+// Command status constants
+const (
+	CommandStatusPending   = "pending"
+	CommandStatusSent      = "sent"
+	CommandStatusCompleted = "completed"
+	CommandStatusFailed    = "failed"
+)

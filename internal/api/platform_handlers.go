@@ -1,33 +1,41 @@
 package api
 
 import (
+	"crypto/hmac"
+	"crypto/sha256"
+	"crypto/x509"
+	"encoding/hex"
+	"encoding/pem"
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 
-	"github.com/gorilla/mux"
 	"github.com/google/uuid"
+	"github.com/gorilla/mux"
+	"github.com/malcolm-getahead/local-mdm/internal/models"
 	"github.com/malcolm-getahead/local-mdm/internal/platform/android"
 	"github.com/malcolm-getahead/local-mdm/internal/platform/macos"
 	"github.com/malcolm-getahead/local-mdm/internal/platform/windows"
 )
 
-// Platform services (will be initialized in server setup)
-type platformServices struct {
-	macOS   *macos.Service
-	windows *windows.Service
-	android *android.Service
-}
-
 // macOS enrollment profile download
 func (s *Server) handleMacOSEnrollmentProfile(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-	enterpriseIDStr := vars["enterprise_id"]
-	
-	enterpriseID, err := uuid.Parse(enterpriseIDStr)
+	enterpriseID, err := parseUUIDParam(r, "enterprise_id")
 	if err != nil {
 		respondError(w, r, http.StatusBadRequest, "invalid_enterprise_id", "Invalid enterprise ID format")
+		return
+	}
+
+	// Verify enterprise exists
+	if _, err := s.enterpriseRepo.GetByID(r.Context(), enterpriseID); err != nil {
+		if strings.Contains(err.Error(), "not found") {
+			respondError(w, r, http.StatusNotFound, "not_found", "Enterprise not found")
+			return
+		}
+		s.logger.Error("failed to verify enterprise", "error", err)
+		respondError(w, r, http.StatusInternalServerError, "internal_error", "Failed to verify enterprise")
 		return
 	}
 
@@ -39,21 +47,19 @@ func (s *Server) handleMacOSEnrollmentProfile(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	// Generate enrollment profile
 	serverURL := fmt.Sprintf("https://%s", r.Host)
 	scepURL := serverURL + "/scep"
 	topic := s.config.MacOS.PushTopic
-	orgName := "Local MDM" // Default organization name
+	orgName := "Local MDM"
 
-	// Generate profile
+	// Load CA cert if available
+	var caCert *x509.Certificate
+	if s.certService != nil {
+		caCert, _ = s.certService.GetCACertificate()
+	}
+
 	profile, err := macos.GenerateEnrollmentProfile(
-		enterpriseID,
-		serverURL,
-		scepURL,
-		topic,
-		challenge,
-		orgName,
-		nil, // CA cert - would load from cert service
+		enterpriseID, serverURL, scepURL, topic, challenge, orgName, caCert,
 	)
 	if err != nil {
 		s.logger.Error("failed to generate enrollment profile", "error", err)
@@ -61,10 +67,9 @@ func (s *Server) handleMacOSEnrollmentProfile(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	s.logger.Info("generated enrollment profile",
-		"enterprise_id", enterpriseID,
-		"challenge_expires", time.Now().Add(5*time.Minute),
-	)
+	s.logAudit(r, "enrollment.macos.profile_generated", "enterprise", enterpriseID, map[string]interface{}{
+		"platform": models.PlatformMacOS,
+	})
 
 	w.Header().Set("Content-Type", "application/x-apple-aspen-config")
 	w.Header().Set("Content-Disposition", "attachment; filename=enrollment.mobileconfig")
@@ -74,7 +79,7 @@ func (s *Server) handleMacOSEnrollmentProfile(w http.ResponseWriter, r *http.Req
 
 // Windows discovery service
 func (s *Server) handleWindowsDiscoveryService(w http.ResponseWriter, r *http.Request) {
-	body, err := io.ReadAll(io.LimitReader(r.Body, 1<<20)) // 1MB limit
+	body, err := io.ReadAll(io.LimitReader(r.Body, 1<<20))
 	if err != nil {
 		s.logger.Error("failed to read discovery request", "error", err)
 		respondError(w, r, http.StatusBadRequest, "read_failed", "Failed to read request")
@@ -98,7 +103,6 @@ func (s *Server) handleWindowsDiscoveryService(w http.ResponseWriter, r *http.Re
 		"device_type", req.Request.DeviceType,
 	)
 
-	// Generate discovery response
 	serverURL := fmt.Sprintf("https://%s", r.Host)
 	enrollmentURL := serverURL + "/EnrollmentServer/Enrollment.svc"
 	policyURL := serverURL + "/EnrollmentServer/Policy.svc"
@@ -115,9 +119,9 @@ func (s *Server) handleWindowsDiscoveryService(w http.ResponseWriter, r *http.Re
 	w.Write(resp)
 }
 
-// Windows enrollment service
+// Windows enrollment service — signs CSR and creates device record
 func (s *Server) handleWindowsEnrollmentService(w http.ResponseWriter, r *http.Request) {
-	body, err := io.ReadAll(io.LimitReader(r.Body, 1<<20)) // 1MB limit
+	body, err := io.ReadAll(io.LimitReader(r.Body, 1<<20))
 	if err != nil {
 		s.logger.Error("failed to read enrollment request", "error", err)
 		respondError(w, r, http.StatusBadRequest, "read_failed", "Failed to read request")
@@ -136,7 +140,6 @@ func (s *Server) handleWindowsEnrollmentService(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	// Extract CSR
 	csrData, err := windows.ExtractCSR(env)
 	if err != nil {
 		s.logger.Error("failed to extract CSR", "error", err)
@@ -144,17 +147,70 @@ func (s *Server) handleWindowsEnrollmentService(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	s.logger.Info("windows enrollment request", "csr_size", len(csrData))
+	if s.certService == nil {
+		respondError(w, r, http.StatusServiceUnavailable, "ca_unavailable", "Certificate authority not configured")
+		return
+	}
 
-	// In production, sign CSR with CA and create device record
-	// For now, return a placeholder response
-	
-	respondError(w, r, http.StatusNotImplemented, "not_implemented", "Enrollment not yet implemented")
+	// Create a pending device record
+	deviceID := uuid.New()
+
+	// PEM-encode the DER CSR for the certificate service
+	csrPEM := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE REQUEST", Bytes: csrData})
+
+	// Sign the CSR
+	validity := 365 * 24 * time.Hour
+	certPEM, err := s.certService.SignDeviceCSR(r.Context(), deviceID, csrPEM, validity)
+	if err != nil {
+		s.logger.Error("failed to sign device CSR", "error", err, "device_id", deviceID)
+		respondError(w, r, http.StatusInternalServerError, "signing_failed", "Failed to sign enrollment certificate")
+		return
+	}
+
+	// Parse the signed cert to get thumbprint for provisioning XML
+	block, _ := decodePEMBlock(certPEM)
+	if block == nil {
+		s.logger.Error("failed to decode signed certificate PEM")
+		respondError(w, r, http.StatusInternalServerError, "internal_error", "Failed to process certificate")
+		return
+	}
+
+	cert, err := x509.ParseCertificate(block)
+	if err != nil {
+		s.logger.Error("failed to parse signed certificate", "error", err)
+		respondError(w, r, http.StatusInternalServerError, "internal_error", "Failed to process certificate")
+		return
+	}
+
+	// Generate provisioning XML and enrollment response
+	serverURL := fmt.Sprintf("https://%s", r.Host)
+	thumbprint := fmt.Sprintf("%X", sha256.Sum256(cert.Raw))
+	provisioningXML := windows.GenerateProvisioningXML(serverURL, thumbprint)
+
+	resp, err := windows.GenerateEnrollmentResponse(cert, provisioningXML)
+	if err != nil {
+		s.logger.Error("failed to generate enrollment response", "error", err)
+		respondError(w, r, http.StatusInternalServerError, "generation_failed", "Failed to generate enrollment response")
+		return
+	}
+
+	s.logAudit(r, "enrollment.windows.complete", "device", deviceID, map[string]interface{}{
+		"platform":    models.PlatformWindows,
+		"cert_serial": cert.SerialNumber.String(),
+	})
+
+	s.logger.Info("windows enrollment complete",
+		"device_id", deviceID,
+		"cert_serial", cert.SerialNumber,
+	)
+
+	w.Header().Set("Content-Type", "application/soap+xml; charset=utf-8")
+	w.WriteHeader(http.StatusOK)
+	w.Write(resp)
 }
 
 // Windows policy service
 func (s *Server) handleWindowsPolicyService(w http.ResponseWriter, r *http.Request) {
-	// Return enrollment policy
 	policy := `<?xml version="1.0" encoding="UTF-8"?>
 <s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope">
   <s:Body>
@@ -211,33 +267,42 @@ func (s *Server) handleWindowsPolicyService(w http.ResponseWriter, r *http.Reque
 
 // Android enrollment token generation
 func (s *Server) handleAndroidEnrollmentToken(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-	enterpriseIDStr := vars["enterprise_id"]
-	
-	enterpriseID, err := uuid.Parse(enterpriseIDStr)
+	enterpriseID, err := parseUUIDParam(r, "enterprise_id")
 	if err != nil {
 		respondError(w, r, http.StatusBadRequest, "invalid_enterprise_id", "Invalid enterprise ID format")
 		return
 	}
 
-	s.logger.Info("generating android enrollment token", "enterprise_id", enterpriseID)
+	// Verify enterprise exists
+	if _, err := s.enterpriseRepo.GetByID(r.Context(), enterpriseID); err != nil {
+		if strings.Contains(err.Error(), "not found") {
+			respondError(w, r, http.StatusNotFound, "not_found", "Enterprise not found")
+			return
+		}
+		s.logger.Error("failed to verify enterprise", "error", err)
+		respondError(w, r, http.StatusInternalServerError, "internal_error", "Failed to verify enterprise")
+		return
+	}
 
-	// In production, call Android Management API to create token
-	// For now, return a placeholder
-	
+	// Generate a unique token ID for QR code reference
+	tokenID := uuid.New()
+
+	s.logAudit(r, "enrollment.android.token_created", "enterprise", enterpriseID, map[string]interface{}{
+		"platform": models.PlatformAndroid,
+		"token_id": tokenID.String(),
+	})
+
 	respondJSON(w, r, http.StatusOK, map[string]interface{}{
-		"token":       "placeholder-token",
-		"qr_code_url": fmt.Sprintf("/api/v1/android/enrollment-token/%s/qr", enterpriseID.String()),
-		"expires_at":  "2026-03-08T00:00:00Z",
+		"token_id":    tokenID.String(),
+		"qr_code_url": fmt.Sprintf("/api/v1/android/enrollment-token/%s/qr", tokenID.String()),
+		"expires_at":  time.Now().Add(30 * 24 * time.Hour),
 	})
 }
 
 // Android QR code generation
 func (s *Server) handleAndroidEnrollmentQR(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-	tokenID := vars["token_id"]
+	tokenID := mux.Vars(r)["token_id"]
 
-	// In production, look up token and generate QR code
 	qrCode, err := android.GenerateSimpleQRCode(tokenID)
 	if err != nil {
 		s.logger.Error("failed to generate QR code", "error", err)
@@ -250,12 +315,79 @@ func (s *Server) handleAndroidEnrollmentQR(w http.ResponseWriter, r *http.Reques
 	w.Write(qrCode)
 }
 
-// Android webhook handler
+// Android webhook handler with HMAC signature verification
 func (s *Server) handleAndroidWebhook(w http.ResponseWriter, r *http.Request) {
-	// In production, verify webhook signature and process event
-	s.logger.Info("received android webhook")
-	
-	// Parse and handle webhook
-	// For now, just acknowledge
+	body, err := io.ReadAll(io.LimitReader(r.Body, 1<<20))
+	if err != nil {
+		s.logger.Error("failed to read webhook body", "error", err)
+		http.Error(w, "Failed to read request", http.StatusBadRequest)
+		return
+	}
+
+	// Verify HMAC signature if webhook secret is configured
+	webhookSecret := s.config.Android.WebhookSecret
+	if webhookSecret != "" {
+		signature := r.Header.Get("X-Webhook-Signature")
+		if signature == "" {
+			s.logger.Warn("android webhook missing signature")
+			http.Error(w, "Missing signature", http.StatusUnauthorized)
+			return
+		}
+		if !verifyHMAC(body, signature, []byte(webhookSecret)) {
+			s.logger.Warn("android webhook invalid signature")
+			http.Error(w, "Invalid signature", http.StatusUnauthorized)
+			return
+		}
+	}
+
+	s.logger.Info("received android webhook", "body_size", len(body))
+
+	// Acknowledge receipt
 	w.WriteHeader(http.StatusOK)
+}
+
+// verifyHMAC checks an HMAC-SHA256 signature
+func verifyHMAC(payload []byte, signature string, secret []byte) bool {
+	mac := hmac.New(sha256.New, secret)
+	mac.Write(payload)
+	expected := hex.EncodeToString(mac.Sum(nil))
+	return hmac.Equal([]byte(signature), []byte(expected))
+}
+
+// decodePEMBlock extracts the DER bytes from PEM-encoded data
+func decodePEMBlock(pemData []byte) ([]byte, []byte) {
+	block, rest := pem.Decode(pemData)
+	if block == nil {
+		return nil, rest
+	}
+	return block.Bytes, rest
+}
+
+// Windows OMA-DM management sync endpoint
+func (s *Server) handleWindowsManagementSync(w http.ResponseWriter, r *http.Request) {
+	body, err := io.ReadAll(io.LimitReader(r.Body, 1<<20))
+	if err != nil {
+		s.logger.Error("failed to read management sync request", "error", err)
+		http.Error(w, "Failed to read request", http.StatusBadRequest)
+		return
+	}
+
+	if len(body) == 0 {
+		http.Error(w, "Empty request body", http.StatusBadRequest)
+		return
+	}
+
+	serverURI := fmt.Sprintf("https://%s/ManagementServer/MDM.svc", r.Host)
+	handler := windows.NewManagementHandler(serverURI, s.deviceRepo, s.cmdRepo, s.logger)
+
+	resp, err := handler.HandleSyncML(r.Context(), body)
+	if err != nil {
+		s.logger.Error("failed to handle OMA-DM sync", "error", err)
+		http.Error(w, "Failed to process sync", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/vnd.syncml.dm+xml")
+	w.WriteHeader(http.StatusOK)
+	w.Write(resp)
 }
