@@ -18,7 +18,11 @@ import (
 
 // Health check handler
 func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
-	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	timeout := s.config.Server.HealthCheckTimeout
+	if timeout == 0 {
+		timeout = 5 * time.Second
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), timeout)
 	defer cancel()
 
 	type healthCheck struct {
@@ -519,6 +523,14 @@ func (s *Server) logAudit(r *http.Request, action, resourceType string, resource
 		if uid, err := uuid.Parse(user.ID); err == nil {
 			userID = uid
 		}
+	}
+
+	// Propagate request ID into audit details
+	if details == nil {
+		details = make(map[string]interface{})
+	}
+	if reqID, ok := r.Context().Value(requestIDKey).(string); ok && reqID != "" {
+		details["request_id"] = reqID
 	}
 
 	ip := net.ParseIP(strings.Split(r.RemoteAddr, ":")[0])

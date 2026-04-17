@@ -50,15 +50,16 @@ type CORSConfig struct {
 
 // ServerConfig holds HTTP server configuration
 type ServerConfig struct {
-	Host           string           `yaml:"host"`
-	Port           int              `yaml:"port"`
-	TLS            TLSConfig        `yaml:"tls"`
-	ReadTimeout    time.Duration    `yaml:"read_timeout"`
-	WriteTimeout   time.Duration    `yaml:"write_timeout"`
-	IdleTimeout    time.Duration    `yaml:"idle_timeout"`
-	RequestTimeout time.Duration    `yaml:"request_timeout"`
-	RateLimit      RateLimitConfig  `yaml:"rate_limit"`
-	CORS           CORSConfig       `yaml:"cors"`
+	Host               string           `yaml:"host"`
+	Port               int              `yaml:"port"`
+	TLS                TLSConfig        `yaml:"tls"`
+	ReadTimeout        time.Duration    `yaml:"read_timeout"`
+	WriteTimeout       time.Duration    `yaml:"write_timeout"`
+	IdleTimeout        time.Duration    `yaml:"idle_timeout"`
+	RequestTimeout     time.Duration    `yaml:"request_timeout"`
+	HealthCheckTimeout time.Duration    `yaml:"health_check_timeout"`
+	RateLimit          RateLimitConfig  `yaml:"rate_limit"`
+	CORS               CORSConfig       `yaml:"cors"`
 }
 
 // RateLimitConfig holds rate limiting configuration
@@ -155,6 +156,7 @@ type CertificatesConfig struct {
 	CACertPath          string                      `yaml:"ca_cert_path"`
 	CAKeyPath           string                      `yaml:"ca_key_path"`
 	DeviceCertValidity  time.Duration               `yaml:"device_cert_validity"`
+	SCEPChallengeTTL    time.Duration               `yaml:"scep_challenge_ttl"`
 	ExpirationMonitor   CertExpirationMonitorConfig `yaml:"expiration_monitor"`
 }
 
@@ -251,14 +253,48 @@ func (c *Config) overrideFromEnv() {
 
 // Validate checks if the configuration is valid
 func (c *Config) Validate() error {
+	// Database
 	if c.Database.Host == "" {
 		return fmt.Errorf("database host is required")
 	}
 	if c.Database.Port == 0 {
 		return fmt.Errorf("database port is required")
 	}
+	if c.Database.Database == "" {
+		return fmt.Errorf("database name is required")
+	}
+
+	// Server
 	if c.Server.Port == 0 {
 		return fmt.Errorf("server port is required")
+	}
+	if c.Server.Port < 1 || c.Server.Port > 65535 {
+		return fmt.Errorf("server port must be between 1 and 65535, got %d", c.Server.Port)
+	}
+
+	// Keycloak
+	if c.Keycloak.URL == "" {
+		return fmt.Errorf("keycloak URL is required")
+	}
+	if c.Keycloak.Realm == "" {
+		return fmt.Errorf("keycloak realm is required")
+	}
+	if c.Keycloak.ClientID == "" {
+		return fmt.Errorf("keycloak client_id is required")
+	}
+
+	// Database pool sanity
+	if c.Database.MaxOpenConns > 0 && c.Database.MaxIdleConns > c.Database.MaxOpenConns {
+		return fmt.Errorf("database max_idle_conns (%d) must not exceed max_open_conns (%d)",
+			c.Database.MaxIdleConns, c.Database.MaxOpenConns)
+	}
+
+	// Logging level
+	if c.Logging.Level != "" {
+		validLevels := map[string]bool{"debug": true, "info": true, "warn": true, "error": true}
+		if !validLevels[c.Logging.Level] {
+			return fmt.Errorf("invalid logging level: %s (must be: debug, info, warn, or error)", c.Logging.Level)
+		}
 	}
 
 	// Validate environment

@@ -42,6 +42,32 @@ func TestLoadConfigNotFound(t *testing.T) {
 	assert.Error(t, err)
 }
 
+// validBaseConfig returns a config with all required fields populated for testing.
+// Tests override specific fields to test individual validation rules.
+func validBaseConfig() *config.Config {
+	return &config.Config{
+		Server: config.ServerConfig{
+			Host: "0.0.0.0",
+			Port: 8080,
+		},
+		Database: config.DatabaseConfig{
+			Host:     "localhost",
+			Port:     5432,
+			Database: "localmdm",
+			Password: "strong-password-at-least-16-chars",
+		},
+		Auth: config.AuthConfig{
+			JWTSecret: "strong-jwt-secret-at-least-32-characters-long",
+		},
+		Keycloak: config.KeycloakConfig{
+			URL:          "http://localhost:8180",
+			Realm:        "localmdm",
+			ClientID:     "localmdm-api",
+			ClientSecret: "strong-keycloak-secret",
+		},
+	}
+}
+
 func TestConfigValidation(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -58,12 +84,16 @@ func TestConfigValidation(t *testing.T) {
 				Database: config.DatabaseConfig{
 					Host:     "localhost",
 					Port:     5432,
+					Database: "localmdm",
 					Password: "strong-password-at-least-16-chars",
 				},
 				Auth: config.AuthConfig{
 					JWTSecret: "strong-jwt-secret-at-least-32-characters-long",
 				},
 				Keycloak: config.KeycloakConfig{
+					URL:          "http://localhost:8180",
+					Realm:        "localmdm",
+					ClientID:     "localmdm-api",
 					ClientSecret: "strong-keycloak-secret",
 				},
 			},
@@ -213,190 +243,99 @@ func TestSecretValidation(t *testing.T) {
 	}{
 		{
 			name: "valid secrets",
-			cfg: &config.Config{
-				Server: config.ServerConfig{Port: 8080},
-				Database: config.DatabaseConfig{
-					Host:     "localhost",
-					Port:     5432,
-					Password: "strong-password-at-least-16-chars",
-				},
-				Auth: config.AuthConfig{
-					JWTSecret: "strong-jwt-secret-at-least-32-characters-long",
-				},
-				Keycloak: config.KeycloakConfig{
-					ClientSecret: "strong-keycloak-secret",
-				},
-			},
+			cfg: func() *config.Config {
+				c := validBaseConfig()
+				return c
+			}(),
 			wantErr: false,
 		},
 		{
 			name: "default jwt secret",
-			cfg: &config.Config{
-				Server: config.ServerConfig{Port: 8080},
-				Database: config.DatabaseConfig{
-					Host:     "localhost",
-					Port:     5432,
-					Password: "strong-password-at-least-16-chars",
-				},
-				Auth: config.AuthConfig{
-					JWTSecret: "change-me-in-production",
-				},
-				Keycloak: config.KeycloakConfig{
-					ClientSecret: "strong-keycloak-secret",
-				},
-			},
+			cfg: func() *config.Config {
+				c := validBaseConfig()
+				c.Auth.JWTSecret = "change-me-in-production"
+				return c
+			}(),
 			wantErr: true,
 			errMsg:  "jwt_secret must be changed from default value",
 		},
 		{
 			name: "empty jwt secret",
-			cfg: &config.Config{
-				Server: config.ServerConfig{Port: 8080},
-				Database: config.DatabaseConfig{
-					Host:     "localhost",
-					Port:     5432,
-					Password: "strong-password-at-least-16-chars",
-				},
-				Auth: config.AuthConfig{
-					JWTSecret: "",
-				},
-				Keycloak: config.KeycloakConfig{
-					ClientSecret: "strong-keycloak-secret",
-				},
-			},
+			cfg: func() *config.Config {
+				c := validBaseConfig()
+				c.Auth.JWTSecret = ""
+				return c
+			}(),
 			wantErr: true,
 			errMsg:  "jwt_secret is required",
 		},
 		{
 			name: "short jwt secret",
-			cfg: &config.Config{
-				Server: config.ServerConfig{Port: 8080},
-				Database: config.DatabaseConfig{
-					Host:     "localhost",
-					Port:     5432,
-					Password: "strong-password-at-least-16-chars",
-				},
-				Auth: config.AuthConfig{
-					JWTSecret: "short",
-				},
-				Keycloak: config.KeycloakConfig{
-					ClientSecret: "strong-keycloak-secret",
-				},
-			},
+			cfg: func() *config.Config {
+				c := validBaseConfig()
+				c.Auth.JWTSecret = "short"
+				return c
+			}(),
 			wantErr: true,
 			errMsg:  "jwt_secret must be at least 32 characters",
 		},
 		{
 			name: "default database password",
-			cfg: &config.Config{
-				Server: config.ServerConfig{Port: 8080},
-				Database: config.DatabaseConfig{
-					Host:     "localhost",
-					Port:     5432,
-					Password: "postgres",
-				},
-				Auth: config.AuthConfig{
-					JWTSecret: "strong-jwt-secret-at-least-32-characters-long",
-				},
-				Keycloak: config.KeycloakConfig{
-					ClientSecret: "strong-keycloak-secret",
-				},
-			},
+			cfg: func() *config.Config {
+				c := validBaseConfig()
+				c.Database.Password = "postgres"
+				return c
+			}(),
 			wantErr: true,
 			errMsg:  "database password must be changed from default value",
 		},
 		{
 			name: "empty database password",
-			cfg: &config.Config{
-				Server: config.ServerConfig{Port: 8080},
-				Database: config.DatabaseConfig{
-					Host:     "localhost",
-					Port:     5432,
-					Password: "",
-				},
-				Auth: config.AuthConfig{
-					JWTSecret: "strong-jwt-secret-at-least-32-characters-long",
-				},
-				Keycloak: config.KeycloakConfig{
-					ClientSecret: "strong-keycloak-secret",
-				},
-			},
+			cfg: func() *config.Config {
+				c := validBaseConfig()
+				c.Database.Password = ""
+				return c
+			}(),
 			wantErr: true,
 			errMsg:  "database password is required",
 		},
 		{
 			name: "short database password",
-			cfg: &config.Config{
-				Server: config.ServerConfig{Port: 8080},
-				Database: config.DatabaseConfig{
-					Host:     "localhost",
-					Port:     5432,
-					Password: "short",
-				},
-				Auth: config.AuthConfig{
-					JWTSecret: "strong-jwt-secret-at-least-32-characters-long",
-				},
-				Keycloak: config.KeycloakConfig{
-					ClientSecret: "strong-keycloak-secret",
-				},
-			},
+			cfg: func() *config.Config {
+				c := validBaseConfig()
+				c.Database.Password = "short"
+				return c
+			}(),
 			wantErr: true,
 			errMsg:  "database password must be at least 16 characters",
 		},
 		{
 			name: "default keycloak secret",
-			cfg: &config.Config{
-				Server: config.ServerConfig{Port: 8080},
-				Database: config.DatabaseConfig{
-					Host:     "localhost",
-					Port:     5432,
-					Password: "strong-password-at-least-16-chars",
-				},
-				Auth: config.AuthConfig{
-					JWTSecret: "strong-jwt-secret-at-least-32-characters-long",
-				},
-				Keycloak: config.KeycloakConfig{
-					ClientSecret: "localmdm-api-secret",
-				},
-			},
+			cfg: func() *config.Config {
+				c := validBaseConfig()
+				c.Keycloak.ClientSecret = "localmdm-api-secret"
+				return c
+			}(),
 			wantErr: true,
 			errMsg:  "keycloak client_secret must be changed from default value",
 		},
 		{
 			name: "empty keycloak secret",
-			cfg: &config.Config{
-				Server: config.ServerConfig{Port: 8080},
-				Database: config.DatabaseConfig{
-					Host:     "localhost",
-					Port:     5432,
-					Password: "strong-password-at-least-16-chars",
-				},
-				Auth: config.AuthConfig{
-					JWTSecret: "strong-jwt-secret-at-least-32-characters-long",
-				},
-				Keycloak: config.KeycloakConfig{
-					ClientSecret: "",
-				},
-			},
+			cfg: func() *config.Config {
+				c := validBaseConfig()
+				c.Keycloak.ClientSecret = ""
+				return c
+			}(),
 			wantErr: true,
 			errMsg:  "keycloak client_secret is required",
 		},
 		{
 			name: "short keycloak secret",
-			cfg: &config.Config{
-				Server: config.ServerConfig{Port: 8080},
-				Database: config.DatabaseConfig{
-					Host:     "localhost",
-					Port:     5432,
-					Password: "strong-password-at-least-16-chars",
-				},
-				Auth: config.AuthConfig{
-					JWTSecret: "strong-jwt-secret-at-least-32-characters-long",
-				},
-				Keycloak: config.KeycloakConfig{
-					ClientSecret: "short",
-				},
-			},
+			cfg: func() *config.Config {
+				c := validBaseConfig()
+				c.Keycloak.ClientSecret = "short"
+				return c
+			}(),
 			wantErr: true,
 			errMsg:  "keycloak client_secret must be at least 16 characters",
 		},
@@ -476,28 +415,11 @@ func TestEnvironmentValidation(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cfg := &config.Config{
-				Environment: tt.environment,
-				Server: config.ServerConfig{
-					Port: 8080,
-					TLS: config.TLSConfig{
-						Enabled:  tt.tlsEnabled,
-						CertFile: tt.certFile,
-						KeyFile:  tt.keyFile,
-					},
-				},
-				Database: config.DatabaseConfig{
-					Host:     "localhost",
-					Port:     5432,
-					Password: "strong-password-at-least-16-chars",
-				},
-				Auth: config.AuthConfig{
-					JWTSecret: "strong-jwt-secret-at-least-32-characters-long",
-				},
-				Keycloak: config.KeycloakConfig{
-					ClientSecret: "strong-keycloak-secret",
-				},
-			}
+			cfg := validBaseConfig()
+			cfg.Environment = tt.environment
+			cfg.Server.TLS.Enabled = tt.tlsEnabled
+			cfg.Server.TLS.CertFile = tt.certFile
+			cfg.Server.TLS.KeyFile = tt.keyFile
 
 			err := cfg.Validate()
 			if tt.wantErr {
@@ -600,28 +522,11 @@ func TestTLSValidation(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cfg := &config.Config{
-				Environment: tt.environment,
-				Server: config.ServerConfig{
-					Port: 8080,
-					TLS: config.TLSConfig{
-						Enabled:  tt.tlsEnabled,
-						CertFile: tt.certFile,
-						KeyFile:  tt.keyFile,
-					},
-				},
-				Database: config.DatabaseConfig{
-					Host:     "localhost",
-					Port:     5432,
-					Password: "strong-password-at-least-16-chars",
-				},
-				Auth: config.AuthConfig{
-					JWTSecret: "strong-jwt-secret-at-least-32-characters-long",
-				},
-				Keycloak: config.KeycloakConfig{
-					ClientSecret: "strong-keycloak-secret",
-				},
-			}
+			cfg := validBaseConfig()
+			cfg.Environment = tt.environment
+			cfg.Server.TLS.Enabled = tt.tlsEnabled
+			cfg.Server.TLS.CertFile = tt.certFile
+			cfg.Server.TLS.KeyFile = tt.keyFile
 
 			err := cfg.Validate()
 			if tt.wantErr {
@@ -632,6 +537,72 @@ func TestTLSValidation(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestNewValidationRules(t *testing.T) {
+	t.Run("missing database name", func(t *testing.T) {
+		cfg := validBaseConfig()
+		cfg.Database.Database = ""
+		err := cfg.Validate()
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "database name is required")
+	})
+
+	t.Run("invalid server port", func(t *testing.T) {
+		cfg := validBaseConfig()
+		cfg.Server.Port = 99999
+		err := cfg.Validate()
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "server port must be between")
+	})
+
+	t.Run("missing keycloak URL", func(t *testing.T) {
+		cfg := validBaseConfig()
+		cfg.Keycloak.URL = ""
+		err := cfg.Validate()
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "keycloak URL is required")
+	})
+
+	t.Run("missing keycloak realm", func(t *testing.T) {
+		cfg := validBaseConfig()
+		cfg.Keycloak.Realm = ""
+		err := cfg.Validate()
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "keycloak realm is required")
+	})
+
+	t.Run("missing keycloak client ID", func(t *testing.T) {
+		cfg := validBaseConfig()
+		cfg.Keycloak.ClientID = ""
+		err := cfg.Validate()
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "keycloak client_id is required")
+	})
+
+	t.Run("idle conns exceeds open conns", func(t *testing.T) {
+		cfg := validBaseConfig()
+		cfg.Database.MaxOpenConns = 10
+		cfg.Database.MaxIdleConns = 20
+		err := cfg.Validate()
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "max_idle_conns")
+	})
+
+	t.Run("invalid logging level", func(t *testing.T) {
+		cfg := validBaseConfig()
+		cfg.Logging.Level = "verbose"
+		err := cfg.Validate()
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid logging level")
+	})
+
+	t.Run("valid logging level", func(t *testing.T) {
+		cfg := validBaseConfig()
+		cfg.Logging.Level = "debug"
+		err := cfg.Validate()
+		assert.NoError(t, err)
+	})
 }
 
 func TestEnvironmentOverrideFromEnv(t *testing.T) {

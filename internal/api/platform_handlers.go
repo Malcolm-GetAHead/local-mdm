@@ -24,7 +24,7 @@ import (
 func (s *Server) handleMacOSEnrollmentProfile(w http.ResponseWriter, r *http.Request) {
 	enterpriseID, err := parseUUIDParam(r, "enterprise_id")
 	if err != nil {
-		respondError(w, r, http.StatusBadRequest, "invalid_enterprise_id", "Invalid enterprise ID format")
+		respondError(w, r, http.StatusBadRequest, "invalid_id", "Invalid enterprise ID format")
 		return
 	}
 
@@ -39,8 +39,12 @@ func (s *Server) handleMacOSEnrollmentProfile(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	// Generate unique SCEP challenge with 5 minute expiration
-	challenge, err := s.challengeManager.GenerateChallenge(enterpriseID.String(), 5*time.Minute)
+	// Generate unique SCEP challenge with configurable expiration
+	challengeTTL := s.config.Certificates.SCEPChallengeTTL
+	if challengeTTL == 0 {
+		challengeTTL = 5 * time.Minute
+	}
+	challenge, err := s.challengeManager.GenerateChallenge(enterpriseID.String(), challengeTTL)
 	if err != nil {
 		s.logger.Error("failed to generate SCEP challenge", "error", err)
 		respondError(w, r, http.StatusInternalServerError, "challenge_generation_failed", "Failed to generate enrollment challenge")
@@ -269,7 +273,7 @@ func (s *Server) handleWindowsPolicyService(w http.ResponseWriter, r *http.Reque
 func (s *Server) handleAndroidEnrollmentToken(w http.ResponseWriter, r *http.Request) {
 	enterpriseID, err := parseUUIDParam(r, "enterprise_id")
 	if err != nil {
-		respondError(w, r, http.StatusBadRequest, "invalid_enterprise_id", "Invalid enterprise ID format")
+		respondError(w, r, http.StatusBadRequest, "invalid_id", "Invalid enterprise ID format")
 		return
 	}
 
