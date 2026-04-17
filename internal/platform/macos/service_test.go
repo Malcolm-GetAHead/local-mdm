@@ -1,8 +1,19 @@
 package macos
 
 import (
+	"bytes"
 	"context"
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/x509"
+	"crypto/x509/pkix"
+	"encoding/json"
+	"log/slog"
+	"math/big"
+	"net/http"
+	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/malcolm-getahead/local-mdm/internal/models"
@@ -239,4 +250,160 @@ func BenchmarkGenerateEnrollmentProfile(b *testing.B) {
 			b.Fatal(err)
 		}
 	}
+}
+
+// --- Webhook Handler Tests ---
+
+func TestWebhookHandler_HandleWebhook(t *testing.T) {
+	deviceRepo := new(MockDeviceRepository)
+	svc := NewService(deviceRepo)
+	logger := slog.New(slog.NewTextHandler(bytes.NewBuffer(nil), &slog.HandlerOptions{Level: slog.LevelError}))
+	handler := NewWebhookHandler(svc, logger)
+
+	t.Run("handles Authenticate event", func(t *testing.T) {
+		event := WebhookEvent{
+			Topic:   "mdm",
+			EventID: "evt-1",
+			CheckinEvent: &CheckinEvent{
+				UDID:        "test-udid",
+				MessageType: "Authenticate",
+			},
+		}
+		body, _ := json.Marshal(event)
+		req := httptest.NewRequest("POST", "/webhook", bytes.NewReader(body))
+		w := httptest.NewRecorder()
+
+		handler.HandleWebhook(w, req)
+		assert.Equal(t, http.StatusOK, w.Code)
+	})
+
+	t.Run("handles TokenUpdate event", func(t *testing.T) {
+		event := WebhookEvent{
+			Topic:   "mdm",
+			EventID: "evt-2",
+			CheckinEvent: &CheckinEvent{
+				UDID:        "test-udid",
+				MessageType: "TokenUpdate",
+			},
+		}
+		body, _ := json.Marshal(event)
+		req := httptest.NewRequest("POST", "/webhook", bytes.NewReader(body))
+		w := httptest.NewRecorder()
+
+		handler.HandleWebhook(w, req)
+		assert.Equal(t, http.StatusOK, w.Code)
+	})
+
+	t.Run("handles CheckOut event", func(t *testing.T) {
+		event := WebhookEvent{
+			Topic:   "mdm",
+			EventID: "evt-3",
+			CheckinEvent: &CheckinEvent{
+				UDID:        "test-udid",
+				MessageType: "CheckOut",
+			},
+		}
+		body, _ := json.Marshal(event)
+		req := httptest.NewRequest("POST", "/webhook", bytes.NewReader(body))
+		w := httptest.NewRecorder()
+
+		handler.HandleWebhook(w, req)
+		assert.Equal(t, http.StatusOK, w.Code)
+	})
+
+	t.Run("handles nil checkin event", func(t *testing.T) {
+		event := WebhookEvent{Topic: "mdm", EventID: "evt-4"}
+		body, _ := json.Marshal(event)
+		req := httptest.NewRequest("POST", "/webhook", bytes.NewReader(body))
+		w := httptest.NewRecorder()
+
+		handler.HandleWebhook(w, req)
+		assert.Equal(t, http.StatusOK, w.Code)
+	})
+
+	t.Run("rejects invalid JSON", func(t *testing.T) {
+		req := httptest.NewRequest("POST", "/webhook", bytes.NewReader([]byte("not json")))
+		w := httptest.NewRecorder()
+
+		handler.HandleWebhook(w, req)
+		assert.Equal(t, http.StatusBadRequest, w.Code)
+	})
+}
+
+// --- NanoMDM Service Tests ---
+
+func TestNanoMDMService(t *testing.T) {
+	t.Run("HandleCommand logs and returns nil", func(t *testing.T) {
+		svc, err := NewNanoMDMService(nil, slog.Default())
+		require.NoError(t, err)
+
+		err = svc.HandleCommand(context.Background(), "test-udid")
+		assert.NoError(t, err)
+	})
+
+	t.Run("HandleCheckin logs and returns nil", func(t *testing.T) {
+		svc, err := NewNanoMDMService(nil, slog.Default())
+		require.NoError(t, err)
+
+		err = svc.HandleCheckin(context.Background(), "test-udid", "Authenticate")
+		assert.NoError(t, err)
+	})
+}
+
+// --- CheckinHandler and CommandHandler Tests ---
+
+func TestCheckinHandler_ServeHTTP(t *testing.T) {
+	svc, _ := NewNanoMDMService(nil, slog.Default())
+	deviceRepo := new(MockDeviceRepository)
+	service := NewService(deviceRepo)
+	logger := slog.New(slog.NewTextHandler(bytes.NewBuffer(nil), &slog.HandlerOptions{Level: slog.LevelError}))
+	handler := NewCheckinHandler(svc, service, logger)
+
+	req := httptest.NewRequest("PUT", "/checkin", nil)
+	w := httptest.NewRecorder()
+
+	handler.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusOK, w.Code)
+}
+
+func TestCommandHandler_ServeHTTP(t *testing.T) {
+	svc, _ := NewNanoMDMService(nil, slog.Default())
+	logger := slog.New(slog.NewTextHandler(bytes.NewBuffer(nil), &slog.HandlerOptions{Level: slog.LevelError}))
+	handler := NewCommandHandler(svc, logger)
+
+	req := httptest.NewRequest("PUT", "/mdm", nil)
+	w := httptest.NewRecorder()
+
+	handler.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusOK, w.Code)
+}
+
+// --- Enrollment Profile with CA Cert ---
+
+func TestGenerateEnrollmentProfile_WithCACert(t *testing.T) {
+	// Generate a self-signed CA cert for testing
+	key, err := rsa.GenerateKey(rand.Reader, 2048)
+	require.NoError(t, err)
+
+	template := &x509.Certificate{
+		SerialNumber: big.NewInt(1),
+		Subject:      pkix.Name{CommonName: "Test CA"},
+		NotBefore:    time.Now(),
+		NotAfter:     time.Now().Add(24 * time.Hour),
+		IsCA:         true,
+	}
+
+	certDER, err := x509.CreateCertificate(rand.Reader, template, template, &key.PublicKey, key)
+	require.NoError(t, err)
+
+	caCert, err := x509.ParseCertificate(certDER)
+	require.NoError(t, err)
+
+	profile, err := GenerateEnrollmentProfile(
+		uuid.New(), "https://mdm.example.com", "https://mdm.example.com/scep",
+		"com.example.mdm", "challenge", "Test Org", caCert,
+	)
+	require.NoError(t, err)
+	assert.NotNil(t, profile)
+	assert.Contains(t, string(profile), "com.apple.mdm")
 }

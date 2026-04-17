@@ -1,7 +1,12 @@
 package android
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
+	"log/slog"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"github.com/google/uuid"
@@ -233,4 +238,137 @@ func BenchmarkGenerateQRCode(b *testing.B) {
 			b.Fatal(err)
 		}
 	}
+}
+
+// --- Service UpdateDeviceStatus Tests ---
+
+func TestService_UpdateDeviceStatus(t *testing.T) {
+	ctx := context.Background()
+	deviceID := uuid.New()
+
+	t.Run("success", func(t *testing.T) {
+		deviceRepo := new(MockDeviceRepository)
+		enterpriseRepo := new(MockEnterpriseRepository)
+
+		existing := &models.Device{
+			BaseModel: models.BaseModel{ID: deviceID},
+			Platform:  models.PlatformAndroid,
+			Status:    models.DeviceStatusPending,
+		}
+		deviceRepo.On("GetByID", ctx, deviceID).Return(existing, nil)
+		deviceRepo.On("Update", ctx, mock.AnythingOfType("*models.Device")).Return(nil)
+
+		svc := NewService(deviceRepo, enterpriseRepo, "proj", "sa.json")
+		err := svc.UpdateDeviceStatus(ctx, deviceID, models.DeviceStatusEnrolled)
+
+		require.NoError(t, err)
+		assert.Equal(t, models.DeviceStatusEnrolled, existing.Status)
+		deviceRepo.AssertExpectations(t)
+	})
+
+	t.Run("device not found", func(t *testing.T) {
+		deviceRepo := new(MockDeviceRepository)
+		enterpriseRepo := new(MockEnterpriseRepository)
+
+		deviceRepo.On("GetByID", ctx, deviceID).Return(nil, assert.AnError)
+
+		svc := NewService(deviceRepo, enterpriseRepo, "proj", "sa.json")
+		err := svc.UpdateDeviceStatus(ctx, deviceID, models.DeviceStatusEnrolled)
+
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to get device")
+	})
+
+	t.Run("update error", func(t *testing.T) {
+		deviceRepo := new(MockDeviceRepository)
+		enterpriseRepo := new(MockEnterpriseRepository)
+
+		existing := &models.Device{
+			BaseModel: models.BaseModel{ID: deviceID},
+			Status:    models.DeviceStatusPending,
+		}
+		deviceRepo.On("GetByID", ctx, deviceID).Return(existing, nil)
+		deviceRepo.On("Update", ctx, mock.AnythingOfType("*models.Device")).Return(assert.AnError)
+
+		svc := NewService(deviceRepo, enterpriseRepo, "proj", "sa.json")
+		err := svc.UpdateDeviceStatus(ctx, deviceID, models.DeviceStatusEnrolled)
+
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to update device")
+	})
+}
+
+// --- Webhook Handler Tests ---
+
+func TestWebhookHandler_HandleWebhook(t *testing.T) {
+	deviceRepo := new(MockDeviceRepository)
+	enterpriseRepo := new(MockEnterpriseRepository)
+	svc := NewService(deviceRepo, enterpriseRepo, "proj", "sa.json")
+	logger := slog.New(slog.NewTextHandler(bytes.NewBuffer(nil), &slog.HandlerOptions{Level: slog.LevelError}))
+	// nil client — we test dispatch logic, not Google API calls
+	handler := NewWebhookHandler(svc, nil, logger)
+
+	t.Run("handles COMPLIANCE_REPORT", func(t *testing.T) {
+		event := WebhookEvent{
+			NotificationType: "COMPLIANCE_REPORT",
+			DeviceName:       "enterprises/test/devices/123",
+			Timestamp:        "2026-04-17T00:00:00Z",
+		}
+		body, _ := json.Marshal(event)
+		req := httptest.NewRequest("POST", "/webhook", bytes.NewReader(body))
+		w := httptest.NewRecorder()
+
+		handler.HandleWebhook(w, req)
+		assert.Equal(t, http.StatusOK, w.Code)
+	})
+
+	t.Run("handles UNENROLLMENT", func(t *testing.T) {
+		event := WebhookEvent{
+			NotificationType: "UNENROLLMENT",
+			DeviceName:       "enterprises/test/devices/123",
+			Timestamp:        "2026-04-17T00:00:00Z",
+		}
+		body, _ := json.Marshal(event)
+		req := httptest.NewRequest("POST", "/webhook", bytes.NewReader(body))
+		w := httptest.NewRecorder()
+
+		handler.HandleWebhook(w, req)
+		assert.Equal(t, http.StatusOK, w.Code)
+	})
+
+	t.Run("handles unknown notification type", func(t *testing.T) {
+		event := WebhookEvent{
+			NotificationType: "UNKNOWN_TYPE",
+			Timestamp:        "2026-04-17T00:00:00Z",
+		}
+		body, _ := json.Marshal(event)
+		req := httptest.NewRequest("POST", "/webhook", bytes.NewReader(body))
+		w := httptest.NewRecorder()
+
+		handler.HandleWebhook(w, req)
+		assert.Equal(t, http.StatusOK, w.Code)
+	})
+
+	t.Run("rejects invalid JSON", func(t *testing.T) {
+		req := httptest.NewRequest("POST", "/webhook", bytes.NewReader([]byte("not json")))
+		w := httptest.NewRecorder()
+
+		handler.HandleWebhook(w, req)
+		assert.Equal(t, http.StatusBadRequest, w.Code)
+	})
+
+	t.Run("handles ENROLLMENT with missing device name", func(t *testing.T) {
+		event := WebhookEvent{
+			NotificationType: "ENROLLMENT",
+			DeviceName:       "",
+			Timestamp:        "2026-04-17T00:00:00Z",
+		}
+		body, _ := json.Marshal(event)
+		req := httptest.NewRequest("POST", "/webhook", bytes.NewReader(body))
+		w := httptest.NewRecorder()
+
+		handler.HandleWebhook(w, req)
+		// Should return 500 because enrollment handler returns error for empty device name
+		assert.Equal(t, http.StatusInternalServerError, w.Code)
+	})
 }

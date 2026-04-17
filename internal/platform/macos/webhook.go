@@ -53,13 +53,17 @@ func (h *WebhookHandler) HandleWebhook(w http.ResponseWriter, r *http.Request) {
 	h.logger.Info("received webhook event",
 		"topic", event.Topic,
 		"event_id", event.EventID,
-		"message_type", event.CheckinEvent.MessageType,
 	)
 
 	if event.CheckinEvent == nil {
 		w.WriteHeader(http.StatusOK)
 		return
 	}
+
+	h.logger.Info("processing checkin event",
+		"message_type", event.CheckinEvent.MessageType,
+		"udid", event.CheckinEvent.UDID,
+	)
 
 	switch event.CheckinEvent.MessageType {
 	case "Authenticate":
