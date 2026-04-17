@@ -591,3 +591,13 @@ func computeHMAC(payload, secret []byte) string {
 	mac.Write(payload)
 	return hex.EncodeToString(mac.Sum(nil))
 }
+
+// --- Duplicate Prevention Tests (M-05) ---
+
+func TestIsDuplicateError(t *testing.T) {
+	assert.True(t, isDuplicateError(fmt.Errorf("duplicate key value violates unique constraint")))
+	assert.True(t, isDuplicateError(fmt.Errorf("unique_violation")))
+	assert.True(t, isDuplicateError(fmt.Errorf("resource already exists")))
+	assert.False(t, isDuplicateError(fmt.Errorf("connection refused")))
+	assert.False(t, isDuplicateError(fmt.Errorf("not found")))
+}

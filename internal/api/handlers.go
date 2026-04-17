@@ -178,7 +178,7 @@ func (s *Server) handleCreateEnterprise(w http.ResponseWriter, r *http.Request) 
 	}
 
 	if err := s.enterpriseRepo.Create(r.Context(), enterprise); err != nil {
-		if strings.Contains(err.Error(), "duplicate") || strings.Contains(err.Error(), "unique") {
+		if isDuplicateError(err) {
 			respondError(w, r, http.StatusConflict, "conflict", "Enterprise with this slug already exists")
 			return
 		}
@@ -558,4 +558,9 @@ func isValidPolicyType(t string) bool {
 		return true
 	}
 	return false
+}
+
+func isDuplicateError(err error) bool {
+	msg := err.Error()
+	return strings.Contains(msg, "duplicate") || strings.Contains(msg, "unique") || strings.Contains(msg, "already exists")
 }
