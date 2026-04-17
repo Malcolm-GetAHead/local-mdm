@@ -43,37 +43,28 @@ Without advanced security:
 
 ### 1. Mutual TLS (mTLS)
 
+**Context**: Sprint 2 built the CA infrastructure (CAManager generates a self-signed CA, signs device CSRs during enrollment, stores certs in DB). Devices receive signed certificates but the server does not currently verify them on incoming connections. Device identity is determined from protocol messages (SyncML Source, SCEP challenge) rather than TLS client certificates.
+
+**What needs to happen**:
+- Configure device-facing endpoints (`/ManagementServer/MDM.svc`, `/mdm`, `/checkin`) to require client certificates signed by our CA
+- Load our CA's public cert into the TLS `ClientCAs` pool at server startup
+- Extract device identity from the verified client certificate (CN or SAN) instead of trusting the message body
+- Non-device endpoints (API, enrollment) remain without client cert requirement
+
 **Implementation**:
 ```go
 // internal/api/server.go
-func NewServerWithMTLS(config *Config) *http.Server {
-    // Load CA certificate for client verification
-    caCert, _ := ioutil.ReadFile(config.ClientCAPath)
+func (s *Server) deviceTLSConfig() *tls.Config {
+    caCertPEM, _ := s.certService.GetCACertificatePEM()
     caCertPool := x509.NewCertPool()
-    caCertPool.AppendCertsFromPEM(caCert)
+    caCertPool.AppendCertsFromPEM(caCertPEM)
     
-    tlsConfig := &tls.Config{
+    return &tls.Config{
         ClientAuth: tls.RequireAndVerifyClientCert,
         ClientCAs:  caCertPool,
         MinVersion: tls.VersionTLS13,
     }
-    
-    server := &http.Server{
-        Addr:      ":8443",
-        TLSConfig: tlsConfig,
-    }
-    
-    return server
 }
-```
-
-**Configuration**:
-```yaml
-security:
-  mtls:
-    enabled: true
-    client_ca_path: /etc/localmdm/client-ca.pem
-    require_client_cert: true
 ```
 
 **Benefits**:

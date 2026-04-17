@@ -29,7 +29,7 @@
 | H-01 | Incomplete Error Handling | HIGH | ✅ Done | - | 0.5 days | 2026-02-09 | io.ReadAll with size limit |
 | H-03 | Missing Audit Logging | HIGH | ✅ Done | - | 0.5 days | 2026-04-17 | Audit logging on all handlers |
 | H-04 | Placeholder Implementations | HIGH | ✅ Done | - | 1 day | 2026-04-17 | All handlers wired to repos |
-| H-05 | Missing TLS Validation | HIGH | 🔴 Open | | 0.25 days | | Google API |
+| H-05 | Missing TLS Validation | HIGH | ⏸️ Invalid | - | 0.25 days | 2026-04-17 | InsecureSkipVerify not in codebase; mTLS deferred to F-03 |
 
 ---
 
@@ -70,10 +70,10 @@
 
 ### By Priority
 - **Critical**: 7/7 (100%) ✅ **COMPLETE**
-- **High**: 3/5 (60%) 🟡 **IN PROGRESS** (H-01, H-03, H-04 done; H-05 likely invalid)
-- **Medium**: 4/5 (80%) 🟡 **IN PROGRESS** (M-01 partial, M-02/M-03/M-04 done; M-05 open)
+- **High**: 4/5 (80%) 🟡 (H-01, H-03, H-04 done; H-05 closed as invalid)
+- **Medium**: 5/5 (100%) ✅ **COMPLETE**
 - **Low**: 3/3 (100%) ✅ **COMPLETE**
-- **Overall**: 17/20 (85%) - **Sprint 2 near completion**
+- **Overall**: 19/20 (95%) - **Sprint 2 review issues nearly complete**
 
 > **Note on H-05 (Missing TLS Validation)**: Investigation on 2026-04-17 found that `InsecureSkipVerify: true` does NOT exist in the codebase. The Android client uses `androidmanagement.NewService()` with Go's default HTTP client which has proper TLS. This issue may be invalid.
 
