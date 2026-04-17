@@ -74,6 +74,9 @@ func (s *Server) handleMacOSEnrollmentProfile(w http.ResponseWriter, r *http.Req
 	s.logAudit(r, "enrollment.macos.profile_generated", "enterprise", enterpriseID, map[string]interface{}{
 		"platform": models.PlatformMacOS,
 	})
+	if s.metrics != nil {
+		s.metrics.EnrollmentsTotal.WithLabelValues(models.PlatformMacOS, "profile_generated").Inc()
+	}
 
 	w.Header().Set("Content-Type", "application/x-apple-aspen-config")
 	w.Header().Set("Content-Disposition", "attachment; filename=enrollment.mobileconfig")
@@ -202,6 +205,9 @@ func (s *Server) handleWindowsEnrollmentService(w http.ResponseWriter, r *http.R
 		"platform":    models.PlatformWindows,
 		"cert_serial": cert.SerialNumber.String(),
 	})
+	if s.metrics != nil {
+		s.metrics.EnrollmentsTotal.WithLabelValues(models.PlatformWindows, "complete").Inc()
+	}
 
 	s.logger.Info("windows enrollment complete",
 		"device_id", deviceID,
@@ -295,6 +301,9 @@ func (s *Server) handleAndroidEnrollmentToken(w http.ResponseWriter, r *http.Req
 		"platform": models.PlatformAndroid,
 		"token_id": tokenID.String(),
 	})
+	if s.metrics != nil {
+		s.metrics.EnrollmentsTotal.WithLabelValues(models.PlatformAndroid, "token_created").Inc()
+	}
 
 	respondJSON(w, r, http.StatusOK, map[string]interface{}{
 		"token_id":    tokenID.String(),

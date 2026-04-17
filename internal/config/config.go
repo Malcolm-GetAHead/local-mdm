@@ -23,6 +23,7 @@ type Config struct {
 	Android      AndroidConfig      `yaml:"android"`
 	Logging      LoggingConfig      `yaml:"logging"`
 	Features     FeaturesConfig     `yaml:"features"`
+	Metrics      MetricsConfig      `yaml:"metrics"`
 	Tracing      TracingConfig      `yaml:"tracing"`
 	Admin        AdminConfig        `yaml:"admin"`
 }
@@ -203,6 +204,13 @@ type FeaturesConfig struct {
 	EnableAuditLog bool `yaml:"enable_audit_log"`
 	EnableWebhooks bool `yaml:"enable_webhooks"`
 	EnableMetrics  bool `yaml:"enable_metrics"`
+}
+
+// MetricsConfig holds metrics server configuration
+type MetricsConfig struct {
+	Enabled bool   `yaml:"enabled"`
+	Host    string `yaml:"host"`
+	Port    int    `yaml:"port"`
 }
 
 // Load reads configuration from a YAML file

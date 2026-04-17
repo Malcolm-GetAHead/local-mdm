@@ -17,6 +17,7 @@ import (
 	"github.com/malcolm-getahead/local-mdm/internal/config"
 	"github.com/malcolm-getahead/local-mdm/internal/constants"
 	"github.com/malcolm-getahead/local-mdm/internal/db"
+	"github.com/malcolm-getahead/local-mdm/internal/metrics"
 	"github.com/malcolm-getahead/local-mdm/internal/repository"
 	"github.com/malcolm-getahead/local-mdm/internal/scep"
 )
@@ -32,6 +33,8 @@ type Server struct {
 	server           *http.Server
 	authRateLimiter  *authRateLimiter
 	enrollmentLimiter *rateLimiter
+	metrics           *metrics.Metrics
+	metricsServer     *metrics.Server
 	certMonitor      *certs.ExpirationMonitor
 	challengeManager *scep.ChallengeManager
 	deviceRepo       repository.DeviceRepository
@@ -157,6 +160,13 @@ func New(cfg *config.Config, database *db.DB, logger *slog.Logger) (*Server, err
 	
 	// Enrollment rate limiter: 10 requests per minute per IP
 	s.enrollmentLimiter = newRateLimiter(10, time.Minute)
+
+	// Initialize metrics
+	if cfg.Metrics.Enabled {
+		s.metrics = metrics.New(database.DB)
+		s.metricsServer = metrics.NewServer(cfg.Metrics.Host, cfg.Metrics.Port, s.metrics, logger)
+		logger.Info("Metrics enabled", "host", cfg.Metrics.Host, "port", cfg.Metrics.Port)
+	}
 	
 	s.setupRoutes()
 	s.setupMiddleware()
@@ -286,7 +296,12 @@ func (s *Server) setupRoutes() {
 
 // setupMiddleware configures middleware
 func (s *Server) setupMiddleware() {
-	// Tracing - apply first to capture all requests
+	// Metrics - apply first to capture all requests
+	if s.metrics != nil {
+		s.router.Use(s.metrics.Middleware)
+	}
+
+	// Tracing - apply early to capture all requests
 	s.router.Use(tracingMiddleware)
 
 	// Request size limit - apply second to reject large requests early
@@ -327,6 +342,11 @@ func (s *Server) setupMiddleware() {
 
 // Start starts the HTTP server
 func (s *Server) Start() error {
+	// Start metrics server if configured
+	if s.metricsServer != nil {
+		s.metricsServer.Start()
+	}
+
 	// Start certificate expiration monitor if configured
 	if s.certMonitor != nil {
 		s.certMonitor.Start()
@@ -359,6 +379,13 @@ func (s *Server) Shutdown(ctx context.Context) error {
 	// Stop enrollment rate limiter
 	if s.enrollmentLimiter != nil {
 		s.enrollmentLimiter.Stop()
+	}
+
+	// Stop metrics server
+	if s.metricsServer != nil {
+		if err := s.metricsServer.Shutdown(ctx); err != nil {
+			s.logger.Warn("Metrics server shutdown error", "error", err)
+		}
 	}
 	
 	// Gracefully shutdown async audit logger (drain queue with timeout)
