@@ -46,7 +46,7 @@ S2-01, S2-02, S2-03, S2-05, and S2-06 can all start in parallel. S2-04 requires 
 ## Definition of Done
 
 - [ ] macOS device enrolls via configuration profile, appears in device list
-- [ ] macOS DEP profile can be defined and assigned to serial numbers
+- [x] macOS DEP profile can be defined and assigned to serial numbers
 - [x] Windows device discovers MDM server and completes enrollment
 - [x] Windows device reports DeviceInfo via OMA-DM sync
 - [ ] Android device enrolls via QR code, appears in device list

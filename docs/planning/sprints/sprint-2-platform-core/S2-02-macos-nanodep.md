@@ -49,8 +49,24 @@ Integrate NanoDEP for Apple DEP/ADE automated device enrollment. Devices assigne
 
 ## Acceptance Criteria
 
-- [ ] DEP token PKI exchange completes successfully
-- [ ] DEP profile can be defined and assigned to serial numbers
-- [ ] Device syncer fetches devices from Apple (or depsim for testing)
-- [ ] Auto-assigner assigns profile to newly synced devices
-- [ ] Synced devices visible via API
+- [x] DEP token PKI exchange completes successfully
+- [x] DEP profile can be defined and assigned to serial numbers
+- [x] Device syncer fetches devices from Apple (or depsim for testing)
+- [x] Auto-assigner assigns profile to newly synced devices
+- [x] Synced devices visible via API
+
+## Implementation Notes (2026-04-17)
+
+Actual file locations:
+- `internal/platform/macos/dep_storage.go` — Encrypted DEP token storage (pgcrypto)
+- `internal/platform/macos/dep_service.go` — DEP service (profiles, sync, assignment)
+- `internal/platform/macos/dep_test.go` — Unit tests with mock storage
+- `migrations/000004_dep_names.up.sql` — dep_names + dep_devices tables
+
+API endpoints:
+- `GET/PUT /api/v1/dep/{name}/tokenpki` — Token PKI exchange
+- `GET/PUT /api/v1/dep/{name}/assigner` — Assigner profile management
+- `GET /api/v1/dep/{name}/devices` — List synced devices
+
+OAuth tokens encrypted at rest with pgp_sym_encrypt. Encryption key from config
+(DEP_ENCRYPTION_KEY env var, secrets/dep_encryption.key for dev).

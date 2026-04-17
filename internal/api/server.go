@@ -18,6 +18,7 @@ import (
 	"github.com/malcolm-getahead/local-mdm/internal/constants"
 	"github.com/malcolm-getahead/local-mdm/internal/db"
 	"github.com/malcolm-getahead/local-mdm/internal/metrics"
+	"github.com/malcolm-getahead/local-mdm/internal/platform/macos"
 	"github.com/malcolm-getahead/local-mdm/internal/repository"
 	"github.com/malcolm-getahead/local-mdm/internal/scep"
 )
@@ -45,6 +46,7 @@ type Server struct {
 	certRepo         repository.CertificateRepository
 	auditLogRepo     repository.AuditLogRepository
 	cmdRepo          repository.CommandRepository
+	depService       *macos.DEPService
 }
 
 // New creates a new API server
@@ -167,6 +169,13 @@ func New(cfg *config.Config, database *db.DB, logger *slog.Logger) (*Server, err
 		s.metricsServer = metrics.NewServer(cfg.Metrics.Host, cfg.Metrics.Port, s.metrics, logger)
 		logger.Info("Metrics enabled", "host", cfg.Metrics.Host, "port", cfg.Metrics.Port)
 	}
+
+	// Initialize DEP service if encryption key is configured
+	if cfg.MacOS.DEPEncryptionKey != "" {
+		depStorage := macos.NewDEPStorage(database.DB, cfg.MacOS.DEPEncryptionKey)
+		s.depService = macos.NewDEPService(depStorage, logger)
+		logger.Info("DEP service initialized")
+	}
 	
 	s.setupRoutes()
 	s.setupMiddleware()
@@ -271,6 +280,21 @@ func (s *Server) setupRoutes() {
 	
 	// macOS MDM endpoints
 	api.Handle("/macos/enroll/{enterprise_id}", enrollLimiter(http.HandlerFunc(s.handleMacOSEnrollmentProfile))).Methods("GET")
+
+	// macOS DEP endpoints
+	api.Handle("/dep/{name}/tokenpki", s.authMiddleware.RequireAuth(
+		s.authMiddleware.RequireRole("admin", "super_admin")(
+			http.HandlerFunc(s.handleDEPTokenPKI),
+		),
+	)).Methods("GET", "PUT")
+	api.Handle("/dep/{name}/assigner", s.authMiddleware.RequireAuth(
+		s.authMiddleware.RequireRole("admin", "super_admin")(
+			http.HandlerFunc(s.handleDEPAssignerProfile),
+		),
+	)).Methods("GET", "PUT")
+	api.Handle("/dep/{name}/devices", s.authMiddleware.RequireAuth(
+		http.HandlerFunc(s.handleDEPDevices),
+	)).Methods("GET")
 	s.router.HandleFunc("/mdm", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// NanoMDM command handler - will be wired up with actual handler
 		w.WriteHeader(http.StatusOK)

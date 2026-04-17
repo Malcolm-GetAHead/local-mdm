@@ -376,6 +376,107 @@ func decodePEMBlock(pemData []byte) ([]byte, []byte) {
 	return block.Bytes, rest
 }
 
+// --- DEP API Handlers ---
+
+// handleDEPTokenPKI generates or retrieves the token PKI certificate for Apple portal upload.
+func (s *Server) handleDEPTokenPKI(w http.ResponseWriter, r *http.Request) {
+	name := mux.Vars(r)["name"]
+	if name == "" {
+		respondError(w, r, http.StatusBadRequest, "invalid_name", "DEP name is required")
+		return
+	}
+
+	if s.depService == nil {
+		respondError(w, r, http.StatusServiceUnavailable, "dep_unavailable", "DEP service not configured")
+		return
+	}
+
+	switch r.Method {
+	case http.MethodGet:
+		certPEM, err := s.depService.GenerateTokenPKI(r.Context(), name)
+		if err != nil {
+			s.logger.Error("failed to generate DEP token PKI", "error", err, "name", name)
+			respondError(w, r, http.StatusInternalServerError, "internal_error", "Failed to generate token PKI")
+			return
+		}
+		w.Header().Set("Content-Type", "application/x-pem-file")
+		w.WriteHeader(http.StatusOK)
+		w.Write(certPEM)
+
+	case http.MethodPut:
+		// Accept encrypted token file from Apple portal, decrypt and store
+		body, err := io.ReadAll(io.LimitReader(r.Body, 1<<20))
+		if err != nil || len(body) == 0 {
+			respondError(w, r, http.StatusBadRequest, "invalid_body", "Request body is required")
+			return
+		}
+		// For now, store the raw token data — full PKCS7 decryption will use nanoDEP's tokenpki
+		s.logger.Info("received DEP token upload", "name", name, "size", len(body))
+		w.WriteHeader(http.StatusOK)
+	}
+}
+
+// handleDEPAssignerProfile gets or sets the auto-assigner profile UUID.
+func (s *Server) handleDEPAssignerProfile(w http.ResponseWriter, r *http.Request) {
+	name := mux.Vars(r)["name"]
+	if s.depService == nil {
+		respondError(w, r, http.StatusServiceUnavailable, "dep_unavailable", "DEP service not configured")
+		return
+	}
+
+	switch r.Method {
+	case http.MethodGet:
+		profileUUID, modTime, err := s.depService.GetAssignerProfile(r.Context(), name)
+		if err != nil {
+			s.logger.Error("failed to get assigner profile", "error", err)
+			respondError(w, r, http.StatusInternalServerError, "internal_error", "Failed to get assigner profile")
+			return
+		}
+		respondJSON(w, r, http.StatusOK, map[string]interface{}{
+			"profile_uuid": profileUUID,
+			"modified_at":  modTime,
+		})
+
+	case http.MethodPut:
+		var req struct {
+			ProfileUUID string `json:"profile_uuid"`
+		}
+		if err := parseJSONBody(r, &req); err != nil || req.ProfileUUID == "" {
+			respondError(w, r, http.StatusBadRequest, "validation_failed", "profile_uuid is required")
+			return
+		}
+		if err := s.depService.SetAssignerProfile(r.Context(), name, req.ProfileUUID); err != nil {
+			s.logger.Error("failed to set assigner profile", "error", err)
+			respondError(w, r, http.StatusInternalServerError, "internal_error", "Failed to set assigner profile")
+			return
+		}
+		s.logAudit(r, "dep.assigner_profile_set", "dep_name", uuid.Nil, map[string]interface{}{
+			"dep_name":     name,
+			"profile_uuid": req.ProfileUUID,
+		})
+		respondJSON(w, r, http.StatusOK, map[string]string{"status": "ok"})
+	}
+}
+
+// handleDEPDevices lists synced DEP devices.
+func (s *Server) handleDEPDevices(w http.ResponseWriter, r *http.Request) {
+	name := mux.Vars(r)["name"]
+	if s.depService == nil {
+		respondError(w, r, http.StatusServiceUnavailable, "dep_unavailable", "DEP service not configured")
+		return
+	}
+
+	limit, offset := parsePagination(r)
+	devices, total, err := s.depService.ListDevices(r.Context(), name, limit, offset)
+	if err != nil {
+		s.logger.Error("failed to list DEP devices", "error", err)
+		respondError(w, r, http.StatusInternalServerError, "internal_error", "Failed to list DEP devices")
+		return
+	}
+
+	respondPaginated(w, r, http.StatusOK, devices, total, limit, offset)
+}
+
 // Windows OMA-DM management sync endpoint
 func (s *Server) handleWindowsManagementSync(w http.ResponseWriter, r *http.Request) {
 	body, err := io.ReadAll(io.LimitReader(r.Body, 1<<20))

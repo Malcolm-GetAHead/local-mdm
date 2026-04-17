@@ -177,10 +177,12 @@ type WindowsConfig struct {
 
 // MacOSConfig holds macOS MDM configuration
 type MacOSConfig struct {
-	APNSCertPath  string `yaml:"apns_cert_path"`
-	APNSPassword  string `yaml:"apns_password"`
-	PushTopic     string `yaml:"push_topic"`
-	EnrollmentURL string `yaml:"enrollment_url"`
+	APNSCertPath       string        `yaml:"apns_cert_path"`
+	APNSPassword       string        `yaml:"apns_password"`
+	PushTopic          string        `yaml:"push_topic"`
+	EnrollmentURL      string        `yaml:"enrollment_url"`
+	DEPEncryptionKey   string        `yaml:"dep_encryption_key"`
+	DEPSyncInterval    time.Duration `yaml:"dep_sync_interval"`
 }
 
 // AndroidConfig holds Android MDM configuration
@@ -256,6 +258,9 @@ func (c *Config) overrideFromEnv() {
 	}
 	if keycloakSecret := os.Getenv("KEYCLOAK_CLIENT_SECRET"); keycloakSecret != "" {
 		c.Keycloak.ClientSecret = keycloakSecret
+	}
+	if depKey := os.Getenv("DEP_ENCRYPTION_KEY"); depKey != "" {
+		c.MacOS.DEPEncryptionKey = depKey
 	}
 }
 

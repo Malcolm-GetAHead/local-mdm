@@ -1,0 +1,2 @@
+DROP TABLE IF EXISTS dep_devices;
+DROP TABLE IF EXISTS dep_names;
