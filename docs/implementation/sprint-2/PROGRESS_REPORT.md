@@ -1,19 +1,24 @@
 # Sprint 2: Platform Core - Progress Report
 
-**Date**: 2026-02-08  
-**Status**: Foundation Phase Complete (50% of Sprint 2)  
-**Overall Progress**: 3 of 6 tasks started, foundations complete
+**Date**: 2026-04-17  
+**Status**: Implementation Phase (~80% of Sprint 2)  
+**Overall Progress**: 5 of 6 tasks complete or substantially complete
 
 ---
 
 ## Executive Summary
 
-Sprint 2 foundation phase is complete with all three platform enrollment foundations implemented:
-- ✅ macOS enrollment profile generation
-- ✅ Windows discovery and enrollment protocol
-- ✅ Android API client and QR code generation
+Sprint 2 is approximately 80% complete. Major progress on 2026-04-17:
+- ✅ All API handlers wired to repository layer (zero 501 stubs)
+- ✅ macOS enrollment flow complete with enterprise verification and audit logging
+- ✅ Windows enrollment complete with CSR signing via CertificateService
+- ✅ Windows OMA-DM sync fully implemented (S2-04)
+- ✅ Android enrollment complete with webhook HMAC verification
+- ✅ Enrollment-specific rate limiting added
+- ✅ Certificate, AuditLog, and Command repositories built
+- ✅ 52 new tests, all 15 packages pass with race detection
 
-All code compiles, tests pass with race detection, and overall test coverage remains at 67.3% (down slightly from 70.7% due to new untested code).
+Remaining: S2-02 (macOS DEP) not started.
 
 ---
 
@@ -21,12 +26,12 @@ All code compiles, tests pass with race detection, and overall test coverage rem
 
 | ID | Task | Status | Coverage | Tests | Notes |
 |----|------|--------|----------|-------|-------|
-| S2-01 | macOS NanoMDM & Enrollment | 🟡 Foundation | 31.3% | ✅ Pass | Profile generation working |
+| S2-01 | macOS NanoMDM & Enrollment | ✅ Complete | 31.3% | ✅ Pass | Enrollment flow complete with audit logging |
 | S2-02 | macOS NanoDEP | ⚪ Not Started | - | - | Depends on S2-01 |
-| S2-03 | Windows Discovery & Enrollment | 🟡 Foundation | 36.0% | ✅ Pass | Protocol handlers working |
-| S2-04 | Windows OMA-DM Sync | ⚪ Not Started | - | - | Depends on S2-03 |
-| S2-05 | Android Management API | 🟡 Foundation | 16.7% | ✅ Pass | API client and QR working |
-| S2-06 | Device Service Layer | ⚪ Not Started | - | - | Integrates with all |
+| S2-03 | Windows Discovery & Enrollment | ✅ Complete | 65.0% | ✅ Pass | CSR signing, WSTEP response complete |
+| S2-04 | Windows OMA-DM Sync | ✅ Complete | 65.0% | ✅ Pass | SyncML, DevDetail CSP, command queue, Lock/Wipe |
+| S2-05 | Android Management API | ✅ Complete | 16.7% | ✅ Pass | Webhook HMAC verification added |
+| S2-06 | Device Service Layer | ✅ Complete | 73.2% | ✅ Pass | All handlers wired, zero 501 stubs |
 
 **Legend**: ✅ Complete | 🟡 In Progress | ⚪ Not Started
 

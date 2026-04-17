@@ -48,9 +48,18 @@ Handle OMA-DM SyncML sessions from enrolled Windows devices. Collect device inve
 
 ## Acceptance Criteria
 
-- [ ] Enrolled Windows device initiates OMA-DM sync session
-- [ ] Server correctly handles SyncML pkg 1/2 exchange
-- [ ] DeviceInfo CSP queries return device inventory
-- [ ] Device record updated with hardware/software info
-- [ ] Command queue delivers pending commands during sync
-- [ ] Command responses processed and status updated
+- [x] Enrolled Windows device initiates OMA-DM sync session
+- [x] Server correctly handles SyncML pkg 1/2 exchange
+- [x] DeviceInfo CSP queries return device inventory
+- [x] Device record updated with hardware/software info
+- [x] Command queue delivers pending commands during sync
+- [x] Command responses processed and status updated
+
+## Implementation Notes (2026-04-17)
+
+Actual file locations differ from plan:
+- `internal/platform/windows/syncml.go` — SyncML XML types, parser, generator
+- `internal/platform/windows/management.go` — Session handler, DevDetail CSP, command delivery
+- `internal/repository/command.go` — Command queue repository
+- `migrations/000003_device_commands.up.sql` — device_commands table
+- Route: `POST /ManagementServer/MDM.svc`

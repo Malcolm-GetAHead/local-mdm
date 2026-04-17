@@ -47,8 +47,8 @@ S2-01, S2-02, S2-03, S2-05, and S2-06 can all start in parallel. S2-04 requires 
 
 - [ ] macOS device enrolls via configuration profile, appears in device list
 - [ ] macOS DEP profile can be defined and assigned to serial numbers
-- [ ] Windows device discovers MDM server and completes enrollment
-- [ ] Windows device reports DeviceInfo via OMA-DM sync
+- [x] Windows device discovers MDM server and completes enrollment
+- [x] Windows device reports DeviceInfo via OMA-DM sync
 - [ ] Android device enrolls via QR code, appears in device list
-- [ ] `GET /api/v1/devices` returns enrolled devices from all platforms
-- [ ] `GET /api/v1/devices/{id}` returns platform-specific inventory data
+- [x] `GET /api/v1/devices` returns enrolled devices from all platforms
+- [x] `GET /api/v1/devices/{id}` returns platform-specific inventory data
