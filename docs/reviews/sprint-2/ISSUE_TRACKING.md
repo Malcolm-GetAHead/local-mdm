@@ -38,8 +38,8 @@
 | ID | Issue | Priority | Status | Assignee | Effort | Completed | Notes |
 |----|-------|----------|--------|----------|--------|-----------|-------|
 | M-01 | Low Test Coverage | MEDIUM | 🟡 In Progress | | 4 days | | API 73%, Windows 65% |
-| M-02 | Missing Observability | MEDIUM | 🔴 Open | | 2 days | | Metrics/traces |
-| M-03 | Missing Config Validation | MEDIUM | 🔴 Open | | 1 day | | Startup validation |
+| M-02 | Missing Observability | MEDIUM | ✅ Done | - | 2 days | 2026-04-17 | Prometheus metrics on :9090 |
+| M-03 | Missing Config Validation | MEDIUM | ✅ Done | - | 1 day | 2026-04-17 | DB/Keycloak/port/pool/logging |
 | M-04 | Inefficient XML Generation | MEDIUM | ✅ Done | - | 2 days | 2026-04-17 | SyncML parser/generator |
 | M-05 | Missing Idempotency | MEDIUM | 🔴 Open | | 2 days | | Duplicate requests |
 
@@ -49,9 +49,9 @@
 
 | ID | Issue | Priority | Status | Assignee | Effort | Completed | Notes |
 |----|-------|----------|--------|----------|--------|-----------|-------|
-| L-01 | Inconsistent Error Messages | LOW | 🔴 Open | | 0.25 days | | Standardize messages |
-| L-02 | Missing Request ID | LOW | 🔴 Open | | 0.25 days | | Log correlation |
-| L-03 | Hardcoded Timeouts | LOW | 🔴 Open | | 0.25 days | | Move to config |
+| L-01 | Inconsistent Error Messages | LOW | ✅ Done | - | 0.25 days | 2026-04-17 | Standardized error codes |
+| L-02 | Missing Request ID | LOW | ✅ Done | - | 0.25 days | 2026-04-17 | Propagated to audit details |
+| L-03 | Hardcoded Timeouts | LOW | ✅ Done | - | 0.25 days | 2026-04-17 | Configurable via config |
 
 ---
 
@@ -70,23 +70,17 @@
 
 ### By Priority
 - **Critical**: 7/7 (100%) ✅ **COMPLETE**
-- **High**: 3/5 (60%) 🟡 **IN PROGRESS** (H-01, H-03, H-04 done; H-05 open — see note below)
-- **Medium**: 2/5 (40%) 🟡 **IN PROGRESS** (M-01 partial, M-04 done)
-- **Low**: 0/3 (0%) 🔴 **NOT STARTED**
-- **Overall**: 12/20 (60%) - **Sprint 2 progressing well**
+- **High**: 3/5 (60%) 🟡 **IN PROGRESS** (H-01, H-03, H-04 done; H-05 likely invalid)
+- **Medium**: 4/5 (80%) 🟡 **IN PROGRESS** (M-01 partial, M-02/M-03/M-04 done; M-05 open)
+- **Low**: 3/3 (100%) ✅ **COMPLETE**
+- **Overall**: 17/20 (85%) - **Sprint 2 near completion**
 
 > **Note on H-05 (Missing TLS Validation)**: Investigation on 2026-04-17 found that `InsecureSkipVerify: true` does NOT exist in the codebase. The Android client uses `androidmanagement.NewService()` with Go's default HTTP client which has proper TLS. This issue may be invalid.
 
 ### By Effort
 - **Total Effort**: 18 days (revised from 28 days)
-- **Completed**: ~10 days
-- **Remaining**: ~4-5 days
-
-### By Timeline
-- **v1.0 Critical**: 4 remaining (5-6 days) - ⚠️ **42.9% COMPLETE**
-- **v1.0 High**: 4 remaining (2-3 days) - ⚠️ **20% COMPLETE**
-- **v1.0 Medium**: 5 remaining (11 days) - 🔴 **0% COMPLETE**
-- **v1.0 Low**: 3 remaining (0.75 days) - 🔴 **0% COMPLETE**
+- **Completed**: ~15 days
+- **Remaining**: ~2-3 days (M-01 ongoing, M-05, S2-02)
 
 ---
 

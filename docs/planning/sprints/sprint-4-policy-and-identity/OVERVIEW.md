@@ -43,3 +43,9 @@ S3 complete
 - [ ] Compliance engine reports which devices are non-compliant and why
 - [ ] macOS device receives Platform SSO profile and can authenticate to Keycloak
 - [ ] Device unenrollment triggers Keycloak device removal
+- [ ] Idempotency-Key header support on all POST endpoints
+
+## Additional Items
+
+### Idempotency-Key Support
+Added from Sprint 2 (M-05). Sprint 2 implemented simple duplicate prevention via DB unique constraints + 409 Conflict responses. Full `Idempotency-Key` header support (store key + cached response in Redis, return cached response on duplicate key) should be implemented in this sprint when the policy assignment system creates more complex multi-step operations that benefit from idempotent retries.
