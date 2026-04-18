@@ -17,7 +17,9 @@ import (
 	"github.com/malcolm-getahead/local-mdm/internal/auth"
 	"github.com/malcolm-getahead/local-mdm/internal/config"
 	"github.com/malcolm-getahead/local-mdm/internal/models"
+	"github.com/malcolm-getahead/local-mdm/internal/platform/macos"
 	"github.com/malcolm-getahead/local-mdm/internal/scep"
+	depClient "github.com/micromdm/nanodep/client"
 )
 
 // --- Mock Repositories ---
@@ -294,6 +296,7 @@ func newTestServer(t *testing.T) *testServer {
 		certRepo:         cr,
 		auditLogRepo:     ar,
 		enrollmentLimiter: newRateLimiterWithSize(10, time.Minute, 100),
+		depService:       macos.NewDEPService(&testDEPStorage{}, slog.New(slog.NewTextHandler(bytes.NewBuffer(nil), nil))),
 	}
 
 	// Register only the routes we're testing (no auth middleware)
@@ -312,6 +315,9 @@ func newTestServer(t *testing.T) *testServer {
 	api.HandleFunc("/audit-logs", s.handleListAuditLogs).Methods("GET")
 	api.HandleFunc("/android/webhook", s.handleAndroidWebhook).Methods("POST")
 	api.HandleFunc("/macos/enroll/{enterprise_id}", s.handleMacOSEnrollmentProfile).Methods("GET")
+	api.HandleFunc("/dep/{name}/tokenpki", s.handleDEPTokenPKI).Methods("GET", "PUT")
+	api.HandleFunc("/dep/{name}/assigner", s.handleDEPAssignerProfile).Methods("GET", "PUT")
+	api.HandleFunc("/dep/{name}/devices", s.handleDEPDevices).Methods("GET")
 
 	return &testServer{
 		server:         s,
@@ -363,4 +369,49 @@ func jsonBody(t *testing.T, v interface{}) *bytes.Reader {
 		t.Fatalf("failed to marshal: %v", err)
 	}
 	return bytes.NewReader(b)
+}
+
+// testDEPStorage is a minimal in-memory DEP storage for handler tests
+type testDEPStorage struct {
+	profile    string
+	modTime    time.Time
+}
+
+func (s *testDEPStorage) RetrieveAuthTokens(_ context.Context, _ string) (*depClient.OAuth1Tokens, error) {
+	return &depClient.OAuth1Tokens{}, nil
+}
+func (s *testDEPStorage) StoreAuthTokens(_ context.Context, _ string, _ *depClient.OAuth1Tokens) error {
+	return nil
+}
+func (s *testDEPStorage) RetrieveConfig(_ context.Context, _ string) (*depClient.Config, error) {
+	return &depClient.Config{}, nil
+}
+func (s *testDEPStorage) StoreConfig(_ context.Context, _ string, _ *depClient.Config) error {
+	return nil
+}
+func (s *testDEPStorage) RetrieveCursor(_ context.Context, _ string) (string, error) { return "", nil }
+func (s *testDEPStorage) StoreCursor(_ context.Context, _, _ string) error           { return nil }
+func (s *testDEPStorage) RetrieveAssignerProfile(_ context.Context, _ string) (string, time.Time, error) {
+	return s.profile, s.modTime, nil
+}
+func (s *testDEPStorage) StoreAssignerProfile(_ context.Context, _ string, p string) error {
+	s.profile = p
+	s.modTime = time.Now()
+	return nil
+}
+func (s *testDEPStorage) GenerateTokenPKI(_ context.Context, _, _ string, _ int) ([]byte, error) {
+	return []byte("-----BEGIN CERTIFICATE-----\ntest\n-----END CERTIFICATE-----"), nil
+}
+func (s *testDEPStorage) RetrieveCurrentTokenPKI(_ context.Context, _ string) ([]byte, []byte, error) {
+	return nil, nil, nil
+}
+func (s *testDEPStorage) RetrieveStagingTokenPKI(_ context.Context, _ string) ([]byte, []byte, error) {
+	return nil, nil, nil
+}
+func (s *testDEPStorage) UpstageTokenPKI(_ context.Context, _ string) error { return nil }
+func (s *testDEPStorage) StoreSyncedDevice(_ context.Context, _, _ string, _ map[string]interface{}) error {
+	return nil
+}
+func (s *testDEPStorage) ListDEPDevices(_ context.Context, _ string, _, _ int) ([]macos.DEPDevice, int, error) {
+	return []macos.DEPDevice{}, 0, nil
 }

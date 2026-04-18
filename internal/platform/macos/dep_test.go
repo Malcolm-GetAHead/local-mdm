@@ -84,6 +84,49 @@ func TestDEPService_ListDevices(t *testing.T) {
 	})
 }
 
+func TestDEPService_GenerateTokenPKI(t *testing.T) {
+	storage := &mockDEPStorage{}
+	logger := slog.Default()
+	svc := NewDEPService(storage, logger)
+
+	certPEM, err := svc.GenerateTokenPKI(context.Background(), "test-dep")
+	require.NoError(t, err)
+	assert.Contains(t, string(certPEM), "BEGIN CERTIFICATE")
+}
+
+func TestDEPService_StoreConfig(t *testing.T) {
+	storage := &mockDEPStorage{}
+	logger := slog.Default()
+	svc := NewDEPService(storage, logger)
+
+	err := svc.StoreConfig(context.Background(), "test-dep", "https://mdmenrollment.apple.com")
+	require.NoError(t, err)
+	assert.Equal(t, "https://mdmenrollment.apple.com", storage.configBaseURL)
+}
+
+func TestDEPService_SyncCallback_EmptyDevices(t *testing.T) {
+	storage := &mockDEPStorage{}
+	logger := slog.Default()
+	svc := &DEPService{storage: storage, logger: logger}
+
+	callback := svc.SyncDevicesCallbackForName("test")
+	err := callback(context.Background(), false, &godep.FetchDeviceResponseJson{
+		Devices: []godep.DeviceJson{},
+	})
+	assert.NoError(t, err)
+	assert.Empty(t, storage.storedDevices)
+}
+
+func TestDeviceToMap(t *testing.T) {
+	d := godep.DeviceJson{
+		SerialNumber: "C02TEST123",
+		Model:        "MacBookPro18,1",
+	}
+	m := deviceToMap(d)
+	assert.Equal(t, "C02TEST123", m["serial_number"])
+	assert.Equal(t, "MacBookPro18,1", m["model"])
+}
+
 // --- Mock DEP Storage ---
 
 type storedDevice struct {
@@ -96,6 +139,7 @@ type mockDEPStorage struct {
 	storedDevices    []storedDevice
 	assignerProfile  string
 	assignerModTime  time.Time
+	configBaseURL    string
 }
 
 func (m *mockDEPStorage) RetrieveAuthTokens(_ context.Context, _ string) (*client.OAuth1Tokens, error) {
@@ -107,7 +151,8 @@ func (m *mockDEPStorage) StoreAuthTokens(_ context.Context, _ string, _ *client.
 func (m *mockDEPStorage) RetrieveConfig(_ context.Context, _ string) (*client.Config, error) {
 	return &client.Config{}, nil
 }
-func (m *mockDEPStorage) StoreConfig(_ context.Context, _ string, _ *client.Config) error {
+func (m *mockDEPStorage) StoreConfig(_ context.Context, _ string, cfg *client.Config) error {
+	m.configBaseURL = cfg.BaseURL
 	return nil
 }
 func (m *mockDEPStorage) RetrieveCursor(_ context.Context, _ string) (string, error) {

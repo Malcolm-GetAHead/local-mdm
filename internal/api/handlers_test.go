@@ -592,6 +592,60 @@ func computeHMAC(payload, secret []byte) string {
 	return hex.EncodeToString(mac.Sum(nil))
 }
 
+// --- DEP Handler Tests ---
+
+func TestHandleDEPTokenPKI(t *testing.T) {
+	t.Run("generates token PKI certificate", func(t *testing.T) {
+		ts := newTestServer(t)
+		req := httptest.NewRequest("GET", "/api/v1/dep/test-server/tokenpki", nil)
+		w := ts.do(req)
+
+		assert.Equal(t, http.StatusOK, w.Code)
+		assert.Equal(t, "application/x-pem-file", w.Header().Get("Content-Type"))
+		assert.Contains(t, w.Body.String(), "BEGIN CERTIFICATE")
+	})
+}
+
+func TestHandleDEPAssignerProfile(t *testing.T) {
+	t.Run("get empty profile", func(t *testing.T) {
+		ts := newTestServer(t)
+		req := httptest.NewRequest("GET", "/api/v1/dep/test-server/assigner", nil)
+		w := ts.do(req)
+
+		assert.Equal(t, http.StatusOK, w.Code)
+	})
+
+	t.Run("set profile", func(t *testing.T) {
+		ts := newTestServer(t)
+		body := jsonBody(t, map[string]string{"profile_uuid": "uuid-123"})
+		req := httptest.NewRequest("PUT", "/api/v1/dep/test-server/assigner", body)
+		w := ts.do(req)
+
+		assert.Equal(t, http.StatusOK, w.Code)
+	})
+
+	t.Run("rejects empty profile UUID", func(t *testing.T) {
+		ts := newTestServer(t)
+		body := jsonBody(t, map[string]string{"profile_uuid": ""})
+		req := httptest.NewRequest("PUT", "/api/v1/dep/test-server/assigner", body)
+		w := ts.do(req)
+
+		assert.Equal(t, http.StatusBadRequest, w.Code)
+	})
+}
+
+func TestHandleDEPDevices(t *testing.T) {
+	t.Run("returns empty device list", func(t *testing.T) {
+		ts := newTestServer(t)
+		req := httptest.NewRequest("GET", "/api/v1/dep/test-server/devices", nil)
+		w := ts.do(req)
+
+		assert.Equal(t, http.StatusOK, w.Code)
+		resp := decodeResponse(t, w)
+		assert.Equal(t, 0, resp.Meta.Total)
+	})
+}
+
 // --- Duplicate Prevention Tests (M-05) ---
 
 func TestIsDuplicateError(t *testing.T) {
