@@ -349,6 +349,17 @@ func (s *Server) handleLockDevice(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Create command for platform dispatch
+	cmd := &models.DeviceCommand{
+		DeviceID:    device.ID,
+		CommandType: models.CommandTypeLock,
+	}
+	if err := s.cmdRepo.Create(r.Context(), cmd); err != nil {
+		s.logger.Error("failed to create lock command", "error", err, "id", id)
+		respondError(w, r, http.StatusInternalServerError, "internal_error", "Failed to lock device")
+		return
+	}
+
 	device.Status = models.DeviceStatusLost
 	if err := s.deviceRepo.Update(r.Context(), device); err != nil {
 		s.logger.Error("failed to lock device", "error", err, "id", id)
@@ -357,10 +368,14 @@ func (s *Server) handleLockDevice(w http.ResponseWriter, r *http.Request) {
 	}
 
 	s.logAudit(r, "device.lock", "device", id, map[string]interface{}{
-		"platform": device.Platform,
+		"platform":   device.Platform,
+		"command_id": cmd.ID,
 	})
 
-	respondJSON(w, r, http.StatusOK, device)
+	respondJSON(w, r, http.StatusOK, map[string]interface{}{
+		"device":  device,
+		"command": cmd,
+	})
 }
 
 func (s *Server) handleWipeDevice(w http.ResponseWriter, r *http.Request) {
@@ -381,6 +396,16 @@ func (s *Server) handleWipeDevice(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	cmd := &models.DeviceCommand{
+		DeviceID:    device.ID,
+		CommandType: models.CommandTypeWipe,
+	}
+	if err := s.cmdRepo.Create(r.Context(), cmd); err != nil {
+		s.logger.Error("failed to create wipe command", "error", err, "id", id)
+		respondError(w, r, http.StatusInternalServerError, "internal_error", "Failed to wipe device")
+		return
+	}
+
 	device.Status = models.DeviceStatusWiped
 	if err := s.deviceRepo.Update(r.Context(), device); err != nil {
 		s.logger.Error("failed to wipe device", "error", err, "id", id)
@@ -389,10 +414,14 @@ func (s *Server) handleWipeDevice(w http.ResponseWriter, r *http.Request) {
 	}
 
 	s.logAudit(r, "device.wipe", "device", id, map[string]interface{}{
-		"platform": device.Platform,
+		"platform":   device.Platform,
+		"command_id": cmd.ID,
 	})
 
-	respondJSON(w, r, http.StatusOK, device)
+	respondJSON(w, r, http.StatusOK, map[string]interface{}{
+		"device":  device,
+		"command": cmd,
+	})
 }
 
 func (s *Server) handleUpdateDevice(w http.ResponseWriter, r *http.Request) {
@@ -997,6 +1026,50 @@ func (s *Server) handleInstallProfile(w http.ResponseWriter, r *http.Request) {
 	})
 
 	respondJSON(w, r, http.StatusCreated, cmd)
+}
+
+func (s *Server) handleRestartDevice(w http.ResponseWriter, r *http.Request) {
+	id, err := parseUUIDParam(r, "id")
+	if err != nil {
+		respondError(w, r, http.StatusBadRequest, "invalid_id", "Invalid device ID format")
+		return
+	}
+
+	device, err := s.deviceRepo.GetByID(r.Context(), id)
+	if err != nil {
+		if strings.Contains(err.Error(), "not found") {
+			respondError(w, r, http.StatusNotFound, "not_found", "Device not found")
+			return
+		}
+		respondError(w, r, http.StatusInternalServerError, "internal_error", "Failed to get device")
+		return
+	}
+
+	// Restart is supported on macOS and Android only
+	if device.Platform == models.PlatformWindows {
+		respondError(w, r, http.StatusBadRequest, "unsupported", "Restart is not supported on Windows devices")
+		return
+	}
+
+	cmd := &models.DeviceCommand{
+		DeviceID:    device.ID,
+		CommandType: models.CommandTypeRestart,
+	}
+	if err := s.cmdRepo.Create(r.Context(), cmd); err != nil {
+		s.logger.Error("failed to create restart command", "error", err, "id", id)
+		respondError(w, r, http.StatusInternalServerError, "internal_error", "Failed to restart device")
+		return
+	}
+
+	s.logAudit(r, "device.restart", "device", id, map[string]interface{}{
+		"platform":   device.Platform,
+		"command_id": cmd.ID,
+	})
+
+	respondJSON(w, r, http.StatusOK, map[string]interface{}{
+		"device":  device,
+		"command": cmd,
+	})
 }
 
 func (s *Server) handleRemoveProfile(w http.ResponseWriter, r *http.Request) {

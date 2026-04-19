@@ -484,6 +484,7 @@ func newTestServer(t *testing.T) *testServer {
 	api.HandleFunc("/devices/{id}", s.handleDeleteDevice).Methods("DELETE")
 	api.HandleFunc("/devices/{id}/lock", s.handleLockDevice).Methods("POST")
 	api.HandleFunc("/devices/{id}/wipe", s.handleWipeDevice).Methods("POST")
+	api.HandleFunc("/devices/{id}/restart", s.handleRestartDevice).Methods("POST")
 	api.HandleFunc("/policies", s.handleListPolicies).Methods("GET")
 	api.HandleFunc("/policies", s.handleCreatePolicy).Methods("POST")
 	api.HandleFunc("/policies/{id}", s.handleGetPolicy).Methods("GET")

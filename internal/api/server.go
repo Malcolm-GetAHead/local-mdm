@@ -295,6 +295,12 @@ func (s *Server) setupRoutes() {
 		),
 	)).Methods("POST")
 
+	api.Handle("/devices/{id}/restart", s.authMiddleware.RequireAuth(
+		s.authMiddleware.RequireRole("admin", "operator")(
+			http.HandlerFunc(s.handleRestartDevice),
+		),
+	)).Methods("POST")
+
 	api.Handle("/devices/{id}", s.authMiddleware.RequireAuth(
 		s.authMiddleware.RequireRole("admin", "operator")(
 			http.HandlerFunc(s.handleUpdateDevice),
