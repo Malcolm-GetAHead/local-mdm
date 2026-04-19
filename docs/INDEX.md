@@ -5,8 +5,8 @@ Complete guide to Local MDM documentation.
 ## Quick Links
 
 - **Getting Started**: [Setup Guide](dev/SETUP.md) | [Quick Reference](dev/QUICK_REFERENCE.md)
-- **Current Status**: [Sprint 1 Review](reviews/sprint-1/README.md) - 95.8% complete
-- **Implementation**: [Sprint 1 Implementations](implementation/sprint-1/README.md)
+- **Current Status**: [Sprint 2 Review](reviews/sprint-2/) - 95% complete (19/20 issues)
+- **Implementation**: [Sprint 2 Implementations](implementation/sprint-2/)
 - **Future Plans**: [Post-v1.0 Roadmap](planning/future/README.md)
 
 ## Documentation Structure

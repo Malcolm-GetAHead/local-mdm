@@ -34,7 +34,16 @@ Unified Control Plane (Go)
 ✅ **Sprint 1 Complete** - 23/24 issues resolved (95.8%)
 - See [Sprint 1 Review](docs/reviews/sprint-1/) for completion status
 - See [Implementation Docs](docs/implementation/sprint-1/) for completed features
-- Ready to begin Sprint 2 (Platform Core)
+
+✅ **Sprint 2 Complete** - 6/6 tasks done, 19/20 review issues resolved (95%)
+- All API handlers wired to repository layer (zero 501 stubs)
+- Platform enrollment flows: macOS, Windows (with cert signing), Android (with HMAC)
+- Windows OMA-DM sync with SyncML protocol, DevDetail CSP, command queue
+- macOS DEP integration with encrypted token storage (pgcrypto)
+- Prometheus metrics on separate internal port
+- See [Sprint 2 Review](docs/reviews/sprint-2/) for issue tracking
+- See [Implementation Docs](docs/implementation/sprint-2/) for completed features
+- Ready to begin Sprint 3 (Platform Features)
 
 ## Documentation
 

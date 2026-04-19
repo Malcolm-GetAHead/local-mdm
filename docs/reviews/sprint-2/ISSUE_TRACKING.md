@@ -1,10 +1,10 @@
 # Issue Tracking - Sprint 2 Platform Core
 
-**Last Updated**: 2026-04-17  
+**Last Updated**: 2026-04-18  
 **Scope**: Sprint 2 (Platform Enrollment)  
 **Total Issues**: 20  
-**Resolved**: 12  
-**Status**: 🟡 **60% Complete - In Progress**
+**Resolved**: 19  
+**Status**: ✅ **95% Complete — Sprint 2 Done**
 
 ---
 
@@ -41,7 +41,7 @@
 | M-02 | Missing Observability | MEDIUM | ✅ Done | - | 2 days | 2026-04-17 | Prometheus metrics on :9090 |
 | M-03 | Missing Config Validation | MEDIUM | ✅ Done | - | 1 day | 2026-04-17 | DB/Keycloak/port/pool/logging |
 | M-04 | Inefficient XML Generation | MEDIUM | ✅ Done | - | 2 days | 2026-04-17 | SyncML parser/generator |
-| M-05 | Missing Idempotency | MEDIUM | 🔴 Open | | 2 days | | Duplicate requests |
+| M-05 | Missing Idempotency | MEDIUM | ✅ Done | - | 2 days | 2026-04-17 | DB unique constraints + 409; full Idempotency-Key in Sprint 4 |
 
 ---
 
@@ -73,7 +73,7 @@
 - **High**: 4/5 (80%) 🟡 (H-01, H-03, H-04 done; H-05 closed as invalid)
 - **Medium**: 5/5 (100%) ✅ **COMPLETE**
 - **Low**: 3/3 (100%) ✅ **COMPLETE**
-- **Overall**: 19/20 (95%) - **Sprint 2 review issues nearly complete**
+- **Overall**: 19/20 (95%) ✅ **Sprint 2 Complete** (M-01 ongoing)
 
 > **Note on H-05 (Missing TLS Validation)**: Investigation on 2026-04-17 found that `InsecureSkipVerify: true` does NOT exist in the codebase. The Android client uses `androidmanagement.NewService()` with Go's default HTTP client which has proper TLS. This issue may be invalid.
 
