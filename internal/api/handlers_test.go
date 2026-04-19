@@ -655,3 +655,293 @@ func TestIsDuplicateError(t *testing.T) {
 	assert.False(t, isDuplicateError(fmt.Errorf("connection refused")))
 	assert.False(t, isDuplicateError(fmt.Errorf("not found")))
 }
+
+// --- S2a-01: New CRUD Endpoint Tests ---
+
+func TestHandleUpdateEnterprise(t *testing.T) {
+	t.Run("updates enterprise name", func(t *testing.T) {
+		ts := newTestServer(t)
+		id := uuid.New()
+		ts.enterpriseRepo.enterprises = append(ts.enterpriseRepo.enterprises, &models.Enterprise{
+			BaseModel: models.BaseModel{ID: id, CreatedAt: time.Now(), UpdatedAt: time.Now()},
+			Name:      "Old Name",
+			Slug:      "old",
+		})
+
+		body := jsonBody(t, map[string]string{"name": "New Name"})
+		req := httptest.NewRequest("PUT", "/api/v1/enterprises/"+id.String(), body)
+		w := ts.do(req)
+
+		assert.Equal(t, http.StatusOK, w.Code)
+		assert.Equal(t, "New Name", ts.enterpriseRepo.enterprises[0].Name)
+		require.Len(t, ts.auditLogger.events, 1)
+		assert.Equal(t, "enterprise.update", ts.auditLogger.events[0].Action)
+	})
+
+	t.Run("returns 404 for missing enterprise", func(t *testing.T) {
+		ts := newTestServer(t)
+		body := jsonBody(t, map[string]string{"name": "New"})
+		req := httptest.NewRequest("PUT", "/api/v1/enterprises/"+uuid.New().String(), body)
+		w := ts.do(req)
+
+		assert.Equal(t, http.StatusNotFound, w.Code)
+	})
+
+	t.Run("rejects empty name", func(t *testing.T) {
+		ts := newTestServer(t)
+		id := uuid.New()
+		ts.enterpriseRepo.enterprises = append(ts.enterpriseRepo.enterprises, &models.Enterprise{
+			BaseModel: models.BaseModel{ID: id},
+			Name:      "Existing",
+		})
+
+		name := ""
+		body := jsonBody(t, map[string]*string{"name": &name})
+		req := httptest.NewRequest("PUT", "/api/v1/enterprises/"+id.String(), body)
+		w := ts.do(req)
+
+		assert.Equal(t, http.StatusBadRequest, w.Code)
+	})
+
+	t.Run("returns 400 for invalid UUID", func(t *testing.T) {
+		ts := newTestServer(t)
+		req := httptest.NewRequest("PUT", "/api/v1/enterprises/bad-id", jsonBody(t, map[string]string{"name": "X"}))
+		w := ts.do(req)
+
+		assert.Equal(t, http.StatusBadRequest, w.Code)
+	})
+}
+
+func TestHandleDeleteEnterprise(t *testing.T) {
+	t.Run("deletes enterprise", func(t *testing.T) {
+		ts := newTestServer(t)
+		id := uuid.New()
+		ts.enterpriseRepo.enterprises = append(ts.enterpriseRepo.enterprises, &models.Enterprise{
+			BaseModel: models.BaseModel{ID: id},
+			Name:      "To Delete",
+		})
+
+		req := httptest.NewRequest("DELETE", "/api/v1/enterprises/"+id.String(), nil)
+		w := ts.do(req)
+
+		assert.Equal(t, http.StatusNoContent, w.Code)
+		assert.Len(t, ts.enterpriseRepo.enterprises, 0)
+		require.Len(t, ts.auditLogger.events, 1)
+		assert.Equal(t, "enterprise.delete", ts.auditLogger.events[0].Action)
+	})
+
+	t.Run("returns 404 for missing enterprise", func(t *testing.T) {
+		ts := newTestServer(t)
+		req := httptest.NewRequest("DELETE", "/api/v1/enterprises/"+uuid.New().String(), nil)
+		w := ts.do(req)
+
+		assert.Equal(t, http.StatusNotFound, w.Code)
+	})
+}
+
+func TestHandleUpdateDevice(t *testing.T) {
+	t.Run("updates device fields", func(t *testing.T) {
+		ts := newTestServer(t)
+		id := uuid.New()
+		ts.deviceRepo.devices = append(ts.deviceRepo.devices, &models.Device{
+			BaseModel: models.BaseModel{ID: id},
+			Platform:  models.PlatformWindows,
+			Name:      "Old",
+			Status:    models.DeviceStatusEnrolled,
+		})
+
+		body := jsonBody(t, map[string]string{"name": "New Name", "model": "Surface Pro"})
+		req := httptest.NewRequest("PUT", "/api/v1/devices/"+id.String(), body)
+		w := ts.do(req)
+
+		assert.Equal(t, http.StatusOK, w.Code)
+		assert.Equal(t, "New Name", ts.deviceRepo.devices[0].Name)
+		assert.Equal(t, "Surface Pro", ts.deviceRepo.devices[0].Model)
+		require.Len(t, ts.auditLogger.events, 1)
+		assert.Equal(t, "device.update", ts.auditLogger.events[0].Action)
+	})
+
+	t.Run("returns 404 for missing device", func(t *testing.T) {
+		ts := newTestServer(t)
+		body := jsonBody(t, map[string]string{"name": "X"})
+		req := httptest.NewRequest("PUT", "/api/v1/devices/"+uuid.New().String(), body)
+		w := ts.do(req)
+
+		assert.Equal(t, http.StatusNotFound, w.Code)
+	})
+}
+
+func TestHandleDeleteDevice(t *testing.T) {
+	t.Run("deletes device", func(t *testing.T) {
+		ts := newTestServer(t)
+		id := uuid.New()
+		ts.deviceRepo.devices = append(ts.deviceRepo.devices, &models.Device{
+			BaseModel: models.BaseModel{ID: id},
+		})
+
+		req := httptest.NewRequest("DELETE", "/api/v1/devices/"+id.String(), nil)
+		w := ts.do(req)
+
+		assert.Equal(t, http.StatusNoContent, w.Code)
+		assert.Len(t, ts.deviceRepo.devices, 0)
+		require.Len(t, ts.auditLogger.events, 1)
+		assert.Equal(t, "device.delete", ts.auditLogger.events[0].Action)
+	})
+
+	t.Run("returns 404 for missing device", func(t *testing.T) {
+		ts := newTestServer(t)
+		req := httptest.NewRequest("DELETE", "/api/v1/devices/"+uuid.New().String(), nil)
+		w := ts.do(req)
+
+		assert.Equal(t, http.StatusNotFound, w.Code)
+	})
+}
+
+func TestHandleUpdatePolicy(t *testing.T) {
+	t.Run("updates policy fields", func(t *testing.T) {
+		ts := newTestServer(t)
+		id := uuid.New()
+		ts.policyRepo.policies = append(ts.policyRepo.policies, &models.Policy{
+			BaseModel: models.BaseModel{ID: id, CreatedAt: time.Now(), UpdatedAt: time.Now()},
+			Name:      "Old Policy",
+			IsActive:  false,
+		})
+
+		active := true
+		body := jsonBody(t, map[string]interface{}{"name": "Updated Policy", "is_active": active})
+		req := httptest.NewRequest("PUT", "/api/v1/policies/"+id.String(), body)
+		w := ts.do(req)
+
+		assert.Equal(t, http.StatusOK, w.Code)
+		assert.Equal(t, "Updated Policy", ts.policyRepo.policies[0].Name)
+		assert.True(t, ts.policyRepo.policies[0].IsActive)
+		require.Len(t, ts.auditLogger.events, 1)
+		assert.Equal(t, "policy.update", ts.auditLogger.events[0].Action)
+	})
+
+	t.Run("rejects empty name", func(t *testing.T) {
+		ts := newTestServer(t)
+		id := uuid.New()
+		ts.policyRepo.policies = append(ts.policyRepo.policies, &models.Policy{
+			BaseModel: models.BaseModel{ID: id},
+			Name:      "Existing",
+		})
+
+		name := ""
+		body := jsonBody(t, map[string]*string{"name": &name})
+		req := httptest.NewRequest("PUT", "/api/v1/policies/"+id.String(), body)
+		w := ts.do(req)
+
+		assert.Equal(t, http.StatusBadRequest, w.Code)
+	})
+
+	t.Run("returns 404 for missing policy", func(t *testing.T) {
+		ts := newTestServer(t)
+		body := jsonBody(t, map[string]string{"name": "X"})
+		req := httptest.NewRequest("PUT", "/api/v1/policies/"+uuid.New().String(), body)
+		w := ts.do(req)
+
+		assert.Equal(t, http.StatusNotFound, w.Code)
+	})
+}
+
+func TestHandleDeletePolicy(t *testing.T) {
+	t.Run("deletes policy", func(t *testing.T) {
+		ts := newTestServer(t)
+		id := uuid.New()
+		ts.policyRepo.policies = append(ts.policyRepo.policies, &models.Policy{
+			BaseModel: models.BaseModel{ID: id},
+		})
+
+		req := httptest.NewRequest("DELETE", "/api/v1/policies/"+id.String(), nil)
+		w := ts.do(req)
+
+		assert.Equal(t, http.StatusNoContent, w.Code)
+		assert.Len(t, ts.policyRepo.policies, 0)
+		require.Len(t, ts.auditLogger.events, 1)
+		assert.Equal(t, "policy.delete", ts.auditLogger.events[0].Action)
+	})
+
+	t.Run("returns 404 for missing policy", func(t *testing.T) {
+		ts := newTestServer(t)
+		req := httptest.NewRequest("DELETE", "/api/v1/policies/"+uuid.New().String(), nil)
+		w := ts.do(req)
+
+		assert.Equal(t, http.StatusNotFound, w.Code)
+	})
+}
+
+func TestHandleAssignPolicy(t *testing.T) {
+	t.Run("assigns policy to devices", func(t *testing.T) {
+		ts := newTestServer(t)
+		policyID := uuid.New()
+		ts.policyRepo.policies = append(ts.policyRepo.policies, &models.Policy{
+			BaseModel: models.BaseModel{ID: policyID, CreatedAt: time.Now(), UpdatedAt: time.Now()},
+			Name:      "Test Policy",
+		})
+
+		deviceIDs := []uuid.UUID{uuid.New(), uuid.New()}
+		body := jsonBody(t, map[string]interface{}{"device_ids": deviceIDs})
+		req := httptest.NewRequest("POST", "/api/v1/policies/"+policyID.String()+"/assign", body)
+		w := ts.do(req)
+
+		assert.Equal(t, http.StatusOK, w.Code)
+		assert.Len(t, ts.policyRepo.assignments, 2)
+		require.Len(t, ts.auditLogger.events, 1)
+		assert.Equal(t, "policy.assign", ts.auditLogger.events[0].Action)
+	})
+
+	t.Run("rejects empty device_ids", func(t *testing.T) {
+		ts := newTestServer(t)
+		policyID := uuid.New()
+		ts.policyRepo.policies = append(ts.policyRepo.policies, &models.Policy{
+			BaseModel: models.BaseModel{ID: policyID},
+		})
+
+		body := jsonBody(t, map[string]interface{}{"device_ids": []uuid.UUID{}})
+		req := httptest.NewRequest("POST", "/api/v1/policies/"+policyID.String()+"/assign", body)
+		w := ts.do(req)
+
+		assert.Equal(t, http.StatusBadRequest, w.Code)
+	})
+
+	t.Run("returns 404 for missing policy", func(t *testing.T) {
+		ts := newTestServer(t)
+		body := jsonBody(t, map[string]interface{}{"device_ids": []uuid.UUID{uuid.New()}})
+		req := httptest.NewRequest("POST", "/api/v1/policies/"+uuid.New().String()+"/assign", body)
+		w := ts.do(req)
+
+		assert.Equal(t, http.StatusNotFound, w.Code)
+	})
+}
+
+func TestHandleUnassignPolicy(t *testing.T) {
+	t.Run("unassigns policy from device", func(t *testing.T) {
+		ts := newTestServer(t)
+		policyID := uuid.New()
+		deviceID := uuid.New()
+
+		req := httptest.NewRequest("DELETE", "/api/v1/policies/"+policyID.String()+"/assign/"+deviceID.String(), nil)
+		w := ts.do(req)
+
+		assert.Equal(t, http.StatusNoContent, w.Code)
+		require.Len(t, ts.auditLogger.events, 1)
+		assert.Equal(t, "policy.unassign", ts.auditLogger.events[0].Action)
+	})
+
+	t.Run("returns 400 for invalid policy ID", func(t *testing.T) {
+		ts := newTestServer(t)
+		req := httptest.NewRequest("DELETE", "/api/v1/policies/bad-id/assign/"+uuid.New().String(), nil)
+		w := ts.do(req)
+
+		assert.Equal(t, http.StatusBadRequest, w.Code)
+	})
+
+	t.Run("returns 400 for invalid device ID", func(t *testing.T) {
+		ts := newTestServer(t)
+		req := httptest.NewRequest("DELETE", "/api/v1/policies/"+uuid.New().String()+"/assign/bad-id", nil)
+		w := ts.do(req)
+
+		assert.Equal(t, http.StatusBadRequest, w.Code)
+	})
+}

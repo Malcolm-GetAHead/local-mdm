@@ -18,7 +18,9 @@ import (
 	"github.com/malcolm-getahead/local-mdm/internal/constants"
 	"github.com/malcolm-getahead/local-mdm/internal/db"
 	"github.com/malcolm-getahead/local-mdm/internal/metrics"
+	"github.com/malcolm-getahead/local-mdm/internal/platform/android"
 	"github.com/malcolm-getahead/local-mdm/internal/platform/macos"
+	"github.com/malcolm-getahead/local-mdm/internal/platform/windows"
 	"github.com/malcolm-getahead/local-mdm/internal/repository"
 	"github.com/malcolm-getahead/local-mdm/internal/scep"
 )
@@ -47,6 +49,12 @@ type Server struct {
 	auditLogRepo     repository.AuditLogRepository
 	cmdRepo          repository.CommandRepository
 	depService       *macos.DEPService
+	depSyncCancel    context.CancelFunc
+	macosService     *macos.Service
+	nanomdmService   *macos.NanoMDMService
+	windowsService   *windows.Service
+	windowsMgmtHandler *windows.ManagementHandler
+	androidService   *android.Service
 }
 
 // New creates a new API server
@@ -66,8 +74,15 @@ func New(cfg *config.Config, database *db.DB, logger *slog.Logger) (*Server, err
 		db:               database,
 		config:           cfg,
 		logger:           logger,
-		auditLogger:      audit.NewAsyncLogger(database.DB, bufferSize, workerCount, logger),
 		challengeManager: scep.NewChallengeManager(),
+	}
+
+	// Initialize audit logger (conditional on feature flag)
+	if cfg.Features.EnableAuditLog {
+		s.auditLogger = audit.NewAsyncLogger(database.DB, bufferSize, workerCount, logger)
+		logger.Info("Audit logging enabled")
+	} else {
+		s.auditLogger = audit.NopAuditLogger{}
 	}
 
 	// Initialize repositories
@@ -176,7 +191,26 @@ func New(cfg *config.Config, database *db.DB, logger *slog.Logger) (*Server, err
 		s.depService = macos.NewDEPService(depStorage, logger)
 		logger.Info("DEP service initialized")
 	}
-	
+
+	// Initialize platform services
+	s.macosService = macos.NewService(s.deviceRepo)
+
+	nanomdmSvc, err := macos.NewNanoMDMService(database.DB, logger)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create NanoMDM service: %w", err)
+	}
+	s.nanomdmService = nanomdmSvc
+
+	s.windowsService = windows.NewService(s.deviceRepo)
+
+	mgmtURI := cfg.Windows.ManagementURL
+	if mgmtURI == "" {
+		mgmtURI = fmt.Sprintf("https://%s:%d/ManagementServer/MDM.svc", cfg.Server.Host, cfg.Server.Port)
+	}
+	s.windowsMgmtHandler = windows.NewManagementHandler(mgmtURI, s.deviceRepo, s.cmdRepo, logger)
+
+	s.androidService = android.NewService(s.deviceRepo, s.enterpriseRepo, cfg.Android.ProjectID, cfg.Android.ServiceAccountJSON)
+
 	s.setupRoutes()
 	s.setupMiddleware()
 
@@ -224,7 +258,21 @@ func (s *Server) setupRoutes() {
 	api.Handle("/enterprises/{id}", s.authMiddleware.RequireAuth(
 		http.HandlerFunc(s.handleGetEnterprise),
 	)).Methods("GET")
-	
+
+	api.Handle("/enterprises/{id}", s.authMiddleware.RequireAuth(
+		s.authMiddleware.RequireRole("admin", "super_admin")(
+			http.HandlerFunc(s.handleUpdateEnterprise),
+		),
+	)).Methods("PUT")
+
+	api.Handle("/enterprises/{id}", s.authMiddleware.RequireAuth(
+		s.authMiddleware.RequireRole("super_admin")(
+			ipAllowlistMiddleware(s.config.Admin.AllowedIPs)(
+				http.HandlerFunc(s.handleDeleteEnterprise),
+			),
+		),
+	)).Methods("DELETE")
+
 	// Devices
 	api.Handle("/devices", s.authMiddleware.RequireAuth(
 		http.HandlerFunc(s.handleListDevices),
@@ -247,7 +295,19 @@ func (s *Server) setupRoutes() {
 			),
 		),
 	)).Methods("POST")
-	
+
+	api.Handle("/devices/{id}", s.authMiddleware.RequireAuth(
+		s.authMiddleware.RequireRole("admin", "operator")(
+			http.HandlerFunc(s.handleUpdateDevice),
+		),
+	)).Methods("PUT")
+
+	api.Handle("/devices/{id}", s.authMiddleware.RequireAuth(
+		s.authMiddleware.RequireRole("admin")(
+			http.HandlerFunc(s.handleDeleteDevice),
+		),
+	)).Methods("DELETE")
+
 	// Policies
 	api.Handle("/policies", s.authMiddleware.RequireAuth(
 		http.HandlerFunc(s.handleListPolicies),
@@ -262,7 +322,31 @@ func (s *Server) setupRoutes() {
 	api.Handle("/policies/{id}", s.authMiddleware.RequireAuth(
 		http.HandlerFunc(s.handleGetPolicy),
 	)).Methods("GET")
-	
+
+	api.Handle("/policies/{id}", s.authMiddleware.RequireAuth(
+		s.authMiddleware.RequireRole("admin", "operator")(
+			http.HandlerFunc(s.handleUpdatePolicy),
+		),
+	)).Methods("PUT")
+
+	api.Handle("/policies/{id}", s.authMiddleware.RequireAuth(
+		s.authMiddleware.RequireRole("admin")(
+			http.HandlerFunc(s.handleDeletePolicy),
+		),
+	)).Methods("DELETE")
+
+	api.Handle("/policies/{id}/assign", s.authMiddleware.RequireAuth(
+		s.authMiddleware.RequireRole("admin", "operator")(
+			http.HandlerFunc(s.handleAssignPolicy),
+		),
+	)).Methods("POST")
+
+	api.Handle("/policies/{id}/assign/{device_id}", s.authMiddleware.RequireAuth(
+		s.authMiddleware.RequireRole("admin", "operator")(
+			http.HandlerFunc(s.handleUnassignPolicy),
+		),
+	)).Methods("DELETE")
+
 	// Certificates
 	api.Handle("/certificates", s.authMiddleware.RequireAuth(
 		http.HandlerFunc(s.handleListCertificates),
@@ -295,14 +379,10 @@ func (s *Server) setupRoutes() {
 	api.Handle("/dep/{name}/devices", s.authMiddleware.RequireAuth(
 		http.HandlerFunc(s.handleDEPDevices),
 	)).Methods("GET")
-	s.router.HandleFunc("/mdm", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// NanoMDM command handler - will be wired up with actual handler
-		w.WriteHeader(http.StatusOK)
-	})).Methods("PUT")
-	s.router.HandleFunc("/checkin", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// NanoMDM checkin handler - will be wired up with actual handler
-		w.WriteHeader(http.StatusOK)
-	})).Methods("PUT")
+	checkinHandler := macos.NewCheckinHandler(s.nanomdmService, s.macosService, s.logger)
+	commandHandler := macos.NewCommandHandler(s.nanomdmService, s.logger)
+	s.router.Handle("/mdm", commandHandler).Methods("PUT")
+	s.router.Handle("/checkin", checkinHandler).Methods("PUT")
 	
 	// Windows MDM endpoints
 	s.router.HandleFunc("/EnrollmentServer/Discovery.svc", s.handleWindowsDiscoveryService).Methods("GET", "POST")
@@ -376,6 +456,16 @@ func (s *Server) Start() error {
 		s.certMonitor.Start()
 		s.logger.Info("Certificate expiration monitor started")
 	}
+
+	// Start DEP sync loop if configured
+	if s.depService != nil {
+		interval := s.config.MacOS.DEPSyncInterval
+		if interval <= 0 {
+			interval = 30 * time.Minute
+		}
+		s.depSyncCancel = s.depService.StartDEPSync("default", interval)
+		s.logger.Info("DEP sync loop started", "interval", interval)
+	}
 	
 	if s.config.Server.TLS.Enabled {
 		return s.server.ListenAndServeTLS(
@@ -393,6 +483,12 @@ func (s *Server) Shutdown(ctx context.Context) error {
 	if s.certMonitor != nil {
 		s.certMonitor.Stop()
 		s.logger.Info("Certificate expiration monitor stopped")
+	}
+
+	// Stop DEP sync loop
+	if s.depSyncCancel != nil {
+		s.depSyncCancel()
+		s.logger.Info("DEP sync loop stopped")
 	}
 	
 	// Stop auth rate limiter background goroutines

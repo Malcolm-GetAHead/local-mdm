@@ -491,10 +491,7 @@ func (s *Server) handleWindowsManagementSync(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	serverURI := fmt.Sprintf("https://%s/ManagementServer/MDM.svc", r.Host)
-	handler := windows.NewManagementHandler(serverURI, s.deviceRepo, s.cmdRepo, s.logger)
-
-	resp, err := handler.HandleSyncML(r.Context(), body)
+	resp, err := s.windowsMgmtHandler.HandleSyncML(r.Context(), body)
 	if err != nil {
 		s.logger.Error("failed to handle OMA-DM sync", "error", err)
 		http.Error(w, "Failed to process sync", http.StatusInternalServerError)

@@ -29,6 +29,8 @@ type mockEnterpriseRepo struct {
 	createErr   error
 	getErr      error
 	listErr     error
+	updateErr   error
+	deleteErr   error
 }
 
 func (m *mockEnterpriseRepo) Create(_ context.Context, e *models.Enterprise) error {
@@ -80,8 +82,30 @@ func (m *mockEnterpriseRepo) List(_ context.Context, limit, offset int) ([]*mode
 	return m.enterprises[offset:end], total, nil
 }
 
-func (m *mockEnterpriseRepo) Update(_ context.Context, e *models.Enterprise) error { return nil }
-func (m *mockEnterpriseRepo) Delete(_ context.Context, id uuid.UUID) error        { return nil }
+func (m *mockEnterpriseRepo) Update(_ context.Context, e *models.Enterprise) error {
+	if m.updateErr != nil {
+		return m.updateErr
+	}
+	for i, existing := range m.enterprises {
+		if existing.ID == e.ID {
+			m.enterprises[i] = e
+			return nil
+		}
+	}
+	return fmt.Errorf("enterprise not found")
+}
+func (m *mockEnterpriseRepo) Delete(_ context.Context, id uuid.UUID) error {
+	if m.deleteErr != nil {
+		return m.deleteErr
+	}
+	for i, e := range m.enterprises {
+		if e.ID == id {
+			m.enterprises = append(m.enterprises[:i], m.enterprises[i+1:]...)
+			return nil
+		}
+	}
+	return fmt.Errorf("enterprise not found")
+}
 
 type mockDeviceRepo struct {
 	devices   []*models.Device
@@ -89,6 +113,7 @@ type mockDeviceRepo struct {
 	getErr    error
 	listErr   error
 	updateErr error
+	deleteErr error
 }
 
 func (m *mockDeviceRepo) Create(_ context.Context, d *models.Device) error {
@@ -146,13 +171,28 @@ func (m *mockDeviceRepo) Update(_ context.Context, d *models.Device) error {
 	return fmt.Errorf("device not found")
 }
 
-func (m *mockDeviceRepo) Delete(_ context.Context, _ uuid.UUID) error { return nil }
+func (m *mockDeviceRepo) Delete(_ context.Context, id uuid.UUID) error {
+	if m.deleteErr != nil {
+		return m.deleteErr
+	}
+	for i, d := range m.devices {
+		if d.ID == id {
+			m.devices = append(m.devices[:i], m.devices[i+1:]...)
+			return nil
+		}
+	}
+	return fmt.Errorf("device not found")
+}
 
 type mockPolicyRepo struct {
-	policies  []*models.Policy
-	createErr error
-	getErr    error
-	listErr   error
+	policies    []*models.Policy
+	assignments map[string]bool // "deviceID:policyID" -> true
+	createErr   error
+	getErr      error
+	listErr     error
+	updateErr   error
+	deleteErr   error
+	assignErr   error
 }
 
 func (m *mockPolicyRepo) Create(_ context.Context, p *models.Policy) error {
@@ -195,12 +235,44 @@ func (m *mockPolicyRepo) List(_ context.Context, _ uuid.UUID, limit, offset int)
 	return m.policies[offset:end], total, nil
 }
 
-func (m *mockPolicyRepo) Update(_ context.Context, _ *models.Policy) error { return nil }
-func (m *mockPolicyRepo) Delete(_ context.Context, _ uuid.UUID) error      { return nil }
-func (m *mockPolicyRepo) AssignToDevice(_ context.Context, _, _ uuid.UUID) error {
+func (m *mockPolicyRepo) Update(_ context.Context, p *models.Policy) error {
+	if m.updateErr != nil {
+		return m.updateErr
+	}
+	for i, existing := range m.policies {
+		if existing.ID == p.ID {
+			m.policies[i] = p
+			return nil
+		}
+	}
+	return fmt.Errorf("policy not found")
+}
+func (m *mockPolicyRepo) Delete(_ context.Context, id uuid.UUID) error {
+	if m.deleteErr != nil {
+		return m.deleteErr
+	}
+	for i, p := range m.policies {
+		if p.ID == id {
+			m.policies = append(m.policies[:i], m.policies[i+1:]...)
+			return nil
+		}
+	}
+	return fmt.Errorf("policy not found")
+}
+func (m *mockPolicyRepo) AssignToDevice(_ context.Context, deviceID, policyID uuid.UUID) error {
+	if m.assignErr != nil {
+		return m.assignErr
+	}
+	if m.assignments == nil {
+		m.assignments = make(map[string]bool)
+	}
+	m.assignments[deviceID.String()+":"+policyID.String()] = true
 	return nil
 }
-func (m *mockPolicyRepo) UnassignFromDevice(_ context.Context, _, _ uuid.UUID) error {
+func (m *mockPolicyRepo) UnassignFromDevice(_ context.Context, deviceID, policyID uuid.UUID) error {
+	if m.assignments != nil {
+		delete(m.assignments, deviceID.String()+":"+policyID.String())
+	}
 	return nil
 }
 
@@ -304,13 +376,21 @@ func newTestServer(t *testing.T) *testServer {
 	api.HandleFunc("/enterprises", s.handleListEnterprises).Methods("GET")
 	api.HandleFunc("/enterprises", s.handleCreateEnterprise).Methods("POST")
 	api.HandleFunc("/enterprises/{id}", s.handleGetEnterprise).Methods("GET")
+	api.HandleFunc("/enterprises/{id}", s.handleUpdateEnterprise).Methods("PUT")
+	api.HandleFunc("/enterprises/{id}", s.handleDeleteEnterprise).Methods("DELETE")
 	api.HandleFunc("/devices", s.handleListDevices).Methods("GET")
 	api.HandleFunc("/devices/{id}", s.handleGetDevice).Methods("GET")
+	api.HandleFunc("/devices/{id}", s.handleUpdateDevice).Methods("PUT")
+	api.HandleFunc("/devices/{id}", s.handleDeleteDevice).Methods("DELETE")
 	api.HandleFunc("/devices/{id}/lock", s.handleLockDevice).Methods("POST")
 	api.HandleFunc("/devices/{id}/wipe", s.handleWipeDevice).Methods("POST")
 	api.HandleFunc("/policies", s.handleListPolicies).Methods("GET")
 	api.HandleFunc("/policies", s.handleCreatePolicy).Methods("POST")
 	api.HandleFunc("/policies/{id}", s.handleGetPolicy).Methods("GET")
+	api.HandleFunc("/policies/{id}", s.handleUpdatePolicy).Methods("PUT")
+	api.HandleFunc("/policies/{id}", s.handleDeletePolicy).Methods("DELETE")
+	api.HandleFunc("/policies/{id}/assign", s.handleAssignPolicy).Methods("POST")
+	api.HandleFunc("/policies/{id}/assign/{device_id}", s.handleUnassignPolicy).Methods("DELETE")
 	api.HandleFunc("/certificates", s.handleListCertificates).Methods("GET")
 	api.HandleFunc("/audit-logs", s.handleListAuditLogs).Methods("GET")
 	api.HandleFunc("/android/webhook", s.handleAndroidWebhook).Methods("POST")

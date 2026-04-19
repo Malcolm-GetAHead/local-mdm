@@ -9,6 +9,7 @@ import (
 
 	"github.com/micromdm/nanodep/client"
 	"github.com/micromdm/nanodep/godep"
+	depsync "github.com/micromdm/nanodep/sync"
 )
 
 // DEPService manages Apple DEP integration — profiles, device sync, and assignment.
@@ -172,4 +173,42 @@ func deviceToMap(d godep.DeviceJson) map[string]interface{} {
 		return map[string]interface{}{"serial_number": d.SerialNumber}
 	}
 	return m
+}
+
+// StartDEPSync starts a background goroutine that periodically syncs devices
+// from Apple DEP. Returns a cancel function to stop the sync loop.
+// If tokens are not configured, the sync will fail gracefully and log errors.
+func (s *DEPService) StartDEPSync(depName string, interval time.Duration) context.CancelFunc {
+	if interval <= 0 {
+		interval = 30 * time.Minute
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+
+	go func() {
+		depClient := godep.NewClient(s.storage, godep.WithUserAgent("local-mdm"))
+		callback := s.SyncDevicesCallbackForName(depName)
+
+		syncer := depsync.NewSyncer(
+			depClient,
+			depName,
+			s.storage,
+			depsync.WithDuration(interval),
+			depsync.WithCallback(callback),
+		)
+
+		s.logger.Info("DEP sync loop starting",
+			"dep_name", depName,
+			"interval", interval,
+		)
+
+		if err := syncer.Run(ctx); err != nil && ctx.Err() == nil {
+			s.logger.Error("DEP sync loop exited with error",
+				"dep_name", depName,
+				"error", err,
+			)
+		}
+	}()
+
+	return cancel
 }

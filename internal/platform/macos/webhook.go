@@ -6,6 +6,8 @@ import (
 	"log/slog"
 	"net/http"
 	"time"
+
+	"github.com/google/uuid"
 )
 
 // WebhookEvent represents a NanoMDM webhook event
@@ -120,11 +122,47 @@ func NewCheckinHandler(nanomdm *NanoMDMService, service *Service, logger *slog.L
 	}
 }
 
-// ServeHTTP handles MDM check-in HTTP requests
+// ServeHTTP handles MDM check-in HTTP requests (NanoMDM webhook JSON format)
 func (h *CheckinHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	h.logger.Info("received mdm checkin request")
-	// Simplified for Sprint 2 - full implementation in future
+	var event WebhookEvent
+	if err := json.NewDecoder(r.Body).Decode(&event); err != nil {
+		h.logger.Error("failed to decode checkin webhook", "error", err)
+		http.Error(w, "invalid request", http.StatusBadRequest)
+		return
+	}
+
+	if event.CheckinEvent == nil {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	ce := event.CheckinEvent
+	h.logger.Info("mdm checkin",
+		"message_type", ce.MessageType,
+		"udid", ce.UDID,
+	)
+
+	if err := h.nanomdm.HandleCheckin(r.Context(), ce.UDID, ce.MessageType); err != nil {
+		h.logger.Error("nanomdm checkin failed", "error", err, "udid", ce.UDID)
+	}
+
+	// On Authenticate, create a device record if we have enterprise context
+	if ce.MessageType == "Authenticate" && ce.UDID != "" {
+		if enterpriseID, ok := ce.Params["enterprise_id"].(string); ok && enterpriseID != "" {
+			if eid, err := parseUUID(enterpriseID); err == nil {
+				if _, err := h.service.CreateDevice(r.Context(), eid, ce.UDID, ce.UDID); err != nil {
+					h.logger.Error("failed to create device on authenticate", "error", err, "udid", ce.UDID)
+				}
+			}
+		}
+	}
+
 	w.WriteHeader(http.StatusOK)
+}
+
+func parseUUID(s string) ([16]byte, error) {
+	id, err := uuid.Parse(s)
+	return id, err
 }
 
 // CommandHandler handles MDM command requests
@@ -141,9 +179,45 @@ func NewCommandHandler(nanomdm *NanoMDMService, logger *slog.Logger) *CommandHan
 	}
 }
 
-// ServeHTTP handles MDM command HTTP requests
+// CommandEvent represents a NanoMDM command result webhook event
+type CommandEvent struct {
+	UDID        string `json:"udid"`
+	CommandUUID string `json:"command_uuid"`
+	Status      string `json:"status"`
+	RawPayload  string `json:"raw_payload,omitempty"`
+}
+
+// CommandWebhookEvent wraps a command result from NanoMDM
+type CommandWebhookEvent struct {
+	Topic        string        `json:"topic"`
+	EventID      string        `json:"event_id"`
+	CommandEvent *CommandEvent `json:"command_event,omitempty"`
+}
+
+// ServeHTTP handles MDM command HTTP requests (NanoMDM webhook JSON format)
 func (h *CommandHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	h.logger.Info("received mdm command request")
-	// Simplified for Sprint 2 - full implementation in future
+	var event CommandWebhookEvent
+	if err := json.NewDecoder(r.Body).Decode(&event); err != nil {
+		h.logger.Error("failed to decode command webhook", "error", err)
+		http.Error(w, "invalid request", http.StatusBadRequest)
+		return
+	}
+
+	if event.CommandEvent == nil {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	ce := event.CommandEvent
+	h.logger.Info("mdm command result",
+		"udid", ce.UDID,
+		"command_uuid", ce.CommandUUID,
+		"status", ce.Status,
+	)
+
+	if err := h.nanomdm.HandleCommand(r.Context(), ce.UDID); err != nil {
+		h.logger.Error("nanomdm command handling failed", "error", err, "udid", ce.UDID)
+	}
+
 	w.WriteHeader(http.StatusOK)
 }

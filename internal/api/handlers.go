@@ -216,6 +216,79 @@ func (s *Server) handleGetEnterprise(w http.ResponseWriter, r *http.Request) {
 	respondJSON(w, r, http.StatusOK, enterprise)
 }
 
+func (s *Server) handleUpdateEnterprise(w http.ResponseWriter, r *http.Request) {
+	id, err := parseUUIDParam(r, "id")
+	if err != nil {
+		respondError(w, r, http.StatusBadRequest, "invalid_id", "Invalid enterprise ID format")
+		return
+	}
+
+	enterprise, err := s.enterpriseRepo.GetByID(r.Context(), id)
+	if err != nil {
+		if strings.Contains(err.Error(), "not found") {
+			respondError(w, r, http.StatusNotFound, "not_found", "Enterprise not found")
+			return
+		}
+		s.logger.Error("failed to get enterprise", "error", err, "id", id)
+		respondError(w, r, http.StatusInternalServerError, "internal_error", "Failed to get enterprise")
+		return
+	}
+
+	var req struct {
+		Name     *string       `json:"name"`
+		Settings *models.JSONB `json:"settings"`
+	}
+	if err := parseJSONBody(r, &req); err != nil {
+		respondError(w, r, http.StatusBadRequest, "invalid_request", err.Error())
+		return
+	}
+
+	if req.Name != nil {
+		if strings.TrimSpace(*req.Name) == "" {
+			respondError(w, r, http.StatusBadRequest, "validation_failed", "name cannot be empty")
+			return
+		}
+		enterprise.Name = strings.TrimSpace(*req.Name)
+	}
+	if req.Settings != nil {
+		enterprise.Settings = *req.Settings
+	}
+
+	if err := s.enterpriseRepo.Update(r.Context(), enterprise); err != nil {
+		s.logger.Error("failed to update enterprise", "error", err, "id", id)
+		respondError(w, r, http.StatusInternalServerError, "internal_error", "Failed to update enterprise")
+		return
+	}
+
+	s.logAudit(r, "enterprise.update", "enterprise", id, map[string]interface{}{
+		"name": enterprise.Name,
+	})
+
+	respondJSON(w, r, http.StatusOK, enterprise)
+}
+
+func (s *Server) handleDeleteEnterprise(w http.ResponseWriter, r *http.Request) {
+	id, err := parseUUIDParam(r, "id")
+	if err != nil {
+		respondError(w, r, http.StatusBadRequest, "invalid_id", "Invalid enterprise ID format")
+		return
+	}
+
+	if err := s.enterpriseRepo.Delete(r.Context(), id); err != nil {
+		if strings.Contains(err.Error(), "not found") {
+			respondError(w, r, http.StatusNotFound, "not_found", "Enterprise not found")
+			return
+		}
+		s.logger.Error("failed to delete enterprise", "error", err, "id", id)
+		respondError(w, r, http.StatusInternalServerError, "internal_error", "Failed to delete enterprise")
+		return
+	}
+
+	s.logAudit(r, "enterprise.delete", "enterprise", id, nil)
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
 // Device handlers
 
 func (s *Server) handleListDevices(w http.ResponseWriter, r *http.Request) {
@@ -322,6 +395,87 @@ func (s *Server) handleWipeDevice(w http.ResponseWriter, r *http.Request) {
 	respondJSON(w, r, http.StatusOK, device)
 }
 
+func (s *Server) handleUpdateDevice(w http.ResponseWriter, r *http.Request) {
+	id, err := parseUUIDParam(r, "id")
+	if err != nil {
+		respondError(w, r, http.StatusBadRequest, "invalid_id", "Invalid device ID format")
+		return
+	}
+
+	device, err := s.deviceRepo.GetByID(r.Context(), id)
+	if err != nil {
+		if strings.Contains(err.Error(), "not found") {
+			respondError(w, r, http.StatusNotFound, "not_found", "Device not found")
+			return
+		}
+		s.logger.Error("failed to get device", "error", err, "id", id)
+		respondError(w, r, http.StatusInternalServerError, "internal_error", "Failed to get device")
+		return
+	}
+
+	var req struct {
+		Name         *string      `json:"name"`
+		Model        *string      `json:"model"`
+		OSVersion    *string      `json:"os_version"`
+		Status       *string      `json:"status"`
+		PlatformData *models.JSONB `json:"platform_data"`
+	}
+	if err := parseJSONBody(r, &req); err != nil {
+		respondError(w, r, http.StatusBadRequest, "invalid_request", err.Error())
+		return
+	}
+
+	if req.Name != nil {
+		device.Name = *req.Name
+	}
+	if req.Model != nil {
+		device.Model = *req.Model
+	}
+	if req.OSVersion != nil {
+		device.OSVersion = *req.OSVersion
+	}
+	if req.Status != nil {
+		device.Status = *req.Status
+	}
+	if req.PlatformData != nil {
+		device.PlatformData = *req.PlatformData
+	}
+
+	if err := s.deviceRepo.Update(r.Context(), device); err != nil {
+		s.logger.Error("failed to update device", "error", err, "id", id)
+		respondError(w, r, http.StatusInternalServerError, "internal_error", "Failed to update device")
+		return
+	}
+
+	s.logAudit(r, "device.update", "device", id, map[string]interface{}{
+		"platform": device.Platform,
+	})
+
+	respondJSON(w, r, http.StatusOK, device)
+}
+
+func (s *Server) handleDeleteDevice(w http.ResponseWriter, r *http.Request) {
+	id, err := parseUUIDParam(r, "id")
+	if err != nil {
+		respondError(w, r, http.StatusBadRequest, "invalid_id", "Invalid device ID format")
+		return
+	}
+
+	if err := s.deviceRepo.Delete(r.Context(), id); err != nil {
+		if strings.Contains(err.Error(), "not found") {
+			respondError(w, r, http.StatusNotFound, "not_found", "Device not found")
+			return
+		}
+		s.logger.Error("failed to delete device", "error", err, "id", id)
+		respondError(w, r, http.StatusInternalServerError, "internal_error", "Failed to delete device")
+		return
+	}
+
+	s.logAudit(r, "device.delete", "device", id, nil)
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
 // Policy handlers
 
 func (s *Server) handleListPolicies(w http.ResponseWriter, r *http.Request) {
@@ -419,6 +573,163 @@ func (s *Server) handleGetPolicy(w http.ResponseWriter, r *http.Request) {
 	}
 
 	respondJSON(w, r, http.StatusOK, policy)
+}
+
+func (s *Server) handleUpdatePolicy(w http.ResponseWriter, r *http.Request) {
+	id, err := parseUUIDParam(r, "id")
+	if err != nil {
+		respondError(w, r, http.StatusBadRequest, "invalid_id", "Invalid policy ID format")
+		return
+	}
+
+	policy, err := s.policyRepo.GetByID(r.Context(), id)
+	if err != nil {
+		if strings.Contains(err.Error(), "not found") {
+			respondError(w, r, http.StatusNotFound, "not_found", "Policy not found")
+			return
+		}
+		s.logger.Error("failed to get policy", "error", err, "id", id)
+		respondError(w, r, http.StatusInternalServerError, "internal_error", "Failed to get policy")
+		return
+	}
+
+	var req struct {
+		Name         *string      `json:"name"`
+		Description  *string      `json:"description"`
+		PolicyConfig *models.JSONB `json:"policy_config"`
+		IsActive     *bool        `json:"is_active"`
+	}
+	if err := parseJSONBody(r, &req); err != nil {
+		respondError(w, r, http.StatusBadRequest, "invalid_request", err.Error())
+		return
+	}
+
+	if req.Name != nil {
+		if strings.TrimSpace(*req.Name) == "" {
+			respondError(w, r, http.StatusBadRequest, "validation_failed", "name cannot be empty")
+			return
+		}
+		policy.Name = strings.TrimSpace(*req.Name)
+	}
+	if req.Description != nil {
+		policy.Description = strings.TrimSpace(*req.Description)
+	}
+	if req.PolicyConfig != nil {
+		policy.PolicyConfig = *req.PolicyConfig
+	}
+	if req.IsActive != nil {
+		policy.IsActive = *req.IsActive
+	}
+
+	if err := s.policyRepo.Update(r.Context(), policy); err != nil {
+		s.logger.Error("failed to update policy", "error", err, "id", id)
+		respondError(w, r, http.StatusInternalServerError, "internal_error", "Failed to update policy")
+		return
+	}
+
+	s.logAudit(r, "policy.update", "policy", id, map[string]interface{}{
+		"name": policy.Name,
+	})
+
+	respondJSON(w, r, http.StatusOK, policy)
+}
+
+func (s *Server) handleDeletePolicy(w http.ResponseWriter, r *http.Request) {
+	id, err := parseUUIDParam(r, "id")
+	if err != nil {
+		respondError(w, r, http.StatusBadRequest, "invalid_id", "Invalid policy ID format")
+		return
+	}
+
+	if err := s.policyRepo.Delete(r.Context(), id); err != nil {
+		if strings.Contains(err.Error(), "not found") {
+			respondError(w, r, http.StatusNotFound, "not_found", "Policy not found")
+			return
+		}
+		s.logger.Error("failed to delete policy", "error", err, "id", id)
+		respondError(w, r, http.StatusInternalServerError, "internal_error", "Failed to delete policy")
+		return
+	}
+
+	s.logAudit(r, "policy.delete", "policy", id, nil)
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (s *Server) handleAssignPolicy(w http.ResponseWriter, r *http.Request) {
+	policyID, err := parseUUIDParam(r, "id")
+	if err != nil {
+		respondError(w, r, http.StatusBadRequest, "invalid_id", "Invalid policy ID format")
+		return
+	}
+
+	var req struct {
+		DeviceIDs []uuid.UUID `json:"device_ids"`
+	}
+	if err := parseJSONBody(r, &req); err != nil {
+		respondError(w, r, http.StatusBadRequest, "invalid_request", err.Error())
+		return
+	}
+
+	if len(req.DeviceIDs) == 0 {
+		respondError(w, r, http.StatusBadRequest, "validation_failed", "device_ids is required")
+		return
+	}
+
+	// Verify policy exists
+	if _, err := s.policyRepo.GetByID(r.Context(), policyID); err != nil {
+		if strings.Contains(err.Error(), "not found") {
+			respondError(w, r, http.StatusNotFound, "not_found", "Policy not found")
+			return
+		}
+		s.logger.Error("failed to get policy", "error", err, "id", policyID)
+		respondError(w, r, http.StatusInternalServerError, "internal_error", "Failed to assign policy")
+		return
+	}
+
+	for _, deviceID := range req.DeviceIDs {
+		if err := s.policyRepo.AssignToDevice(r.Context(), deviceID, policyID); err != nil {
+			s.logger.Error("failed to assign policy", "error", err, "policy_id", policyID, "device_id", deviceID)
+			respondError(w, r, http.StatusInternalServerError, "internal_error", "Failed to assign policy")
+			return
+		}
+	}
+
+	s.logAudit(r, "policy.assign", "policy", policyID, map[string]interface{}{
+		"device_ids": req.DeviceIDs,
+	})
+
+	respondJSON(w, r, http.StatusOK, map[string]interface{}{
+		"policy_id":  policyID,
+		"device_ids": req.DeviceIDs,
+		"status":     "assigned",
+	})
+}
+
+func (s *Server) handleUnassignPolicy(w http.ResponseWriter, r *http.Request) {
+	policyID, err := parseUUIDParam(r, "id")
+	if err != nil {
+		respondError(w, r, http.StatusBadRequest, "invalid_id", "Invalid policy ID format")
+		return
+	}
+
+	deviceID, err := parseUUIDParam(r, "device_id")
+	if err != nil {
+		respondError(w, r, http.StatusBadRequest, "invalid_id", "Invalid device ID format")
+		return
+	}
+
+	if err := s.policyRepo.UnassignFromDevice(r.Context(), deviceID, policyID); err != nil {
+		s.logger.Error("failed to unassign policy", "error", err, "policy_id", policyID, "device_id", deviceID)
+		respondError(w, r, http.StatusInternalServerError, "internal_error", "Failed to unassign policy")
+		return
+	}
+
+	s.logAudit(r, "policy.unassign", "policy", policyID, map[string]interface{}{
+		"device_id": deviceID,
+	})
+
+	w.WriteHeader(http.StatusNoContent)
 }
 
 // Certificate handlers
