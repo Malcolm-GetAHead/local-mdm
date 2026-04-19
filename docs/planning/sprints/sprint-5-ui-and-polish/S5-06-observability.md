@@ -1,208 +1,92 @@
-# S5-06: Observability & Operations
+# S5-06: Observability & Operations (Reduced Scope)
 
-**Sprint**: 5 — UI & Polish
-**Parallel**: ✅ Yes
-**Effort**: 3-4 days
+**Sprint**: 5 — Backend Polish  
+**Parallel**: ✅ Yes  
+**Effort**: 1-1.5 days (reduced from 3-4 days)
 
-## Objective
+## What Sprint 2 Already Delivered
 
-Implement comprehensive observability with health checks, Prometheus metrics, structured logging, and operational documentation.
+- ✅ Prometheus metrics on separate internal port (127.0.0.1:9090)
+  - `http_requests_total`, `http_request_duration_seconds`, `http_active_requests`
+  - `enrollments_total` by platform/status
+  - `commands_queued_total`, `commands_pending`
+  - `db_open_connections`, `db_idle_connections`, `db_wait_count_total`
+  - Middleware auto-instruments all HTTP requests using mux route templates
+- ✅ Structured logging via slog (JSON output, configurable level)
+- ✅ Request ID middleware (X-Request-ID header, propagated to audit log details)
+- ✅ `/health` endpoint with DB and Keycloak dependency checks
+- ✅ Certificate expiration monitor (background goroutine, configurable threshold)
 
-## Tasks
+## Remaining Work
 
-### 1. Enhanced Health Checks
-- `/health` - Basic liveness check (service is running)
-- `/health/ready` - Readiness check (service + all dependencies available)
-- Dependency polling with status reporting
-- Files: `internal/health/health.go`, `internal/health/checks.go`
+### 1. Add `/health/ready` Endpoint (0.25 days)
 
-**Health Check Response**:
-```json
-{
-  "status": "available",
-  "service": "up",
-  "dependencies": {
-    "database": {
-      "status": "up",
-      "latency_ms": 2,
-      "last_check": "2026-02-06T10:30:00Z"
-    },
-    "keycloak": {
-      "status": "up",
-      "latency_ms": 15,
-      "last_check": "2026-02-06T10:30:00Z"
-    },
-    "scep": {
-      "status": "up",
-      "latency_ms": 5,
-      "last_check": "2026-02-06T10:30:00Z"
-    }
-  },
-  "version": "1.0.0",
-  "uptime_seconds": 3600
-}
+The existing `/health` endpoint checks dependencies but doesn't distinguish between liveness and readiness. Kubernetes and load balancers need both:
+
+- `/health` (liveness) — "is the process running?" Always returns 200 unless the server is broken
+- `/health/ready` (readiness) — "can this instance serve traffic?" Checks DB, Keycloak, Redis
+
+```go
+// Add to setupRoutes:
+s.router.HandleFunc("/health/ready", s.handleHealthReady).Methods("GET")
 ```
 
-**Dependency Checks**:
-- Database: `SELECT version()` every 30 seconds
-- Keycloak: `GET /.well-known/openid-configuration` every 60 seconds
-- SCEP: `GET /health` every 60 seconds
-- APNs: Connection test every 5 minutes (macOS only)
+Response should include latency per dependency and overall status (available/degraded/unavailable).
 
-**Status Values**:
-- `up` - Dependency is healthy
-- `degraded` - Dependency is slow (>1s latency)
-- `down` - Dependency is unreachable
+### 2. Add Missing Metrics (0.25 days)
 
-**Service Status**:
-- `available` - Service and all dependencies are up
-- `degraded` - Service is up but some dependencies are degraded/down
-- `unavailable` - Service cannot function (critical dependency down)
+Small additions to the existing `internal/metrics/metrics.go`:
 
-### 2. Prometheus Metrics
-- `/metrics` - Prometheus-formatted metrics endpoint
-- Custom metrics for MDM operations
-- Standard Go runtime metrics
-- Files: `internal/metrics/metrics.go`, `internal/metrics/collectors.go`
+| Metric | Type | Why |
+|--------|------|-----|
+| `devices_total` | GaugeVec (platform, status) | Dashboard "total enrolled devices" |
+| `certificates_expiring_soon` | GaugeVec (days: 7, 30, 90) | Alert on upcoming expirations |
+| `enrollment_duration_seconds` | HistogramVec (platform) | Track enrollment performance |
 
-**Metrics to Expose**:
+These are 3 new collectors added to the existing `Metrics` struct. The cert expiry gauge can be updated by the existing `ExpirationMonitor`.
 
-```
-# Enrollment metrics
-mdm_enrollments_total{platform="windows|macos|android",status="success|failure"}
-mdm_enrollment_duration_seconds{platform="windows|macos|android"}
+### 3. Alerting Documentation (0.5 days)
 
-# Device metrics
-mdm_devices_total{platform="windows|macos|android",status="enrolled|unenrolled"}
-mdm_device_last_seen_seconds{platform="windows|macos|android"}
+Create `docs/operations/ALERTING.md` with recommended Prometheus alert rules:
 
-# Command metrics
-mdm_commands_total{platform="windows|macos|android",command="lock|wipe|install_app",status="success|failure"}
-mdm_command_duration_seconds{platform="windows|macos|android",command="lock|wipe|install_app"}
+| Alert | Condition | Severity |
+|-------|-----------|----------|
+| Service Down | `up{job="local-mdm"} == 0` | Critical |
+| Database Down | `/health/ready` returns unhealthy for DB | Critical |
+| High Error Rate | `rate(http_requests_total{status=~"5.."}[5m]) > 0.05` | High |
+| Certificate Expiring | `certificates_expiring_soon{days="7"} > 0` | High |
+| Enrollment Failures | `rate(enrollments_total{status="failure"}[5m]) > 0.1` | Medium |
+| Slow API | `histogram_quantile(0.95, http_request_duration_seconds) > 2` | Medium |
 
-# Policy metrics
-mdm_policy_deployments_total{platform="windows|macos|android",status="success|failure"}
-mdm_compliance_status{platform="windows|macos|android",status="compliant|non_compliant"}
+Include a basic Prometheus scrape config and Grafana dashboard JSON.
 
-# API metrics
-http_requests_total{method="GET|POST|PUT|DELETE",path="/api/v1/devices",status="200|400|500"}
-http_request_duration_seconds{method="GET|POST|PUT|DELETE",path="/api/v1/devices"}
+### 4. Backup Documentation (0.25 days)
 
-# Database metrics
-db_connections_open
-db_connections_in_use
-db_query_duration_seconds{query="device_list|device_get|policy_list"}
+Create `docs/operations/BACKUP.md` documenting what needs backup beyond PostgreSQL:
 
-# Certificate metrics
-mdm_certificates_issued_total{type="device|apns"}
-mdm_certificates_expiring_soon{days="7|30|90"}
-```
-
-### 3. Structured Logging
-- JSON-formatted logs to stdout
-- Correlation IDs for request tracing
-- Log levels: DEBUG, INFO, WARN, ERROR
-- Contextual logging (enterprise_id, device_id, user_id)
-- Files: `internal/logging/logger.go`, `internal/logging/context.go`
-
-**Log Format**:
-```json
-{
-  "timestamp": "2026-02-06T10:30:00Z",
-  "level": "INFO",
-  "message": "Device enrolled successfully",
-  "correlation_id": "req-123e4567-e89b-12d3-a456-426614174000",
-  "enterprise_id": "ent-123e4567-e89b-12d3-a456-426614174000",
-  "device_id": "dev-123e4567-e89b-12d3-a456-426614174000",
-  "platform": "windows",
-  "duration_ms": 234,
-  "user_id": "user-123e4567-e89b-12d3-a456-426614174000"
-}
-```
-
-### 4. Alerting Documentation
-- Document recommended alerts based on metrics
-- Alert thresholds and severity levels
-- Runbook for common issues
-- Files: `docs/operations/ALERTING.md`, `docs/operations/RUNBOOK.md`
-
-**Recommended Alerts**:
-
-| Alert | Metric | Threshold | Severity |
-|-------|--------|-----------|----------|
-| Service Down | `up{job="local-mdm"}` | `== 0` | Critical |
-| Database Down | `mdm_dependency_status{name="database"}` | `== 0` | Critical |
-| High Error Rate | `rate(http_requests_total{status=~"5.."}[5m])` | `> 0.05` | High |
-| Enrollment Failures | `rate(mdm_enrollments_total{status="failure"}[5m])` | `> 0.1` | Medium |
-| Certificate Expiring | `mdm_certificates_expiring_soon{days="7"}` | `> 0` | High |
-| Slow API Response | `histogram_quantile(0.95, http_request_duration_seconds)` | `> 2` | Medium |
-| Device Not Seen | `mdm_device_last_seen_seconds` | `> 604800` (7 days) | Low |
-
-### 5. Backup Documentation
-- Document what needs backup (outside database)
-- Backup procedures for file-based secrets
-- Certificate backup procedures
-- Files: `docs/operations/BACKUP.md`
-
-**Items Requiring Backup** (non-database):
-- `secrets/` directory (if using file-based secrets)
+- `secrets/` directory (DEP encryption key, any file-based secrets)
+- CA certificate and private key (if file-based, per steering guide)
+- `configs/config.yaml`
 - APNs certificates (if stored on filesystem)
-- Root CA private key (if stored on filesystem)
-- Configuration files (`configs/config.yaml`)
 
-**Note**: Database backup/restore is handled by PostgreSQL infrastructure (not in scope).
+Note: Database backup/restore is PostgreSQL infrastructure, not application-level.
 
-## Configuration Changes
+## Out of Scope (Deferred to F-05)
 
-Update `configs/config.yaml`:
-
-```yaml
-observability:
-  health_checks:
-    enabled: true
-    interval_seconds: 30
-    timeout_seconds: 5
-  
-  metrics:
-    enabled: true
-    path: "/metrics"
-  
-  logging:
-    level: "INFO"  # DEBUG, INFO, WARN, ERROR
-    format: "json"  # json, text
-    output: "stdout"
-```
+The following are planned for [F-05: Advanced Monitoring](../../future/F-05-advanced-monitoring.md):
+- Distributed tracing (OpenTelemetry spans across services)
+- APM integration
+- SLO definition and tracking
+- Error budget monitoring
+- Grafana dashboard templates
 
 ## Acceptance Criteria
 
-- [ ] `/health` returns service status
-- [ ] `/health/ready` checks all dependencies
-- [ ] `/metrics` exposes Prometheus metrics
-- [ ] Logs output in JSON format to stdout
-- [ ] Correlation IDs present in all logs
-- [ ] Alerting documentation complete with thresholds
-- [ ] Backup documentation complete
+- [ ] `/health/ready` checks all dependencies with latency
+- [ ] `devices_total`, `certificates_expiring_soon`, `enrollment_duration_seconds` metrics exposed
+- [ ] Alerting documentation with recommended rules and thresholds
+- [ ] Backup documentation listing all non-database items
 
-## Integration with Monitoring Stack
+---
 
-**Prometheus** (scrape config):
-```yaml
-scrape_configs:
-  - job_name: 'local-mdm'
-    static_configs:
-      - targets: ['localhost:8080']
-    metrics_path: '/metrics'
-    scrape_interval: 15s
-```
-
-**Grafana Dashboard** (future):
-- Device enrollment rate
-- API request latency (p50, p95, p99)
-- Error rate by endpoint
-- Database connection pool usage
-- Certificate expiration timeline
-
-**Log Aggregation** (ELK/Loki):
-- Logs already in JSON format
-- Correlation IDs enable request tracing
-- Structured fields enable filtering/aggregation
+*Updated: 2026-04-18 — Reduced scope to reflect Sprint 2 observability work*
