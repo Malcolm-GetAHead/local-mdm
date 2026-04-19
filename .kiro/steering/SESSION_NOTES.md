@@ -12,12 +12,19 @@
 - Keep documentation up to date as work happens, not as an afterthought
 - Test coverage matters — run tests frequently, flag real bugs found by tests
 - "Do it all" requests are common — batch work efficiently rather than asking for ordering preferences
+- When unsure about a technical decision (e.g. protocol format, library API), research it and recommend an approach rather than asking the owner to decide. Owner will redirect if needed.
+- After completing a sprint, do a retrospective: check scope alignment, audit for gaps, verify docs are current, and update steering files with learnings. Owner values this.
+- When the owner asks "are we missing anything?" — do a thorough audit (scope vs delivered, future sprint dependencies, codebase health). Don't just say "looks good."
+- Clean up after yourself: delete merged branches, remove dead code, push to origin. Don't leave loose ends.
 
 ## Git Workflow
 
 - **Always create a feature branch before starting work.** Branch naming: `sprint-{id}/{short-description}` (e.g. `sprint-2a/gap-closure`). Never commit directly to main.
 - **Commit after each completed sub-task**, not at the end of the sprint. Each commit should represent a logical, working unit (e.g. "S2a-01: Add missing CRUD endpoints" as one commit, "S2a-02: Wire platform services" as the next). This lets the owner review progress incrementally.
 - **Commit messages should reference the task ID** from the sprint plan (e.g. `S2a-01:`, `S2a-03:`) so commits map back to the plan.
+- **Run tests before each commit** — don't commit broken code. If tests pass with `-race`, commit.
+- **Push periodically** so work isn't lost if the session ends unexpectedly. Push after each sub-task commit at minimum.
+- Don't squash or amend unless asked — the owner wants to see the progression.
 - **Run tests before each commit** — don't commit broken code. If tests pass with `-race`, commit.
 - **Push periodically** so work isn't lost if the session ends unexpectedly. Push after each sub-task commit at minimum.
 - Don't squash or amend unless asked — the owner wants to see the progression.
