@@ -1,160 +1,197 @@
 # Testing Guide
 
+**Last Updated**: 2026-04-19
+
 ## Running Tests
 
-### All Tests
+### All Tests (with race detector — always use this)
 ```bash
-make test
-```
-
-### Unit Tests Only
-```bash
-make test-unit
-```
-
-### Integration Tests Only
-```bash
-make test-integration
-```
-
-### Coverage Report
-```bash
-make test-coverage
-# Opens coverage.html in browser
+go test -race ./...
 ```
 
 ### Coverage Summary
 ```bash
-make test-coverage-summary
-# Prints: Total coverage: XX.X%
+go test -cover ./... | grep -v "no test files"
+```
+
+### Coverage Report (HTML)
+```bash
+go test -coverprofile=coverage.out ./...
+go tool cover -html=coverage.out -o coverage.html
+open coverage.html
+```
+
+### Specific Package
+```bash
+go test -race -v ./internal/api/...
+go test -race -v ./internal/platform/macos/...
+```
+
+### Static Analysis
+```bash
+go vet ./...
 ```
 
 ## Test Structure
 
 ```
 internal/
+├── api/
+│   ├── handlers_test.go              # Handler unit tests (CRUD, auth, platform)
+│   ├── handler_test_helpers_test.go   # Mock repos, test server, helpers
+│   ├── health_test.go                # Health endpoint tests
+│   ├── server_auth_test.go           # Auth middleware tests
+│   ├── compression_test.go           # Compression middleware
+│   ├── cors_test.go                  # CORS middleware
+│   ├── ratelimit_test.go             # Rate limiting
+│   ├── auth_ratelimit_test.go        # Auth-specific rate limiting
+│   ├── ip_allowlist_middleware_test.go # IP allowlist
+│   ├── request_id_test.go            # Request ID middleware
+│   ├── request_size_limit_test.go    # Request size limits
+│   ├── timeout_test.go              # Timeout middleware
+│   ├── tracing_middleware_test.go    # Tracing middleware
+│   └── error_handler_test.go        # Error handling
+├── audit/
+│   └── audit_test.go                # Async audit logger tests
 ├── auth/
-│   └── auth_test.go           # Auth integration tests
+│   └── auth_test.go                 # OIDC validator, circuit breaker
 ├── certs/
-│   └── certs_test.go          # Certificate tests
+│   └── certs_test.go                # CA manager, certificate service
+├── config/
+│   └── config_test.go               # Config loading, validation, secrets
+├── db/
+│   └── db_test.go                   # Database connection, health
+├── models/
+│   └── models_test.go               # Model validation
+├── platform/
+│   ├── android/
+│   │   └── service_test.go          # Android service tests
+│   ├── macos/
+│   │   ├── service_test.go          # macOS service, NanoMDM handler tests
+│   │   ├── dep_test.go              # DEP service, sync callback, lifecycle
+│   │   └── webhook_test.go          # Checkin/Command webhook handler tests
+│   └── windows/                     # Windows platform tests
 ├── repository/
-│   └── repository_test.go     # Repository integration tests
-└── testutil/
-    ├── db.go                  # Database test helpers
-    └── helpers.go             # Test data factories
+│   └── *_test.go                    # Repository unit tests
+├── scep/
+│   └── scep_test.go                 # SCEP challenge tests
+├── tracing/
+│   └── tracing_test.go              # Tracing tests
+└── validation/
+    └── validation_test.go           # JSONB validation, pagination
 ```
 
-## Test Helpers
+## Test Patterns
 
-### Database Setup
+### Handler Tests (unit, no infrastructure)
+
+Handler tests use mock repos defined in `handler_test_helpers_test.go`. No database or external services needed.
+
 ```go
-import "github.com/malcolm-getahead/local-mdm/internal/testutil"
+func TestHandleUpdateDevice(t *testing.T) {
+    t.Run("updates device fields", func(t *testing.T) {
+        ts := newTestServer(t)
+        id := uuid.New()
+        ts.deviceRepo.devices = append(ts.deviceRepo.devices, &models.Device{
+            BaseModel: models.BaseModel{ID: id},
+            Platform:  models.PlatformWindows,
+            Name:      "Old",
+        })
 
-func TestSomething(t *testing.T) {
-    db := testutil.SetupTestDB(t)
-    defer testutil.CleanupTestDB(t, db)
-    
-    // Your test code
+        body := jsonBody(t, map[string]string{"name": "New Name"})
+        req := httptest.NewRequest("PUT", "/api/v1/devices/"+id.String(), body)
+        w := ts.do(req)
+
+        assert.Equal(t, http.StatusOK, w.Code)
+        assert.Equal(t, "New Name", ts.deviceRepo.devices[0].Name)
+    })
 }
 ```
 
-### Test Data Factories
-```go
-// Create test enterprise
-enterprise := testutil.NewTestEnterprise(t)
+Key helpers:
+- `newTestServer(t)` — creates a Server with mock repos, no auth middleware
+- `ts.do(req)` — executes request, returns recorder
+- `ts.doWithAuth(req, user)` — executes with authenticated user context
+- `jsonBody(t, v)` — marshals to JSON reader
+- `decodeResponse(t, w)` — decodes standard Response struct
 
-// Create test device
-device := testutil.NewTestDevice(t, enterprise.ID)
+Mock repos have error fields for testing failure paths:
+- `mockDeviceRepo{updateErr: fmt.Errorf("db error")}`
+- `mockPolicyRepo{assignErr: fmt.Errorf("constraint violation")}`
 
-// Create test policy
-policy := testutil.NewTestPolicy(t, enterprise.ID)
+### Integration Tests (need Docker services)
+
+```bash
+make docker-up    # Start PostgreSQL + Keycloak
+sleep 45          # Wait for services
+make migrate-up   # Run migrations
+go test -race ./...
 ```
 
-### Assertions
+### Platform Tests
+
+Platform tests use testify mocks (`MockDeviceRepository`) for the service layer:
+
 ```go
-// Use testify assertions
-testutil.AssertNoError(t, err)
-testutil.AssertEqual(t, expected, actual)
-testutil.AssertNotNil(t, value)
+func TestService_CreateDevice(t *testing.T) {
+    repo := new(MockDeviceRepository)
+    repo.On("Create", mock.Anything, mock.Anything).Return(nil)
+    service := NewService(repo)
+
+    device, err := service.CreateDevice(ctx, enterpriseID, "udid", "serial")
+    require.NoError(t, err)
+    assert.Equal(t, models.PlatformMacOS, device.Platform)
+}
 ```
 
-## Prerequisites
+## Current Coverage (Sprint 2a)
 
-### Local Testing
-- PostgreSQL running on localhost:5432
-- Keycloak running on localhost:8180
-- Run `make docker-up` to start services
-
-### CI/CD
-- GitHub Actions automatically starts PostgreSQL and Keycloak
-- Runs on every push and pull request
-- Coverage reports uploaded to Codecov
+| Package | Coverage | Notes |
+|---------|----------|-------|
+| apperrors | 100.0% | |
+| models | 100.0% | |
+| config | 96.0% | |
+| validation | 96.6% | |
+| audit | 95.2% | |
+| scep | 93.3% | |
+| repository | 87.4% | |
+| tracing | 86.7% | |
+| db | 86.7% | |
+| certs | 78.4% | |
+| auth | 70.8% | |
+| api | 69.0% | 14 new handler tests in Sprint 2a |
+| metrics | 65.0% | |
+| windows | 65.0% | |
+| macos | 45.0% | DEP storage needs real Postgres |
+| android | 36.2% | Client needs Google API credentials |
 
 ## Coverage Goals
 
-- **Sprint 1**: 35%+ (foundation code, many stubs)
-- **Sprint 2**: 50%+ (platform implementations)
-- **Sprint 3**: 60%+ (policy management)
+- **Sprint 1**: 35%+ ✅ (achieved)
+- **Sprint 2**: 50%+ ✅ (achieved)
+- **Sprint 2a**: 60%+ ✅ (achieved — most packages well above)
+- **Sprint 3**: 65%+ (target)
 - **Sprint 4**: 70%+ (production ready)
 
-## Current Coverage
+## Prerequisites
 
-| Package | Coverage |
-|---------|----------|
-| auth | 60.7% |
-| certs | 69.4% |
-| repository | 53.5% |
-| **Total** | **37.5%** |
-
-## Writing Tests
-
-### Integration Test Example
-```go
-func TestDeviceRepository(t *testing.T) {
-    db := testutil.SetupTestDB(t)
-    defer testutil.CleanupTestDB(t, db)
-    
-    repo := repository.NewDeviceRepository(db.DB)
-    enterprise := testutil.NewTestEnterprise(t)
-    device := testutil.NewTestDevice(t, enterprise.ID)
-    
-    // Test Create
-    err := repo.Create(context.Background(), device)
-    testutil.AssertNoError(t, err)
-    
-    // Test Get
-    fetched, err := repo.GetByID(context.Background(), device.ID)
-    testutil.AssertNoError(t, err)
-    testutil.AssertEqual(t, device.Name, fetched.Name)
-}
+### Local Testing (unit tests only)
+```bash
+go test -race ./...   # No external services needed for most tests
 ```
 
-### Unit Test Example (with mocks - future)
-```go
-func TestDeviceService(t *testing.T) {
-    mockRepo := mocks.NewDeviceRepository(t)
-    service := NewDeviceService(mockRepo)
-    
-    // Setup mock expectations
-    mockRepo.On("GetByID", mock.Anything, mock.Anything).
-        Return(&models.Device{Name: "Test"}, nil)
-    
-    // Test
-    device, err := service.GetDevice(context.Background(), uuid.New())
-    testutil.AssertNoError(t, err)
-    testutil.AssertEqual(t, "Test", device.Name)
-    
-    // Verify mock was called
-    mockRepo.AssertExpectations(t)
-}
+### Full Integration Testing
+```bash
+make docker-up        # Start PostgreSQL + Keycloak
+sleep 45              # Wait for services to be ready
+make migrate-up       # Run migrations
+go test -race ./...   # Run all tests
 ```
 
-## Continuous Integration
+## Tips
 
-Tests run automatically on:
-- Every push to main/develop
-- Every pull request
-- Coverage reports generated
-- Failures block merges
-
-See `.github/workflows/test.yml` for CI configuration.
+- **Always use `-race`** — the race detector catches real bugs
+- **Run `go vet ./...`** after changes — catches common mistakes
+- **Check mock stubs** before writing handler tests — some mock methods may be no-ops that need to be made functional
+- **Grep for existing tests** before changing a function's behavior — fleshing out a stub handler will break tests that send nil/empty bodies
+- **New endpoints need test routes** — add them to `newTestServer()` in `handler_test_helpers_test.go`

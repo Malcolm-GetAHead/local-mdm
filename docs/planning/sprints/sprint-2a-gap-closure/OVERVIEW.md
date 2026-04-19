@@ -293,18 +293,19 @@ The DEP service has `SyncDevicesCallbackForName` which stores synced devices, an
 
 ## Definition of Done
 
-- [ ] All repository CRUD methods have corresponding API endpoints
-- [ ] Policy assign/unassign endpoints work
-- [ ] Platform services stored on Server struct, initialized in constructor
-- [ ] ManagementHandler created once, reused across requests
-- [ ] `/mdm` and `/checkin` routes use real handlers (not inline stubs)
-- [ ] DEP sync loop starts when configured, stops on shutdown
-- [ ] .bak files and committed binaries removed
-- [ ] Feature flags either wired or cleaned up
-- [ ] All existing tests still pass
-- [ ] New endpoints have tests
+- [x] All repository CRUD methods have corresponding API endpoints
+- [x] Policy assign/unassign endpoints work
+- [x] Platform services stored on Server struct, initialized in constructor
+- [x] ManagementHandler created once, reused across requests
+- [x] `/mdm` and `/checkin` routes use real handlers (not inline stubs)
+- [x] DEP sync loop starts when configured, stops on shutdown
+- [x] .bak files and committed binaries removed
+- [x] Feature flags either wired or cleaned up
+- [x] All existing tests still pass
+- [x] New endpoints have tests
 
 ---
 
-*Created: 2026-04-18*  
+*Created: 2026-04-18*
+*Completed: 2026-04-19*
 *Sprint: 2a — Gap Closure*

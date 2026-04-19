@@ -1,5 +1,7 @@
 # Local MDM - Quick Reference
 
+**Last Updated**: 2026-04-19
+
 ## Project Location
 ```
 ~/Documents/GitRepos/Malcolm-GetAHead/local-mdm
@@ -12,7 +14,7 @@
 make dev
 
 # Or step by step:
-make docker-up      # Start PostgreSQL
+make docker-up      # Start PostgreSQL + Keycloak
 make migrate-up     # Run migrations
 make run            # Start server
 ```
@@ -25,11 +27,14 @@ make run            # Start server
 | `make run` | Start server |
 | `make build` | Build binary |
 | `make test` | Run tests |
-| `make docker-up` | Start PostgreSQL |
-| `make docker-down` | Stop PostgreSQL |
+| `make docker-up` | Start PostgreSQL + Keycloak |
+| `make docker-down` | Stop services |
 | `make migrate-up` | Run migrations |
 | `make migrate-down` | Rollback migrations |
 | `make migrate-create NAME=xxx` | Create new migration |
+| `go test -race ./...` | Run tests with race detector |
+| `go test -cover ./...` | Coverage summary |
+| `go vet ./...` | Static analysis |
 
 ## Important URLs
 
@@ -37,213 +42,158 @@ make run            # Start server
 |---------|-----|
 | API Server | http://localhost:8080 |
 | Health Check | http://localhost:8080/health |
+| Version | http://localhost:8080/version |
+| Prometheus Metrics | http://127.0.0.1:9090/metrics (internal only) |
 | Adminer (DB UI) | http://localhost:8081 |
-| API Docs | http://localhost:8080/api/v1/docs (future) |
-
-## Database Access
-
-**Adminer (Web)**:
-- URL: http://localhost:8081
-- System: PostgreSQL
-- Server: postgres
-- User: postgres
-- Password: postgres
-- Database: localmdm
-
-**psql (CLI)**:
-```bash
-psql -h localhost -U postgres -d localmdm
-```
-
-## Configuration
-
-**File**: `configs/config.yaml`
-
-**Environment Variables**:
-```bash
-export DB_HOST=localhost
-export DB_PORT=5432
-export DB_USER=postgres
-export DB_PASSWORD=postgres
-export DB_NAME=localmdm
-export JWT_SECRET=your-secret-key
-```
 
 ## Project Structure
 
 ```
 local-mdm/
-├── cmd/server/          # Main application
+├── cmd/server/              # Main application entry point
 ├── internal/
-│   ├── api/            # HTTP handlers
-│   ├── config/         # Configuration
-│   ├── db/             # Database
-│   ├── models/         # Data models
-│   └── platform/       # Platform modules
-├── migrations/         # Database migrations
-├── configs/           # Config files
-└── docs/              # Documentation
+│   ├── api/                 # HTTP handlers, middleware, routing
+│   ├── audit/               # Async audit logging
+│   ├── auth/                # OIDC authentication (Keycloak)
+│   ├── certs/               # Certificate management, CA, SCEP
+│   ├── config/              # Configuration loading & validation
+│   ├── constants/           # Shared constants
+│   ├── db/                  # Database connection & health
+│   ├── metrics/             # Prometheus metrics server
+│   ├── models/              # Data models (Device, Policy, etc.)
+│   ├── platform/
+│   │   ├── android/         # Android Management API integration
+│   │   ├── macos/           # NanoMDM, DEP, enrollment profiles
+│   │   └── windows/         # OMA-DM, SyncML, MS-MDE2
+│   ├── repository/          # Data access layer (PostgreSQL)
+│   ├── scep/                # SCEP challenge management
+│   ├── testutil/            # Test helpers
+│   ├── tracing/             # Request tracing
+│   └── validation/          # Input validation (JSONB, pagination)
+├── migrations/              # Database migrations
+├── configs/                 # Config files
+├── secrets/                 # Dev-only secrets (gitignored)
+└── docs/                    # Documentation
 ```
 
-## Documentation
+## API Endpoints
 
-| Document | Purpose |
-|----------|---------|
-| [README.md](../../README.md) | Project overview |
-| [SCOPE.md](../scope/SCOPE.md) | Project scope |
-| [SETUP.md](SETUP.md) | Setup guide |
-| [DATABASE.md](../schemas/DATABASE.md) | Database schema |
-| [API.md](../schemas/API.md) | API reference |
-| [ARCHITECTURE.md](ARCHITECTURE.md) | System design |
-| [PROGRESS.md](PROGRESS.md) | Development progress |
+### Public (no auth)
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/health` | Health check |
+| GET | `/version` | Version info |
 
-## API Endpoints (Current)
+### Auth
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | `/api/v1/auth/login` | Login (returns JWT) |
+| POST | `/api/v1/auth/refresh` | Refresh token |
 
-### Working
-- `GET /health` - Health check ✅
+### Enterprises
+| Method | Path | Role | Description |
+|--------|------|------|-------------|
+| GET | `/api/v1/enterprises` | admin, super_admin | List enterprises |
+| POST | `/api/v1/enterprises` | super_admin + IP allowlist | Create enterprise |
+| GET | `/api/v1/enterprises/{id}` | any authenticated | Get enterprise |
+| PUT | `/api/v1/enterprises/{id}` | admin, super_admin | Update enterprise |
+| DELETE | `/api/v1/enterprises/{id}` | super_admin + IP allowlist | Delete enterprise |
 
-### Stubbed (Not Implemented Yet)
-- `POST /api/v1/auth/login`
-- `POST /api/v1/auth/refresh`
-- `GET /api/v1/devices`
-- `GET /api/v1/devices/:id`
-- `POST /api/v1/devices/enroll`
-- `DELETE /api/v1/devices/:id`
-- `POST /api/v1/devices/:id/lock`
-- `POST /api/v1/devices/:id/wipe`
-- `GET /api/v1/policies`
-- `POST /api/v1/policies`
-- `GET /api/v1/policies/:id`
-- `PUT /api/v1/policies/:id`
-- `DELETE /api/v1/policies/:id`
-- `POST /api/v1/policies/:id/assign`
+### Devices
+| Method | Path | Role | Description |
+|--------|------|------|-------------|
+| GET | `/api/v1/devices` | any authenticated | List devices |
+| GET | `/api/v1/devices/{id}` | any authenticated | Get device |
+| PUT | `/api/v1/devices/{id}` | admin, operator | Update device |
+| DELETE | `/api/v1/devices/{id}` | admin | Delete device |
+| POST | `/api/v1/devices/{id}/lock` | admin, operator | Lock device |
+| POST | `/api/v1/devices/{id}/wipe` | admin + IP allowlist | Wipe device |
+
+### Policies
+| Method | Path | Role | Description |
+|--------|------|------|-------------|
+| GET | `/api/v1/policies` | any authenticated | List policies |
+| POST | `/api/v1/policies` | admin, operator | Create policy |
+| GET | `/api/v1/policies/{id}` | any authenticated | Get policy |
+| PUT | `/api/v1/policies/{id}` | admin, operator | Update policy |
+| DELETE | `/api/v1/policies/{id}` | admin | Delete policy |
+| POST | `/api/v1/policies/{id}/assign` | admin, operator | Assign to devices |
+| DELETE | `/api/v1/policies/{id}/assign/{device_id}` | admin, operator | Unassign from device |
+
+### Certificates & Audit
+| Method | Path | Role | Description |
+|--------|------|------|-------------|
+| GET | `/api/v1/certificates` | any authenticated | List certificates |
+| GET | `/api/v1/audit-logs` | admin, super_admin | List audit logs |
+
+### macOS
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/v1/macos/enroll/{enterprise_id}` | Enrollment profile download |
+| GET/PUT | `/api/v1/dep/{name}/tokenpki` | DEP token PKI management |
+| GET/PUT | `/api/v1/dep/{name}/assigner` | DEP assigner profile |
+| GET | `/api/v1/dep/{name}/devices` | List DEP-synced devices |
+| PUT | `/checkin` | NanoMDM checkin webhook |
+| PUT | `/mdm` | NanoMDM command webhook |
+
+### Windows
+| Method | Path | Description |
+|--------|------|-------------|
+| GET/POST | `/EnrollmentServer/Discovery.svc` | MS-MDE2 discovery |
+| POST | `/EnrollmentServer/Policy.svc` | Enrollment policy |
+| POST | `/EnrollmentServer/Enrollment.svc` | Device enrollment |
+| POST | `/ManagementServer/MDM.svc` | OMA-DM SyncML sync |
+
+### Android
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | `/api/v1/android/enrollment-token/{enterprise_id}` | Create enrollment token |
+| GET | `/api/v1/android/enrollment-token/{token_id}/qr` | Get enrollment QR code |
+| POST | `/api/v1/android/webhook` | Google Management API webhook |
 
 ## Database Tables
 
 | Table | Purpose |
 |-------|---------|
 | `enterprises` | Organizations/tenants |
-| `users` | Admin users |
 | `devices` | Enrolled devices |
 | `policies` | Management policies |
-| `device_policies` | Device-policy links |
+| `device_policies` | Device-policy assignments |
 | `certificates` | PKI certificates |
-| `api_tokens` | API access tokens |
+| `commands` | Device command queue |
 | `audit_logs` | Audit trail |
-
-## Common Tasks
-
-### Create New Migration
-```bash
-make migrate-create NAME=add_device_groups
-```
-
-### Reset Database
-```bash
-make migrate-down  # Rollback all
-make migrate-up    # Apply all
-```
-
-### View Logs
-```bash
-make docker-logs   # Docker logs
-tail -f logs/app.log  # App logs (future)
-```
-
-### Run Tests
-```bash
-make test              # All tests
-make test-coverage     # With coverage report
-```
-
-### Build for Production
-```bash
-make build
-./bin/local-mdm
-```
-
-## Troubleshooting
-
-### Port 8080 in use
-```bash
-lsof -i :8080
-kill -9 <PID>
-```
-
-### Database connection failed
-```bash
-docker ps  # Check if running
-make docker-up  # Start if not
-```
-
-### Migration stuck
-```bash
-make migrate-force VERSION=1
-```
-
-### Go module issues
-```bash
-go clean -modcache
-make deps
-```
+| `dep_names` | DEP server configurations |
+| `dep_devices` | DEP-synced device inventory |
 
 ## Development Workflow
 
 1. **Start session**
    ```bash
    cd ~/Documents/GitRepos/Malcolm-GetAHead/local-mdm
-   make docker-up
+   make docker-up && sleep 45 && make migrate-up
    make run
    ```
 
-2. **Make changes**
-   - Edit code
-   - Server auto-restarts (future: add hot reload)
+2. **Make changes** — edit code, run tests frequently
 
 3. **Test changes**
    ```bash
-   make test
-   curl http://localhost:8080/health
+   go test -race ./...
+   go vet ./...
    ```
 
-4. **Create migration** (if needed)
+4. **Commit** — one commit per logical unit, reference task IDs
+
+5. **End session**
    ```bash
-   make migrate-create NAME=description
-   # Edit migration files
-   make migrate-up
+   Ctrl+C          # Stop server
+   make docker-down  # Stop services
    ```
 
-5. **Update docs**
-   - Update PROGRESS.md with changes
-   - Document design decisions
-   - Update API.md if endpoints changed
+## Current Phase
 
-6. **End session**
-   ```bash
-   Ctrl+C  # Stop server
-   make docker-down  # Stop PostgreSQL
-   ```
+**Sprint 2a complete** — Gap Closure. All CRUD endpoints wired, platform services initialized, NanoMDM handlers live, DEP sync loop running. Ready for Sprint 3 (Commands, Profiles & Apps).
 
-## Next Steps
-
-See [PROGRESS.md](PROGRESS.md) for current status and next tasks.
-
-**Current Phase**: Foundation (40% complete)
-
-**Next Tasks**:
-1. Implement authentication (JWT)
-2. Create repository layer
-3. Create service layer
-4. Add certificate infrastructure
-5. Write tests
-
-## Getting Help
-
-- Check [PROGRESS.md](PROGRESS.md) for known issues
-- Review [SETUP.md](SETUP.md) for detailed setup
-- See [ARCHITECTURE.md](ARCHITECTURE.md) for design
-- Read [API.md](API.md) for API details
+See [Sprint Planning](../planning/sprints/) for roadmap.
 
 ---
-
-**Last Updated**: 2026-02-05
