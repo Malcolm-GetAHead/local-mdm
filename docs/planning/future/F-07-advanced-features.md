@@ -564,7 +564,8 @@ DELETE /api/v1/tokens/{id}            → Revoke token
 ```
 
 **Includes**:
-- Token generation (cryptographically random, stored hashed)
+- Token generation (cryptographically random, plaintext returned once at creation)
+- Hash-based storage using pgcrypto `crypt()`/`gen_salt()` — token is never stored in plaintext, only verified on each request
 - Token validation middleware (alternative to OIDC JWT)
 - Scoping to enterprise and role
 - Expiration support
