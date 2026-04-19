@@ -18,11 +18,11 @@ This directory contains tasks that are **beyond the scope of v1.0** but would en
 |----|------|----------|--------|-------|--------|
 | [F-01](F-01-real-device-testing.md) | Real Device Testing | High | 3-4 days | +0.30 | Deferred |
 | [F-02](F-02-production-deployment.md) | Production Deployment & HA | High | 2-3 days | +0.20 | Future (K8s) |
-| [F-03](F-03-advanced-security.md) | Advanced Security Features | Medium | 2-3 days | +0.20 | Beyond v1.0 |
+| [F-03](F-03-advanced-security.md) | Advanced Security Features | Medium | 2.5-3.5 days | +0.20 | Beyond v1.0 |
 | [F-04](F-04-disaster-recovery.md) | Disaster Recovery & BC | Medium | 1-2 days | +0.15 | Partial |
 | [F-05](F-05-advanced-monitoring.md) | Advanced Monitoring | Low | 2-3 days | +0.08 | Beyond v1.0 |
 | [F-06](F-06-user-documentation.md) | User Documentation | Low | 2-3 days | +0.07 | Post-launch |
-| [F-07](F-07-advanced-features.md) | Advanced MDM Features | Low | 2-3 days | +0.05 | Out of scope |
+| [F-07](F-07-advanced-features.md) | Advanced MDM Features | Low | 5-7 days | +0.05 | Out of scope |
 | [F-08](F-08-internationalization-accessibility.md) | i18n & Accessibility | Low | 1-2 days | +0.03 | Post-launch |
 | **Total** | | | **16-23 days** | **+1.00** | |
 
@@ -234,5 +234,5 @@ To implement any future task:
 
 ---
 
-**Last Updated**: 2026-02-06  
+**Last Updated**: 2026-04-19  
 **Next Review**: After v1.0 launch

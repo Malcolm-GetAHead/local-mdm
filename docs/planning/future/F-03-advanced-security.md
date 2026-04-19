@@ -323,6 +323,13 @@ func VerifySignature(r *http.Request) error {
 - Set up alerting for critical vulnerabilities
 - Document remediation procedures
 
+### Task 6: Automated Certificate Renewal (0.5 days)
+- Detect device certificates approaching expiration (using existing cert expiration monitor)
+- Automatically re-issue certificates via CAManager before expiry
+- Push renewed certificates to devices via platform-specific mechanisms (macOS InstallProfile, Windows CSP, Android policy)
+- APNs certificate renewal reminders and upload flow via API
+- Audit log all renewal events
+
 ---
 
 ## Acceptance Criteria
@@ -334,6 +341,8 @@ func VerifySignature(r *http.Request) error {
 - [ ] Vulnerability scans run in CI/CD
 - [ ] Critical vulnerabilities block deployment
 - [ ] Certificate pinning documented for mobile apps
+- [ ] Automated certificate renewal before expiry
+- [ ] APNs certificate upload and renewal flow
 - [ ] API request signing implemented (optional)
 
 ---
