@@ -1,15 +1,15 @@
-# S4-02: Policy Assignment & Groups
+# S4-02: Policy Assignment & Static Device Groups
 
-**Sprint**: 4 — Policy & Identity
-**Parallel**: ⚠️ Needs S4-01 policy model
+**Sprint**: 4 — Policy & Identity  
+**Parallel**: ⚠️ Needs S4-01 policy model  
 **Effort**: 3-4 days
 
 ## Tasks
 
-### 1. Device Groups
+### 1. Static Device Groups
 - Create/update/delete device groups per enterprise
-- Static membership (manually add/remove devices)
-- Dynamic membership (filter rules: platform, OS version, compliance status)
+- Static membership — admin manually adds/removes devices
+- Group metadata: name, description, enterprise_id
 - Files: `internal/service/groups.go`, `internal/repository/group.go`
 
 ### 2. Policy Assignment
@@ -26,15 +26,27 @@
 
 ### 4. API Handlers
 - `GET/POST /api/v1/groups` — group CRUD
-- `POST /api/v1/groups/{id}/devices` — add devices
-- `DELETE /api/v1/groups/{id}/devices/{device_id}` — remove device
+- `GET/PUT/DELETE /api/v1/groups/{id}` — group management
+- `POST /api/v1/groups/{id}/devices` — add devices to group
+- `DELETE /api/v1/groups/{id}/devices/{device_id}` — remove device from group
+- `GET /api/v1/groups/{id}/devices` — list devices in group
 - `POST /api/v1/policies/{id}/assign` — assign to device/group
 - Files: `internal/api/handlers/groups.go`
 
 ## Acceptance Criteria
 
 - [ ] Device group created with static members
-- [ ] Dynamic group auto-populates based on filter rules
+- [ ] Devices added to and removed from groups
 - [ ] Policy assigned to group, all member devices receive it
-- [ ] New device enrolling into a group receives existing policies
-- [ ] Policy conflict resolved correctly
+- [ ] New device added to group receives existing group policies
+- [ ] Policy conflict resolved correctly (priority-based)
+
+## Out of Scope (Deferred to F-07)
+
+The following dynamic group features were originally in this task but have been moved to [F-07: Advanced Features](../../future/F-07-advanced-features.md) to keep Sprint 4 focused:
+
+- **Dynamic group membership** — filter rules that auto-populate groups based on device attributes (platform, OS version, compliance status, tags)
+- **Auto-update scheduler** — periodic re-evaluation of dynamic group membership
+- **Rule engine** — parsing and evaluating filter expressions against device data
+
+Static groups cover the core use case (admin assigns devices to groups, assigns policies to groups). Dynamic groups add automation on top of that foundation and can be built later without changing the policy assignment or deployment logic.

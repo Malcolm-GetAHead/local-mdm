@@ -1,7 +1,7 @@
 # F-07: Advanced MDM Features
 
 **Priority**: Low  
-**Effort**: 2-3 days  
+**Effort**: 3-5 days (increased from 2-3 days — dynamic groups moved from S4-02)  
 **Score Impact**: +0.05 points  
 **Status**: Out of scope for v1.0
 
@@ -12,13 +12,13 @@
 ### Current State
 - Core MDM features (enrollment, policies, commands)
 - Basic policy assignment
-- Device groups (static)
+- Device groups (static, from S4-02)
 - Manual policy deployment
 
 ### Missing
+- Dynamic device groups (moved from S4-02 — filter rules, auto-population, periodic re-evaluation)
 - Geofencing (marked as out of scope)
 - Conditional access policies
-- Dynamic device groups
 - Scheduled policy deployment
 - Policy simulation/dry-run mode
 - Bulk operations UI
@@ -189,6 +189,15 @@ func (p *ConditionalPolicy) Evaluate(device *Device, context *Context) bool {
 ```
 
 ### 3. Dynamic Device Groups
+
+> Moved from S4-02 (Sprint 4). S4-02 implements static groups with manual membership. This section adds automatic membership based on filter rules.
+
+**Prerequisite**: S4-02 static groups must be complete. Dynamic groups extend the same `device_groups` table and `device_group_members` junction table with a `rules` JSONB column and a `type` column (static vs dynamic).
+
+**What changes from static groups**:
+- Static: admin manually adds device IDs to a group
+- Dynamic: admin defines filter rules, system evaluates them against all devices and auto-populates membership
+- Policy assignment and deployment logic is identical — it doesn't care how a device got into a group
 
 **Group Rules**:
 ```go
