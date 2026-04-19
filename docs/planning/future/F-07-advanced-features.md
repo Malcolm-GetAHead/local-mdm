@@ -1,7 +1,7 @@
 # F-07: Advanced MDM Features
 
 **Priority**: Low  
-**Effort**: 3-5 days (increased from 2-3 days — dynamic groups moved from S4-02)  
+**Effort**: 5-7 days (increased from 3-5 — user management, API tokens, app updates added from Sprint 2a audit)  
 **Score Impact**: +0.05 points  
 **Status**: Out of scope for v1.0
 
@@ -24,6 +24,9 @@
 - Bulk operations UI
 - Custom device attributes/tags
 - Webhook system for external integrations
+- User management CRUD (Sprint 2a audit — CLI and dashboard assume it exists)
+- API token authentication (Sprint 2a audit — CLI assumes it exists)
+- App update management (Sprint 2a audit — install/remove covered in S3, updates not planned)
 
 ### Impact
 Without advanced features:
@@ -530,6 +533,54 @@ webhooks:
       backoff: exponential
 ```
 
+### 9. User Management CRUD
+
+> **Gap identified in Sprint 2a audit.** The CLI (S5-08) and web dashboard (S5b) both assume user management API endpoints exist, but no sprint task builds them. The `api_tokens` table exists in the schema but has no server-side implementation.
+
+**Endpoints needed**:
+```
+GET    /api/v1/users                  → List users (scoped to enterprise)
+POST   /api/v1/users                  → Create user (admin+)
+GET    /api/v1/users/{id}             → Get user
+PUT    /api/v1/users/{id}             → Update user (roles, enterprise assignment)
+DELETE /api/v1/users/{id}             → Deactivate user
+```
+
+**Includes**:
+- User-to-enterprise association
+- Role assignment (super_admin, admin, operator, viewer)
+- Integration with Keycloak user provisioning
+- Audit logging for all user mutations
+
+### 10. API Token Authentication
+
+> **Gap identified in Sprint 2a audit.** S5-08 (CLI) consumes API tokens but no task builds the server-side token infrastructure.
+
+**Endpoints needed**:
+```
+POST   /api/v1/tokens                 → Generate API token (returns token once)
+GET    /api/v1/tokens                 → List tokens (metadata only, not secret)
+DELETE /api/v1/tokens/{id}            → Revoke token
+```
+
+**Includes**:
+- Token generation (cryptographically random, stored hashed)
+- Token validation middleware (alternative to OIDC JWT)
+- Scoping to enterprise and role
+- Expiration support
+- Uses existing `api_tokens` database table
+
+### 11. App Update Management
+
+> **Gap identified in Sprint 2a audit.** Sprint 3 covers app install/remove and inventory, but not update detection or deployment.
+
+**Includes**:
+- Detect outdated apps by comparing installed versions against catalog
+- Push app updates to devices (via platform-specific mechanisms)
+- Update scheduling (maintenance windows)
+- Update status tracking (pending, downloading, installed, failed)
+- Reporting on outdated app counts per device/enterprise
+
 ---
 
 ## Implementation Tasks
@@ -565,6 +616,24 @@ webhooks:
 - Build dry-run UI
 - Test with various policies
 
+### Task 6: User Management CRUD (1 day)
+- Implement user CRUD handlers and repository
+- User-enterprise association and role assignment
+- Keycloak user provisioning integration
+- Handler tests with mock repos
+
+### Task 7: API Token Authentication (0.5 days)
+- Token generation, hashed storage, validation middleware
+- Token scoping (enterprise, role, expiration)
+- Revocation endpoint
+- Tests for token lifecycle
+
+### Task 8: App Update Management (1 day)
+- Version comparison logic (installed vs catalog)
+- Update push via platform mechanisms
+- Update scheduling and status tracking
+- Reporting on outdated apps
+
 ---
 
 ## Acceptance Criteria
@@ -577,6 +646,9 @@ webhooks:
 - [ ] Bulk operations work for 100+ devices
 - [ ] Custom tags can be added to devices
 - [ ] Webhooks deliver events reliably
+- [ ] User CRUD endpoints work with enterprise scoping and role assignment
+- [ ] API tokens can be generated, validated, and revoked
+- [ ] App updates detected and deployable to devices
 
 ---
 

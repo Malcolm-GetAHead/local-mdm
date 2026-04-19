@@ -29,6 +29,11 @@ Sprint 2 already delivered:
 
 S5-06 should be scoped down to: enhanced health checks (/health/ready with dependency checks), alerting documentation, and any gaps in the existing observability setup. The Prometheus metrics and structured logging work is done.
 
+## Notes from Sprint 2a Audit
+
+- **S5-08 (CLI) assumes API token auth exists** but no sprint task explicitly builds the server-side token generation/validation/revocation endpoints. The `api_tokens` table exists in the schema. This should be built as part of S5-08 or as a prerequisite task. See F-07 sections 9-10 for the full spec if it's deferred beyond v1.0.
+- **User management CRUD** (`GET/POST/PUT/DELETE /api/v1/users`) is assumed by both S5-08 and S5b (dashboard) but not explicitly tasked. Same recommendation — build as part of S5-08 or add a dedicated task. See F-07 section 9.
+
 ## Dependency Graph
 
 ```
