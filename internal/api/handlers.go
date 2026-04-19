@@ -905,6 +905,239 @@ func isDuplicateError(err error) bool {
 	return strings.Contains(msg, "duplicate") || strings.Contains(msg, "unique") || strings.Contains(msg, "already exists")
 }
 
+// --- Sprint 3: App Management Handlers ---
+
+func (s *Server) handleListApps(w http.ResponseWriter, r *http.Request) {
+	user, err := auth.UserFromContext(r.Context())
+	if err != nil {
+		respondError(w, r, http.StatusUnauthorized, "unauthorized", "Authentication required")
+		return
+	}
+
+	limit, offset := parsePagination(r)
+	apps, total, err := s.appRepo.List(r.Context(), user.EnterpriseID, limit, offset)
+	if err != nil {
+		s.logger.Error("failed to list apps", "error", err)
+		respondError(w, r, http.StatusInternalServerError, "internal_error", "Failed to list apps")
+		return
+	}
+
+	respondPaginated(w, r, http.StatusOK, apps, total, limit, offset)
+}
+
+func (s *Server) handleCreateApp(w http.ResponseWriter, r *http.Request) {
+	user, err := auth.UserFromContext(r.Context())
+	if err != nil {
+		respondError(w, r, http.StatusUnauthorized, "unauthorized", "Authentication required")
+		return
+	}
+
+	var req struct {
+		Name        string      `json:"name"`
+		Platform    string      `json:"platform"`
+		Identifier  string      `json:"identifier"`
+		Version     string      `json:"version"`
+		InstallType string      `json:"install_type"`
+		AppConfig   models.JSONB `json:"app_config"`
+	}
+	if err := parseJSONBody(r, &req); err != nil {
+		respondError(w, r, http.StatusBadRequest, "invalid_request", "Invalid request body")
+		return
+	}
+
+	if req.Name == "" || req.Platform == "" || req.Identifier == "" {
+		respondError(w, r, http.StatusBadRequest, "validation_failed", "name, platform, and identifier are required")
+		return
+	}
+	if !isValidPlatform(req.Platform) {
+		respondError(w, r, http.StatusBadRequest, "validation_failed", "Invalid platform")
+		return
+	}
+	if req.InstallType == "" {
+		req.InstallType = models.AppInstallRequired
+	}
+
+	app := &models.App{
+		EnterpriseID: user.EnterpriseID,
+		Name:         req.Name,
+		Platform:     req.Platform,
+		Identifier:   req.Identifier,
+		Version:      req.Version,
+		InstallType:  req.InstallType,
+		AppConfig:    req.AppConfig,
+	}
+
+	if err := s.appRepo.Create(r.Context(), app); err != nil {
+		if isDuplicateError(err) {
+			respondError(w, r, http.StatusConflict, "duplicate", "App already exists for this platform")
+			return
+		}
+		s.logger.Error("failed to create app", "error", err)
+		respondError(w, r, http.StatusInternalServerError, "internal_error", "Failed to create app")
+		return
+	}
+
+	s.logAudit(r, "app.create", "app", app.ID, map[string]interface{}{
+		"name":       app.Name,
+		"platform":   app.Platform,
+		"identifier": app.Identifier,
+	})
+
+	respondJSON(w, r, http.StatusCreated, app)
+}
+
+func (s *Server) handleGetApp(w http.ResponseWriter, r *http.Request) {
+	id, err := parseUUIDParam(r, "id")
+	if err != nil {
+		respondError(w, r, http.StatusBadRequest, "invalid_id", "Invalid app ID format")
+		return
+	}
+
+	app, err := s.appRepo.GetByID(r.Context(), id)
+	if err != nil {
+		if strings.Contains(err.Error(), "not found") {
+			respondError(w, r, http.StatusNotFound, "not_found", "App not found")
+			return
+		}
+		respondError(w, r, http.StatusInternalServerError, "internal_error", "Failed to get app")
+		return
+	}
+
+	respondJSON(w, r, http.StatusOK, app)
+}
+
+func (s *Server) handleUpdateApp(w http.ResponseWriter, r *http.Request) {
+	id, err := parseUUIDParam(r, "id")
+	if err != nil {
+		respondError(w, r, http.StatusBadRequest, "invalid_id", "Invalid app ID format")
+		return
+	}
+
+	app, err := s.appRepo.GetByID(r.Context(), id)
+	if err != nil {
+		if strings.Contains(err.Error(), "not found") {
+			respondError(w, r, http.StatusNotFound, "not_found", "App not found")
+			return
+		}
+		respondError(w, r, http.StatusInternalServerError, "internal_error", "Failed to get app")
+		return
+	}
+
+	var req struct {
+		Name        *string      `json:"name"`
+		Version     *string      `json:"version"`
+		InstallType *string      `json:"install_type"`
+		AppConfig   *models.JSONB `json:"app_config"`
+	}
+	if err := parseJSONBody(r, &req); err != nil {
+		respondError(w, r, http.StatusBadRequest, "invalid_request", "Invalid request body")
+		return
+	}
+
+	if req.Name != nil {
+		app.Name = *req.Name
+	}
+	if req.Version != nil {
+		app.Version = *req.Version
+	}
+	if req.InstallType != nil {
+		app.InstallType = *req.InstallType
+	}
+	if req.AppConfig != nil {
+		app.AppConfig = *req.AppConfig
+	}
+
+	if err := s.appRepo.Update(r.Context(), app); err != nil {
+		s.logger.Error("failed to update app", "error", err)
+		respondError(w, r, http.StatusInternalServerError, "internal_error", "Failed to update app")
+		return
+	}
+
+	s.logAudit(r, "app.update", "app", id, nil)
+	respondJSON(w, r, http.StatusOK, app)
+}
+
+func (s *Server) handleDeleteApp(w http.ResponseWriter, r *http.Request) {
+	id, err := parseUUIDParam(r, "id")
+	if err != nil {
+		respondError(w, r, http.StatusBadRequest, "invalid_id", "Invalid app ID format")
+		return
+	}
+
+	if err := s.appRepo.Delete(r.Context(), id); err != nil {
+		if strings.Contains(err.Error(), "not found") {
+			respondError(w, r, http.StatusNotFound, "not_found", "App not found")
+			return
+		}
+		s.logger.Error("failed to delete app", "error", err)
+		respondError(w, r, http.StatusInternalServerError, "internal_error", "Failed to delete app")
+		return
+	}
+
+	s.logAudit(r, "app.delete", "app", id, nil)
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (s *Server) handleDeployApp(w http.ResponseWriter, r *http.Request) {
+	appID, err := parseUUIDParam(r, "id")
+	if err != nil {
+		respondError(w, r, http.StatusBadRequest, "invalid_id", "Invalid app ID format")
+		return
+	}
+
+	app, err := s.appRepo.GetByID(r.Context(), appID)
+	if err != nil {
+		if strings.Contains(err.Error(), "not found") {
+			respondError(w, r, http.StatusNotFound, "not_found", "App not found")
+			return
+		}
+		respondError(w, r, http.StatusInternalServerError, "internal_error", "Failed to get app")
+		return
+	}
+
+	var req struct {
+		DeviceIDs []uuid.UUID `json:"device_ids"`
+	}
+	if err := parseJSONBody(r, &req); err != nil {
+		respondError(w, r, http.StatusBadRequest, "invalid_request", "Invalid request body")
+		return
+	}
+
+	if len(req.DeviceIDs) == 0 {
+		respondError(w, r, http.StatusBadRequest, "validation_failed", "device_ids is required")
+		return
+	}
+
+	var commands []*models.DeviceCommand
+	for _, deviceID := range req.DeviceIDs {
+		cmd := &models.DeviceCommand{
+			DeviceID:    deviceID,
+			CommandType: models.CommandTypeInstallApp,
+			CommandData: models.JSONB{
+				"app_id":     app.ID,
+				"identifier": app.Identifier,
+				"name":       app.Name,
+				"platform":   app.Platform,
+			},
+		}
+		if err := s.cmdRepo.Create(r.Context(), cmd); err != nil {
+			s.logger.Error("failed to create deploy command", "error", err, "device_id", deviceID)
+			continue
+		}
+		commands = append(commands, cmd)
+	}
+
+	s.logAudit(r, "app.deploy", "app", appID, map[string]interface{}{
+		"device_ids": req.DeviceIDs,
+		"commands":   len(commands),
+	})
+
+	respondJSON(w, r, http.StatusOK, map[string]interface{}{
+		"app":      app,
+		"commands": commands,
+	})
+}
+
 // --- Sprint 3: Command & Profile Handlers ---
 
 func (s *Server) handleSendCommand(w http.ResponseWriter, r *http.Request) {

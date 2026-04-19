@@ -179,6 +179,24 @@ const (
 	CertTypeAPNS   = "apns"
 )
 
+// App represents an application in the enterprise catalog
+type App struct {
+	BaseModel
+	EnterpriseID uuid.UUID `json:"enterprise_id" db:"enterprise_id"`
+	Name         string    `json:"name" db:"name"`
+	Platform     string    `json:"platform" db:"platform"`
+	Identifier   string    `json:"identifier" db:"identifier"` // bundle ID, package name, or MSI product code
+	Version      string    `json:"version" db:"version"`
+	InstallType  string    `json:"install_type" db:"install_type"` // required, available
+	AppConfig    JSONB     `json:"app_config" db:"app_config"`
+}
+
+// App install type constants
+const (
+	AppInstallRequired  = "required"
+	AppInstallAvailable = "available"
+)
+
 // DeviceCommand represents a pending or completed management command
 type DeviceCommand struct {
 	BaseModel

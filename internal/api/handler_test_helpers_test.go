@@ -431,6 +431,81 @@ func (m *mockAuditLogger) Log(_ context.Context, event audit.Event) error {
 	return nil
 }
 
+type mockAppRepo struct {
+	apps      []*models.App
+	createErr error
+	getErr    error
+	listErr   error
+	updateErr error
+	deleteErr error
+}
+
+func (m *mockAppRepo) Create(_ context.Context, app *models.App) error {
+	if m.createErr != nil {
+		return m.createErr
+	}
+	if app.ID == uuid.Nil {
+		app.ID = uuid.New()
+	}
+	app.CreatedAt = time.Now()
+	app.UpdatedAt = time.Now()
+	m.apps = append(m.apps, app)
+	return nil
+}
+
+func (m *mockAppRepo) GetByID(_ context.Context, id uuid.UUID) (*models.App, error) {
+	if m.getErr != nil {
+		return nil, m.getErr
+	}
+	for _, a := range m.apps {
+		if a.ID == id {
+			return a, nil
+		}
+	}
+	return nil, fmt.Errorf("app not found")
+}
+
+func (m *mockAppRepo) List(_ context.Context, _ uuid.UUID, limit, offset int) ([]*models.App, int, error) {
+	if m.listErr != nil {
+		return nil, 0, m.listErr
+	}
+	total := len(m.apps)
+	end := offset + limit
+	if end > total {
+		end = total
+	}
+	if offset >= total {
+		return []*models.App{}, total, nil
+	}
+	return m.apps[offset:end], total, nil
+}
+
+func (m *mockAppRepo) Update(_ context.Context, app *models.App) error {
+	if m.updateErr != nil {
+		return m.updateErr
+	}
+	for i, a := range m.apps {
+		if a.ID == app.ID {
+			m.apps[i] = app
+			return nil
+		}
+	}
+	return fmt.Errorf("app not found")
+}
+
+func (m *mockAppRepo) Delete(_ context.Context, id uuid.UUID) error {
+	if m.deleteErr != nil {
+		return m.deleteErr
+	}
+	for i, a := range m.apps {
+		if a.ID == id {
+			m.apps = append(m.apps[:i], m.apps[i+1:]...)
+			return nil
+		}
+	}
+	return fmt.Errorf("app not found")
+}
+
 // --- Test Helper ---
 
 type testServer struct {
@@ -454,6 +529,7 @@ func newTestServer(t *testing.T) *testServer {
 	ar := &mockAuditLogRepo{}
 	al := &mockAuditLogger{}
 	cmdr := &mockCommandRepo{}
+	appr := &mockAppRepo{}
 
 	s := &Server{
 		router:           mux.NewRouter(),
@@ -467,6 +543,7 @@ func newTestServer(t *testing.T) *testServer {
 		certRepo:         cr,
 		auditLogRepo:     ar,
 		cmdRepo:          cmdr,
+		appRepo:          appr,
 		enrollmentLimiter: newRateLimiterWithSize(10, time.Minute, 100),
 		depService:       macos.NewDEPService(&testDEPStorage{}, slog.New(slog.NewTextHandler(bytes.NewBuffer(nil), nil))),
 	}
@@ -505,6 +582,14 @@ func newTestServer(t *testing.T) *testServer {
 	api.HandleFunc("/devices/{id}/commands", s.handleListCommands).Methods("GET")
 	api.HandleFunc("/devices/{id}/profiles", s.handleInstallProfile).Methods("POST")
 	api.HandleFunc("/devices/{id}/profiles/{profile_id}", s.handleRemoveProfile).Methods("DELETE")
+
+	// Sprint 3: App management routes
+	api.HandleFunc("/apps", s.handleListApps).Methods("GET")
+	api.HandleFunc("/apps", s.handleCreateApp).Methods("POST")
+	api.HandleFunc("/apps/{id}", s.handleGetApp).Methods("GET")
+	api.HandleFunc("/apps/{id}", s.handleUpdateApp).Methods("PUT")
+	api.HandleFunc("/apps/{id}", s.handleDeleteApp).Methods("DELETE")
+	api.HandleFunc("/apps/{id}/deploy", s.handleDeployApp).Methods("POST")
 
 	return &testServer{
 		server:         s,

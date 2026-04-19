@@ -48,6 +48,7 @@ type Server struct {
 	certRepo         repository.CertificateRepository
 	auditLogRepo     repository.AuditLogRepository
 	cmdRepo          repository.CommandRepository
+	appRepo          repository.AppRepository
 	depService       *macos.DEPService
 	depSyncCancel    context.CancelFunc
 	macosService     *macos.Service
@@ -127,6 +128,12 @@ func New(cfg *config.Config, database *db.DB, logger *slog.Logger) (*Server, err
 		return nil, fmt.Errorf("failed to create command repository: %w", err)
 	}
 	s.cmdRepo = cmdRepo
+
+	appRepo, err := repository.NewAppRepository(database.DB)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create app repository: %w", err)
+	}
+	s.appRepo = appRepo
 
 	// Initialize certificate service
 	caManager, err := certs.NewCAManager(cfg.Certificates.CACertPath, cfg.Certificates.CAKeyPath)
@@ -387,6 +394,39 @@ func (s *Server) setupRoutes() {
 			http.HandlerFunc(s.handleListAuditLogs),
 		),
 	)).Methods("GET")
+
+	// App catalog (Sprint 3)
+	api.Handle("/apps", s.authMiddleware.RequireAuth(
+		http.HandlerFunc(s.handleListApps),
+	)).Methods("GET")
+
+	api.Handle("/apps", s.authMiddleware.RequireAuth(
+		s.authMiddleware.RequireRole("admin", "operator")(
+			http.HandlerFunc(s.handleCreateApp),
+		),
+	)).Methods("POST")
+
+	api.Handle("/apps/{id}", s.authMiddleware.RequireAuth(
+		http.HandlerFunc(s.handleGetApp),
+	)).Methods("GET")
+
+	api.Handle("/apps/{id}", s.authMiddleware.RequireAuth(
+		s.authMiddleware.RequireRole("admin", "operator")(
+			http.HandlerFunc(s.handleUpdateApp),
+		),
+	)).Methods("PUT")
+
+	api.Handle("/apps/{id}", s.authMiddleware.RequireAuth(
+		s.authMiddleware.RequireRole("admin")(
+			http.HandlerFunc(s.handleDeleteApp),
+		),
+	)).Methods("DELETE")
+
+	api.Handle("/apps/{id}/deploy", s.authMiddleware.RequireAuth(
+		s.authMiddleware.RequireRole("admin", "operator")(
+			http.HandlerFunc(s.handleDeployApp),
+		),
+	)).Methods("POST")
 
 	// Platform-specific routes (Sprint 2)
 	enrollLimiter := rateLimitMiddleware(s.enrollmentLimiter)
