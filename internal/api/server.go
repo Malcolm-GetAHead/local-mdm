@@ -195,11 +195,10 @@ func New(cfg *config.Config, database *db.DB, logger *slog.Logger) (*Server, err
 	// Initialize platform services
 	s.macosService = macos.NewService(s.deviceRepo)
 
-	nanomdmSvc, err := macos.NewNanoMDMService(database.DB, logger)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create NanoMDM service: %w", err)
-	}
-	s.nanomdmService = nanomdmSvc
+	s.nanomdmService = macos.NewNanoMDMService(
+		cfg.MacOS.NanoMDMURL, cfg.MacOS.NanoMDMAPIKey,
+		s.cmdRepo, s.deviceRepo, logger,
+	)
 
 	s.windowsService = windows.NewService(s.deviceRepo)
 
@@ -351,6 +350,30 @@ func (s *Server) setupRoutes() {
 	api.Handle("/certificates", s.authMiddleware.RequireAuth(
 		http.HandlerFunc(s.handleListCertificates),
 	)).Methods("GET")
+	
+	// Device commands (Sprint 3)
+	api.Handle("/devices/{id}/commands", s.authMiddleware.RequireAuth(
+		s.authMiddleware.RequireRole("admin", "operator")(
+			http.HandlerFunc(s.handleSendCommand),
+		),
+	)).Methods("POST")
+
+	api.Handle("/devices/{id}/commands", s.authMiddleware.RequireAuth(
+		http.HandlerFunc(s.handleListCommands),
+	)).Methods("GET")
+
+	// Device profiles (Sprint 3)
+	api.Handle("/devices/{id}/profiles", s.authMiddleware.RequireAuth(
+		s.authMiddleware.RequireRole("admin", "operator")(
+			http.HandlerFunc(s.handleInstallProfile),
+		),
+	)).Methods("POST")
+
+	api.Handle("/devices/{id}/profiles/{profile_id}", s.authMiddleware.RequireAuth(
+		s.authMiddleware.RequireRole("admin", "operator")(
+			http.HandlerFunc(s.handleRemoveProfile),
+		),
+	)).Methods("DELETE")
 	
 	// Audit logs
 	api.Handle("/audit-logs", s.authMiddleware.RequireAuth(

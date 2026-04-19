@@ -180,6 +180,14 @@ func (m *mockCmdRepoForMgmt) Create(_ context.Context, cmd *models.DeviceCommand
 	m.commands = append(m.commands, cmd)
 	return nil
 }
+func (m *mockCmdRepoForMgmt) GetByID(_ context.Context, id uuid.UUID) (*models.DeviceCommand, error) {
+	for _, c := range m.commands {
+		if c.ID == id {
+			return c, nil
+		}
+	}
+	return nil, fmt.Errorf("command not found")
+}
 func (m *mockCmdRepoForMgmt) ListPending(_ context.Context, deviceID uuid.UUID) ([]*models.DeviceCommand, error) {
 	var pending []*models.DeviceCommand
 	for _, c := range m.commands {
@@ -201,6 +209,9 @@ func (m *mockCmdRepoForMgmt) MarkSent(_ context.Context, id uuid.UUID) error {
 func (m *mockCmdRepoForMgmt) MarkCompleted(_ context.Context, _ uuid.UUID) error { return nil }
 func (m *mockCmdRepoForMgmt) MarkFailed(_ context.Context, _ uuid.UUID, _ string) error {
 	return nil
+}
+func (m *mockCmdRepoForMgmt) ListByDevice(_ context.Context, _ uuid.UUID, _, _ int) ([]*models.DeviceCommand, int, error) {
+	return m.commands, len(m.commands), nil
 }
 
 // --- Management Handler Tests ---

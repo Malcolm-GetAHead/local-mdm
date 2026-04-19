@@ -334,26 +334,32 @@ func TestWebhookHandler_HandleWebhook(t *testing.T) {
 
 func TestNanoMDMService(t *testing.T) {
 	t.Run("HandleCommand logs and returns nil", func(t *testing.T) {
-		svc, err := NewNanoMDMService(nil, slog.Default())
-		require.NoError(t, err)
+		svc := NewNanoMDMService("", "", nil, nil, slog.Default())
 
-		err = svc.HandleCommand(context.Background(), "test-udid")
+		err := svc.HandleCommand(context.Background(), "test-udid", "cmd-1", "Acknowledged")
 		assert.NoError(t, err)
 	})
 
 	t.Run("HandleCheckin logs and returns nil", func(t *testing.T) {
-		svc, err := NewNanoMDMService(nil, slog.Default())
-		require.NoError(t, err)
+		svc := NewNanoMDMService("", "", nil, nil, slog.Default())
 
-		err = svc.HandleCheckin(context.Background(), "test-udid", "Authenticate")
+		err := svc.HandleCheckin(context.Background(), "test-udid", "Authenticate")
 		assert.NoError(t, err)
+	})
+
+	t.Run("SendCommand returns nil when not configured", func(t *testing.T) {
+		svc := NewNanoMDMService("", "", nil, nil, slog.Default())
+
+		resp, err := svc.SendCommand(context.Background(), "test-udid", []byte("test"))
+		assert.NoError(t, err)
+		assert.Nil(t, resp)
 	})
 }
 
 // --- CheckinHandler and CommandHandler Tests ---
 
 func TestCheckinHandler_ServeHTTP(t *testing.T) {
-	svc, _ := NewNanoMDMService(nil, slog.Default())
+	svc := NewNanoMDMService("", "", nil, nil, slog.Default())
 	deviceRepo := new(MockDeviceRepository)
 	service := NewService(deviceRepo)
 	logger := slog.New(slog.NewTextHandler(bytes.NewBuffer(nil), &slog.HandlerOptions{Level: slog.LevelError}))
@@ -369,7 +375,7 @@ func TestCheckinHandler_ServeHTTP(t *testing.T) {
 }
 
 func TestCommandHandler_ServeHTTP(t *testing.T) {
-	svc, _ := NewNanoMDMService(nil, slog.Default())
+	svc := NewNanoMDMService("", "", nil, nil, slog.Default())
 	logger := slog.New(slog.NewTextHandler(bytes.NewBuffer(nil), &slog.HandlerOptions{Level: slog.LevelError}))
 	handler := NewCommandHandler(svc, logger)
 

@@ -215,7 +215,7 @@ func (h *CommandHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		"status", ce.Status,
 	)
 
-	if err := h.nanomdm.HandleCommand(r.Context(), ce.UDID); err != nil {
+	if err := h.nanomdm.HandleCommand(r.Context(), ce.UDID, ce.CommandUUID, ce.Status); err != nil {
 		h.logger.Error("nanomdm command handling failed", "error", err, "udid", ce.UDID)
 	}
 

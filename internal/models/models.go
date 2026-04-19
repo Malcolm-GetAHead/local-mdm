@@ -193,9 +193,19 @@ type DeviceCommand struct {
 
 // Command type constants
 const (
-	CommandTypeDeviceInfo = "device_info"
-	CommandTypeLock       = "lock"
-	CommandTypeWipe       = "wipe"
+	CommandTypeDeviceInfo      = "device_info"
+	CommandTypeLock            = "lock"
+	CommandTypeWipe            = "wipe"
+	CommandTypeRestart         = "restart"
+	CommandTypeShutdown        = "shutdown"
+	CommandTypeInstallProfile  = "install_profile"
+	CommandTypeRemoveProfile   = "remove_profile"
+	CommandTypeInstallApp      = "install_app"
+	CommandTypeRemoveApp       = "remove_app"
+	CommandTypeProfileList     = "profile_list"
+	CommandTypeAppList         = "app_list"
+	CommandTypeSecurityInfo    = "security_info"
+	CommandTypeCertificateList = "certificate_list"
 )
 
 // Command status constants

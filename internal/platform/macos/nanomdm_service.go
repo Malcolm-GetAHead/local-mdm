@@ -2,35 +2,59 @@ package macos
 
 import (
 	"context"
-	"database/sql"
 	"log/slog"
+
+	"github.com/malcolm-getahead/local-mdm/internal/repository"
 )
 
-// NanoMDMService wraps NanoMDM functionality
-// This is a simplified version for Sprint 2 - full integration in future sprints
+// NanoMDMService wraps NanoMDM functionality for sending commands and processing responses.
 type NanoMDMService struct {
-	db     *sql.DB
-	logger *slog.Logger
+	cmdSender *CommandSender
+	respProc  *ResponseProcessor
+	logger    *slog.Logger
 }
 
-// NewNanoMDMService creates a new NanoMDM service instance
-func NewNanoMDMService(db *sql.DB, logger *slog.Logger) (*NanoMDMService, error) {
+// NewNanoMDMService creates a new NanoMDM service instance.
+// If nanomdmURL is empty, command sending is disabled (commands queue only).
+func NewNanoMDMService(nanomdmURL, apiKey string, cmdRepo repository.CommandRepository, deviceRepo repository.DeviceRepository, logger *slog.Logger) *NanoMDMService {
+	var sender *CommandSender
+	if nanomdmURL != "" {
+		sender = NewCommandSender(nanomdmURL, apiKey)
+	}
+
+	var respProc *ResponseProcessor
+	if cmdRepo != nil {
+		respProc = NewResponseProcessor(cmdRepo, deviceRepo, logger)
+	}
+
 	return &NanoMDMService{
-		db:     db,
-		logger: logger,
-	}, nil
+		cmdSender: sender,
+		respProc:  respProc,
+		logger:    logger,
+	}
 }
 
-// HandleCommand processes MDM commands
-// Placeholder for Sprint 2 - will integrate with NanoMDM library in future
-func (s *NanoMDMService) HandleCommand(ctx context.Context, udid string) error {
-	s.logger.Info("handling mdm command", "udid", udid)
+// HandleCommand processes an MDM command result from NanoMDM webhook.
+func (s *NanoMDMService) HandleCommand(ctx context.Context, udid, commandUUID, status string) error {
+	s.logger.Info("handling mdm command result", "udid", udid, "command_uuid", commandUUID, "status", status)
+	if s.respProc != nil {
+		return s.respProc.ProcessCommandResult(ctx, udid, commandUUID, status)
+	}
 	return nil
 }
 
-// HandleCheckin processes MDM check-in
-// Placeholder for Sprint 2 - will integrate with NanoMDM library in future
+// HandleCheckin processes an MDM check-in event.
 func (s *NanoMDMService) HandleCheckin(ctx context.Context, udid string, messageType string) error {
 	s.logger.Info("handling mdm checkin", "udid", udid, "message_type", messageType)
 	return nil
+}
+
+// SendCommand sends a raw plist command to a device via NanoMDM.
+// Returns nil if NanoMDM is not configured (commands will be delivered on next sync).
+func (s *NanoMDMService) SendCommand(ctx context.Context, udid string, commandPlist []byte) (*EnqueueResponse, error) {
+	if s.cmdSender == nil {
+		s.logger.Info("NanoMDM not configured, command queued for next sync", "udid", udid)
+		return nil, nil
+	}
+	return s.cmdSender.SendCommand(ctx, udid, commandPlist)
 }

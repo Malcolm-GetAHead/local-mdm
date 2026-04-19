@@ -13,7 +13,9 @@ import (
 // CommandRepository provides data access for device management commands.
 type CommandRepository interface {
 	Create(ctx context.Context, cmd *models.DeviceCommand) error
+	GetByID(ctx context.Context, id uuid.UUID) (*models.DeviceCommand, error)
 	ListPending(ctx context.Context, deviceID uuid.UUID) ([]*models.DeviceCommand, error)
+	ListByDevice(ctx context.Context, deviceID uuid.UUID, limit, offset int) ([]*models.DeviceCommand, int, error)
 	MarkSent(ctx context.Context, id uuid.UUID) error
 	MarkCompleted(ctx context.Context, id uuid.UUID) error
 	MarkFailed(ctx context.Context, id uuid.UUID, errMsg string) error
@@ -55,6 +57,63 @@ func (r *commandRepository) Create(ctx context.Context, cmd *models.DeviceComman
 	return exec.QueryRowContext(ctx, query,
 		cmd.ID, cmd.DeviceID, cmd.CommandType, cmd.CommandData, cmd.Status,
 	).Scan(&cmd.CreatedAt, &cmd.UpdatedAt)
+}
+
+func (r *commandRepository) GetByID(ctx context.Context, id uuid.UUID) (*models.DeviceCommand, error) {
+	query := `
+		SELECT id, device_id, command_type, command_data, status, sent_at, completed_at, error_message, created_at, updated_at
+		FROM device_commands WHERE id = $1`
+
+	exec := getExecutor(ctx, r.db)
+	cmd := &models.DeviceCommand{}
+	err := exec.QueryRowContext(ctx, query, id).Scan(
+		&cmd.ID, &cmd.DeviceID, &cmd.CommandType, &cmd.CommandData,
+		&cmd.Status, &cmd.SentAt, &cmd.CompletedAt, &cmd.ErrorMessage,
+		&cmd.CreatedAt, &cmd.UpdatedAt,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("command not found")
+	}
+	return cmd, nil
+}
+
+func (r *commandRepository) ListByDevice(ctx context.Context, deviceID uuid.UUID, limit, offset int) ([]*models.DeviceCommand, int, error) {
+	vLimit, vOffset, err := ValidatePagination(limit, offset)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	countQuery := `SELECT COUNT(*) FROM device_commands WHERE device_id = $1`
+	exec := getExecutor(ctx, r.db)
+	var total int
+	if err := exec.QueryRowContext(ctx, countQuery, deviceID).Scan(&total); err != nil {
+		return nil, 0, fmt.Errorf("failed to count commands: %w", err)
+	}
+
+	query := `
+		SELECT id, device_id, command_type, command_data, status, sent_at, completed_at, error_message, created_at, updated_at
+		FROM device_commands WHERE device_id = $1
+		ORDER BY created_at DESC LIMIT $2 OFFSET $3`
+
+	rows, err := exec.QueryContext(ctx, query, deviceID, vLimit, vOffset)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to list commands: %w", err)
+	}
+	defer rows.Close()
+
+	var cmds []*models.DeviceCommand
+	for rows.Next() {
+		cmd := &models.DeviceCommand{}
+		if err := rows.Scan(
+			&cmd.ID, &cmd.DeviceID, &cmd.CommandType, &cmd.CommandData,
+			&cmd.Status, &cmd.SentAt, &cmd.CompletedAt, &cmd.ErrorMessage,
+			&cmd.CreatedAt, &cmd.UpdatedAt,
+		); err != nil {
+			return nil, 0, fmt.Errorf("failed to scan command: %w", err)
+		}
+		cmds = append(cmds, cmd)
+	}
+	return cmds, total, rows.Err()
 }
 
 func (r *commandRepository) ListPending(ctx context.Context, deviceID uuid.UUID) ([]*models.DeviceCommand, error) {

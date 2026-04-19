@@ -181,6 +181,8 @@ type MacOSConfig struct {
 	APNSPassword       string        `yaml:"apns_password"`
 	PushTopic          string        `yaml:"push_topic"`
 	EnrollmentURL      string        `yaml:"enrollment_url"`
+	NanoMDMURL         string        `yaml:"nanomdm_url"`
+	NanoMDMAPIKey      string        `yaml:"nanomdm_api_key"`
 	DEPEncryptionKey   string        `yaml:"dep_encryption_key"`
 	DEPSyncInterval    time.Duration `yaml:"dep_sync_interval"`
 }
