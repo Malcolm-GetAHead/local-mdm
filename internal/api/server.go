@@ -753,6 +753,3 @@ func respondError(w http.ResponseWriter, r *http.Request, status int, code, mess
 	json.NewEncoder(w).Encode(response)
 }
 
-func respondNotImplemented(w http.ResponseWriter, r *http.Request) {
-	respondError(w, r, http.StatusNotImplemented, "not_implemented", "This endpoint is not yet implemented")
-}
