@@ -359,7 +359,9 @@ func TestCheckinHandler_ServeHTTP(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(bytes.NewBuffer(nil), &slog.HandlerOptions{Level: slog.LevelError}))
 	handler := NewCheckinHandler(svc, service, logger)
 
-	req := httptest.NewRequest("PUT", "/checkin", nil)
+	event := WebhookEvent{Topic: "mdm.Authenticate", CheckinEvent: &CheckinEvent{UDID: "test", MessageType: "Authenticate"}}
+	body, _ := json.Marshal(event)
+	req := httptest.NewRequest("PUT", "/checkin", bytes.NewReader(body))
 	w := httptest.NewRecorder()
 
 	handler.ServeHTTP(w, req)
@@ -371,7 +373,9 @@ func TestCommandHandler_ServeHTTP(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(bytes.NewBuffer(nil), &slog.HandlerOptions{Level: slog.LevelError}))
 	handler := NewCommandHandler(svc, logger)
 
-	req := httptest.NewRequest("PUT", "/mdm", nil)
+	event := CommandWebhookEvent{Topic: "mdm.Connect", CommandEvent: &CommandEvent{UDID: "test", CommandUUID: "cmd-1", Status: "Acknowledged"}}
+	body, _ := json.Marshal(event)
+	req := httptest.NewRequest("PUT", "/mdm", bytes.NewReader(body))
 	w := httptest.NewRecorder()
 
 	handler.ServeHTTP(w, req)

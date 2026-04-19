@@ -87,25 +87,22 @@ func (h *WebhookHandler) handleEnrollment(ctx context.Context, event *WebhookEve
 		return fmt.Errorf("missing device name in enrollment event")
 	}
 
-	// Get device details from Google API
-	device, err := h.client.GetDevice(ctx, event.DeviceName)
-	if err != nil {
-		return fmt.Errorf("failed to get device details: %w", err)
+	h.logger.Info("device enrolled", "device_name", event.DeviceName)
+
+	// Create device record if we have enough context
+	// EnterpriseToken maps to our enterprise; DeviceName is the Google resource name
+	if event.EnterpriseToken != "" {
+		enterprise, err := h.service.enterpriseRepo.GetBySlug(ctx, event.EnterpriseToken)
+		if err != nil {
+			h.logger.Warn("cannot map enterprise token to enterprise",
+				"enterprise_token", event.EnterpriseToken, "error", err)
+			return nil
+		}
+		if _, err := h.service.CreateDevice(ctx, enterprise.ID, event.DeviceName, ""); err != nil {
+			return fmt.Errorf("failed to create device: %w", err)
+		}
 	}
 
-	// Extract enterprise ID from enterprise token or device name
-	// For now, we'll need to map this properly
-	// This is simplified - production would need proper enterprise mapping
-	
-	h.logger.Info("device enrolled",
-		"device_name", event.DeviceName,
-		"hardware_info", device.HardwareInfo,
-	)
-
-	// Create device record
-	// In production, we'd extract the enterprise ID from the enrollment context
-	// For now, this is a placeholder
-	
 	return nil
 }
 
@@ -142,8 +139,25 @@ func (h *WebhookHandler) handleStatusReport(ctx context.Context, event *WebhookE
 
 func (h *WebhookHandler) handleUnenrollment(ctx context.Context, event *WebhookEvent) error {
 	h.logger.Info("device unenrolled", "device", event.DeviceName)
-	
-	// Mark device as unenrolled
+
+	// Look up device by device name (Google resource name stored as device_id)
+	if event.DeviceName != "" && event.EnterpriseToken != "" {
+		enterprise, err := h.service.enterpriseRepo.GetBySlug(ctx, event.EnterpriseToken)
+		if err != nil {
+			h.logger.Warn("cannot map enterprise for unenrollment",
+				"enterprise_token", event.EnterpriseToken, "error", err)
+			return nil
+		}
+		device, err := h.service.deviceRepo.GetBySerial(ctx, enterprise.ID, event.DeviceName)
+		if err != nil {
+			h.logger.Warn("device not found for unenrollment", "device_name", event.DeviceName)
+			return nil
+		}
+		if err := h.service.UpdateDeviceStatus(ctx, device.ID, "unenrolled"); err != nil {
+			return fmt.Errorf("failed to update device status: %w", err)
+		}
+	}
+
 	return nil
 }
 

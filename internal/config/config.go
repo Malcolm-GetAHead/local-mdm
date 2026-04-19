@@ -205,7 +205,6 @@ type LoggingConfig struct {
 type FeaturesConfig struct {
 	EnableAuditLog bool `yaml:"enable_audit_log"`
 	EnableWebhooks bool `yaml:"enable_webhooks"`
-	EnableMetrics  bool `yaml:"enable_metrics"`
 }
 
 // MetricsConfig holds metrics server configuration

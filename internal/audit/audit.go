@@ -18,6 +18,12 @@ type AuditLogger interface {
 	Log(ctx context.Context, event Event) error
 }
 
+// NopAuditLogger is a no-op implementation of AuditLogger
+type NopAuditLogger struct{}
+
+// Log discards the event
+func (NopAuditLogger) Log(_ context.Context, _ Event) error { return nil }
+
 // Logger writes audit events to the database
 type Logger struct {
 	db     *sql.DB

@@ -188,3 +188,26 @@ func (m *mockDEPStorage) StoreSyncedDevice(_ context.Context, depName, serial st
 func (m *mockDEPStorage) ListDEPDevices(_ context.Context, _ string, _, _ int) ([]DEPDevice, int, error) {
 	return nil, 0, nil
 }
+
+func TestDEPService_StartDEPSync_Lifecycle(t *testing.T) {
+	storage := &mockDEPStorage{}
+	logger := slog.New(slog.NewTextHandler(&discardWriter{}, &slog.HandlerOptions{Level: slog.LevelError}))
+	svc := NewDEPService(storage, logger)
+
+	// Start with a short interval — the sync will fail (mock returns empty tokens)
+	// but it should start and stop cleanly without panicking
+	cancel := svc.StartDEPSync("test", 100*time.Millisecond)
+
+	// Give the goroutine time to start
+	time.Sleep(50 * time.Millisecond)
+
+	// Cancel should not panic
+	cancel()
+
+	// Give goroutine time to exit
+	time.Sleep(50 * time.Millisecond)
+}
+
+type discardWriter struct{}
+
+func (d *discardWriter) Write(p []byte) (int, error) { return len(p), nil }
