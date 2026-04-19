@@ -1,4 +1,15 @@
-# Implementation Plan - Remaining Gaps (1.0/10)
+# ⚠️ DEPRECATED — See Sprint Plans & Future Roadmap Instead
+
+> **This document is stale** (last updated Feb 2026, pre-Sprint 2a). It references task IDs that no longer exist and doesn't reflect the current project state.
+>
+> For current planning, see:
+> - **Sprint plans**: `docs/planning/sprints/` (Sprint 3 and beyond)
+> - **Future roadmap**: `docs/planning/future/` (F-01 through F-08)
+> - **Project status**: `README.md` (Sprint completion tracking)
+
+---
+
+# Implementation Plan - Remaining Gaps (1.0/10) — ARCHIVED
 
 **Current Score**: 9.0/10  
 **Target Score**: 10/10  

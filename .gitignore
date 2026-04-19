@@ -1,6 +1,7 @@
 # Binaries
 bin/
 server
+*.bak*
 *.exe
 *.dll
 *.so
