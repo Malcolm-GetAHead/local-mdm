@@ -43,7 +43,16 @@ Unified Control Plane (Go)
 - Prometheus metrics on separate internal port
 - See [Sprint 2 Review](docs/reviews/sprint-2/) for issue tracking
 - See [Implementation Docs](docs/implementation/sprint-2/) for completed features
-- Ready to begin Sprint 3 (Platform Features)
+
+✅ **Sprint 2a Complete** - 5/5 tasks done (Gap Closure)
+- Full CRUD endpoints for enterprises, devices, policies (update/delete)
+- Policy assign/unassign endpoints for device targeting
+- Platform services (macOS, Windows, Android) wired into server
+- NanoMDM webhook handlers replace stubs (`/checkin`, `/mdm`)
+- DEP sync loop with nanodep Syncer (configurable interval)
+- Feature flag cleanup, Android webhook wiring, binary/file cleanup
+- See [Sprint 2a Plan](docs/planning/sprints/sprint-2a-gap-closure/OVERVIEW.md)
+- Ready to begin Sprint 3 (Commands, Profiles & Apps)
 
 ## Documentation
 

@@ -2,7 +2,7 @@
 
 **Version**: 1.0  
 **Base URL**: `https://your-mdm-server.com/api/v1`  
-**Last Updated**: 2026-02-05
+**Last Updated**: 2026-04-19
 
 ## Overview
 
@@ -128,6 +128,67 @@ GET /health
 
 ---
 
+## Enterprises
+
+### List Enterprises
+
+```http
+GET /api/v1/enterprises
+```
+
+**Auth**: admin, super_admin
+
+**Query Parameters**:
+- `limit` (optional): Items per page (default: 100)
+- `offset` (optional): Offset for pagination
+
+### Get Enterprise
+
+```http
+GET /api/v1/enterprises/:id
+```
+
+### Create Enterprise
+
+```http
+POST /api/v1/enterprises
+Content-Type: application/json
+
+{
+  "name": "Acme Corp",
+  "slug": "acme",
+  "settings": {}
+}
+```
+
+**Auth**: super_admin + IP allowlist
+
+### Update Enterprise
+
+```http
+PUT /api/v1/enterprises/:id
+Content-Type: application/json
+
+{
+  "name": "Acme Corporation",
+  "settings": {"timezone": "US/Eastern"}
+}
+```
+
+**Auth**: admin, super_admin. Fields are optional — only provided fields are updated.
+
+### Delete Enterprise
+
+```http
+DELETE /api/v1/enterprises/:id
+```
+
+**Auth**: super_admin + IP allowlist. Soft-deletes the enterprise.
+
+**Response**: `204 No Content`
+
+---
+
 ## Devices
 
 ### List Devices
@@ -235,6 +296,33 @@ Content-Type: application/json
 }
 ```
 
+### Update Device
+
+```http
+PUT /api/v1/devices/:id
+Content-Type: application/json
+
+{
+  "name": "Updated Laptop Name",
+  "model": "ThinkPad X1 Carbon Gen 11",
+  "os_version": "Windows 11 Pro 24H2",
+  "status": "enrolled",
+  "platform_data": {}
+}
+```
+
+**Auth**: admin, operator. Fields are optional — only provided fields are updated.
+
+### Delete Device
+
+```http
+DELETE /api/v1/devices/:id
+```
+
+**Auth**: admin. Soft-deletes the device.
+
+**Response**: `204 No Content`
+
 ### Lock Device
 
 ```http
@@ -281,21 +369,6 @@ Content-Type: application/json
     "command_id": "990e8400-e29b-41d4-a716-446655440000",
     "status": "pending",
     "created_at": "2026-02-05T10:30:00Z"
-  }
-}
-```
-
-### Unenroll Device
-
-```http
-DELETE /api/v1/devices/:id
-```
-
-**Response**:
-```json
-{
-  "data": {
-    "message": "Device unenrolled successfully"
   }
 }
 ```
@@ -453,15 +526,12 @@ Content-Type: application/json
 ### Unassign Policy from Device
 
 ```http
-POST /api/v1/policies/:id/unassign
-Content-Type: application/json
-
-{
-  "device_ids": [
-    "550e8400-e29b-41d4-a716-446655440000"
-  ]
-}
+DELETE /api/v1/policies/:id/assign/:device_id
 ```
+
+**Auth**: admin, operator
+
+**Response**: `204 No Content`
 
 ---
 
@@ -557,60 +627,110 @@ DELETE /api/v1/users/:id
 #### Discovery Service
 
 ```http
-GET /windows/discovery
+GET|POST /EnrollmentServer/Discovery.svc
 ```
 
-Used by Windows devices during enrollment.
+MS-MDE2 discovery endpoint used by Windows devices during enrollment.
+
+#### Policy Service
+
+```http
+POST /EnrollmentServer/Policy.svc
+```
+
+Returns enrollment policy to Windows devices.
 
 #### Enrollment Service
 
 ```http
-POST /windows/enrollment
+POST /EnrollmentServer/Enrollment.svc
 ```
 
-#### Management Service
+Handles Windows device enrollment with certificate signing.
+
+#### Management Sync
 
 ```http
-POST /windows/management
+POST /ManagementServer/MDM.svc
 ```
 
-OMA-DM SyncML endpoint.
+OMA-DM SyncML endpoint for device management sync sessions.
 
 ### macOS
 
 #### Enrollment Profile
 
 ```http
-GET /macos/enroll/:token
+GET /api/v1/macos/enroll/:enterprise_id
 ```
 
-Returns enrollment profile for download.
+Returns `.mobileconfig` enrollment profile for download.
 
-#### Check-in
+#### DEP Token PKI
 
 ```http
-PUT /macos/checkin
+GET|PUT /api/v1/dep/:name/tokenpki
 ```
 
-Device check-in endpoint.
+Generate or retrieve DEP token PKI certificate for Apple portal exchange.
+
+#### DEP Assigner Profile
+
+```http
+GET|PUT /api/v1/dep/:name/assigner
+```
+
+Get or set the DEP auto-assign profile UUID.
+
+#### DEP Devices
+
+```http
+GET /api/v1/dep/:name/devices
+```
+
+List devices synced from Apple DEP.
+
+#### Check-in (NanoMDM webhook)
+
+```http
+PUT /checkin
+```
+
+Receives NanoMDM webhook JSON for device check-in events (Authenticate, TokenUpdate, CheckOut).
+
+#### Command (NanoMDM webhook)
+
+```http
+PUT /mdm
+```
+
+Receives NanoMDM webhook JSON for command result events.
 
 ### Android
+
+#### Create Enrollment Token
+
+```http
+POST /api/v1/android/enrollment-token/:enterprise_id
+```
+
+Creates an enrollment token for Android device enrollment.
 
 #### Enrollment QR Code
 
 ```http
-GET /android/enroll/:token/qr
+GET /api/v1/android/enrollment-token/:token_id/qr
 ```
 
-Returns QR code for device enrollment.
+Returns QR code image for device enrollment.
 
 #### Webhook
 
 ```http
-POST /android/webhook
+POST /api/v1/android/webhook
 ```
 
-Receives events from Google Android Management API.
+Receives events from Google Android Management API (enrollment, unenrollment, compliance, status).
 
 ---
 
