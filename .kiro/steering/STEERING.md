@@ -27,6 +27,7 @@
 ### Credential Storage Strategy
 - **Service credentials** (WNS keys, API tokens, service account keys): Store in `secrets/` directory for dev, AWS SSM Parameters in production. Reference via config file paths.
 - **Device-bound secrets** (DEP tokens, per-device certificates, enrollment tokens): Encrypt with pgcrypto (`pgp_sym_encrypt`/`pgp_sym_decrypt`) and store in the database. This is the existing pattern for DEP tokens.
+- **User-issued secrets** (admin API tokens for CLI/integrations): Store in the database using pgcrypto `crypt()`/`gen_salt()` for hash-based verification. The plaintext token is returned once at creation and never stored. This is the same table (`api_tokens`) already in the schema.
 - **Never** store secrets in config YAML values directly — use file paths or environment variables that point to the secret.
 
 ### Testing Approach
