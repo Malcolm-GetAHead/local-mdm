@@ -1,0 +1,11 @@
+DROP TABLE IF EXISTS device_apps;
+ALTER TABLE policies DROP COLUMN IF EXISTS is_template;
+DROP INDEX IF EXISTS idx_device_commands_batch_id;
+DROP INDEX IF EXISTS idx_device_commands_enterprise_id;
+ALTER TABLE device_commands DROP COLUMN IF EXISTS batch_id;
+ALTER TABLE device_commands DROP COLUMN IF EXISTS expires_at;
+ALTER TABLE device_commands DROP COLUMN IF EXISTS enterprise_id;
+DROP TABLE IF EXISTS compliance_results;
+DROP TABLE IF EXISTS policy_assignments;
+DROP TABLE IF EXISTS group_memberships;
+DROP TABLE IF EXISTS device_groups;
