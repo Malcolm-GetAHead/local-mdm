@@ -99,3 +99,18 @@
 - **App management is catalog-based**: The `apps` table is an enterprise-scoped catalog. Deployment is a separate action (`/apps/{id}/deploy`) that triggers platform-specific install flows (NanoMDM InstallApplication, Android Management API app policy, Windows CSP app install).
 - **PPKG generation uses ICD XML**: Windows provisioning packages are built from ICD (Imaging and Configuration Designer) XML templates, then packaged and optionally signed with a dev certificate for trusted installation.
 - **`FeaturesConfig.EnableWebhooks`** was wired in Sprint 3 for outbound webhook notifications on command completion events.
+
+## Implementation Preferences
+
+- Follow existing patterns exactly — constructor style, error handling, repository pattern, test structure. Don't introduce new patterns.
+- Repos accept `interface{}` and type-switch on `*sql.DB` or `executor`. All use `getExecutor(ctx, r.db)` for transaction awareness.
+- Error detection for not-found uses `strings.Contains(err.Error(), "not found")` — repos return plain `fmt.Errorf`, not sentinel errors. This is a known pattern.
+- Audit logging via `s.logAudit(r, action, resourceType, resourceID, details)` on all mutations.
+- Handler tests use mock repos in `handler_test_helpers_test.go` — no infrastructure needed.
+- Integration tests need Docker services: `docker compose up -d` then `migrate up`.
+
+## Sprint 2a Learnings (Testing & Mocks)
+
+- Mock repos in `handler_test_helpers_test.go` may have no-op stub methods (e.g. `Update` returning nil without doing anything). When adding handlers that exercise those methods, make the mocks functional first — add error fields (`updateErr`, `deleteErr`, `assignErr`) and real logic.
+- Always grep for existing tests of a function before changing its behavior. Fleshing out a stub handler (e.g. going from `w.WriteHeader(200)` to parsing JSON) will break tests that send nil/empty bodies.
+- The `newTestServer()` helper in `handler_test_helpers_test.go` registers routes without auth middleware. New endpoints must be added there too, or handler tests won't route.
