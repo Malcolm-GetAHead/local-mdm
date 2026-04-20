@@ -892,7 +892,7 @@ func (s *Server) logAudit(r *http.Request, action, resourceType string, resource
 }
 
 func isValidPlatform(p string) bool {
-	return p == models.PlatformWindows || p == models.PlatformMacOS || p == models.PlatformAndroid
+	return p == models.PlatformWindows || p == models.PlatformMacOS || p == models.PlatformAndroid || p == models.PlatformAll
 }
 
 func isValidPolicyType(t string) bool {
