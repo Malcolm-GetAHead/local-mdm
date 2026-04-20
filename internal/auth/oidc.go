@@ -2,6 +2,7 @@ package auth
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -61,30 +62,28 @@ type TokenClaims struct {
 }
 
 // NewOIDCValidator creates a new OIDC token validator with circuit breaker and caching.
-// The validator verifies JWT tokens against the OIDC provider and caches valid tokens in Redis.
-// If Redis is unavailable, the validator operates without caching but with circuit breaker protection.
+// The validator verifies JWT tokens against the OIDC provider and caches valid tokens in PostgreSQL.
+// If the database is nil, the validator operates without caching but with circuit breaker protection.
 // Returns an error if the OIDC provider configuration cannot be fetched.
-func NewOIDCValidator(issuerURL, clientID, redisAddr string, maxFailures int, timeout, cacheTTL time.Duration, logger *slog.Logger) (*OIDCValidator, error) {
+func NewOIDCValidator(issuerURL, clientID string, db *sql.DB, maxFailures int, timeout, cacheTTL time.Duration, logger *slog.Logger) (*OIDCValidator, error) {
 	// Initialize circuit breaker
 	circuitBreaker := NewCircuitBreaker(maxFailures, timeout, logger)
 	
-	// Initialize token cache (optional - if Redis unavailable, circuit breaker won't use cache)
+	// Initialize token cache (optional - if DB unavailable, circuit breaker won't use cache)
 	var tokenCache *TokenCache
-	if redisAddr != "" {
-		cache, err := NewTokenCache(redisAddr, cacheTTL)
+	if db != nil {
+		cache, err := NewTokenCache(db, cacheTTL)
 		if err != nil {
 			if logger != nil {
 				logger.Warn("Failed to initialize token cache - circuit breaker will work without cache",
 					"error", err,
-					"redis_addr", redisAddr,
 				)
 			}
 			tokenCache = nil
 		} else {
 			tokenCache = cache
 			if logger != nil {
-				logger.Info("Token cache initialized", 
-					"redis_addr", redisAddr, 
+				logger.Info("Token cache initialized",
 					"ttl", cacheTTL,
 					"max_failures", maxFailures,
 					"timeout", timeout,

@@ -2,30 +2,41 @@ package auth
 
 import (
 	"context"
+	"database/sql"
 	"log/slog"
 	"os"
 	"testing"
 	"time"
+
+	_ "github.com/lib/pq"
 )
 
 // BenchmarkOIDCValidator_ValidateToken measures token validation performance
 func BenchmarkOIDCValidator_ValidateToken(b *testing.B) {
-	// Skip if no Keycloak available
 	if os.Getenv("KEYCLOAK_URL") == "" {
 		b.Skip("Skipping: KEYCLOAK_URL not set")
 	}
 
 	issuerURL := os.Getenv("KEYCLOAK_URL") + "/realms/localmdm"
 	clientID := "local-mdm-api"
-	redisAddr := "localhost:6379"
+
+	var db *sql.DB
+	dsn := os.Getenv("TEST_DSN")
+	if dsn != "" {
+		var err error
+		db, err = sql.Open("postgres", dsn)
+		if err != nil {
+			b.Fatalf("Failed to open database: %v", err)
+		}
+		defer db.Close()
+	}
 
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
-	validator, err := NewOIDCValidator(issuerURL, clientID, redisAddr, 5, 30*time.Second, 5*time.Minute, logger)
+	validator, err := NewOIDCValidator(issuerURL, clientID, db, 5, 30*time.Second, 5*time.Minute, logger)
 	if err != nil {
 		b.Fatalf("Failed to create validator: %v", err)
 	}
 
-	// Get a valid token for testing
 	token := os.Getenv("TEST_TOKEN")
 	if token == "" {
 		b.Skip("Skipping: TEST_TOKEN not set")
@@ -54,31 +65,53 @@ func BenchmarkCircuitBreaker_Call(b *testing.B) {
 
 // BenchmarkTokenCache_Get measures cache read performance
 func BenchmarkTokenCache_Get(b *testing.B) {
-	cache, err := NewTokenCache("localhost:6379", 5*time.Minute)
-	if err != nil {
-		b.Skip("Redis not available")
+	dsn := os.Getenv("TEST_DSN")
+	if dsn == "" {
+		b.Skip("Database not available")
 	}
 
-	// Pre-populate cache
+	db, err := sql.Open("postgres", dsn)
+	if err != nil {
+		b.Skip("Database not available")
+	}
+	defer db.Close()
+
+	cache, err := NewTokenCache(db, 5*time.Minute)
+	if err != nil {
+		b.Skip("Token cache not available")
+	}
+
 	user := &AuthUser{
 		ID:    "test-user",
 		Email: "test@example.com",
 		Roles: []string{"admin"},
 	}
 	ctx := context.Background()
-	cache.Set(ctx, "test-token", user)
+	cache.Set(ctx, "bench-token", user)
+	defer cache.Delete(ctx, "bench-token")
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_, _ = cache.Get(ctx, "test-token")
+		_, _ = cache.Get(ctx, "bench-token")
 	}
 }
 
 // BenchmarkTokenCache_Set measures cache write performance
 func BenchmarkTokenCache_Set(b *testing.B) {
-	cache, err := NewTokenCache("localhost:6379", 5*time.Minute)
+	dsn := os.Getenv("TEST_DSN")
+	if dsn == "" {
+		b.Skip("Database not available")
+	}
+
+	db, err := sql.Open("postgres", dsn)
 	if err != nil {
-		b.Skip("Redis not available")
+		b.Skip("Database not available")
+	}
+	defer db.Close()
+
+	cache, err := NewTokenCache(db, 5*time.Minute)
+	if err != nil {
+		b.Skip("Token cache not available")
 	}
 
 	user := &AuthUser{
@@ -90,8 +123,9 @@ func BenchmarkTokenCache_Set(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		cache.Set(ctx, "test-token", user)
+		cache.Set(ctx, "bench-token", user)
 	}
+	cache.Delete(ctx, "bench-token")
 }
 
 // BenchmarkWithUser measures context operations

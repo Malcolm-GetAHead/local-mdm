@@ -167,7 +167,7 @@ func New(cfg *config.Config, database *db.DB, logger *slog.Logger) (*Server, err
 	validator, err := auth.NewOIDCValidator(
 		cfg.Keycloak.IssuerURL(), 
 		cfg.Keycloak.ClientID, 
-		cfg.Redis.Addr(), 
+		database.DB, 
 		cfg.Auth.CircuitBreaker.MaxFailures,
 		cfg.Auth.CircuitBreaker.Timeout,
 		cfg.Auth.TokenCache.TTL,
