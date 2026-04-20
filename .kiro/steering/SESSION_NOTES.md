@@ -105,6 +105,16 @@
 - **Sprint 4 complete**: All 5 tasks + 3 prerequisites delivered. Service layer, policy system, compliance engine, lifecycle hooks, Redis removal, idempotency-key middleware. Retrospective caught versioning bug (handlers bypassing PolicyService) and Redis remnants in config/docker-compose.
 - **Dashboard changed to HTMX**: Sprint 5b uses Go templates + HTMX + Tailwind CSS instead of React. No separate frontend build pipeline. Decision driven by simplicity and owner's skillset.
 
+## Sprint 4 Session Observations (2026-04-20)
+
+- **"Ask questions upfront, then run with it"** is the owner's preferred workflow. Batch all clarifying questions before implementation starts. Once answers are given, execute autonomously — don't ask for approval on each sub-task. The owner trusts the agent to make reasonable decisions within the agreed scope.
+- **Owner has strong architectural instincts** — when presenting options, the owner often already has a leaning. Watch for signals like "would it make more sense to..." or "how about we..." — these aren't questions, they're directional decisions. Confirm and execute rather than re-arguing the tradeoff.
+- **Retrospectives are non-negotiable.** After every sprint: backward look (scope audit, dead code, stale docs, test coverage) then forward look (next 2 sprints + future roadmap alignment). The owner will prompt for this if you don't offer it. The backward look consistently catches real bugs (Sprint 4: handlers bypassing PolicyService, Redis remnants in docker-compose).
+- **Owner values honest pushback.** When asked "should we add this as Sprint 4d?", the agent pushed back with reasoning (wrong home, better as S5-09) and the owner agreed. Don't just say yes — explain why an alternative is better. The owner redirects when they disagree.
+- **Sprint sub-numbering convention**: 4b, 4c, etc. are used for standalone work that's related to but separate from the main sprint. Owner prefers clean separation over cramming everything into one sprint. If a task touches a different domain or toolchain, suggest splitting it out.
+- **Documentation updates happen during the sprint, not after.** The owner checks docs accuracy during retrospective and flags gaps. Keep README, DATABASE.md, API.md, and steering files current as you go.
+- **Three sessions over two days produced Sprints 2a, 3, and 4.** The pace is fast. The owner expects full sprint delivery per session including retrospective and forward planning. Plan accordingly — don't spend time on unnecessary discussion when the path is clear.
+
 ## Sprint 4 Learnings (Policy & Identity)
 
 ### Service Layer Pattern
