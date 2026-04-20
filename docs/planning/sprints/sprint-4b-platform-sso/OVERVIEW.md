@@ -26,6 +26,7 @@ Keeping this separate from Sprint 4's pure Go policy work avoids context-switchi
 | S4b-02 | macOS SSO Extension App | Swift | 2-3 days |
 | S4b-03 | PSSO MDM Profile Generation & Delivery | Go | 1-2 days |
 | S4b-04 | Integration Testing & Documentation | All | 1-2 days |
+| S4b-05 | Keycloak Device Lifecycle Sync | Go | 1-2 days |
 
 ### S4b-01: Keycloak PSSO Extension
 - Implement Keycloak SPI for device-based authentication
@@ -47,6 +48,12 @@ Keeping this separate from Sprint 4's pure Go policy work avoids context-switchi
 ### S4b-04: Integration Testing
 - End-to-end: macOS device enrolls → receives PSSO profile → SSO Extension registers → user authenticates passwordless
 - Unenrollment removes device from Keycloak PSSO
+
+### S4b-05: Keycloak Device Lifecycle Sync (moved from S4-05)
+- Keycloak PSSO admin client (`internal/auth/keycloak_client.go`) — service account with `psso-admin` client
+- Implement `DeviceLifecycleHook` interface (from Sprint 4's S4-05) to call Keycloak `DELETE /device/{serial}` on unenroll/wipe/delete
+- Optional: reconciliation job comparing MDM enrolled devices vs Keycloak registered devices
+- Depends on: S4-05 lifecycle hook infrastructure, S4b-01 Keycloak PSSO extension running
 
 ## Prerequisites
 - Apple Developer account with enterprise team ID
