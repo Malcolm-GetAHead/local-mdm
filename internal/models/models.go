@@ -144,6 +144,7 @@ const (
 	PlatformWindows = "windows"
 	PlatformMacOS   = "macos"
 	PlatformAndroid = "android"
+	PlatformAll     = "all"
 )
 
 // Device status constants
