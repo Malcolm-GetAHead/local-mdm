@@ -1,36 +1,12 @@
 # S5-01: Web Dashboard
 
-**Sprint**: 5 — UI & Polish
+**Sprint**: 5b (split from Sprint 5)
 **Parallel**: ✅ Yes
 **Depends on**: All API endpoints from Sprints 1-4
 **Effort**: 6-8 days
+**Stack**: Go HTML templates + HTMX + Tailwind CSS
 
-## Tasks
-
-### 1. Project Setup
-- Framework choice (React, Vue, or Svelte — recommend React for ecosystem)
-- Keycloak JS adapter for OIDC login (redirect flow with PKCE)
-- API client with auth token injection
-- Files: `web/` directory
-
-### 2. Core Pages
-- Login (redirect to Keycloak)
-- Dashboard overview (device counts by platform/status, compliance summary)
-- Device list (filterable, sortable, paginated)
-- Device detail (info, compliance, command history, installed apps)
-- Policy list and editor
-- Group management
-- Audit log viewer
-
-### 3. Actions
-- Remote lock / wipe from device detail
-- Push profile from device detail
-- Deploy app from device detail
-- Create/edit policy with form builder
-
-### 4. Responsive Design
-- Mobile-friendly layout
-- Accessibility compliant (WCAG 2.1 AA)
+> **Note**: This task has been moved to Sprint 5b. See [Sprint 5b OVERVIEW](../sprint-5b-web-dashboard/OVERVIEW.md) for the full plan. Technology changed from React to HTMX + Go templates (decision 2026-04-20) — simpler stack, no separate build pipeline, same repo and deploy artifact.
 
 ## Acceptance Criteria
 
