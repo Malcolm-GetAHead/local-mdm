@@ -14,6 +14,7 @@ import (
 	"github.com/malcolm-getahead/local-mdm/internal/audit"
 	"github.com/malcolm-getahead/local-mdm/internal/auth"
 	"github.com/malcolm-getahead/local-mdm/internal/models"
+	"github.com/malcolm-getahead/local-mdm/internal/platform/macos"
 )
 
 // Health check handler
@@ -367,6 +368,8 @@ func (s *Server) handleLockDevice(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	s.dispatchCommand(r.Context(), device, cmd)
+
 	s.logAudit(r, "device.lock", "device", id, map[string]interface{}{
 		"platform":   device.Platform,
 		"command_id": cmd.ID,
@@ -412,6 +415,8 @@ func (s *Server) handleWipeDevice(w http.ResponseWriter, r *http.Request) {
 		respondError(w, r, http.StatusInternalServerError, "internal_error", "Failed to wipe device")
 		return
 	}
+
+	s.dispatchCommand(r.Context(), device, cmd)
 
 	s.logAudit(r, "device.wipe", "device", id, map[string]interface{}{
 		"platform":   device.Platform,
@@ -891,6 +896,67 @@ func isValidPlatform(p string) bool {
 	return p == models.PlatformWindows || p == models.PlatformMacOS || p == models.PlatformAndroid
 }
 
+// dispatchCommand sends a queued command to the device's platform immediately.
+// For macOS: sends via NanoMDM enqueue API.
+// For Windows: commands are delivered on next OMA-DM sync (no immediate dispatch).
+// For Android: would call Management API (requires real credentials).
+// Errors are logged but not returned — the command remains queued for retry.
+func (s *Server) dispatchCommand(ctx context.Context, device *models.Device, cmd *models.DeviceCommand) {
+	switch device.Platform {
+	case models.PlatformMacOS:
+		s.dispatchMacOSCommand(ctx, device, cmd)
+	case models.PlatformWindows:
+		// Windows commands are delivered via OMA-DM sync loop in management.go
+		s.logger.Info("command queued for Windows OMA-DM sync",
+			"device_id", device.ID, "command_type", cmd.CommandType)
+	case models.PlatformAndroid:
+		s.logger.Info("command queued for Android",
+			"device_id", device.ID, "command_type", cmd.CommandType)
+	}
+}
+
+func (s *Server) dispatchMacOSCommand(ctx context.Context, device *models.Device, cmd *models.DeviceCommand) {
+	if s.nanomdmService == nil {
+		return
+	}
+
+	var plist []byte
+	switch cmd.CommandType {
+	case models.CommandTypeLock:
+		plist, _ = macos.BuildDeviceLockCommand("", "")
+	case models.CommandTypeWipe:
+		plist, _ = macos.BuildEraseDeviceCommand("")
+	case models.CommandTypeRestart:
+		plist, _ = macos.BuildRestartDeviceCommand()
+	case models.CommandTypeInstallProfile:
+		// Profile data is in CommandData
+		if profileData, ok := cmd.CommandData["raw_profile"].(string); ok {
+			plist, _ = macos.BuildInstallProfileCommand([]byte(profileData))
+		}
+	case models.CommandTypeInstallApp:
+		if id, ok := cmd.CommandData["identifier"].(string); ok {
+			plist, _ = macos.BuildInstallApplicationCommand(0, id)
+		}
+	default:
+		return
+	}
+
+	if len(plist) == 0 {
+		return
+	}
+
+	udid := device.DeviceID
+	if _, err := s.nanomdmService.SendCommand(ctx, udid, plist); err != nil {
+		s.logger.Error("failed to dispatch macOS command",
+			"error", err, "device_id", device.ID, "command_type", cmd.CommandType)
+		return
+	}
+
+	if err := s.cmdRepo.MarkSent(ctx, cmd.ID); err != nil {
+		s.logger.Error("failed to mark command sent", "error", err, "cmd_id", cmd.ID)
+	}
+}
+
 func isValidPolicyType(t string) bool {
 	switch t {
 	case models.PolicyTypeWiFi, models.PolicyTypeVPN, models.PolicyTypeSecurity,
@@ -1124,6 +1190,10 @@ func (s *Server) handleDeployApp(w http.ResponseWriter, r *http.Request) {
 			s.logger.Error("failed to create deploy command", "error", err, "device_id", deviceID)
 			continue
 		}
+		// Dispatch to platform
+		if device, err := s.deviceRepo.GetByID(r.Context(), deviceID); err == nil {
+			s.dispatchCommand(r.Context(), device, cmd)
+		}
 		commands = append(commands, cmd)
 	}
 
@@ -1293,6 +1363,8 @@ func (s *Server) handleRestartDevice(w http.ResponseWriter, r *http.Request) {
 		respondError(w, r, http.StatusInternalServerError, "internal_error", "Failed to restart device")
 		return
 	}
+
+	s.dispatchCommand(r.Context(), device, cmd)
 
 	s.logAudit(r, "device.restart", "device", id, map[string]interface{}{
 		"platform":   device.Platform,
