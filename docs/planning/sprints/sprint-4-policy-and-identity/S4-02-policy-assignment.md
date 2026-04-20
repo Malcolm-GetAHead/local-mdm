@@ -16,22 +16,19 @@
 - Assign policy to: individual device, device group, or all devices
 - Priority ordering when multiple policies apply
 - Conflict resolution (most restrictive wins, or priority-based)
-- Files: `internal/policy/assignment.go`
+- Uses `policy_assignments` table (migration 000006) with target_type/target_id/priority
+- Files: `internal/service/policy.go` (assignment methods on PolicyService)
 
 ### 3. Policy Deployment Trigger
 - On assignment: translate + push to all affected devices
 - On device enrollment: evaluate and push applicable policies
 - On group membership change: re-evaluate affected devices
-- Files: `internal/policy/deploy.go`
+- Service calls platform translators (Sprint 3) and command dispatcher (async)
+- Files: `internal/service/policy.go` (deployment methods on PolicyService)
 
 ### 4. API Handlers
-- `GET/POST /api/v1/groups` — group CRUD
-- `GET/PUT/DELETE /api/v1/groups/{id}` — group management
-- `POST /api/v1/groups/{id}/devices` — add devices to group
-- `DELETE /api/v1/groups/{id}/devices/{device_id}` — remove device from group
-- `GET /api/v1/groups/{id}/devices` — list devices in group
-- `POST /api/v1/policies/{id}/assign` — assign to device/group
-- Files: `internal/api/handlers/groups.go`
+- Handlers are thin — parse request, call GroupService/PolicyService, format response
+- Files: `internal/api/handlers.go` (new handler methods on Server)
 
 ## Acceptance Criteria
 

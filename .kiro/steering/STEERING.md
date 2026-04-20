@@ -168,10 +168,44 @@ type DeviceRepository interface {
     GetByID(ctx context.Context, id uuid.UUID) (*Device, error)
     List(ctx context.Context, enterpriseID uuid.UUID, limit, offset int) ([]*Device, int, error)
 }
-
-// Business logic goes in services (future)
-// Handlers should be thin - just request/response mapping
 ```
+
+### Service Layer (Sprint 4+)
+```go
+// ✅ Services handle business logic — reusable from handlers, CLI, background jobs
+type PolicyService struct {
+    policyRepo  PolicyRepository
+    deviceRepo  DeviceRepository
+    groupRepo   GroupRepository
+    cmdRepo     CommandRepository
+    dispatcher  CommandDispatcher
+    logger      *slog.Logger
+}
+
+// Services do NOT import net/http — they are transport-agnostic
+func (s *PolicyService) AssignToGroup(ctx context.Context, policyID, groupID uuid.UUID) error {
+    // Multi-step business logic: look up devices, translate, push
+}
+
+// ✅ Handlers are thin — parse request, call service, format response
+func (s *Server) handleAssignPolicyToGroup(w http.ResponseWriter, r *http.Request) {
+    policyID, _ := parseUUIDParam(r, "id")
+    groupID, _ := parseUUIDParam(r, "group_id")
+    err := s.policyService.AssignToGroup(r.Context(), policyID, groupID)
+    // respond
+}
+
+// ❌ BAD — business logic in handler (pre-Sprint 4 pattern, don't extend)
+func (s *Server) handleAssignPolicyToGroup(w http.ResponseWriter, r *http.Request) {
+    // 50 lines of business logic mixed with HTTP concerns
+}
+```
+
+**Rules:**
+- New business logic (Sprint 4+) goes in `internal/service/`
+- Existing simple handlers (CRUD, lock/wipe) stay as-is — no refactor for its own sake
+- Services accept interfaces via constructor (dependency injection)
+- Services never import `net/http`
 
 ### Transaction Usage
 ```go
@@ -327,13 +361,17 @@ internal/
 ├── config/       - Configuration loading
 ├── db/           - Database connection
 ├── models/       - Data models
+├── platform/     - Platform-specific code (macos/, windows/, android/)
 ├── repository/   - Data access layer
+├── service/      - Business logic layer (Sprint 4+)
 ├── validation/   - Input validation
 └── testutil/     - Test helpers
 
-docs/tasks/
-├── sprint-1-foundation/  - Current sprint
-│   └── review-2/         - Code review findings
+docs/planning/
+├── sprints/              - Sprint plans and task breakdowns
+│   ├── sprint-3-platform-features/
+│   ├── sprint-4-policy-and-identity/
+│   └── sprint-4b-platform-sso/
 └── future/               - Future enhancements (F-01 to F-08)
 ```
 
