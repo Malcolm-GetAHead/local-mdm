@@ -14,7 +14,7 @@ Wire device lifecycle events (unenrollment, wipe, delete) to extensible hook poi
 
 ### 1. Device Lifecycle Hook Interface
 - Define a `DeviceLifecycleHook` interface: `OnUnenroll(ctx, device)`, `OnWipe(ctx, device)`, `OnDelete(ctx, device)`
-- Server holds a slice of hooks, iterates on each event
+- Register hooks as EventBus subscribers for `device.unenrolled`, `device.wiped`, `device.deleted`
 - No-op by default — Sprint 4b adds the Keycloak hook implementation
 - Files: `internal/service/lifecycle.go`
 

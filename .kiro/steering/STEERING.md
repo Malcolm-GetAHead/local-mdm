@@ -207,6 +207,13 @@ func (s *Server) handleAssignPolicyToGroup(w http.ResponseWriter, r *http.Reques
 - Services accept interfaces via constructor (dependency injection)
 - Services never import `net/http`
 
+### Event Bus (Sprint 4+)
+- PostgreSQL `LISTEN`/`NOTIFY` for decoupled event-driven communication
+- Handlers/services write to DB → PostgreSQL triggers fire `pg_notify` → Go `EventBus` listener dispatches to subscribers
+- Subscribers are registered at startup (compliance evaluation, policy deployment, lifecycle hooks, future webhooks)
+- Transactional: events only fire on commit
+- Multi-instance safe: all server instances receive notifications
+
 ### Transaction Usage
 ```go
 // ✅ Use SERIALIZABLE for critical operations
