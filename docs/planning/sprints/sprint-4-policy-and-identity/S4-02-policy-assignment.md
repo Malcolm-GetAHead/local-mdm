@@ -20,9 +20,9 @@
 - Files: `internal/service/policy.go` (assignment methods on PolicyService)
 
 ### 3. Policy Deployment Trigger
-- On assignment: translate + push to all affected devices
-- On device enrollment: evaluate and push applicable policies
-- On group membership change: re-evaluate affected devices
+- On assignment: translate + push to all affected devices (direct call from PolicyService)
+- On device enrollment: push applicable policies (via EventBus `device.enrolled` subscriber)
+- On group membership change: re-evaluate affected devices (direct call from GroupService)
 - Service calls platform translators (Sprint 3) and command dispatcher (async)
 - Files: `internal/service/policy.go` (deployment methods on PolicyService)
 

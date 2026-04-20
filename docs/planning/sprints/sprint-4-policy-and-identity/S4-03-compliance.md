@@ -10,7 +10,10 @@
 - Compare device state against assigned policies
 - Per-device compliance status: compliant, non-compliant, unknown
 - Per-policy compliance: which specific rules pass/fail
-- Run on: device check-in, policy change, manual trigger
+- Triggered via EventBus subscribers:
+  - `device.checkin` → re-evaluate after device state update
+  - `policy.assigned` / `policy.updated` → evaluate affected devices
+  - Manual trigger via API endpoint
 - Files: `internal/service/compliance.go`
 
 ### 2. Compliance Reporting

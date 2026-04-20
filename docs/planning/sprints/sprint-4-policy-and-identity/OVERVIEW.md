@@ -52,6 +52,94 @@ HTTP Handler (thin: parse request + format response)
 - `internal/service/lifecycle.go` — device lifecycle hook management
 - `internal/service/groups.go` — device group business logic
 
+## Architecture Decision: Event Bus via PostgreSQL LISTEN/NOTIFY
+
+**Decision (2026-04-20):** Sprint 4 implements an event bus using PostgreSQL's built-in `LISTEN`/`NOTIFY` for decoupled event-driven communication between services.
+
+**Why:** The compliance engine (S4-03) needs to fire on device check-in, policy change, and manual trigger. Future features (F-07 outbound webhooks, notifications) need the same trigger points. Rather than adding direct calls in every handler, an event bus decouples producers from consumers.
+
+**Why PostgreSQL over in-process channels or Redis:**
+- Multi-instance support from day one (both server instances receive events)
+- Transactional — notifications only fire on commit, so consumers never see uncommitted data
+- No new infrastructure — PostgreSQL is already the primary datastore
+- `lib/pq` (already in go.mod) supports LISTEN/NOTIFY natively
+
+**Pattern:**
+```
+Handler/Service writes to DB
+    → PostgreSQL trigger fires pg_notify('mdm_events', payload)
+    → Go EventBus listener receives notification
+    → Dispatches to registered subscribers
+```
+
+**Implementation:**
+```sql
+-- Trigger function (reusable across tables):
+CREATE FUNCTION notify_event() RETURNS TRIGGER AS $$
+BEGIN
+    PERFORM pg_notify('mdm_events', json_build_object(
+        'type', TG_ARGV[0],
+        'id', NEW.id,
+        'device_id', COALESCE(NEW.device_id, NEW.id)
+    )::text);
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Attach to tables that produce events:
+CREATE TRIGGER device_command_event AFTER INSERT ON device_commands
+    FOR EACH ROW EXECUTE FUNCTION notify_event('command.created');
+CREATE TRIGGER policy_assignment_event AFTER INSERT ON policy_assignments
+    FOR EACH ROW EXECUTE FUNCTION notify_event('policy.assigned');
+CREATE TRIGGER compliance_result_event AFTER INSERT OR UPDATE ON compliance_results
+    FOR EACH ROW EXECUTE FUNCTION notify_event('compliance.evaluated');
+```
+
+```go
+// internal/service/eventbus.go
+type EventBus struct {
+    subscribers map[string][]EventHandler
+}
+
+type EventHandler func(ctx context.Context, event Event)
+
+type Event struct {
+    Type     string    // "command.created", "policy.assigned", etc.
+    ID       uuid.UUID
+    DeviceID uuid.UUID
+}
+
+func (bus *EventBus) Subscribe(eventType string, handler EventHandler)
+func (bus *EventBus) listen(ctx context.Context, db *sql.DB) // background goroutine
+```
+
+**Event types (Sprint 4):**
+- `command.created` — new command queued (triggers: compliance check if device_info result)
+- `policy.assigned` — policy assigned to device/group (triggers: compliance evaluation)
+- `policy.updated` — policy config changed (triggers: re-evaluate all assigned devices)
+- `device.checkin` — device completed sync (triggers: compliance evaluation)
+- `device.enrolled` — new device enrolled (triggers: push applicable policies)
+- `device.unenrolled` — device unenrolled (triggers: lifecycle hooks)
+
+**Subscribers (Sprint 4):**
+- `ComplianceService.OnPolicyAssigned` — evaluate device compliance
+- `ComplianceService.OnDeviceCheckin` — re-evaluate after state update
+- `PolicyService.OnDeviceEnrolled` — push applicable policies to new device
+- `LifecycleService.OnDeviceUnenrolled` — call lifecycle hooks
+
+**Future subscribers (F-07):**
+- `WebhookService.OnAnyEvent` — deliver outbound webhook notifications
+- `NotificationService.OnComplianceChange` — alert admin on non-compliance
+
+**Constraints:**
+- Payload limit: 8KB per notification (sufficient — payloads are `{type, id, device_id}`, subscribers look up details from DB)
+- Latency: ~1-5ms (acceptable for async reactions)
+- Delivery: at-most-once within a connection (if listener disconnects, events during downtime are missed — acceptable for compliance which also runs on manual trigger)
+
+**Files:**
+- `internal/service/eventbus.go` — EventBus, subscriber registration, LISTEN loop
+- `migrations/000007_event_triggers.up.sql` — pg_notify trigger functions
+
 ## Service-Level Dependencies
 
 | This Sprint Produces | Consumed By |
