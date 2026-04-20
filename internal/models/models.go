@@ -86,6 +86,7 @@ type Policy struct {
 	PolicyType   string    `json:"policy_type" db:"policy_type"`
 	PolicyConfig JSONB     `json:"policy_config" db:"policy_config"`
 	IsActive     bool      `json:"is_active" db:"is_active"`
+	IsTemplate   bool      `json:"is_template" db:"is_template"`
 }
 
 // DevicePolicy represents the junction between devices and policies
@@ -197,15 +198,86 @@ const (
 	AppInstallAvailable = "available"
 )
 
+// DeviceGroup represents a static group of devices
+type DeviceGroup struct {
+	BaseModel
+	EnterpriseID uuid.UUID `json:"enterprise_id" db:"enterprise_id"`
+	Name         string    `json:"name" db:"name"`
+	Description  string    `json:"description" db:"description"`
+}
+
+// GroupMembership represents a device's membership in a group
+type GroupMembership struct {
+	GroupID  uuid.UUID `json:"group_id" db:"group_id"`
+	DeviceID uuid.UUID `json:"device_id" db:"device_id"`
+	AddedAt  time.Time `json:"added_at" db:"added_at"`
+}
+
+// PolicyAssignment represents a policy assigned to a target (device, group, or enterprise)
+type PolicyAssignment struct {
+	ID         uuid.UUID `json:"id" db:"id"`
+	PolicyID   uuid.UUID `json:"policy_id" db:"policy_id"`
+	TargetType string    `json:"target_type" db:"target_type"` // device, group, enterprise
+	TargetID   uuid.UUID `json:"target_id" db:"target_id"`
+	Priority   int       `json:"priority" db:"priority"`
+	CreatedAt  time.Time `json:"created_at" db:"created_at"`
+}
+
+// Policy assignment target types
+const (
+	TargetTypeDevice     = "device"
+	TargetTypeGroup      = "group"
+	TargetTypeEnterprise = "enterprise"
+)
+
+// ComplianceResult represents a device's compliance state for a policy
+type ComplianceResult struct {
+	ID          uuid.UUID `json:"id" db:"id"`
+	DeviceID    uuid.UUID `json:"device_id" db:"device_id"`
+	PolicyID    uuid.UUID `json:"policy_id" db:"policy_id"`
+	Status      string    `json:"status" db:"status"`
+	Details     JSONB     `json:"details" db:"details"`
+	EvaluatedAt time.Time `json:"evaluated_at" db:"evaluated_at"`
+}
+
+// Compliance status constants
+const (
+	ComplianceStatusCompliant    = "compliant"
+	ComplianceStatusNonCompliant = "non_compliant"
+	ComplianceStatusUnknown      = "unknown"
+	ComplianceStatusError        = "error"
+)
+
+// DeviceApp tracks an app's installation state on a device
+type DeviceApp struct {
+	DeviceID         uuid.UUID  `json:"device_id" db:"device_id"`
+	AppID            uuid.UUID  `json:"app_id" db:"app_id"`
+	InstalledVersion string     `json:"installed_version" db:"installed_version"`
+	Status           string     `json:"status" db:"status"`
+	InstalledAt      *time.Time `json:"installed_at,omitempty" db:"installed_at"`
+	UpdatedAt        time.Time  `json:"updated_at" db:"updated_at"`
+}
+
+// Device app status constants
+const (
+	DeviceAppPending   = "pending"
+	DeviceAppInstalled = "installed"
+	DeviceAppFailed    = "failed"
+	DeviceAppRemoved   = "removed"
+)
+
 // DeviceCommand represents a pending or completed management command
 type DeviceCommand struct {
 	BaseModel
 	DeviceID     uuid.UUID  `json:"device_id" db:"device_id"`
+	EnterpriseID *uuid.UUID `json:"enterprise_id,omitempty" db:"enterprise_id"`
 	CommandType  string     `json:"command_type" db:"command_type"`
 	CommandData  JSONB      `json:"command_data" db:"command_data"`
 	Status       string     `json:"status" db:"status"`
 	SentAt       *time.Time `json:"sent_at,omitempty" db:"sent_at"`
 	CompletedAt  *time.Time `json:"completed_at,omitempty" db:"completed_at"`
+	ExpiresAt    *time.Time `json:"expires_at,omitempty" db:"expires_at"`
+	BatchID      *uuid.UUID `json:"batch_id,omitempty" db:"batch_id"`
 	ErrorMessage string     `json:"error_message,omitempty" db:"error_message"`
 }
 

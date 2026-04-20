@@ -523,3 +523,83 @@ All foreign keys have indexes for query performance. Additional indexes are crea
 2. Add database connection code
 3. Implement repository layer
 4. Add seed data for development
+
+## Sprint 4 Schema Prep (Migration 000006)
+
+### device_groups
+
+Static device groups for policy targeting.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| id | UUID PK | Group identifier |
+| enterprise_id | UUID FK → enterprises | Owning enterprise |
+| name | VARCHAR(255) | Group name (unique per enterprise) |
+| description | TEXT | Group description |
+| created_at | TIMESTAMPTZ | Creation time |
+| updated_at | TIMESTAMPTZ | Last update |
+| deleted_at | TIMESTAMPTZ | Soft delete |
+
+### group_memberships
+
+Device-to-group mapping (many-to-many).
+
+| Column | Type | Description |
+|--------|------|-------------|
+| group_id | UUID FK → device_groups | Group |
+| device_id | UUID FK → devices | Device |
+| added_at | TIMESTAMPTZ | When device was added |
+
+PK: (group_id, device_id)
+
+### policy_assignments
+
+Flexible policy targeting — assign to device, group, or enterprise-wide.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| id | UUID PK | Assignment identifier |
+| policy_id | UUID FK → policies | Policy being assigned |
+| target_type | VARCHAR(20) | `device`, `group`, or `enterprise` |
+| target_id | UUID | ID of the target (device, group, or enterprise) |
+| priority | INT | Higher = takes precedence on conflict |
+| created_at | TIMESTAMPTZ | Assignment time |
+
+Unique: (policy_id, target_type, target_id)
+
+### compliance_results
+
+Per-device, per-policy compliance evaluation state.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| id | UUID PK | Result identifier |
+| device_id | UUID FK → devices | Device evaluated |
+| policy_id | UUID FK → policies | Policy evaluated against |
+| status | VARCHAR(20) | `compliant`, `non_compliant`, `unknown`, `error` |
+| details | JSONB | Evaluation details |
+| evaluated_at | TIMESTAMPTZ | When evaluation ran |
+
+Unique: (device_id, policy_id)
+
+### device_apps
+
+Tracks app installation state per device.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| device_id | UUID FK → devices | Device |
+| app_id | UUID FK → apps | App from catalog |
+| installed_version | VARCHAR(100) | Version installed on device |
+| status | VARCHAR(20) | `pending`, `installed`, `failed`, `removed` |
+| installed_at | TIMESTAMPTZ | When app was installed |
+| updated_at | TIMESTAMPTZ | Last status change |
+
+PK: (device_id, app_id)
+
+### Column additions
+
+- `device_commands.enterprise_id` — UUID FK, for enterprise-scoped queries
+- `device_commands.expires_at` — TIMESTAMPTZ, command expiration
+- `device_commands.batch_id` — UUID, tracks bulk operations
+- `policies.is_template` — BOOLEAN, marks policy templates
