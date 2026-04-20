@@ -61,6 +61,11 @@ After device state is parsed and stored, trigger compliance evaluation:
 - [ ] Compliance evaluation runs after device check-in
 - [ ] S5-02 compliance reports show real data
 
+## Notes
+
+- S5-09 establishes the `platform_data.security_state` pattern. Future work (F-01: Real Device Testing) extends this with additional device state: installed profiles, app inventory, hardware details. The pattern matters more than completeness at this stage.
+- The `platform_data` JSONB field on devices is currently underutilized — mostly empty or minimal enrollment metadata. This task makes it the foundation for compliance, reporting, and the dashboard.
+
 ---
 
 *Created 2026-04-20 during Sprint 4 retrospective.*
