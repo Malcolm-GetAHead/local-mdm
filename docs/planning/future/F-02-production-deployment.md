@@ -335,6 +335,17 @@ spec:
 
 ---
 
+## Security Hardening (from SECURITY.md TODOs)
+
+The following items were identified as TODOs in `docs/SECURITY.md` during Sprint 4 retrospective and belong in this production deployment scope:
+
+- **Dependency scanning**: Set up automated vulnerability scanning (Dependabot, Snyk, or `govulncheck`) in CI pipeline
+- **Code signing**: Sign release binaries and container images for supply chain integrity
+- **Network segmentation**: Document production network architecture (VPC, security groups, private subnets for DB/services)
+- **Security contact email**: Set up `security@localmdm.dev` for responsible disclosure
+
+---
+
 ## Acceptance Criteria
 
 - [ ] Kubernetes manifests deploy successfully
