@@ -19,6 +19,7 @@
 | S5-08 | [CLI Tools for Administration](S5-08-cli-tools.md) | ✅ Yes | All API endpoints | 2-3 days |
 | S5-09 | [Device State Collection & Compliance Evaluation](S5-09-device-state-compliance.md) | ⚠️ Partial | S4-03 | 3-4 days |
 | S5-10 | [Migrate Remaining Handlers to Service Layer](S5-10-service-layer-migration.md) | ✅ Yes (before S5-08) | S4 service pattern | 2-3 days |
+| S5-11 | [User Management CRUD & API Token Auth](S5-11-user-token-auth.md) | ✅ Yes (before S5-08) | Existing users/api_tokens tables | 2-3 days |
 
 **Total effort**: ~20-25 days (most tasks parallel; critical path ~8-10 days)
 
@@ -48,7 +49,8 @@ S5-06 should be scoped down to: enhanced health checks (/health/ready with depen
 S4 complete
     │
     ├── S5-09 (Device State) ───────┐
-    ├── S5-10 (Service Migration) ──┤──→ S5-08 (CLI Tools)
+    ├── S5-10 (Service Migration) ──┤
+    ├── S5-11 (User/Token Auth) ────┤──→ S5-08 (CLI Tools)
     ├── S5-02 (Reporting) ──────────┤ (S5-02 depends on S5-09)
     ├── S5-03 (API Docs) ───────────┤
     ├── S5-04 (Deployment Guide) ───┤──→ S5-05 (E2E Testing)
