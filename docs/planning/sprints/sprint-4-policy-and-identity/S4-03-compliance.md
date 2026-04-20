@@ -11,19 +11,20 @@
 - Per-device compliance status: compliant, non-compliant, unknown
 - Per-policy compliance: which specific rules pass/fail
 - Run on: device check-in, policy change, manual trigger
-- Files: `internal/policy/compliance.go`
+- Files: `internal/service/compliance.go`
 
 ### 2. Compliance Reporting
 - `GET /api/v1/compliance` — enterprise-wide compliance summary
 - `GET /api/v1/devices/{id}/compliance` — per-device compliance detail
 - Non-compliant device list with reasons
-- Files: `internal/api/handlers/compliance.go`
+- Handlers are thin — call ComplianceService, format response
+- Files: `internal/api/handlers.go` (new handler methods)
 
 ### 3. Remediation Actions (basic)
 - Notify admin (audit log entry)
 - Auto-push missing policy on next check-in
 - Mark device as non-compliant (future: block access)
-- Files: `internal/policy/remediation.go`
+- Files: `internal/service/compliance.go` (remediation methods on ComplianceService)
 
 ## Acceptance Criteria
 

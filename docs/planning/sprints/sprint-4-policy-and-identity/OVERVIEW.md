@@ -25,6 +25,33 @@ S3 complete
     └── S4-05 (Lifecycle Hooks) — parallel, no dependencies
 ```
 
+## Architecture Decision: Service Layer
+
+**Decision (2026-04-20):** Sprint 4 introduces `internal/service/` as a business logic layer between HTTP handlers and repositories.
+
+**Pattern:**
+```
+HTTP Handler (thin: parse request + format response)
+    → Service (business logic, reusable)
+        → Repository (DB queries)
+        → Command Dispatcher (async platform dispatch)
+```
+
+**Why:** Sprint 4's policy assignment, compliance evaluation, and lifecycle hooks involve multi-step business logic that would bloat handlers and can't be reused from the CLI (Sprint 5). The service layer keeps handlers thin and makes business logic testable and reusable.
+
+**Rules:**
+- New Sprint 4+ business logic goes in `internal/service/`
+- Existing handlers (CRUD, lock/wipe/restart) stay as-is — no refactor for its own sake
+- Services accept repository interfaces via constructor (dependency injection)
+- Services do NOT import `net/http` — they are transport-agnostic
+- Handlers call services; services call repos and the command dispatcher
+
+**New packages:**
+- `internal/service/policy.go` — policy translation, deployment, templates
+- `internal/service/compliance.go` — evaluation, reporting, remediation
+- `internal/service/lifecycle.go` — device lifecycle hook management
+- `internal/service/groups.go` — device group business logic
+
 ## Service-Level Dependencies
 
 | This Sprint Produces | Consumed By |
