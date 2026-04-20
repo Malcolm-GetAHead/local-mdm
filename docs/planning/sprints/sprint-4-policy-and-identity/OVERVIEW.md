@@ -161,3 +161,13 @@ func (bus *EventBus) listen(ctx context.Context, db *sql.DB) // background gorou
 
 ### Idempotency-Key Support
 Added from Sprint 2 (M-05). Sprint 2 implemented simple duplicate prevention via DB unique constraints + 409 Conflict responses. Full `Idempotency-Key` header support (store key + cached response in Redis, return cached response on duplicate key) should be implemented in this sprint when the policy assignment system creates more complex multi-step operations that benefit from idempotent retries.
+
+### Prerequisite: Remove Redis, Use PostgreSQL
+**Decision (2026-04-20):** Replace Redis with PostgreSQL for all caching/storage needs. Redis is currently used only for auth token caching (`internal/auth/token_cache.go`). PostgreSQL is sufficient at our scale and simplifies the stack to a single datastore. Scaling path: PostgreSQL → Aurora PostgreSQL with read replicas.
+
+Tasks:
+- Replace Redis token cache with in-memory `sync.Map` + TTL (token cache doesn't need persistence or cross-instance sharing until F-02)
+- Build Idempotency-Key middleware using PostgreSQL table with `expires_at` + periodic cleanup
+- Remove `go-redis/v9` from `go.mod`
+- Remove Redis from `docker-compose.yml`
+- Update config to remove Redis settings
