@@ -114,6 +114,7 @@
 - **Sprint sub-numbering convention**: 4b, 4c, etc. are used for standalone work that's related to but separate from the main sprint. Owner prefers clean separation over cramming everything into one sprint. If a task touches a different domain or toolchain, suggest splitting it out.
 - **Documentation updates happen during the sprint, not after.** The owner checks docs accuracy during retrospective and flags gaps. Keep README, DATABASE.md, API.md, and steering files current as you go.
 - **Three sessions over two days produced Sprints 2a, 3, and 4.** The pace is fast. The owner expects full sprint delivery per session including retrospective and forward planning. Plan accordingly — don't spend time on unnecessary discussion when the path is clear.
+- **Per-task commits are recovery checkpoints, not review artifacts.** The owner trusts the agent's output and doesn't review individual commits during the session. The granular commit history exists so that if context is lost mid-sprint, the next session can identify the last clean state and continue. Always push after each commit — work must survive session loss.
 
 ## Sprint 4 Learnings (Policy & Identity)
 
