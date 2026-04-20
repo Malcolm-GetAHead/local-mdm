@@ -551,7 +551,7 @@ func (s *Server) handleWindowsPPKGGenerate(w http.ResponseWriter, r *http.Reques
 		cfg.VPN = req.VPN
 	}
 
-	data, err := windows.GeneratePPKG(cfg)
+	data, err := windows.GeneratePPKG(cfg, s.ppkgSigner)
 	if err != nil {
 		s.logger.Error("failed to generate ppkg", "error", err)
 		respondError(w, r, http.StatusInternalServerError, "internal_error", "Failed to generate provisioning package")

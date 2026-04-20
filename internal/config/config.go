@@ -170,11 +170,13 @@ type CertExpirationMonitorConfig struct {
 
 // WindowsConfig holds Windows MDM configuration
 type WindowsConfig struct {
-	DiscoveryURL    string `yaml:"discovery_url"`
-	EnrollmentURL   string `yaml:"enrollment_url"`
-	ManagementURL   string `yaml:"management_url"`
-	WNSClientID     string `yaml:"wns_client_id"`
-	WNSClientSecret string `yaml:"wns_client_secret"`
+	DiscoveryURL       string `yaml:"discovery_url"`
+	EnrollmentURL      string `yaml:"enrollment_url"`
+	ManagementURL      string `yaml:"management_url"`
+	WNSClientID        string `yaml:"wns_client_id"`
+	WNSClientSecret    string `yaml:"wns_client_secret"`
+	PPKGSigningCert    string `yaml:"ppkg_signing_cert"`
+	PPKGSigningKey     string `yaml:"ppkg_signing_key"`
 }
 
 // MacOSConfig holds macOS MDM configuration

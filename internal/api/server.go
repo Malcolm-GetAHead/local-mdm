@@ -55,6 +55,7 @@ type Server struct {
 	nanomdmService   *macos.NanoMDMService
 	windowsService   *windows.Service
 	windowsMgmtHandler *windows.ManagementHandler
+	ppkgSigner         *windows.PPKGSigner
 	androidService   *android.Service
 }
 
@@ -214,6 +215,17 @@ func New(cfg *config.Config, database *db.DB, logger *slog.Logger) (*Server, err
 		mgmtURI = fmt.Sprintf("https://%s:%d/ManagementServer/MDM.svc", cfg.Server.Host, cfg.Server.Port)
 	}
 	s.windowsMgmtHandler = windows.NewManagementHandler(mgmtURI, s.deviceRepo, s.cmdRepo, logger)
+
+	// Initialize PPKG signer (auto-generates dev cert if paths configured but files missing)
+	if cfg.Windows.PPKGSigningCert != "" && cfg.Windows.PPKGSigningKey != "" {
+		signer, err := windows.NewPPKGSigner(cfg.Windows.PPKGSigningCert, cfg.Windows.PPKGSigningKey, true)
+		if err != nil {
+			logger.Warn("PPKG signing not available", "error", err)
+		} else {
+			s.ppkgSigner = signer
+			logger.Info("PPKG signing initialized")
+		}
+	}
 
 	s.androidService = android.NewService(s.deviceRepo, s.enterpriseRepo, cfg.Android.ProjectID, cfg.Android.ServiceAccountJSON)
 

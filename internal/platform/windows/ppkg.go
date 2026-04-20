@@ -50,7 +50,8 @@ func AvailableTemplates() []PPKGTemplate {
 }
 
 // GeneratePPKG creates a .ppkg ZIP file containing ICD XML provisioning data.
-func GeneratePPKG(cfg PPKGConfig) ([]byte, error) {
+// If signer is non-nil, the package is signed and the signature + cert are included.
+func GeneratePPKG(cfg PPKGConfig, signer *PPKGSigner) ([]byte, error) {
 	if cfg.ServerURL == "" {
 		return nil, fmt.Errorf("server URL is required")
 	}
@@ -69,7 +70,7 @@ func GeneratePPKG(cfg PPKGConfig) ([]byte, error) {
 		return nil, fmt.Errorf("failed to render ICD XML: %w", err)
 	}
 
-	return assembleZIP(cfg.Name, xmlData)
+	return assembleZIP(cfg.Name, xmlData, signer)
 }
 
 func renderICDXML(cfg PPKGConfig) ([]byte, error) {
@@ -127,7 +128,7 @@ func renderICDXML(cfg PPKGConfig) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-func assembleZIP(name string, icdXML []byte) ([]byte, error) {
+func assembleZIP(name string, icdXML []byte, signer *PPKGSigner) ([]byte, error) {
 	var buf bytes.Buffer
 	w := zip.NewWriter(&buf)
 
@@ -137,6 +138,27 @@ func assembleZIP(name string, icdXML []byte) ([]byte, error) {
 	}
 	if _, err := f.Write(icdXML); err != nil {
 		return nil, fmt.Errorf("failed to write zip entry: %w", err)
+	}
+
+	if signer != nil {
+		sig, err := signer.Sign(icdXML)
+		if err != nil {
+			return nil, fmt.Errorf("failed to sign package: %w", err)
+		}
+		sf, err := w.Create("Signature.p7x")
+		if err != nil {
+			return nil, fmt.Errorf("failed to create signature entry: %w", err)
+		}
+		if _, err := sf.Write(sig); err != nil {
+			return nil, fmt.Errorf("failed to write signature: %w", err)
+		}
+		cf, err := w.Create("Certificates/signing.cer")
+		if err != nil {
+			return nil, fmt.Errorf("failed to create cert entry: %w", err)
+		}
+		if _, err := cf.Write(signer.CertificatePEM()); err != nil {
+			return nil, fmt.Errorf("failed to write cert: %w", err)
+		}
 	}
 
 	if err := w.Close(); err != nil {
