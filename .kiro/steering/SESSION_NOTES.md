@@ -17,6 +17,15 @@
 - When the owner asks "are we missing anything?" — do a thorough audit (scope vs delivered, future sprint dependencies, codebase health). Don't just say "looks good."
 - Clean up after yourself: delete merged branches, remove dead code, push to origin. Don't leave loose ends.
 
+## Owner Background
+
+- **DevOps engineer** by trade — understands infrastructure, deployment, and operations deeply
+- **Career path**: Windows/Linux sysadmin → DevOps. Understands systems management, policies, and MDM concepts from the admin side
+- **Languages**: Python and PostgreSQL at intermediate level (utility, not primary craft). No Go experience — don't assume the owner reads Go code directly
+- **Strengths**: Architecture patterns, infrastructure decisions, tradeoff analysis, knowing when something smells wrong
+- **Communication style**: Reviews agent outputs, asks clarifying questions, gives directional nudges on implementation decisions. Prefers to discuss architecture before code changes.
+- **When explaining**: Use plain language for Go-specific patterns (interfaces, goroutines, channels, etc.). Relate to concepts the owner already knows (Python equivalents, infrastructure analogies). The owner will ask if they don't understand — don't over-simplify, just be clear.
+
 ## Git Workflow
 
 - **Always create a feature branch before starting work.** Branch naming: `sprint-{id}/{short-description}` (e.g. `sprint-2a/gap-closure`). Never commit directly to main.
