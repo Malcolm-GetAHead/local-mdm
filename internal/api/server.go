@@ -64,6 +64,7 @@ type Server struct {
 	policyVersionRepo repository.PolicyVersionRepository
 	groupService     *service.GroupService
 	complianceService *service.ComplianceService
+	cleanupCancel     context.CancelFunc
 }
 
 // New creates a new API server
@@ -702,6 +703,9 @@ func (s *Server) Start() error {
 		s.cmdDispatcher.Start()
 	}
 
+	// Start periodic cleanup for expired token cache and idempotency keys
+	s.startCleanupTicker()
+
 	if s.config.Server.TLS.Enabled {
 		return s.server.ListenAndServeTLS(
 			s.config.Server.TLS.CertFile,
@@ -754,8 +758,37 @@ func (s *Server) Shutdown(ctx context.Context) error {
 	if s.cmdDispatcher != nil {
 		s.cmdDispatcher.Stop()
 	}
+
+	// Stop cleanup ticker
+	if s.cleanupCancel != nil {
+		s.cleanupCancel()
+	}
 	
 	return s.server.Shutdown(ctx)
+}
+
+// startCleanupTicker runs periodic cleanup of expired token cache and idempotency keys.
+func (s *Server) startCleanupTicker() {
+	ctx, cancel := context.WithCancel(context.Background())
+	s.cleanupCancel = cancel
+
+	go func() {
+		ticker := time.NewTicker(1 * time.Hour)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				if n, err := cleanupIdempotencyKeys(s.db.DB); err != nil {
+					s.logger.Warn("idempotency key cleanup failed", "error", err)
+				} else if n > 0 {
+					s.logger.Info("cleaned up expired idempotency keys", "count", n)
+				}
+			}
+		}
+	}()
+	s.logger.Info("Periodic cleanup ticker started", "interval", "1h")
 }
 
 // Middleware

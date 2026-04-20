@@ -14,7 +14,6 @@ type Config struct {
 	Environment  string             `yaml:"environment"`  // development, staging, production
 	Server       ServerConfig       `yaml:"server"`
 	Database     DatabaseConfig     `yaml:"database"`
-	Redis        RedisConfig        `yaml:"redis"`
 	Auth         AuthConfig         `yaml:"auth"`
 	Keycloak     KeycloakConfig     `yaml:"keycloak"`
 	Certificates CertificatesConfig `yaml:"certificates"`
@@ -100,17 +99,6 @@ func (c DatabaseConfig) DSN() string {
 
 	return fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=%s statement_timeout=%d",
 		c.Host, c.Port, c.User, c.Password, c.Database, c.SSLMode, timeout.Milliseconds())
-}
-
-// RedisConfig holds Redis configuration
-type RedisConfig struct {
-	Host string `yaml:"host"`
-	Port int    `yaml:"port"`
-}
-
-// Addr returns the Redis address
-func (c RedisConfig) Addr() string {
-	return fmt.Sprintf("%s:%d", c.Host, c.Port)
 }
 
 // AuthConfig holds authentication configuration

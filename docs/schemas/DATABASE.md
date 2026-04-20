@@ -603,3 +603,68 @@ PK: (device_id, app_id)
 - `device_commands.expires_at` — TIMESTAMPTZ, command expiration
 - `device_commands.batch_id` — UUID, tracks bulk operations
 - `policies.is_template` — BOOLEAN, marks policy templates
+
+## Sprint 4 Features (Migration 000007)
+
+### token_cache
+
+PostgreSQL-backed token cache (replaces Redis).
+
+| Column | Type | Description |
+|--------|------|-------------|
+| token_hash | VARCHAR(64) PK | SHA-256 hex of the bearer token |
+| user_data | JSONB | Cached user info (id, email, roles, enterprise_id) |
+| expires_at | TIMESTAMPTZ | When the cached entry expires |
+
+### idempotency_keys
+
+Stores responses for Idempotency-Key header support.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| key | VARCHAR(255) PK | Client-provided idempotency key |
+| method | VARCHAR(10) | HTTP method (POST, PUT, PATCH) |
+| path | VARCHAR(500) | Request path |
+| status_code | INT | Cached response status |
+| response_headers | JSONB | Cached response headers |
+| response_body | BYTEA | Cached response body |
+| created_at | TIMESTAMPTZ | When the key was first used |
+| expires_at | TIMESTAMPTZ | When the cached response expires (24h) |
+
+### policy_versions
+
+Full snapshots of policy state for versioning and rollback.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| id | UUID PK | Version identifier |
+| policy_id | UUID FK → policies | Parent policy |
+| version | INT | Version number (1, 2, 3...) |
+| policy_config | JSONB | Full policy config snapshot |
+| name | VARCHAR(255) | Policy name at this version |
+| description | TEXT | Policy description at this version |
+| platform | VARCHAR(20) | Platform at this version |
+| policy_type | VARCHAR(50) | Policy type at this version |
+| is_active | BOOLEAN | Active state at this version |
+| created_by | VARCHAR(255) | User who created this version |
+| created_at | TIMESTAMPTZ | When version was created |
+
+Unique: (policy_id, version)
+
+### Event Triggers
+
+PostgreSQL `LISTEN`/`NOTIFY` triggers for event-driven architecture (Go listener in Sprint 5).
+
+| Trigger | Table | Event Type | Fires On |
+|---------|-------|------------|----------|
+| device_enrolled_event | devices | device.enrolled | INSERT |
+| device_updated_event | devices | device.status_changed | UPDATE OF status (when changed) |
+| policy_updated_event | policies | policy.updated | UPDATE |
+| command_created_event | device_commands | command.created | INSERT |
+| policy_assigned_event | policy_assignments | policy.assigned | INSERT |
+| compliance_evaluated_event | compliance_results | compliance.evaluated | INSERT OR UPDATE |
+
+All triggers call `notify_mdm_event()` which sends JSON payload to `mdm_events` channel:
+```json
+{"type": "event.type", "id": "entity-uuid", "device_id": "device-uuid", "table": "table_name", "op": "INSERT"}
+```

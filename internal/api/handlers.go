@@ -592,7 +592,7 @@ func (s *Server) handleCreatePolicy(w http.ResponseWriter, r *http.Request) {
 		IsActive:     req.IsActive,
 	}
 
-	if err := s.policyRepo.Create(r.Context(), policy); err != nil {
+	if err := s.policyService.Create(r.Context(), policy, user.ID); err != nil {
 		s.logger.Error("failed to create policy", "error", err)
 		respondError(w, r, http.StatusInternalServerError, "internal_error", "Failed to create policy")
 		return
@@ -673,7 +673,13 @@ func (s *Server) handleUpdatePolicy(w http.ResponseWriter, r *http.Request) {
 		policy.IsActive = *req.IsActive
 	}
 
-	if err := s.policyRepo.Update(r.Context(), policy); err != nil {
+	user, _ := auth.UserFromContext(r.Context())
+	userID := ""
+	if user != nil {
+		userID = user.ID
+	}
+
+	if err := s.policyService.Update(r.Context(), policy, userID); err != nil {
 		s.logger.Error("failed to update policy", "error", err, "id", id)
 		respondError(w, r, http.StatusInternalServerError, "internal_error", "Failed to update policy")
 		return

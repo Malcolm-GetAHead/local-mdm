@@ -47,10 +47,6 @@ database:
   conn_max_lifetime: 5m
   query_timeout: 30s
 
-redis:
-  host: "localhost"
-  port: 6379
-
 auth:
   jwt_secret: "REPLACE_WITH_ENV_VAR"  # CRITICAL: Set JWT_SECRET environment variable (min 32 chars)
   access_token_duration: 1h
