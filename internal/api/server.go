@@ -62,6 +62,7 @@ type Server struct {
 	lifecycleService *service.LifecycleService
 	policyService    *service.PolicyService
 	policyVersionRepo repository.PolicyVersionRepository
+	groupService     *service.GroupService
 }
 
 // New creates a new API server
@@ -245,6 +246,16 @@ func New(cfg *config.Config, database *db.DB, logger *slog.Logger) (*Server, err
 	s.policyVersionRepo = policyVersionRepo
 	s.policyService = service.NewPolicyService(s.policyRepo, policyVersionRepo, logger)
 
+	groupRepo, err := repository.NewGroupRepository(database.DB)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create group repository: %w", err)
+	}
+	assignmentRepo, err := repository.NewPolicyAssignmentRepository(database.DB)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create policy assignment repository: %w", err)
+	}
+	s.groupService = service.NewGroupService(groupRepo, assignmentRepo, logger)
+
 	s.setupRoutes()
 	s.setupMiddleware()
 
@@ -411,6 +422,71 @@ func (s *Server) setupRoutes() {
 			http.HandlerFunc(s.handleClonePolicyTemplate),
 		),
 	)).Methods("POST")
+
+	// Policy assignment to targets (Sprint 4)
+	api.Handle("/policies/{id}/assignments", s.authMiddleware.RequireAuth(
+		http.HandlerFunc(s.handleListPolicyAssignments),
+	)).Methods("GET")
+
+	api.Handle("/policies/{id}/assignments", s.authMiddleware.RequireAuth(
+		s.authMiddleware.RequireRole("admin", "operator")(
+			http.HandlerFunc(s.handleAssignPolicyToTarget),
+		),
+	)).Methods("POST")
+
+	api.Handle("/policy-assignments/{assignment_id}", s.authMiddleware.RequireAuth(
+		s.authMiddleware.RequireRole("admin", "operator")(
+			http.HandlerFunc(s.handleUnassignPolicyFromTarget),
+		),
+	)).Methods("DELETE")
+
+	// Device effective policies (Sprint 4)
+	api.Handle("/devices/{id}/effective-policies", s.authMiddleware.RequireAuth(
+		http.HandlerFunc(s.handleGetDeviceEffectivePolicies),
+	)).Methods("GET")
+
+	// Device groups (Sprint 4)
+	api.Handle("/groups", s.authMiddleware.RequireAuth(
+		http.HandlerFunc(s.handleListGroups),
+	)).Methods("GET")
+
+	api.Handle("/groups", s.authMiddleware.RequireAuth(
+		s.authMiddleware.RequireRole("admin", "operator")(
+			http.HandlerFunc(s.handleCreateGroup),
+		),
+	)).Methods("POST")
+
+	api.Handle("/groups/{id}", s.authMiddleware.RequireAuth(
+		http.HandlerFunc(s.handleGetGroup),
+	)).Methods("GET")
+
+	api.Handle("/groups/{id}", s.authMiddleware.RequireAuth(
+		s.authMiddleware.RequireRole("admin", "operator")(
+			http.HandlerFunc(s.handleUpdateGroup),
+		),
+	)).Methods("PUT")
+
+	api.Handle("/groups/{id}", s.authMiddleware.RequireAuth(
+		s.authMiddleware.RequireRole("admin")(
+			http.HandlerFunc(s.handleDeleteGroup),
+		),
+	)).Methods("DELETE")
+
+	api.Handle("/groups/{id}/members", s.authMiddleware.RequireAuth(
+		http.HandlerFunc(s.handleListGroupMembers),
+	)).Methods("GET")
+
+	api.Handle("/groups/{id}/members", s.authMiddleware.RequireAuth(
+		s.authMiddleware.RequireRole("admin", "operator")(
+			http.HandlerFunc(s.handleAddGroupMember),
+		),
+	)).Methods("POST")
+
+	api.Handle("/groups/{id}/members/{device_id}", s.authMiddleware.RequireAuth(
+		s.authMiddleware.RequireRole("admin", "operator")(
+			http.HandlerFunc(s.handleRemoveGroupMember),
+		),
+	)).Methods("DELETE")
 
 	// Certificates
 	api.Handle("/certificates", s.authMiddleware.RequireAuth(
