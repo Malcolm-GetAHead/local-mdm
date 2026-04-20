@@ -1,6 +1,6 @@
 # Local MDM - Quick Reference
 
-**Last Updated**: 2026-04-19
+**Last Updated**: 2026-04-20
 
 ## Project Location
 ```
@@ -151,6 +151,31 @@ local-mdm/
 | GET | `/api/v1/android/enrollment-token/{token_id}/qr` | Get enrollment QR code |
 | POST | `/api/v1/android/webhook` | Google Management API webhook |
 
+### Device Commands & Profiles (Sprint 3)
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | `/api/v1/devices/{id}/commands` | Send command to device |
+| GET | `/api/v1/devices/{id}/commands` | List command history |
+| POST | `/api/v1/devices/{id}/profiles` | Install profile |
+| DELETE | `/api/v1/devices/{id}/profiles/{profile_id}` | Remove profile |
+| POST | `/api/v1/devices/{id}/restart` | Restart device |
+
+### Apps (Sprint 3)
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/v1/apps` | List apps |
+| POST | `/api/v1/apps` | Create app |
+| GET | `/api/v1/apps/{id}` | Get app |
+| PUT | `/api/v1/apps/{id}` | Update app |
+| DELETE | `/api/v1/apps/{id}` | Delete app |
+| POST | `/api/v1/apps/{id}/deploy` | Deploy app to devices |
+
+### Windows Provisioning (Sprint 3)
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | `/api/v1/windows/ppkg` | Generate provisioning package |
+| GET | `/api/v1/windows/ppkg/templates` | List ppkg templates |
+
 ## Database Tables
 
 | Table | Purpose |
@@ -161,6 +186,7 @@ local-mdm/
 | `device_policies` | Device-policy assignments |
 | `certificates` | PKI certificates |
 | `commands` | Device command queue |
+| `apps` | Application catalog |
 | `audit_logs` | Audit trail |
 | `dep_names` | DEP server configurations |
 | `dep_devices` | DEP-synced device inventory |
@@ -192,7 +218,7 @@ local-mdm/
 
 ## Current Phase
 
-**Sprint 2a complete** — Gap Closure. All CRUD endpoints wired, platform services initialized, NanoMDM handlers live, DEP sync loop running. Ready for Sprint 3 (Commands, Profiles & Apps).
+**Sprint 3 complete** — Commands, Profiles & Apps. macOS MDM commands, Windows CSPs, Android policy translation, unified remote actions, app management, and Windows provisioning packages all delivered. Ready for Sprint 4 (Policy Engine & Identity).
 
 See [Sprint Planning](../planning/sprints/) for roadmap.
 

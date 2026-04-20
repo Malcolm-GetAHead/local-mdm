@@ -25,6 +25,9 @@ Unified Control Plane (Go)
 - **Multi-platform support**: Manage Windows, macOS, and Android from a single interface
 - **Agent-less enrollment**: Windows and macOS use native OS capabilities
 - **Policy abstraction**: Define policies once, deploy across platforms
+- **Remote actions**: Unified lock, wipe, and restart across all platforms
+- **App management**: Deploy and manage applications across device fleets
+- **Configuration profiles**: WiFi, VPN, certificates, and restrictions
 - **Certificate management**: Automated PKI for device authentication
 - **REST API**: Comprehensive API for integration and automation
 - **Multi-tenant**: Support multiple enterprises/organizations
@@ -52,7 +55,16 @@ Unified Control Plane (Go)
 - DEP sync loop with nanodep Syncer (configurable interval)
 - Feature flag cleanup, Android webhook wiring, binary/file cleanup
 - See [Sprint 2a Plan](docs/planning/sprints/sprint-2a-gap-closure/OVERVIEW.md)
-- Ready to begin Sprint 3 (Commands, Profiles & Apps)
+
+✅ **Sprint 3 Complete** - 6/6 tasks done + gap closure (Commands, Profiles & Apps)
+- macOS MDM commands (12 command builders), configuration profiles (WiFi/VPN/Cert/Restrictions), NanoMDM HTTP API integration
+- Windows CSP framework (Policy/WiFi/VPN/DeviceLock/App CSPs), WNS push client, SyncML Replace support
+- Android policy translation (security/restrictions/WiFi/apps → Management API), DeviceCommander, AppManager
+- Unified remote actions (lock/wipe/restart) with command tracking, platform dispatch
+- App management service (catalog model, CRUD API, deploy to devices)
+- Windows provisioning packages (.ppkg) with ICD XML generation, signing, templates
+- See [Sprint 3 Plan](docs/planning/sprints/sprint-3-platform-features/OVERVIEW.md)
+- Ready to begin Sprint 4 (Policy Engine & Identity)
 
 ## Documentation
 

@@ -32,10 +32,22 @@ S3-01, S3-02, S3-03 are fully parallel. S3-04 and S3-05 can start once at least 
 
 ## Definition of Done
 
-- [ ] macOS: InstallProfile, RemoveProfile, DeviceInformation, DeviceLock commands work
-- [ ] macOS: WiFi, VPN, Certificate configuration profiles can be generated and pushed
-- [ ] Windows: Policy, WiFi, VPN, DeviceLock CSPs deployed via OMA-DM
-- [ ] Android: Security policies enforced, apps installed from managed Play
-- [ ] Remote lock works on all three platforms via unified API
-- [ ] Remote wipe works on all three platforms via unified API
-- [ ] App install/remove works on macOS and Android
+- [x] macOS: InstallProfile, RemoveProfile, DeviceInformation, DeviceLock commands work
+- [x] macOS: WiFi, VPN, Certificate configuration profiles can be generated and pushed
+- [x] Windows: Policy, WiFi, VPN, DeviceLock CSPs deployed via OMA-DM
+- [x] Android: Security policies enforced, apps installed from managed Play
+- [x] Remote lock works on all three platforms via unified API
+- [x] Remote wipe works on all three platforms via unified API
+- [x] App install/remove works on macOS and Android
+
+## Completion Notes
+
+**Sprint 3 completed**: 2026-04-20
+
+All 6 tasks delivered plus gap closure (PPKG signing with dev cert, platform dispatch wiring). Key deliverables:
+- 12 macOS command builders with NanoMDM HTTP API integration
+- Windows CSP framework with WNS push and SyncML Replace
+- Android policy translation to Management API format
+- Unified remote actions with command tracking and platform dispatch
+- App management service with full CRUD and deploy API
+- Windows provisioning packages with ICD XML generation and signing

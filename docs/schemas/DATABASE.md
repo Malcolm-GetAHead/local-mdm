@@ -372,6 +372,48 @@ CREATE INDEX idx_audit_logs_created_at ON audit_logs(created_at);
 - `user_agent`: Client user agent
 - `created_at`: Action timestamp
 
+### apps
+
+Application catalog for managed app deployment.
+
+```sql
+CREATE TABLE apps (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    enterprise_id UUID NOT NULL REFERENCES enterprises(id) ON DELETE CASCADE,
+    name VARCHAR(255) NOT NULL,
+    platform VARCHAR(20) NOT NULL,
+    identifier VARCHAR(500) NOT NULL,
+    version VARCHAR(100) DEFAULT '',
+    install_type VARCHAR(20) NOT NULL DEFAULT 'required',
+    app_config JSONB DEFAULT '{}',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    deleted_at TIMESTAMP WITH TIME ZONE,
+    UNIQUE(enterprise_id, platform, identifier)
+);
+
+CREATE INDEX idx_apps_enterprise_id ON apps(enterprise_id);
+CREATE INDEX idx_apps_platform ON apps(platform);
+```
+
+**Fields**:
+- `id`: Unique identifier
+- `enterprise_id`: Associated enterprise
+- `name`: Application display name
+- `platform`: Target platform (windows, macos, android)
+- `identifier`: Platform-specific app identifier (bundle ID, package name, etc.)
+- `version`: Application version
+- `install_type`: Default install type (required, available, uninstall)
+- `app_config`: Platform-specific configuration (JSONB)
+- `created_at`: Creation timestamp
+- `updated_at`: Last modification timestamp
+- `deleted_at`: Soft delete timestamp
+
+**Install Types**:
+- `required`: Force install on assigned devices
+- `available`: Available in company portal
+- `uninstall`: Remove from assigned devices
+
 ## Migrations
 
 Migrations are managed using golang-migrate and stored in `/migrations` directory.

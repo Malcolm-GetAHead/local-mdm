@@ -2,7 +2,7 @@
 
 **Version**: 1.0  
 **Base URL**: `https://your-mdm-server.com/api/v1`  
-**Last Updated**: 2026-04-19
+**Last Updated**: 2026-04-20
 
 ## Overview
 
@@ -552,16 +552,79 @@ GET /api/v1/apps
   "data": [
     {
       "id": "aa0e8400-e29b-41d4-a716-446655440000",
+      "enterprise_id": "660e8400-e29b-41d4-a716-446655440000",
       "name": "Microsoft Office",
       "platform": "windows",
+      "identifier": "com.microsoft.office",
       "version": "2024",
-      "package_id": "com.microsoft.office",
-      "install_count": 30,
-      "created_at": "2026-02-01T09:00:00Z"
+      "install_type": "required",
+      "app_config": {},
+      "created_at": "2026-02-01T09:00:00Z",
+      "updated_at": "2026-02-01T09:00:00Z"
     }
   ]
 }
 ```
+
+### Create Application
+
+```http
+POST /api/v1/apps
+Content-Type: application/json
+
+{
+  "name": "Microsoft Office",
+  "platform": "windows",
+  "identifier": "com.microsoft.office",
+  "version": "2024",
+  "install_type": "required",
+  "app_config": {}
+}
+```
+
+**Response**: `201 Created`
+```json
+{
+  "data": {
+    "id": "aa0e8400-e29b-41d4-a716-446655440000",
+    "enterprise_id": "660e8400-e29b-41d4-a716-446655440000",
+    "name": "Microsoft Office",
+    "platform": "windows",
+    "identifier": "com.microsoft.office",
+    "version": "2024",
+    "install_type": "required",
+    "app_config": {},
+    "created_at": "2026-04-01T09:00:00Z",
+    "updated_at": "2026-04-01T09:00:00Z"
+  }
+}
+```
+
+### Get Application
+
+```http
+GET /api/v1/apps/:id
+```
+
+### Update Application
+
+```http
+PUT /api/v1/apps/:id
+Content-Type: application/json
+
+{
+  "name": "Microsoft Office 365",
+  "version": "2025"
+}
+```
+
+### Delete Application
+
+```http
+DELETE /api/v1/apps/:id
+```
+
+**Response**: `204 No Content`
 
 ### Deploy Application
 
@@ -581,6 +644,165 @@ Content-Type: application/json
 - `required`: Force install
 - `available`: Available in company portal
 - `uninstall`: Remove application
+
+**Response**:
+```json
+{
+  "data": {
+    "deployed": 1,
+    "failed": 0
+  }
+}
+```
+
+---
+
+## Device Commands & Profiles
+
+### Send Command
+
+```http
+POST /api/v1/devices/:id/commands
+Content-Type: application/json
+
+{
+  "command_type": "DeviceLock",
+  "parameters": {
+    "message": "Locked by IT",
+    "pin": "1234"
+  }
+}
+```
+
+**Response**: `201 Created`
+```json
+{
+  "data": {
+    "command_id": "880e8400-e29b-41d4-a716-446655440000",
+    "command_type": "DeviceLock",
+    "status": "pending",
+    "created_at": "2026-04-05T10:30:00Z"
+  }
+}
+```
+
+### List Command History
+
+```http
+GET /api/v1/devices/:id/commands
+```
+
+**Response**:
+```json
+{
+  "data": [
+    {
+      "command_id": "880e8400-e29b-41d4-a716-446655440000",
+      "command_type": "DeviceLock",
+      "status": "completed",
+      "created_at": "2026-04-05T10:30:00Z",
+      "completed_at": "2026-04-05T10:30:05Z"
+    }
+  ]
+}
+```
+
+### Install Profile
+
+```http
+POST /api/v1/devices/:id/profiles
+Content-Type: application/json
+
+{
+  "profile_type": "wifi",
+  "payload": {
+    "ssid": "CorpWiFi",
+    "security_type": "WPA2-Enterprise",
+    "eap_type": "PEAP",
+    "auto_join": true
+  }
+}
+```
+
+**Response**: `201 Created`
+```json
+{
+  "data": {
+    "command_id": "990e8400-e29b-41d4-a716-446655440000",
+    "status": "pending",
+    "created_at": "2026-04-05T10:31:00Z"
+  }
+}
+```
+
+### Remove Profile
+
+```http
+DELETE /api/v1/devices/:id/profiles/:profile_id
+```
+
+**Response**: `204 No Content`
+
+### Restart Device
+
+```http
+POST /api/v1/devices/:id/restart
+```
+
+**Response**:
+```json
+{
+  "data": {
+    "command_id": "aa1e8400-e29b-41d4-a716-446655440000",
+    "status": "pending",
+    "created_at": "2026-04-05T10:32:00Z"
+  }
+}
+```
+
+---
+
+## Windows Provisioning Packages
+
+### Generate Provisioning Package
+
+```http
+POST /api/v1/windows/ppkg
+Content-Type: application/json
+
+{
+  "template": "basic_enrollment",
+  "parameters": {
+    "enrollment_url": "https://mdm.example.com/enroll",
+    "wifi_ssid": "CorpWiFi",
+    "wifi_security": "WPA2-Enterprise"
+  }
+}
+```
+
+**Response**: Binary `.ppkg` file download with `Content-Type: application/octet-stream`.
+
+### List Provisioning Package Templates
+
+```http
+GET /api/v1/windows/ppkg/templates
+```
+
+**Response**:
+```json
+{
+  "data": [
+    {
+      "name": "basic_enrollment",
+      "description": "Basic MDM enrollment with WiFi"
+    },
+    {
+      "name": "full_provisioning",
+      "description": "Full device provisioning with policies"
+    }
+  ]
+}
+```
 
 ---
 
