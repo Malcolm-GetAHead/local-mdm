@@ -609,6 +609,9 @@ func newTestServer(t *testing.T) *testServer {
 		groupService:     service.NewGroupService(&mockGroupRepo{}, &mockAssignmentRepo{}, slog.New(slog.NewTextHandler(bytes.NewBuffer(nil), nil))),
 	}
 
+	gs := s.groupService
+	s.complianceService = service.NewComplianceService(&mockComplianceRepo{}, gs, pr, slog.New(slog.NewTextHandler(bytes.NewBuffer(nil), nil)))
+
 	// Register only the routes we're testing (no auth middleware)
 	api := s.router.PathPrefix("/api/v1").Subrouter()
 	api.HandleFunc("/enterprises", s.handleListEnterprises).Methods("GET")
@@ -651,6 +654,11 @@ func newTestServer(t *testing.T) *testServer {
 	api.HandleFunc("/policies/{id}/assignments", s.handleAssignPolicyToTarget).Methods("POST")
 	api.HandleFunc("/policy-assignments/{assignment_id}", s.handleUnassignPolicyFromTarget).Methods("DELETE")
 	api.HandleFunc("/devices/{id}/effective-policies", s.handleGetDeviceEffectivePolicies).Methods("GET")
+
+	// Sprint 4: Compliance
+	api.HandleFunc("/compliance", s.handleComplianceSummary).Methods("GET")
+	api.HandleFunc("/devices/{id}/compliance", s.handleDeviceCompliance).Methods("GET")
+	api.HandleFunc("/devices/{id}/compliance/evaluate", s.handleEvaluateDeviceCompliance).Methods("POST")
 	api.HandleFunc("/certificates", s.handleListCertificates).Methods("GET")
 	api.HandleFunc("/audit-logs", s.handleListAuditLogs).Methods("GET")
 	api.HandleFunc("/android/webhook", s.handleAndroidWebhook).Methods("POST")
@@ -873,4 +881,28 @@ func (m *mockAssignmentRepo) ListByPolicy(_ context.Context, _ uuid.UUID) ([]*mo
 }
 func (m *mockAssignmentRepo) GetEffectivePolicies(_ context.Context, _ uuid.UUID, _ []uuid.UUID, _ uuid.UUID) ([]*models.PolicyAssignment, error) {
 	return m.assignments, nil
+}
+
+type mockComplianceRepo struct {
+	results []*models.ComplianceResult
+}
+
+func (m *mockComplianceRepo) Upsert(_ context.Context, r *models.ComplianceResult) error {
+	if r.ID == uuid.Nil {
+		r.ID = uuid.New()
+	}
+	m.results = append(m.results, r)
+	return nil
+}
+func (m *mockComplianceRepo) GetByDevice(_ context.Context, deviceID uuid.UUID) ([]*models.ComplianceResult, error) {
+	var filtered []*models.ComplianceResult
+	for _, r := range m.results {
+		if r.DeviceID == deviceID {
+			filtered = append(filtered, r)
+		}
+	}
+	return filtered, nil
+}
+func (m *mockComplianceRepo) GetSummary(_ context.Context, _ uuid.UUID) (*models.ComplianceSummary, error) {
+	return &models.ComplianceSummary{}, nil
 }

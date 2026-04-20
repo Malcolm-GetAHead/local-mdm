@@ -249,6 +249,15 @@ const (
 	ComplianceStatusError        = "error"
 )
 
+// ComplianceSummary holds enterprise-wide compliance counts.
+type ComplianceSummary struct {
+	Compliant    int `json:"compliant"`
+	NonCompliant int `json:"non_compliant"`
+	Unknown      int `json:"unknown"`
+	Error        int `json:"error"`
+	Total        int `json:"total"`
+}
+
 // DeviceApp tracks an app's installation state on a device
 type DeviceApp struct {
 	DeviceID         uuid.UUID  `json:"device_id" db:"device_id"`

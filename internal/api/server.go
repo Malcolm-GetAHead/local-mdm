@@ -63,6 +63,7 @@ type Server struct {
 	policyService    *service.PolicyService
 	policyVersionRepo repository.PolicyVersionRepository
 	groupService     *service.GroupService
+	complianceService *service.ComplianceService
 }
 
 // New creates a new API server
@@ -255,6 +256,12 @@ func New(cfg *config.Config, database *db.DB, logger *slog.Logger) (*Server, err
 		return nil, fmt.Errorf("failed to create policy assignment repository: %w", err)
 	}
 	s.groupService = service.NewGroupService(groupRepo, assignmentRepo, logger)
+
+	complianceRepo, err := repository.NewComplianceRepository(database.DB)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create compliance repository: %w", err)
+	}
+	s.complianceService = service.NewComplianceService(complianceRepo, s.groupService, s.policyRepo, logger)
 
 	s.setupRoutes()
 	s.setupMiddleware()
@@ -487,6 +494,21 @@ func (s *Server) setupRoutes() {
 			http.HandlerFunc(s.handleRemoveGroupMember),
 		),
 	)).Methods("DELETE")
+
+	// Compliance (Sprint 4)
+	api.Handle("/compliance", s.authMiddleware.RequireAuth(
+		http.HandlerFunc(s.handleComplianceSummary),
+	)).Methods("GET")
+
+	api.Handle("/devices/{id}/compliance", s.authMiddleware.RequireAuth(
+		http.HandlerFunc(s.handleDeviceCompliance),
+	)).Methods("GET")
+
+	api.Handle("/devices/{id}/compliance/evaluate", s.authMiddleware.RequireAuth(
+		s.authMiddleware.RequireRole("admin", "operator")(
+			http.HandlerFunc(s.handleEvaluateDeviceCompliance),
+		),
+	)).Methods("POST")
 
 	// Certificates
 	api.Handle("/certificates", s.authMiddleware.RequireAuth(
