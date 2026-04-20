@@ -171,3 +171,14 @@ Tasks:
 - Remove `go-redis/v9` from `go.mod`
 - Remove Redis from `docker-compose.yml`
 - Update config to remove Redis settings
+
+### Prerequisite: Read/Write Database Pools
+**Decision (2026-04-20):** Split the single DB connection into separate Writer and Reader pools to prepare for Aurora read replicas in production.
+
+Tasks:
+- Update `internal/db/db.go`: `DB` struct holds `Writer *sql.DB` and `Reader *sql.DB`
+- Add `writer_dsn` and `reader_dsn` to DatabaseConfig (fall back to single DSN if reader not set)
+- Update repository constructors to accept both pools — writes use Writer, reads use Reader
+- Existing `getExecutor(ctx, db)` pattern continues to work for transaction-aware writes
+- In dev, both pools point to the same PostgreSQL instance
+- In production, Reader points to Aurora read replica
