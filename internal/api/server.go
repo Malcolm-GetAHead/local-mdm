@@ -458,6 +458,15 @@ func (s *Server) setupRoutes() {
 	s.router.HandleFunc("/EnrollmentServer/Policy.svc", s.handleWindowsPolicyService).Methods("POST")
 	s.router.Handle("/EnrollmentServer/Enrollment.svc", enrollLimiter(http.HandlerFunc(s.handleWindowsEnrollmentService))).Methods("POST")
 	s.router.HandleFunc("/ManagementServer/MDM.svc", s.handleWindowsManagementSync).Methods("POST")
+
+	// Windows provisioning packages (Sprint 3)
+	api.Handle("/windows/ppkg", s.authMiddleware.RequireAuth(
+		s.authMiddleware.RequireRole("admin", "operator")(
+			http.HandlerFunc(s.handleWindowsPPKGGenerate),
+		),
+	)).Methods("POST")
+
+	api.HandleFunc("/windows/ppkg/templates", s.handleWindowsPPKGTemplates).Methods("GET")
 	
 	// Android MDM endpoints
 	api.Handle("/android/enrollment-token/{enterprise_id}", s.authMiddleware.RequireAuth(
