@@ -299,8 +299,9 @@ func TestHandleWipeDevice(t *testing.T) {
 
 		assert.Equal(t, http.StatusOK, w.Code)
 		assert.Equal(t, models.DeviceStatusWiped, ts.deviceRepo.devices[0].Status)
-		require.Len(t, ts.auditLogger.events, 1)
+		require.Len(t, ts.auditLogger.events, 2)
 		assert.Equal(t, "device.wipe", ts.auditLogger.events[0].Action)
+		assert.Equal(t, "device.lifecycle.wipe", ts.auditLogger.events[1].Action)
 	})
 
 	t.Run("returns 404 for missing device", func(t *testing.T) {
@@ -784,8 +785,9 @@ func TestHandleDeleteDevice(t *testing.T) {
 
 		assert.Equal(t, http.StatusNoContent, w.Code)
 		assert.Len(t, ts.deviceRepo.devices, 0)
-		require.Len(t, ts.auditLogger.events, 1)
+		require.Len(t, ts.auditLogger.events, 2)
 		assert.Equal(t, "device.delete", ts.auditLogger.events[0].Action)
+		assert.Equal(t, "device.lifecycle.delete", ts.auditLogger.events[1].Action)
 	})
 
 	t.Run("returns 404 for missing device", func(t *testing.T) {

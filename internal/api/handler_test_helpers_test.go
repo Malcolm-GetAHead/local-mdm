@@ -19,6 +19,7 @@ import (
 	"github.com/malcolm-getahead/local-mdm/internal/models"
 	"github.com/malcolm-getahead/local-mdm/internal/platform/macos"
 	"github.com/malcolm-getahead/local-mdm/internal/scep"
+	"github.com/malcolm-getahead/local-mdm/internal/service"
 	depClient "github.com/micromdm/nanodep/client"
 )
 
@@ -140,6 +141,15 @@ func (m *mockDeviceRepo) GetByID(_ context.Context, id uuid.UUID) (*models.Devic
 }
 
 func (m *mockDeviceRepo) GetBySerial(_ context.Context, _ uuid.UUID, _ string) (*models.Device, error) {
+	return nil, fmt.Errorf("device not found")
+}
+
+func (m *mockDeviceRepo) GetByPlatformID(_ context.Context, platform, deviceID string) (*models.Device, error) {
+	for _, d := range m.devices {
+		if d.Platform == platform && d.DeviceID == deviceID {
+			return d, nil
+		}
+	}
 	return nil, fmt.Errorf("device not found")
 }
 
@@ -548,6 +558,7 @@ func newTestServer(t *testing.T) *testServer {
 		cmdDispatcher:    newCommandDispatcher(cmdr, nil, slog.New(slog.NewTextHandler(bytes.NewBuffer(nil), nil))),
 		enrollmentLimiter: newRateLimiterWithSize(10, time.Minute, 100),
 		depService:       macos.NewDEPService(&testDEPStorage{}, slog.New(slog.NewTextHandler(bytes.NewBuffer(nil), nil))),
+		lifecycleService: service.NewLifecycleService(slog.New(slog.NewTextHandler(bytes.NewBuffer(nil), nil))),
 	}
 
 	// Register only the routes we're testing (no auth middleware)

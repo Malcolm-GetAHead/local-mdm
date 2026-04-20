@@ -23,6 +23,7 @@ import (
 	"github.com/malcolm-getahead/local-mdm/internal/platform/windows"
 	"github.com/malcolm-getahead/local-mdm/internal/repository"
 	"github.com/malcolm-getahead/local-mdm/internal/scep"
+	"github.com/malcolm-getahead/local-mdm/internal/service"
 )
 
 // Server represents the HTTP server
@@ -58,6 +59,7 @@ type Server struct {
 	ppkgSigner         *windows.PPKGSigner
 	androidService   *android.Service
 	cmdDispatcher    *commandDispatcher
+	lifecycleService *service.LifecycleService
 }
 
 // New creates a new API server
@@ -231,6 +233,8 @@ func New(cfg *config.Config, database *db.DB, logger *slog.Logger) (*Server, err
 	s.androidService = android.NewService(s.deviceRepo, s.enterpriseRepo, cfg.Android.ProjectID, cfg.Android.ServiceAccountJSON)
 
 	s.cmdDispatcher = newCommandDispatcher(s.cmdRepo, s.nanomdmService, logger)
+
+	s.lifecycleService = service.NewLifecycleService(logger)
 
 	s.setupRoutes()
 	s.setupMiddleware()
@@ -463,7 +467,7 @@ func (s *Server) setupRoutes() {
 	api.Handle("/dep/{name}/devices", s.authMiddleware.RequireAuth(
 		http.HandlerFunc(s.handleDEPDevices),
 	)).Methods("GET")
-	checkinHandler := macos.NewCheckinHandler(s.nanomdmService, s.macosService, s.logger)
+	checkinHandler := macos.NewCheckinHandler(s.nanomdmService, s.macosService, s.lifecycleService, s.logger)
 	commandHandler := macos.NewCommandHandler(s.nanomdmService, s.logger)
 	s.router.Handle("/mdm", commandHandler).Methods("PUT")
 	s.router.Handle("/checkin", checkinHandler).Methods("PUT")

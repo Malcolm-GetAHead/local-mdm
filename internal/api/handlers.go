@@ -417,9 +417,15 @@ func (s *Server) handleWipeDevice(w http.ResponseWriter, r *http.Request) {
 
 	s.cmdDispatcher.Enqueue(device, cmd)
 
+	s.lifecycleService.OnWipe(r.Context(), device)
+
 	s.logAudit(r, "device.wipe", "device", id, map[string]interface{}{
 		"platform":   device.Platform,
 		"command_id": cmd.ID,
+	})
+
+	s.logAudit(r, "device.lifecycle.wipe", "device", id, map[string]interface{}{
+		"platform": device.Platform,
 	})
 
 	respondJSON(w, r, http.StatusOK, map[string]interface{}{
@@ -494,17 +500,30 @@ func (s *Server) handleDeleteDevice(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := s.deviceRepo.Delete(r.Context(), id); err != nil {
+	// Fetch device before deletion for lifecycle hooks
+	device, err := s.deviceRepo.GetByID(r.Context(), id)
+	if err != nil {
 		if strings.Contains(err.Error(), "not found") {
 			respondError(w, r, http.StatusNotFound, "not_found", "Device not found")
 			return
 		}
+		s.logger.Error("failed to get device for delete", "error", err, "id", id)
+		respondError(w, r, http.StatusInternalServerError, "internal_error", "Failed to delete device")
+		return
+	}
+
+	if err := s.deviceRepo.Delete(r.Context(), id); err != nil {
 		s.logger.Error("failed to delete device", "error", err, "id", id)
 		respondError(w, r, http.StatusInternalServerError, "internal_error", "Failed to delete device")
 		return
 	}
 
+	s.lifecycleService.OnDelete(r.Context(), device)
+
 	s.logAudit(r, "device.delete", "device", id, nil)
+	s.logAudit(r, "device.lifecycle.delete", "device", id, map[string]interface{}{
+		"platform": device.Platform,
+	})
 
 	w.WriteHeader(http.StatusNoContent)
 }

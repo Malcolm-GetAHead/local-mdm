@@ -51,6 +51,14 @@ func (m *MockDeviceRepository) GetBySerial(ctx context.Context, enterpriseID uui
 	return args.Get(0).(*models.Device), args.Error(1)
 }
 
+func (m *MockDeviceRepository) GetByPlatformID(ctx context.Context, platform, deviceID string) (*models.Device, error) {
+	args := m.Called(ctx, platform, deviceID)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*models.Device), args.Error(1)
+}
+
 func (m *MockDeviceRepository) Update(ctx context.Context, device *models.Device) error {
 	args := m.Called(ctx, device)
 	return args.Error(0)
@@ -363,7 +371,7 @@ func TestCheckinHandler_ServeHTTP(t *testing.T) {
 	deviceRepo := new(MockDeviceRepository)
 	service := NewService(deviceRepo)
 	logger := slog.New(slog.NewTextHandler(bytes.NewBuffer(nil), &slog.HandlerOptions{Level: slog.LevelError}))
-	handler := NewCheckinHandler(svc, service, logger)
+	handler := NewCheckinHandler(svc, service, nil, logger)
 
 	event := WebhookEvent{Topic: "mdm.Authenticate", CheckinEvent: &CheckinEvent{UDID: "test", MessageType: "Authenticate"}}
 	body, _ := json.Marshal(event)

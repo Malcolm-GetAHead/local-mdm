@@ -16,6 +16,7 @@ type DeviceRepository interface {
 	Create(ctx context.Context, device *models.Device) error
 	GetByID(ctx context.Context, id uuid.UUID) (*models.Device, error)
 	GetBySerial(ctx context.Context, enterpriseID uuid.UUID, serial string) (*models.Device, error)
+	GetByPlatformID(ctx context.Context, platform, deviceID string) (*models.Device, error)
 	List(ctx context.Context, enterpriseID uuid.UUID, limit, offset int) ([]*models.Device, int, error)
 	Update(ctx context.Context, device *models.Device) error
 	Delete(ctx context.Context, id uuid.UUID) error
@@ -96,6 +97,26 @@ func (r *deviceRepository) GetBySerial(ctx context.Context, enterpriseID uuid.UU
 	device := &models.Device{}
 	exec := getExecutor(ctx, r.db)
 	err := exec.QueryRowContext(ctx, query, enterpriseID, serial).Scan(
+		&device.ID, &device.EnterpriseID, &device.Platform, &device.DeviceID,
+		&device.SerialNumber, &device.Name, &device.Model, &device.OSVersion,
+		&device.EnrollmentDate, &device.LastSeen, &device.Status, &device.PlatformData,
+		&device.CreatedAt, &device.UpdatedAt, &device.DeletedAt,
+	)
+	if err == sql.ErrNoRows {
+		return nil, fmt.Errorf("device not found")
+	}
+	return device, err
+}
+
+func (r *deviceRepository) GetByPlatformID(ctx context.Context, platform, deviceID string) (*models.Device, error) {
+	query := `
+		SELECT id, enterprise_id, platform, device_id, serial_number, name, model, os_version,
+		       enrollment_date, last_seen, status, platform_data, created_at, updated_at, deleted_at
+		FROM devices
+		WHERE platform = $1 AND device_id = $2 AND deleted_at IS NULL`
+
+	device := &models.Device{}
+	err := getExecutor(ctx, r.db).QueryRowContext(ctx, query, platform, deviceID).Scan(
 		&device.ID, &device.EnterpriseID, &device.Platform, &device.DeviceID,
 		&device.SerialNumber, &device.Name, &device.Model, &device.OSVersion,
 		&device.EnrollmentDate, &device.LastSeen, &device.Status, &device.PlatformData,
