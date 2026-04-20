@@ -545,6 +545,7 @@ func newTestServer(t *testing.T) *testServer {
 		auditLogRepo:     ar,
 		cmdRepo:          cmdr,
 		appRepo:          appr,
+		cmdDispatcher:    newCommandDispatcher(cmdr, nil, slog.New(slog.NewTextHandler(bytes.NewBuffer(nil), nil))),
 		enrollmentLimiter: newRateLimiterWithSize(10, time.Minute, 100),
 		depService:       macos.NewDEPService(&testDEPStorage{}, slog.New(slog.NewTextHandler(bytes.NewBuffer(nil), nil))),
 	}
