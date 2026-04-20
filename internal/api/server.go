@@ -57,6 +57,7 @@ type Server struct {
 	windowsMgmtHandler *windows.ManagementHandler
 	ppkgSigner         *windows.PPKGSigner
 	androidService   *android.Service
+	cmdDispatcher    *commandDispatcher
 }
 
 // New creates a new API server
@@ -228,6 +229,8 @@ func New(cfg *config.Config, database *db.DB, logger *slog.Logger) (*Server, err
 	}
 
 	s.androidService = android.NewService(s.deviceRepo, s.enterpriseRepo, cfg.Android.ProjectID, cfg.Android.ServiceAccountJSON)
+
+	s.cmdDispatcher = newCommandDispatcher(s.cmdRepo, s.nanomdmService, logger)
 
 	s.setupRoutes()
 	s.setupMiddleware()
@@ -557,6 +560,11 @@ func (s *Server) Start() error {
 		s.logger.Info("DEP sync loop started", "interval", interval)
 	}
 	
+	// Start command dispatcher
+	if s.cmdDispatcher != nil {
+		s.cmdDispatcher.Start()
+	}
+
 	if s.config.Server.TLS.Enabled {
 		return s.server.ListenAndServeTLS(
 			s.config.Server.TLS.CertFile,
@@ -603,6 +611,11 @@ func (s *Server) Shutdown(ctx context.Context) error {
 		if err := asyncLogger.Shutdown(ctx); err != nil {
 			s.logger.Warn("Audit logger shutdown timeout", "error", err)
 		}
+	}
+
+	// Stop command dispatcher (drain queue)
+	if s.cmdDispatcher != nil {
+		s.cmdDispatcher.Stop()
 	}
 	
 	return s.server.Shutdown(ctx)
