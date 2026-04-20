@@ -945,3 +945,441 @@ func TestHandleUnassignPolicy(t *testing.T) {
 		assert.Equal(t, http.StatusBadRequest, w.Code)
 	})
 }
+
+// --- Sprint 3: Command Handlers ---
+
+func TestHandleSendCommand(t *testing.T) {
+	t.Run("sends command successfully", func(t *testing.T) {
+		ts := newTestServer(t)
+		id := uuid.New()
+		ts.deviceRepo.devices = append(ts.deviceRepo.devices, &models.Device{
+			BaseModel: models.BaseModel{ID: id},
+			Platform:  models.PlatformWindows,
+		})
+
+		body := jsonBody(t, map[string]interface{}{"command_type": "device_info"})
+		req := httptest.NewRequest("POST", "/api/v1/devices/"+id.String()+"/commands", body)
+		w := ts.do(req)
+
+		assert.Equal(t, http.StatusCreated, w.Code)
+		require.Len(t, ts.commandRepo.commands, 1)
+		assert.Equal(t, "device_info", ts.commandRepo.commands[0].CommandType)
+		require.Len(t, ts.auditLogger.events, 1)
+		assert.Equal(t, "command.send", ts.auditLogger.events[0].Action)
+	})
+
+	t.Run("returns 404 for missing device", func(t *testing.T) {
+		ts := newTestServer(t)
+		body := jsonBody(t, map[string]interface{}{"command_type": "lock"})
+		req := httptest.NewRequest("POST", "/api/v1/devices/"+uuid.New().String()+"/commands", body)
+		w := ts.do(req)
+
+		assert.Equal(t, http.StatusNotFound, w.Code)
+	})
+
+	t.Run("returns 400 for missing command_type", func(t *testing.T) {
+		ts := newTestServer(t)
+		id := uuid.New()
+		ts.deviceRepo.devices = append(ts.deviceRepo.devices, &models.Device{
+			BaseModel: models.BaseModel{ID: id},
+		})
+
+		body := jsonBody(t, map[string]interface{}{"command_type": ""})
+		req := httptest.NewRequest("POST", "/api/v1/devices/"+id.String()+"/commands", body)
+		w := ts.do(req)
+
+		assert.Equal(t, http.StatusBadRequest, w.Code)
+	})
+}
+
+func TestHandleListCommands(t *testing.T) {
+	t.Run("lists commands for device", func(t *testing.T) {
+		ts := newTestServer(t)
+		deviceID := uuid.New()
+		ts.commandRepo.commands = append(ts.commandRepo.commands, &models.DeviceCommand{
+			BaseModel:   models.BaseModel{ID: uuid.New()},
+			DeviceID:    deviceID,
+			CommandType: "lock",
+			Status:      "pending",
+		})
+
+		req := httptest.NewRequest("GET", "/api/v1/devices/"+deviceID.String()+"/commands", nil)
+		w := ts.do(req)
+
+		assert.Equal(t, http.StatusOK, w.Code)
+		resp := decodeResponse(t, w)
+		assert.Equal(t, 1, resp.Meta.Total)
+	})
+
+	t.Run("returns 400 for invalid device ID", func(t *testing.T) {
+		ts := newTestServer(t)
+		req := httptest.NewRequest("GET", "/api/v1/devices/bad-id/commands", nil)
+		w := ts.do(req)
+
+		assert.Equal(t, http.StatusBadRequest, w.Code)
+	})
+}
+
+// --- Sprint 3: Profile Handlers ---
+
+func TestHandleInstallProfile(t *testing.T) {
+	t.Run("installs profile successfully", func(t *testing.T) {
+		ts := newTestServer(t)
+		id := uuid.New()
+		ts.deviceRepo.devices = append(ts.deviceRepo.devices, &models.Device{
+			BaseModel: models.BaseModel{ID: id},
+			Platform:  models.PlatformMacOS,
+		})
+
+		body := jsonBody(t, map[string]interface{}{
+			"profile_type": "wifi",
+			"profile_data": map[string]interface{}{"ssid": "TestNet"},
+		})
+		req := httptest.NewRequest("POST", "/api/v1/devices/"+id.String()+"/profiles", body)
+		w := ts.do(req)
+
+		assert.Equal(t, http.StatusCreated, w.Code)
+		require.Len(t, ts.commandRepo.commands, 1)
+		assert.Equal(t, models.CommandTypeInstallProfile, ts.commandRepo.commands[0].CommandType)
+		require.Len(t, ts.auditLogger.events, 1)
+		assert.Equal(t, "profile.install", ts.auditLogger.events[0].Action)
+	})
+
+	t.Run("returns 404 for missing device", func(t *testing.T) {
+		ts := newTestServer(t)
+		body := jsonBody(t, map[string]interface{}{"profile_type": "wifi"})
+		req := httptest.NewRequest("POST", "/api/v1/devices/"+uuid.New().String()+"/profiles", body)
+		w := ts.do(req)
+
+		assert.Equal(t, http.StatusNotFound, w.Code)
+	})
+
+	t.Run("returns 400 for missing profile_type", func(t *testing.T) {
+		ts := newTestServer(t)
+		id := uuid.New()
+		ts.deviceRepo.devices = append(ts.deviceRepo.devices, &models.Device{
+			BaseModel: models.BaseModel{ID: id},
+		})
+
+		body := jsonBody(t, map[string]interface{}{"profile_type": ""})
+		req := httptest.NewRequest("POST", "/api/v1/devices/"+id.String()+"/profiles", body)
+		w := ts.do(req)
+
+		assert.Equal(t, http.StatusBadRequest, w.Code)
+	})
+}
+
+func TestHandleRemoveProfile(t *testing.T) {
+	t.Run("removes profile successfully", func(t *testing.T) {
+		ts := newTestServer(t)
+		id := uuid.New()
+		ts.deviceRepo.devices = append(ts.deviceRepo.devices, &models.Device{
+			BaseModel: models.BaseModel{ID: id},
+			Platform:  models.PlatformMacOS,
+		})
+
+		req := httptest.NewRequest("DELETE", "/api/v1/devices/"+id.String()+"/profiles/com.example.wifi", nil)
+		w := ts.do(req)
+
+		assert.Equal(t, http.StatusCreated, w.Code)
+		require.Len(t, ts.commandRepo.commands, 1)
+		assert.Equal(t, models.CommandTypeRemoveProfile, ts.commandRepo.commands[0].CommandType)
+		require.Len(t, ts.auditLogger.events, 1)
+		assert.Equal(t, "profile.remove", ts.auditLogger.events[0].Action)
+	})
+
+	t.Run("returns 404 for missing device", func(t *testing.T) {
+		ts := newTestServer(t)
+		req := httptest.NewRequest("DELETE", "/api/v1/devices/"+uuid.New().String()+"/profiles/com.example.wifi", nil)
+		w := ts.do(req)
+
+		assert.Equal(t, http.StatusNotFound, w.Code)
+	})
+}
+
+// --- Sprint 3: Restart Handler ---
+
+func TestHandleRestartDevice(t *testing.T) {
+	t.Run("restarts macOS device", func(t *testing.T) {
+		ts := newTestServer(t)
+		id := uuid.New()
+		ts.deviceRepo.devices = append(ts.deviceRepo.devices, &models.Device{
+			BaseModel: models.BaseModel{ID: id},
+			Platform:  models.PlatformMacOS,
+			Status:    models.DeviceStatusEnrolled,
+		})
+
+		req := httptest.NewRequest("POST", "/api/v1/devices/"+id.String()+"/restart", nil)
+		w := ts.do(req)
+
+		assert.Equal(t, http.StatusOK, w.Code)
+		require.Len(t, ts.commandRepo.commands, 1)
+		assert.Equal(t, models.CommandTypeRestart, ts.commandRepo.commands[0].CommandType)
+		require.Len(t, ts.auditLogger.events, 1)
+		assert.Equal(t, "device.restart", ts.auditLogger.events[0].Action)
+	})
+
+	t.Run("rejects Windows device", func(t *testing.T) {
+		ts := newTestServer(t)
+		id := uuid.New()
+		ts.deviceRepo.devices = append(ts.deviceRepo.devices, &models.Device{
+			BaseModel: models.BaseModel{ID: id},
+			Platform:  models.PlatformWindows,
+		})
+
+		req := httptest.NewRequest("POST", "/api/v1/devices/"+id.String()+"/restart", nil)
+		w := ts.do(req)
+
+		assert.Equal(t, http.StatusBadRequest, w.Code)
+	})
+
+	t.Run("returns 404 for missing device", func(t *testing.T) {
+		ts := newTestServer(t)
+		req := httptest.NewRequest("POST", "/api/v1/devices/"+uuid.New().String()+"/restart", nil)
+		w := ts.do(req)
+
+		assert.Equal(t, http.StatusNotFound, w.Code)
+	})
+}
+
+// --- Sprint 3: App Management Handlers ---
+
+func TestHandleCreateApp(t *testing.T) {
+	t.Run("creates app successfully", func(t *testing.T) {
+		ts := newTestServer(t)
+		body := jsonBody(t, map[string]interface{}{
+			"name":       "Slack",
+			"platform":   "macos",
+			"identifier": "com.slack.Slack",
+			"version":    "4.0",
+		})
+		req := httptest.NewRequest("POST", "/api/v1/apps", body)
+		w := ts.doWithAuth(req, testUser())
+
+		assert.Equal(t, http.StatusCreated, w.Code)
+		require.Len(t, ts.appRepo.apps, 1)
+		assert.Equal(t, "Slack", ts.appRepo.apps[0].Name)
+		require.Len(t, ts.auditLogger.events, 1)
+		assert.Equal(t, "app.create", ts.auditLogger.events[0].Action)
+	})
+
+	t.Run("returns 400 for missing required fields", func(t *testing.T) {
+		ts := newTestServer(t)
+		body := jsonBody(t, map[string]interface{}{"name": "Slack"})
+		req := httptest.NewRequest("POST", "/api/v1/apps", body)
+		w := ts.doWithAuth(req, testUser())
+
+		assert.Equal(t, http.StatusBadRequest, w.Code)
+	})
+
+	t.Run("returns 401 without auth", func(t *testing.T) {
+		ts := newTestServer(t)
+		body := jsonBody(t, map[string]interface{}{
+			"name": "Slack", "platform": "macos", "identifier": "com.slack.Slack",
+		})
+		req := httptest.NewRequest("POST", "/api/v1/apps", body)
+		w := ts.do(req)
+
+		assert.Equal(t, http.StatusUnauthorized, w.Code)
+	})
+}
+
+func TestHandleGetApp(t *testing.T) {
+	t.Run("returns app by ID", func(t *testing.T) {
+		ts := newTestServer(t)
+		id := uuid.New()
+		ts.appRepo.apps = append(ts.appRepo.apps, &models.App{
+			BaseModel:  models.BaseModel{ID: id},
+			Name:       "Slack",
+			Platform:   "macos",
+			Identifier: "com.slack.Slack",
+		})
+
+		req := httptest.NewRequest("GET", "/api/v1/apps/"+id.String(), nil)
+		w := ts.do(req)
+
+		assert.Equal(t, http.StatusOK, w.Code)
+	})
+
+	t.Run("returns 404 for missing app", func(t *testing.T) {
+		ts := newTestServer(t)
+		req := httptest.NewRequest("GET", "/api/v1/apps/"+uuid.New().String(), nil)
+		w := ts.do(req)
+
+		assert.Equal(t, http.StatusNotFound, w.Code)
+	})
+}
+
+func TestHandleUpdateApp(t *testing.T) {
+	t.Run("updates app successfully", func(t *testing.T) {
+		ts := newTestServer(t)
+		id := uuid.New()
+		ts.appRepo.apps = append(ts.appRepo.apps, &models.App{
+			BaseModel:  models.BaseModel{ID: id},
+			Name:       "Slack",
+			Platform:   "macos",
+			Identifier: "com.slack.Slack",
+			Version:    "3.0",
+		})
+
+		body := jsonBody(t, map[string]interface{}{"version": "4.0"})
+		req := httptest.NewRequest("PUT", "/api/v1/apps/"+id.String(), body)
+		w := ts.do(req)
+
+		assert.Equal(t, http.StatusOK, w.Code)
+		assert.Equal(t, "4.0", ts.appRepo.apps[0].Version)
+	})
+
+	t.Run("returns 404 for missing app", func(t *testing.T) {
+		ts := newTestServer(t)
+		body := jsonBody(t, map[string]interface{}{"version": "4.0"})
+		req := httptest.NewRequest("PUT", "/api/v1/apps/"+uuid.New().String(), body)
+		w := ts.do(req)
+
+		assert.Equal(t, http.StatusNotFound, w.Code)
+	})
+}
+
+func TestHandleDeleteApp(t *testing.T) {
+	t.Run("deletes app successfully", func(t *testing.T) {
+		ts := newTestServer(t)
+		id := uuid.New()
+		ts.appRepo.apps = append(ts.appRepo.apps, &models.App{
+			BaseModel: models.BaseModel{ID: id},
+			Name:      "Slack",
+		})
+
+		req := httptest.NewRequest("DELETE", "/api/v1/apps/"+id.String(), nil)
+		w := ts.do(req)
+
+		assert.Equal(t, http.StatusNoContent, w.Code)
+		assert.Len(t, ts.appRepo.apps, 0)
+	})
+
+	t.Run("returns 404 for missing app", func(t *testing.T) {
+		ts := newTestServer(t)
+		req := httptest.NewRequest("DELETE", "/api/v1/apps/"+uuid.New().String(), nil)
+		w := ts.do(req)
+
+		assert.Equal(t, http.StatusNotFound, w.Code)
+	})
+}
+
+func TestHandleListApps(t *testing.T) {
+	t.Run("lists apps for enterprise", func(t *testing.T) {
+		ts := newTestServer(t)
+		ts.appRepo.apps = append(ts.appRepo.apps, &models.App{
+			BaseModel: models.BaseModel{ID: uuid.New()},
+			Name:      "Slack",
+			Platform:  "macos",
+		})
+
+		req := httptest.NewRequest("GET", "/api/v1/apps", nil)
+		w := ts.doWithAuth(req, testUser())
+
+		assert.Equal(t, http.StatusOK, w.Code)
+		resp := decodeResponse(t, w)
+		assert.Equal(t, 1, resp.Meta.Total)
+	})
+
+	t.Run("returns 401 without auth", func(t *testing.T) {
+		ts := newTestServer(t)
+		req := httptest.NewRequest("GET", "/api/v1/apps", nil)
+		w := ts.do(req)
+
+		assert.Equal(t, http.StatusUnauthorized, w.Code)
+	})
+}
+
+func TestHandleDeployApp(t *testing.T) {
+	t.Run("deploys app to devices", func(t *testing.T) {
+		ts := newTestServer(t)
+		appID := uuid.New()
+		deviceID := uuid.New()
+		ts.appRepo.apps = append(ts.appRepo.apps, &models.App{
+			BaseModel:  models.BaseModel{ID: appID},
+			Name:       "Slack",
+			Platform:   "macos",
+			Identifier: "com.slack.Slack",
+		})
+		ts.deviceRepo.devices = append(ts.deviceRepo.devices, &models.Device{
+			BaseModel: models.BaseModel{ID: deviceID},
+			Platform:  models.PlatformMacOS,
+		})
+
+		body := jsonBody(t, map[string]interface{}{"device_ids": []string{deviceID.String()}})
+		req := httptest.NewRequest("POST", "/api/v1/apps/"+appID.String()+"/deploy", body)
+		w := ts.do(req)
+
+		assert.Equal(t, http.StatusOK, w.Code)
+		require.Len(t, ts.commandRepo.commands, 1)
+		assert.Equal(t, models.CommandTypeInstallApp, ts.commandRepo.commands[0].CommandType)
+	})
+
+	t.Run("returns 404 for missing app", func(t *testing.T) {
+		ts := newTestServer(t)
+		body := jsonBody(t, map[string]interface{}{"device_ids": []string{uuid.New().String()}})
+		req := httptest.NewRequest("POST", "/api/v1/apps/"+uuid.New().String()+"/deploy", body)
+		w := ts.do(req)
+
+		assert.Equal(t, http.StatusNotFound, w.Code)
+	})
+
+	t.Run("returns 400 for empty device_ids", func(t *testing.T) {
+		ts := newTestServer(t)
+		appID := uuid.New()
+		ts.appRepo.apps = append(ts.appRepo.apps, &models.App{
+			BaseModel: models.BaseModel{ID: appID},
+			Name:      "Slack",
+		})
+
+		body := jsonBody(t, map[string]interface{}{"device_ids": []string{}})
+		req := httptest.NewRequest("POST", "/api/v1/apps/"+appID.String()+"/deploy", body)
+		w := ts.do(req)
+
+		assert.Equal(t, http.StatusBadRequest, w.Code)
+	})
+}
+
+// --- Sprint 3: Windows PPKG Handlers ---
+
+func TestHandleWindowsPPKGTemplates(t *testing.T) {
+	t.Run("returns available templates", func(t *testing.T) {
+		ts := newTestServer(t)
+		req := httptest.NewRequest("GET", "/api/v1/windows/ppkg/templates", nil)
+		w := ts.do(req)
+
+		assert.Equal(t, http.StatusOK, w.Code)
+	})
+}
+
+func TestHandleWindowsPPKGGenerate(t *testing.T) {
+	t.Run("generates basic ppkg", func(t *testing.T) {
+		ts := newTestServer(t)
+		ts.server.config.Server.Host = "mdm.test.com"
+		ts.server.config.Server.Port = 443
+
+		body := jsonBody(t, map[string]interface{}{
+			"name":     "test-enrollment",
+			"template": "enrollment_only",
+		})
+		req := httptest.NewRequest("POST", "/api/v1/windows/ppkg/generate", body)
+		w := ts.do(req)
+
+		assert.Equal(t, http.StatusOK, w.Code)
+		assert.Equal(t, "application/octet-stream", w.Header().Get("Content-Type"))
+		assert.Contains(t, w.Header().Get("Content-Disposition"), "test-enrollment.ppkg")
+	})
+
+	t.Run("returns 400 for enrollment_wifi without wifi config", func(t *testing.T) {
+		ts := newTestServer(t)
+		body := jsonBody(t, map[string]interface{}{
+			"name":     "test",
+			"template": "enrollment_wifi",
+		})
+		req := httptest.NewRequest("POST", "/api/v1/windows/ppkg/generate", body)
+		w := ts.do(req)
+
+		assert.Equal(t, http.StatusBadRequest, w.Code)
+	})
+}

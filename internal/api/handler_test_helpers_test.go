@@ -517,6 +517,7 @@ type testServer struct {
 	auditLogRepo   *mockAuditLogRepo
 	auditLogger    *mockAuditLogger
 	commandRepo    *mockCommandRepo
+	appRepo        *mockAppRepo
 }
 
 func newTestServer(t *testing.T) *testServer {
@@ -591,6 +592,10 @@ func newTestServer(t *testing.T) *testServer {
 	api.HandleFunc("/apps/{id}", s.handleDeleteApp).Methods("DELETE")
 	api.HandleFunc("/apps/{id}/deploy", s.handleDeployApp).Methods("POST")
 
+	// Sprint 3: Windows PPKG routes
+	api.HandleFunc("/windows/ppkg/generate", s.handleWindowsPPKGGenerate).Methods("POST")
+	api.HandleFunc("/windows/ppkg/templates", s.handleWindowsPPKGTemplates).Methods("GET")
+
 	return &testServer{
 		server:         s,
 		enterpriseRepo: er,
@@ -600,6 +605,7 @@ func newTestServer(t *testing.T) *testServer {
 		auditLogRepo:   ar,
 		auditLogger:    al,
 		commandRepo:    cmdr,
+		appRepo:        appr,
 	}
 }
 

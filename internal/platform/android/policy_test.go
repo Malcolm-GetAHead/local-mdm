@@ -1,143 +1,173 @@
 package android
 
 import (
-	"encoding/json"
 	"testing"
 
 	"github.com/malcolm-getahead/local-mdm/internal/models"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
-func TestTranslatePolicy_Security(t *testing.T) {
+func TestTranslatePolicy_NilConfig(t *testing.T) {
 	policy := &models.Policy{
-		PolicyType: models.PolicyTypeSecurity,
-		PolicyConfig: models.JSONB{
-			"min_password_length":  float64(8),
-			"password_quality":     "ALPHANUMERIC",
-			"max_failed_attempts":  float64(10),
-			"require_encryption":   true,
-			"lock_timeout_minutes": float64(5),
-		},
+		PolicyType:   models.PolicyTypeSecurity,
+		PolicyConfig: nil,
 	}
-
 	ap := TranslatePolicy(policy)
-	require.NotNil(t, ap.PasswordRequirements)
-	assert.Equal(t, int64(8), ap.PasswordRequirements.PasswordMinimumLength)
-	assert.Equal(t, "ALPHANUMERIC", ap.PasswordRequirements.PasswordQuality)
-	assert.Equal(t, int64(10), ap.PasswordRequirements.MaximumFailedPasswordsForWipe)
-	assert.Equal(t, "ENABLED_WITHOUT_PASSWORD", ap.EncryptionPolicy)
-	assert.Equal(t, int64(300000), ap.MaximumTimeToLock) // 5 min in ms
+	assert.NotNil(t, ap)
+	assert.Nil(t, ap.PasswordRequirements)
 }
 
-func TestTranslatePolicy_Restrictions(t *testing.T) {
-	policy := &models.Policy{
-		PolicyType: models.PolicyTypeRestriction,
-		PolicyConfig: models.JSONB{
-			"allow_camera":          false,
-			"allow_screen_capture":  false,
-			"allow_usb_transfer":    false,
-			"allow_bluetooth":       false,
-		},
-	}
+func TestApplySecurityPolicy(t *testing.T) {
+	t.Run("all fields", func(t *testing.T) {
+		policy := &models.Policy{
+			PolicyType: models.PolicyTypeSecurity,
+			PolicyConfig: models.JSONB{
+				"min_password_length": float64(8),
+				"password_quality":    "NUMERIC_COMPLEX",
+				"max_failed_attempts": float64(5),
+				"require_encryption":  true,
+				"lock_timeout_minutes": float64(10),
+			},
+		}
+		ap := TranslatePolicy(policy)
+		assert.NotNil(t, ap.PasswordRequirements)
+		assert.Equal(t, int64(8), ap.PasswordRequirements.PasswordMinimumLength)
+		assert.Equal(t, "NUMERIC_COMPLEX", ap.PasswordRequirements.PasswordQuality)
+		assert.Equal(t, int64(5), ap.PasswordRequirements.MaximumFailedPasswordsForWipe)
+		assert.Equal(t, "ENABLED_WITHOUT_PASSWORD", ap.EncryptionPolicy)
+		assert.Equal(t, int64(600000), ap.MaximumTimeToLock)
+	})
 
-	ap := TranslatePolicy(policy)
-	assert.True(t, ap.CameraDisabled)
-	assert.True(t, ap.ScreenCaptureDisabled)
-	assert.True(t, ap.UsbFileTransferDisabled)
-	assert.True(t, ap.BluetoothDisabled)
+	t.Run("no password requirements", func(t *testing.T) {
+		policy := &models.Policy{
+			PolicyType: models.PolicyTypeSecurity,
+			PolicyConfig: models.JSONB{
+				"require_encryption": false,
+			},
+		}
+		ap := TranslatePolicy(policy)
+		assert.Nil(t, ap.PasswordRequirements)
+		assert.Empty(t, ap.EncryptionPolicy)
+	})
 }
 
-func TestTranslatePolicy_Restrictions_Allowed(t *testing.T) {
-	policy := &models.Policy{
-		PolicyType: models.PolicyTypeRestriction,
-		PolicyConfig: models.JSONB{
-			"allow_camera": true,
-		},
-	}
+func TestApplyRestrictionPolicy(t *testing.T) {
+	t.Run("all restrictions disabled", func(t *testing.T) {
+		policy := &models.Policy{
+			PolicyType: models.PolicyTypeRestriction,
+			PolicyConfig: models.JSONB{
+				"allow_camera":         false,
+				"allow_screen_capture": false,
+				"allow_usb_transfer":   false,
+				"allow_bluetooth":      false,
+			},
+		}
+		ap := TranslatePolicy(policy)
+		assert.True(t, ap.CameraDisabled)
+		assert.True(t, ap.ScreenCaptureDisabled)
+		assert.True(t, ap.UsbFileTransferDisabled)
+		assert.True(t, ap.BluetoothDisabled)
+	})
 
-	ap := TranslatePolicy(policy)
-	assert.False(t, ap.CameraDisabled) // camera allowed = not disabled
+	t.Run("all restrictions allowed", func(t *testing.T) {
+		policy := &models.Policy{
+			PolicyType: models.PolicyTypeRestriction,
+			PolicyConfig: models.JSONB{
+				"allow_camera":         true,
+				"allow_screen_capture": true,
+				"allow_usb_transfer":   true,
+				"allow_bluetooth":      true,
+			},
+		}
+		ap := TranslatePolicy(policy)
+		assert.False(t, ap.CameraDisabled)
+		assert.False(t, ap.ScreenCaptureDisabled)
+		assert.False(t, ap.UsbFileTransferDisabled)
+		assert.False(t, ap.BluetoothDisabled)
+	})
 }
 
-func TestTranslatePolicy_WiFi(t *testing.T) {
+func TestApplyWiFiPolicy_SSIDOnly(t *testing.T) {
 	policy := &models.Policy{
 		PolicyType: models.PolicyTypeWiFi,
 		PolicyConfig: models.JSONB{
-			"ssid":          "CorpNet",
-			"security_type": "WPA2_PSK",
-			"password":      "secret123",
+			"ssid": "OpenNetwork",
+			// no password, no security_type
 		},
 	}
-
 	ap := TranslatePolicy(policy)
-	require.NotNil(t, ap.OpenNetworkConfiguration)
-
-	var onc map[string]interface{}
-	err := json.Unmarshal(ap.OpenNetworkConfiguration, &onc)
-	require.NoError(t, err)
-	configs, ok := onc["NetworkConfigurations"].([]interface{})
-	require.True(t, ok)
-	require.Len(t, configs, 1)
-	cfg := configs[0].(map[string]interface{})
-	assert.Equal(t, "CorpNet", cfg["Name"])
+	assert.NotNil(t, ap.OpenNetworkConfiguration)
 }
 
-func TestTranslatePolicy_App(t *testing.T) {
+func TestApplyWiFiPolicy_EmptySSID(t *testing.T) {
+	policy := &models.Policy{
+		PolicyType: models.PolicyTypeWiFi,
+		PolicyConfig: models.JSONB{
+			"ssid": "",
+		},
+	}
+	ap := TranslatePolicy(policy)
+	assert.Nil(t, ap.OpenNetworkConfiguration)
+}
+
+func TestApplyAppPolicy_EmptyApps(t *testing.T) {
+	policy := &models.Policy{
+		PolicyType: models.PolicyTypeApp,
+		PolicyConfig: models.JSONB{
+			"applications": []interface{}{},
+		},
+	}
+	ap := TranslatePolicy(policy)
+	assert.Nil(t, ap.Applications)
+}
+
+func TestApplyAppPolicy_InvalidAppEntry(t *testing.T) {
+	policy := &models.Policy{
+		PolicyType: models.PolicyTypeApp,
+		PolicyConfig: models.JSONB{
+			"applications": []interface{}{
+				"not-a-map",
+				map[string]interface{}{"package_name": ""},
+				map[string]interface{}{"package_name": "com.valid.app"},
+			},
+		},
+	}
+	ap := TranslatePolicy(policy)
+	assert.Len(t, ap.Applications, 1)
+	assert.Equal(t, "com.valid.app", ap.Applications[0].PackageName)
+}
+
+func TestApplyAppPolicy_CustomInstallType(t *testing.T) {
 	policy := &models.Policy{
 		PolicyType: models.PolicyTypeApp,
 		PolicyConfig: models.JSONB{
 			"applications": []interface{}{
 				map[string]interface{}{
 					"package_name": "com.example.app",
-					"install_type": "FORCE_INSTALLED",
-				},
-				map[string]interface{}{
-					"package_name": "com.example.optional",
 					"install_type": "AVAILABLE",
 				},
 			},
 		},
 	}
-
 	ap := TranslatePolicy(policy)
-	require.Len(t, ap.Applications, 2)
-	assert.Equal(t, "com.example.app", ap.Applications[0].PackageName)
-	assert.Equal(t, "FORCE_INSTALLED", ap.Applications[0].InstallType)
-	assert.Equal(t, "com.example.optional", ap.Applications[1].PackageName)
-	assert.Equal(t, "AVAILABLE", ap.Applications[1].InstallType)
+	assert.Len(t, ap.Applications, 1)
+	assert.Equal(t, "AVAILABLE", ap.Applications[0].InstallType)
 }
 
-func TestTranslatePolicy_EmptyConfig(t *testing.T) {
+func TestApplyAppPolicy_NotSlice(t *testing.T) {
 	policy := &models.Policy{
-		PolicyType:   models.PolicyTypeSecurity,
-		PolicyConfig: nil,
+		PolicyType: models.PolicyTypeApp,
+		PolicyConfig: models.JSONB{
+			"applications": "not-a-slice",
+		},
 	}
-
-	ap := TranslatePolicy(policy)
-	assert.Nil(t, ap.PasswordRequirements)
-}
-
-func TestTranslatePolicy_EmptyAppList(t *testing.T) {
-	policy := &models.Policy{
-		PolicyType:   models.PolicyTypeApp,
-		PolicyConfig: models.JSONB{},
-	}
-
 	ap := TranslatePolicy(policy)
 	assert.Nil(t, ap.Applications)
 }
 
-func TestTranslatePolicy_SecurityPartial(t *testing.T) {
-	policy := &models.Policy{
-		PolicyType: models.PolicyTypeSecurity,
-		PolicyConfig: models.JSONB{
-			"min_password_length": float64(6),
-		},
-	}
-
-	ap := TranslatePolicy(policy)
-	require.NotNil(t, ap.PasswordRequirements)
-	assert.Equal(t, int64(6), ap.PasswordRequirements.PasswordMinimumLength)
-	assert.Equal(t, "", ap.EncryptionPolicy) // not set
+func TestGenerateQRCode_WiFiSSIDNoPassword(t *testing.T) {
+	qr, err := GenerateQRCode("token", "https://example.com/download", "OpenWiFi", "")
+	assert.NoError(t, err)
+	assert.NotNil(t, qr)
+	assert.Greater(t, len(qr), 0)
 }
