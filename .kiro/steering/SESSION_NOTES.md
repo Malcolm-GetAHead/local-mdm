@@ -114,3 +114,12 @@
 - Mock repos in `handler_test_helpers_test.go` may have no-op stub methods (e.g. `Update` returning nil without doing anything). When adding handlers that exercise those methods, make the mocks functional first — add error fields (`updateErr`, `deleteErr`, `assignErr`) and real logic.
 - Always grep for existing tests of a function before changing its behavior. Fleshing out a stub handler (e.g. going from `w.WriteHeader(200)` to parsing JSON) will break tests that send nil/empty bodies.
 - The `newTestServer()` helper in `handler_test_helpers_test.go` registers routes without auth middleware. New endpoints must be added there too, or handler tests won't route.
+
+## Sprint 3 Session Observations (2026-04-20)
+
+- **Retrospective pattern is high-value**: backward look (scope audit, code quality, docs, git) + forward look (dependency analysis, architecture decisions) between sprints catches gaps before they become expensive. Owner expects this after every sprint.
+- **Architecture discussions before code**: Owner prefers to talk through design decisions (service layer, event bus, Redis removal, read/write pools) before any code is written. Present options with tradeoffs, let owner choose, then implement.
+- **Owner asks excellent "why" questions**: Questions like "can we use PostgreSQL instead of Redis?" and "should this be an enum instead of null?" consistently lead to simpler, better solutions. Don't rush past these — they're the most productive part of the session.
+- **Sprint 4 is fully prepped**: schema migration 000006, async command dispatcher, service layer pattern, event bus design (PostgreSQL LISTEN/NOTIFY), Redis removal plan, read/write DB pools plan, S4-05 rescoped, all task docs updated.
+- **Dashboard changed to HTMX**: Sprint 5b uses Go templates + HTMX + Tailwind CSS instead of React. No separate frontend build pipeline. Decision driven by simplicity and owner's skillset.
+- **Vendor accounts not needed until F-01**: Apple Developer ($99/yr), Apple Business Manager (free, needs DUNS), Google Cloud (free tier), Microsoft WNS (free). Everything through Sprint 5b works with mocks.
