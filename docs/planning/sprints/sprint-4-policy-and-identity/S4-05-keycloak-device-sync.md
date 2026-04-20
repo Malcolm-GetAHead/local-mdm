@@ -32,9 +32,9 @@ Wire device lifecycle events (unenrollment, wipe, delete) to extensible hook poi
 - Each hook call logs to audit trail with action `device.lifecycle.{event}`
 - Files: update `internal/api/handlers.go`
 
-## What Moved to Sprint 4b
+## What Moved to Sprint 4c
 
-The following are now part of Sprint 4b (Platform SSO):
+The following are now part of Sprint 4c (Platform SSO):
 - Keycloak PSSO admin client (`internal/auth/keycloak_client.go`)
 - `DELETE /device/{serial}` calls to Keycloak
 - Keycloak ↔ MDM reconciliation job
