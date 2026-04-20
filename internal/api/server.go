@@ -533,6 +533,7 @@ func (s *Server) setupMiddleware() {
 	s.router.Use(requestIDMiddleware)
 	s.router.Use(s.loggingMiddleware)
 	s.router.Use(recoveryMiddleware(s.logger))
+	s.router.Use(idempotencyMiddleware(s.db.DB))
 	s.router.Use(securityHeadersMiddleware)
 	s.router.Use(corsMiddleware(s.config.Server.CORS))
 }
