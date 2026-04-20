@@ -60,6 +60,8 @@ type Server struct {
 	androidService   *android.Service
 	cmdDispatcher    *commandDispatcher
 	lifecycleService *service.LifecycleService
+	policyService    *service.PolicyService
+	policyVersionRepo repository.PolicyVersionRepository
 }
 
 // New creates a new API server
@@ -236,6 +238,13 @@ func New(cfg *config.Config, database *db.DB, logger *slog.Logger) (*Server, err
 
 	s.lifecycleService = service.NewLifecycleService(logger)
 
+	policyVersionRepo, err := repository.NewPolicyVersionRepository(database.DB)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create policy version repository: %w", err)
+	}
+	s.policyVersionRepo = policyVersionRepo
+	s.policyService = service.NewPolicyService(s.policyRepo, policyVersionRepo, logger)
+
 	s.setupRoutes()
 	s.setupMiddleware()
 
@@ -377,6 +386,31 @@ func (s *Server) setupRoutes() {
 			http.HandlerFunc(s.handleUnassignPolicy),
 		),
 	)).Methods("DELETE")
+
+	// Policy versioning & templates (Sprint 4)
+	api.Handle("/policies/{id}/versions", s.authMiddleware.RequireAuth(
+		http.HandlerFunc(s.handleListPolicyVersions),
+	)).Methods("GET")
+
+	api.Handle("/policies/{id}/rollback", s.authMiddleware.RequireAuth(
+		s.authMiddleware.RequireRole("admin", "operator")(
+			http.HandlerFunc(s.handleRollbackPolicy),
+		),
+	)).Methods("POST")
+
+	api.Handle("/policies/{id}/translate", s.authMiddleware.RequireAuth(
+		http.HandlerFunc(s.handleTranslatePolicy),
+	)).Methods("GET")
+
+	api.Handle("/policy-templates", s.authMiddleware.RequireAuth(
+		http.HandlerFunc(s.handleListPolicyTemplates),
+	)).Methods("GET")
+
+	api.Handle("/policy-templates/{id}/clone", s.authMiddleware.RequireAuth(
+		s.authMiddleware.RequireRole("admin", "operator")(
+			http.HandlerFunc(s.handleClonePolicyTemplate),
+		),
+	)).Methods("POST")
 
 	// Certificates
 	api.Handle("/certificates", s.authMiddleware.RequireAuth(

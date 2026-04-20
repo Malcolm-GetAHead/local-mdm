@@ -441,6 +441,52 @@ func (m *mockAuditLogger) Log(_ context.Context, event audit.Event) error {
 	return nil
 }
 
+type mockPolicyVersionRepo struct {
+	versions []*models.PolicyVersion
+}
+
+func (m *mockPolicyVersionRepo) Create(_ context.Context, v *models.PolicyVersion) error {
+	if v.ID == uuid.Nil {
+		v.ID = uuid.New()
+	}
+	m.versions = append(m.versions, v)
+	return nil
+}
+func (m *mockPolicyVersionRepo) ListByPolicy(_ context.Context, policyID uuid.UUID, limit, offset int) ([]*models.PolicyVersion, int, error) {
+	var filtered []*models.PolicyVersion
+	for _, v := range m.versions {
+		if v.PolicyID == policyID {
+			filtered = append(filtered, v)
+		}
+	}
+	total := len(filtered)
+	end := offset + limit
+	if end > total {
+		end = total
+	}
+	if offset >= total {
+		return nil, total, nil
+	}
+	return filtered[offset:end], total, nil
+}
+func (m *mockPolicyVersionRepo) GetByVersion(_ context.Context, policyID uuid.UUID, version int) (*models.PolicyVersion, error) {
+	for _, v := range m.versions {
+		if v.PolicyID == policyID && v.Version == version {
+			return v, nil
+		}
+	}
+	return nil, fmt.Errorf("policy version not found")
+}
+func (m *mockPolicyVersionRepo) LatestVersion(_ context.Context, policyID uuid.UUID) (int, error) {
+	max := 0
+	for _, v := range m.versions {
+		if v.PolicyID == policyID && v.Version > max {
+			max = v.Version
+		}
+	}
+	return max, nil
+}
+
 type mockAppRepo struct {
 	apps      []*models.App
 	createErr error
@@ -559,6 +605,7 @@ func newTestServer(t *testing.T) *testServer {
 		enrollmentLimiter: newRateLimiterWithSize(10, time.Minute, 100),
 		depService:       macos.NewDEPService(&testDEPStorage{}, slog.New(slog.NewTextHandler(bytes.NewBuffer(nil), nil))),
 		lifecycleService: service.NewLifecycleService(slog.New(slog.NewTextHandler(bytes.NewBuffer(nil), nil))),
+		policyService:    service.NewPolicyService(pr, &mockPolicyVersionRepo{}, slog.New(slog.NewTextHandler(bytes.NewBuffer(nil), nil))),
 	}
 
 	// Register only the routes we're testing (no auth middleware)
@@ -582,6 +629,13 @@ func newTestServer(t *testing.T) *testServer {
 	api.HandleFunc("/policies/{id}", s.handleDeletePolicy).Methods("DELETE")
 	api.HandleFunc("/policies/{id}/assign", s.handleAssignPolicy).Methods("POST")
 	api.HandleFunc("/policies/{id}/assign/{device_id}", s.handleUnassignPolicy).Methods("DELETE")
+
+	// Sprint 4: Policy versioning & templates
+	api.HandleFunc("/policies/{id}/versions", s.handleListPolicyVersions).Methods("GET")
+	api.HandleFunc("/policies/{id}/rollback", s.handleRollbackPolicy).Methods("POST")
+	api.HandleFunc("/policies/{id}/translate", s.handleTranslatePolicy).Methods("GET")
+	api.HandleFunc("/policy-templates", s.handleListPolicyTemplates).Methods("GET")
+	api.HandleFunc("/policy-templates/{id}/clone", s.handleClonePolicyTemplate).Methods("POST")
 	api.HandleFunc("/certificates", s.handleListCertificates).Methods("GET")
 	api.HandleFunc("/audit-logs", s.handleListAuditLogs).Methods("GET")
 	api.HandleFunc("/android/webhook", s.handleAndroidWebhook).Methods("POST")

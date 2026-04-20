@@ -784,6 +784,169 @@ func (s *Server) handleUnassignPolicy(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+// Policy versioning handlers (Sprint 4)
+
+func (s *Server) handleListPolicyVersions(w http.ResponseWriter, r *http.Request) {
+	id, err := parseUUIDParam(r, "id")
+	if err != nil {
+		respondError(w, r, http.StatusBadRequest, "invalid_id", "Invalid policy ID format")
+		return
+	}
+
+	limit, offset := parsePagination(r)
+	versions, total, err := s.policyService.ListVersions(r.Context(), id, limit, offset)
+	if err != nil {
+		s.logger.Error("failed to list policy versions", "error", err, "id", id)
+		respondError(w, r, http.StatusInternalServerError, "internal_error", "Failed to list versions")
+		return
+	}
+
+	respondPaginated(w, r, http.StatusOK, versions, total, limit, offset)
+}
+
+func (s *Server) handleRollbackPolicy(w http.ResponseWriter, r *http.Request) {
+	id, err := parseUUIDParam(r, "id")
+	if err != nil {
+		respondError(w, r, http.StatusBadRequest, "invalid_id", "Invalid policy ID format")
+		return
+	}
+
+	var req struct {
+		Version int `json:"version"`
+	}
+	if err := parseJSONBody(r, &req); err != nil {
+		respondError(w, r, http.StatusBadRequest, "invalid_request", err.Error())
+		return
+	}
+	if req.Version < 1 {
+		respondError(w, r, http.StatusBadRequest, "invalid_version", "Version must be >= 1")
+		return
+	}
+
+	user, _ := auth.UserFromContext(r.Context())
+	userID := ""
+	if user != nil {
+		userID = user.ID
+	}
+
+	policy, err := s.policyService.Rollback(r.Context(), id, req.Version, userID)
+	if err != nil {
+		if strings.Contains(err.Error(), "not found") {
+			respondError(w, r, http.StatusNotFound, "not_found", err.Error())
+			return
+		}
+		s.logger.Error("failed to rollback policy", "error", err, "id", id)
+		respondError(w, r, http.StatusInternalServerError, "internal_error", "Failed to rollback")
+		return
+	}
+
+	s.logAudit(r, "policy.rollback", "policy", id, map[string]interface{}{"version": req.Version})
+	respondJSON(w, r, http.StatusOK, policy)
+}
+
+func (s *Server) handleTranslatePolicy(w http.ResponseWriter, r *http.Request) {
+	id, err := parseUUIDParam(r, "id")
+	if err != nil {
+		respondError(w, r, http.StatusBadRequest, "invalid_id", "Invalid policy ID format")
+		return
+	}
+
+	policy, err := s.policyRepo.GetByID(r.Context(), id)
+	if err != nil {
+		if strings.Contains(err.Error(), "not found") {
+			respondError(w, r, http.StatusNotFound, "not_found", "Policy not found")
+			return
+		}
+		respondError(w, r, http.StatusInternalServerError, "internal_error", "Failed to get policy")
+		return
+	}
+
+	platform := r.URL.Query().Get("platform")
+	if platform != "" {
+		result, err := s.policyService.Translate(policy, platform)
+		if err != nil {
+			respondError(w, r, http.StatusBadRequest, "translation_error", err.Error())
+			return
+		}
+		respondJSON(w, r, http.StatusOK, result)
+		return
+	}
+
+	results := s.policyService.TranslateAll(policy)
+	respondJSON(w, r, http.StatusOK, results)
+}
+
+func (s *Server) handleListPolicyTemplates(w http.ResponseWriter, r *http.Request) {
+	user, err := auth.UserFromContext(r.Context())
+	if err != nil {
+		respondError(w, r, http.StatusUnauthorized, "unauthorized", "Authentication required")
+		return
+	}
+
+	limit, offset := parsePagination(r)
+	policies, _, err := s.policyRepo.List(r.Context(), user.EnterpriseID, limit, offset)
+	if err != nil {
+		respondError(w, r, http.StatusInternalServerError, "internal_error", "Failed to list templates")
+		return
+	}
+
+	// Filter to templates only
+	var templates []*models.Policy
+	for _, p := range policies {
+		if p.IsTemplate {
+			templates = append(templates, p)
+		}
+	}
+
+	respondJSON(w, r, http.StatusOK, map[string]interface{}{
+		"templates": templates,
+		"total":     len(templates),
+	})
+}
+
+func (s *Server) handleClonePolicyTemplate(w http.ResponseWriter, r *http.Request) {
+	templateID, err := parseUUIDParam(r, "id")
+	if err != nil {
+		respondError(w, r, http.StatusBadRequest, "invalid_id", "Invalid template ID format")
+		return
+	}
+
+	var req struct {
+		Name string `json:"name"`
+	}
+	if err := parseJSONBody(r, &req); err != nil {
+		respondError(w, r, http.StatusBadRequest, "invalid_request", err.Error())
+		return
+	}
+	if req.Name == "" {
+		respondError(w, r, http.StatusBadRequest, "validation_failed", "Name is required")
+		return
+	}
+
+	user, _ := auth.UserFromContext(r.Context())
+	enterpriseID := uuid.Nil
+	userID := ""
+	if user != nil {
+		enterpriseID = user.EnterpriseID
+		userID = user.ID
+	}
+
+	policy, err := s.policyService.CloneTemplate(r.Context(), templateID, enterpriseID, req.Name, userID)
+	if err != nil {
+		if strings.Contains(err.Error(), "not found") || strings.Contains(err.Error(), "not a template") {
+			respondError(w, r, http.StatusBadRequest, "invalid_template", err.Error())
+			return
+		}
+		respondError(w, r, http.StatusInternalServerError, "internal_error", "Failed to clone template")
+		return
+	}
+
+	s.logAudit(r, "policy.clone_template", "policy", policy.ID, map[string]interface{}{
+		"template_id": templateID,
+	})
+	respondJSON(w, r, http.StatusCreated, policy)
+}
+
 // Certificate handlers
 func (s *Server) handleListCertificates(w http.ResponseWriter, r *http.Request) {
 	limit, offset := parsePagination(r)
