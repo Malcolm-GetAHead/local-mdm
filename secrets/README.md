@@ -27,6 +27,30 @@ echo "localmdm-api-secret" > secrets/keycloak_client_secret
 - `apns_cert.pem` - APNs certificate (macOS push) - optional
 - `apns_key.pem` - APNs private key - optional
 - `ca_key.pem` - Root CA private key - auto-generated
+- `ppkg_signing.crt` - Windows .ppkg code signing certificate - auto-generated for dev
+- `ppkg_signing.key` - Windows .ppkg code signing private key - auto-generated for dev
+
+## Windows PPKG Signing Certificate
+
+For development, a self-signed code signing certificate is auto-generated on first use.
+Windows will show a trust warning when applying packages signed with this cert.
+
+**To use a real code signing certificate in production:**
+
+```bash
+# 1. Obtain a code signing certificate from your CA (or purchase one)
+# 2. Export as PEM files:
+openssl pkcs12 -in your-cert.pfx -clcerts -nokeys -out secrets/ppkg_signing.crt
+openssl pkcs12 -in your-cert.pfx -nocerts -nodes -out secrets/ppkg_signing.key
+
+# 3. Configure in config.yaml:
+#    windows:
+#      ppkg_signing_cert: secrets/ppkg_signing.crt
+#      ppkg_signing_key: secrets/ppkg_signing.key
+```
+
+For internal enterprise use, you can also use your organization's internal CA
+to issue a code signing certificate and distribute the CA cert via Group Policy.
 
 ## Production
 

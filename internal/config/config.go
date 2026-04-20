@@ -170,9 +170,13 @@ type CertExpirationMonitorConfig struct {
 
 // WindowsConfig holds Windows MDM configuration
 type WindowsConfig struct {
-	DiscoveryURL  string `yaml:"discovery_url"`
-	EnrollmentURL string `yaml:"enrollment_url"`
-	ManagementURL string `yaml:"management_url"`
+	DiscoveryURL       string `yaml:"discovery_url"`
+	EnrollmentURL      string `yaml:"enrollment_url"`
+	ManagementURL      string `yaml:"management_url"`
+	WNSClientID        string `yaml:"wns_client_id"`
+	WNSClientSecret    string `yaml:"wns_client_secret"`
+	PPKGSigningCert    string `yaml:"ppkg_signing_cert"`
+	PPKGSigningKey     string `yaml:"ppkg_signing_key"`
 }
 
 // MacOSConfig holds macOS MDM configuration
@@ -181,6 +185,8 @@ type MacOSConfig struct {
 	APNSPassword       string        `yaml:"apns_password"`
 	PushTopic          string        `yaml:"push_topic"`
 	EnrollmentURL      string        `yaml:"enrollment_url"`
+	NanoMDMURL         string        `yaml:"nanomdm_url"`
+	NanoMDMAPIKey      string        `yaml:"nanomdm_api_key"`
 	DEPEncryptionKey   string        `yaml:"dep_encryption_key"`
 	DEPSyncInterval    time.Duration `yaml:"dep_sync_interval"`
 }

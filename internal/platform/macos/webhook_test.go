@@ -2,7 +2,6 @@ package macos
 
 import (
 	"bytes"
-	"database/sql"
 	"encoding/json"
 	"log/slog"
 	"net/http"
@@ -15,10 +14,9 @@ import (
 
 func testNanoMDMService(t *testing.T) *NanoMDMService {
 	t.Helper()
-	return &NanoMDMService{
-		db:     &sql.DB{},
-		logger: slog.New(slog.NewTextHandler(&bytes.Buffer{}, &slog.HandlerOptions{Level: slog.LevelError})),
-	}
+	return NewNanoMDMService("", "", nil, nil,
+		slog.New(slog.NewTextHandler(&bytes.Buffer{}, &slog.HandlerOptions{Level: slog.LevelError})),
+	)
 }
 
 func testMacOSService(t *testing.T) *Service {

@@ -216,11 +216,19 @@ func (h *ManagementHandler) deliverPendingCommands(ctx context.Context, deviceID
 			resp.AddGet(strconv.Itoa(cmdID), DevDetailNodes()...)
 			cmdID++
 		case models.CommandTypeLock:
-			resp.AddExec(strconv.Itoa(cmdID), "./Vendor/MSFT/RemoteLock/Lock")
-			cmdID++
+			cmdID = ApplyCSPCommands(resp, cmdID, BuildDeviceLockCSPCommands("lock", nil))
 		case models.CommandTypeWipe:
-			resp.AddExec(strconv.Itoa(cmdID), "./Vendor/MSFT/RemoteWipe/doWipe")
-			cmdID++
+			cmdID = ApplyCSPCommands(resp, cmdID, BuildDeviceLockCSPCommands("wipe", nil))
+		case models.CommandTypeInstallProfile:
+			// Profile commands carry CSP data in CommandData
+			if cmd.CommandData != nil {
+				profileType, _ := cmd.CommandData["profile_type"].(string)
+				profileData, _ := cmd.CommandData["profile_data"].(map[string]interface{})
+				cspCmds := h.buildProfileCSPCommands(profileType, models.JSONB(profileData))
+				cmdID = ApplyCSPCommands(resp, cmdID, cspCmds)
+			}
+		case models.CommandTypeAppList:
+			cmdID = ApplyCSPCommands(resp, cmdID, BuildAppInventoryCSPCommands())
 		default:
 			h.logger.Warn("unknown command type", "type", cmd.CommandType)
 			continue
@@ -243,6 +251,31 @@ func (h *ManagementHandler) findDeviceByDeviceID(ctx context.Context, deviceID s
 	// Otherwise it's an OMA-DM device URI — not directly queryable yet
 	// For now, return not found
 	return nil, fmt.Errorf("device not found: %s", deviceID)
+}
+
+// buildProfileCSPCommands converts a profile type + data into CSP commands.
+func (h *ManagementHandler) buildProfileCSPCommands(profileType string, data models.JSONB) []CSPCommand {
+	switch profileType {
+	case "wifi":
+		cmds, err := BuildWiFiCSPCommands(data)
+		if err != nil {
+			h.logger.Error("failed to build WiFi CSP", "error", err)
+			return nil
+		}
+		return cmds
+	case "vpn":
+		cmds, err := BuildVPNCSPCommands(data)
+		if err != nil {
+			h.logger.Error("failed to build VPN CSP", "error", err)
+			return nil
+		}
+		return cmds
+	case "security":
+		return BuildPolicyCSPCommands(data)
+	default:
+		h.logger.Warn("unsupported profile type for Windows CSP", "type", profileType)
+		return nil
+	}
 }
 
 // DevDetailNodes returns the OMA-DM URIs for device detail queries.

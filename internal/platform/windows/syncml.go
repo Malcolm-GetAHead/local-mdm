@@ -195,6 +195,23 @@ func (msg *SyncML) AddExec(cmdID, targetURI string) {
 	})
 }
 
+// AddReplace adds a Replace command to set a CSP node value.
+func (msg *SyncML) AddReplace(cmdID, targetURI, value, format string) {
+	item := SyncMLItem{
+		Target: &LocURI{LocURI: targetURI},
+		Data:   value,
+	}
+	if format != "" {
+		item.Meta = &SyncMLMeta{
+			Format: &MetaFormat{XMLNS: "syncml:metinf", Value: format},
+		}
+	}
+	msg.SyncBody.Replace = append(msg.SyncBody.Replace, SyncMLReplace{
+		CmdID: cmdID,
+		Item:  []SyncMLItem{item},
+	})
+}
+
 // GetDeviceID extracts the device identifier from the SyncML Source header
 func (msg *SyncML) GetDeviceID() string {
 	if msg.SyncHdr.Source != nil {

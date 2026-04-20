@@ -5,8 +5,8 @@ Complete guide to Local MDM documentation.
 ## Quick Links
 
 - **Getting Started**: [Setup Guide](dev/SETUP.md) | [Quick Reference](dev/QUICK_REFERENCE.md)
-- **Current Status**: [Sprint 2 Review](reviews/sprint-2/) - 95% complete (19/20 issues)
-- **Implementation**: [Sprint 2 Implementations](implementation/sprint-2/)
+- **Current Status**: [Sprint 3 Complete](planning/sprints/sprint-3-platform-features/OVERVIEW.md) - Commands, Profiles & Apps delivered
+- **Implementation**: [Sprint 3 Plan](planning/sprints/sprint-3-platform-features/OVERVIEW.md)
 - **Future Plans**: [Post-v1.0 Roadmap](planning/future/README.md)
 
 ## Documentation Structure
@@ -80,8 +80,8 @@ Complete guide to Local MDM documentation.
 
 #### Sprint Planning (`planning/sprints/`)
 - **sprint-1-foundation/** - Database, auth, API, PKI (✅ Complete)
-- **sprint-2-platform-core/** - Platform enrollment (📋 Planned)
-- **sprint-3-platform-features/** - Platform commands (📋 Planned)
+- **sprint-2-platform-core/** - Platform enrollment (✅ Complete)
+- **sprint-3-platform-features/** - Platform commands (✅ Complete)
 - **sprint-4-policy-and-identity/** - Policy engine (📋 Planned)
 - **sprint-5-ui-and-polish/** - UI and deployment (📋 Planned)
 
@@ -189,4 +189,4 @@ This documentation structure supports:
 - ✅ Implementation tracking
 - ✅ Review tracking
 
-Last updated: 2026-02-08
+Last updated: 2026-04-20

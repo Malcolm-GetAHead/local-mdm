@@ -1,6 +1,6 @@
 # Session Notes — Working Preferences & Project Knowledge
 
-**Last Updated**: 2026-04-19  
+**Last Updated**: 2026-04-20  
 **Purpose**: Guidance for AI agents working on this codebase, based on observed preferences and project-specific knowledge from Sprint 2 and 2a implementation.
 
 ---
@@ -78,3 +78,15 @@
 - `FeaturesConfig.EnableWebhooks` exists but is intentionally unwired until Sprint 3.
 - `config.MacOS.DEPSyncInterval` exists in the config struct but had no runtime consumer until Sprint 2a wired the DEP sync loop.
 - `config.Windows.ManagementURL` is used for the pre-created `ManagementHandler`. Falls back to `host:port` if empty.
+
+## Sprint 3 Learnings (Platform Commands & Profiles)
+
+- **NanoMDM HTTP API for command push**: Commands are sent to NanoMDM via its HTTP API (`POST /v1/push/{udid}` and `POST /v1/enqueue/{udid}`), not via webhooks. The webhook flow is inbound only (device → NanoMDM → Local MDM). Outbound commands go Local MDM → NanoMDM HTTP API → APNs → device.
+- **macOS command builders are stateless**: Each of the 12 command builders (DeviceLock, EraseDevice, InstallProfile, RemoveProfile, DeviceInformation, etc.) produces a plist command payload. NanoMDM handles queuing and delivery.
+- **Windows CSP framework uses SyncML Replace**: Pushing configuration to Windows devices uses `<Replace>` elements in SyncML (not `<Add>`). The CSP framework generates OMA-URI paths per CSP type (Policy, WiFi, VPN, DeviceLock, App).
+- **WNS push client triggers device sync**: Windows devices don't poll — WNS push notification tells the device to initiate an OMA-DM sync session, at which point queued commands/CSPs are delivered.
+- **Android policy translation is declarative**: Policies are translated to the Management API JSON format and applied via `enterprises.policies.patch`. The device picks up changes on next sync. DeviceCommander uses `devices.issueCommand` for immediate actions (lock/wipe/reboot).
+- **Unified remote actions use platform dispatch**: The `/devices/{id}/commands` endpoint determines platform from the device record and dispatches to the appropriate platform service. Command tracking in `device_commands` table provides unified status regardless of platform.
+- **App management is catalog-based**: The `apps` table is an enterprise-scoped catalog. Deployment is a separate action (`/apps/{id}/deploy`) that triggers platform-specific install flows (NanoMDM InstallApplication, Android Management API app policy, Windows CSP app install).
+- **PPKG generation uses ICD XML**: Windows provisioning packages are built from ICD (Imaging and Configuration Designer) XML templates, then packaged and optionally signed with a dev certificate for trusted installation.
+- **`FeaturesConfig.EnableWebhooks`** was wired in Sprint 3 for outbound webhook notifications on command completion events.

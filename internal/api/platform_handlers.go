@@ -502,3 +502,73 @@ func (s *Server) handleWindowsManagementSync(w http.ResponseWriter, r *http.Requ
 	w.WriteHeader(http.StatusOK)
 	w.Write(resp)
 }
+
+// --- Windows Provisioning Package Handlers ---
+
+func (s *Server) handleWindowsPPKGGenerate(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Name         string                `json:"name"`
+		Template     string                `json:"template"`
+		ServerURL    string                `json:"server_url"`
+		DiscoveryURL string                `json:"discovery_url"`
+		WiFi         *windows.PPKGWiFiConfig `json:"wifi,omitempty"`
+		VPN          *windows.PPKGVPNConfig  `json:"vpn,omitempty"`
+	}
+	if err := parseJSONBody(r, &req); err != nil {
+		respondError(w, r, http.StatusBadRequest, "invalid_request", "Invalid request body")
+		return
+	}
+
+	serverURL := req.ServerURL
+	if serverURL == "" {
+		serverURL = fmt.Sprintf("https://%s:%d", s.config.Server.Host, s.config.Server.Port)
+	}
+
+	cfg := windows.PPKGConfig{
+		Name:         req.Name,
+		ServerURL:    serverURL,
+		DiscoveryURL: req.DiscoveryURL,
+	}
+
+	// Apply template defaults
+	switch req.Template {
+	case "enrollment_wifi":
+		if req.WiFi == nil {
+			respondError(w, r, http.StatusBadRequest, "validation_failed", "wifi config required for enrollment_wifi template")
+			return
+		}
+		cfg.WiFi = req.WiFi
+	case "enrollment_wifi_vpn":
+		if req.WiFi == nil || req.VPN == nil {
+			respondError(w, r, http.StatusBadRequest, "validation_failed", "wifi and vpn config required for enrollment_wifi_vpn template")
+			return
+		}
+		cfg.WiFi = req.WiFi
+		cfg.VPN = req.VPN
+	default:
+		// enrollment_only or custom — apply whatever was provided
+		cfg.WiFi = req.WiFi
+		cfg.VPN = req.VPN
+	}
+
+	data, err := windows.GeneratePPKG(cfg, s.ppkgSigner)
+	if err != nil {
+		s.logger.Error("failed to generate ppkg", "error", err)
+		respondError(w, r, http.StatusInternalServerError, "internal_error", "Failed to generate provisioning package")
+		return
+	}
+
+	s.logAudit(r, "ppkg.generate", "windows", uuid.Nil, map[string]interface{}{
+		"name":     cfg.Name,
+		"template": req.Template,
+	})
+
+	w.Header().Set("Content-Type", "application/octet-stream")
+	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s.ppkg"`, cfg.Name))
+	w.WriteHeader(http.StatusOK)
+	w.Write(data)
+}
+
+func (s *Server) handleWindowsPPKGTemplates(w http.ResponseWriter, r *http.Request) {
+	respondJSON(w, r, http.StatusOK, windows.AvailableTemplates())
+}

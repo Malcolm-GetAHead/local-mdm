@@ -48,12 +48,14 @@ type Server struct {
 	certRepo         repository.CertificateRepository
 	auditLogRepo     repository.AuditLogRepository
 	cmdRepo          repository.CommandRepository
+	appRepo          repository.AppRepository
 	depService       *macos.DEPService
 	depSyncCancel    context.CancelFunc
 	macosService     *macos.Service
 	nanomdmService   *macos.NanoMDMService
 	windowsService   *windows.Service
 	windowsMgmtHandler *windows.ManagementHandler
+	ppkgSigner         *windows.PPKGSigner
 	androidService   *android.Service
 }
 
@@ -128,6 +130,12 @@ func New(cfg *config.Config, database *db.DB, logger *slog.Logger) (*Server, err
 	}
 	s.cmdRepo = cmdRepo
 
+	appRepo, err := repository.NewAppRepository(database.DB)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create app repository: %w", err)
+	}
+	s.appRepo = appRepo
+
 	// Initialize certificate service
 	caManager, err := certs.NewCAManager(cfg.Certificates.CACertPath, cfg.Certificates.CAKeyPath)
 	if err != nil {
@@ -195,11 +203,10 @@ func New(cfg *config.Config, database *db.DB, logger *slog.Logger) (*Server, err
 	// Initialize platform services
 	s.macosService = macos.NewService(s.deviceRepo)
 
-	nanomdmSvc, err := macos.NewNanoMDMService(database.DB, logger)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create NanoMDM service: %w", err)
-	}
-	s.nanomdmService = nanomdmSvc
+	s.nanomdmService = macos.NewNanoMDMService(
+		cfg.MacOS.NanoMDMURL, cfg.MacOS.NanoMDMAPIKey,
+		s.cmdRepo, s.deviceRepo, logger,
+	)
 
 	s.windowsService = windows.NewService(s.deviceRepo)
 
@@ -208,6 +215,17 @@ func New(cfg *config.Config, database *db.DB, logger *slog.Logger) (*Server, err
 		mgmtURI = fmt.Sprintf("https://%s:%d/ManagementServer/MDM.svc", cfg.Server.Host, cfg.Server.Port)
 	}
 	s.windowsMgmtHandler = windows.NewManagementHandler(mgmtURI, s.deviceRepo, s.cmdRepo, logger)
+
+	// Initialize PPKG signer (auto-generates dev cert if paths configured but files missing)
+	if cfg.Windows.PPKGSigningCert != "" && cfg.Windows.PPKGSigningKey != "" {
+		signer, err := windows.NewPPKGSigner(cfg.Windows.PPKGSigningCert, cfg.Windows.PPKGSigningKey, true)
+		if err != nil {
+			logger.Warn("PPKG signing not available", "error", err)
+		} else {
+			s.ppkgSigner = signer
+			logger.Info("PPKG signing initialized")
+		}
+	}
 
 	s.androidService = android.NewService(s.deviceRepo, s.enterpriseRepo, cfg.Android.ProjectID, cfg.Android.ServiceAccountJSON)
 
@@ -296,6 +314,12 @@ func (s *Server) setupRoutes() {
 		),
 	)).Methods("POST")
 
+	api.Handle("/devices/{id}/restart", s.authMiddleware.RequireAuth(
+		s.authMiddleware.RequireRole("admin", "operator")(
+			http.HandlerFunc(s.handleRestartDevice),
+		),
+	)).Methods("POST")
+
 	api.Handle("/devices/{id}", s.authMiddleware.RequireAuth(
 		s.authMiddleware.RequireRole("admin", "operator")(
 			http.HandlerFunc(s.handleUpdateDevice),
@@ -352,12 +376,69 @@ func (s *Server) setupRoutes() {
 		http.HandlerFunc(s.handleListCertificates),
 	)).Methods("GET")
 	
+	// Device commands (Sprint 3)
+	api.Handle("/devices/{id}/commands", s.authMiddleware.RequireAuth(
+		s.authMiddleware.RequireRole("admin", "operator")(
+			http.HandlerFunc(s.handleSendCommand),
+		),
+	)).Methods("POST")
+
+	api.Handle("/devices/{id}/commands", s.authMiddleware.RequireAuth(
+		http.HandlerFunc(s.handleListCommands),
+	)).Methods("GET")
+
+	// Device profiles (Sprint 3)
+	api.Handle("/devices/{id}/profiles", s.authMiddleware.RequireAuth(
+		s.authMiddleware.RequireRole("admin", "operator")(
+			http.HandlerFunc(s.handleInstallProfile),
+		),
+	)).Methods("POST")
+
+	api.Handle("/devices/{id}/profiles/{profile_id}", s.authMiddleware.RequireAuth(
+		s.authMiddleware.RequireRole("admin", "operator")(
+			http.HandlerFunc(s.handleRemoveProfile),
+		),
+	)).Methods("DELETE")
+	
 	// Audit logs
 	api.Handle("/audit-logs", s.authMiddleware.RequireAuth(
 		s.authMiddleware.RequireRole("admin", "super_admin")(
 			http.HandlerFunc(s.handleListAuditLogs),
 		),
 	)).Methods("GET")
+
+	// App catalog (Sprint 3)
+	api.Handle("/apps", s.authMiddleware.RequireAuth(
+		http.HandlerFunc(s.handleListApps),
+	)).Methods("GET")
+
+	api.Handle("/apps", s.authMiddleware.RequireAuth(
+		s.authMiddleware.RequireRole("admin", "operator")(
+			http.HandlerFunc(s.handleCreateApp),
+		),
+	)).Methods("POST")
+
+	api.Handle("/apps/{id}", s.authMiddleware.RequireAuth(
+		http.HandlerFunc(s.handleGetApp),
+	)).Methods("GET")
+
+	api.Handle("/apps/{id}", s.authMiddleware.RequireAuth(
+		s.authMiddleware.RequireRole("admin", "operator")(
+			http.HandlerFunc(s.handleUpdateApp),
+		),
+	)).Methods("PUT")
+
+	api.Handle("/apps/{id}", s.authMiddleware.RequireAuth(
+		s.authMiddleware.RequireRole("admin")(
+			http.HandlerFunc(s.handleDeleteApp),
+		),
+	)).Methods("DELETE")
+
+	api.Handle("/apps/{id}/deploy", s.authMiddleware.RequireAuth(
+		s.authMiddleware.RequireRole("admin", "operator")(
+			http.HandlerFunc(s.handleDeployApp),
+		),
+	)).Methods("POST")
 
 	// Platform-specific routes (Sprint 2)
 	enrollLimiter := rateLimitMiddleware(s.enrollmentLimiter)
@@ -389,6 +470,15 @@ func (s *Server) setupRoutes() {
 	s.router.HandleFunc("/EnrollmentServer/Policy.svc", s.handleWindowsPolicyService).Methods("POST")
 	s.router.Handle("/EnrollmentServer/Enrollment.svc", enrollLimiter(http.HandlerFunc(s.handleWindowsEnrollmentService))).Methods("POST")
 	s.router.HandleFunc("/ManagementServer/MDM.svc", s.handleWindowsManagementSync).Methods("POST")
+
+	// Windows provisioning packages (Sprint 3)
+	api.Handle("/windows/ppkg", s.authMiddleware.RequireAuth(
+		s.authMiddleware.RequireRole("admin", "operator")(
+			http.HandlerFunc(s.handleWindowsPPKGGenerate),
+		),
+	)).Methods("POST")
+
+	api.HandleFunc("/windows/ppkg/templates", s.handleWindowsPPKGTemplates).Methods("GET")
 	
 	// Android MDM endpoints
 	api.Handle("/android/enrollment-token/{enterprise_id}", s.authMiddleware.RequireAuth(

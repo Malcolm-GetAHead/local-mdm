@@ -325,6 +325,103 @@ func (m *mockAuditLogRepo) List(_ context.Context, _ uuid.UUID, limit, offset in
 	return m.logs[offset:end], total, nil
 }
 
+type mockCommandRepo struct {
+	commands []*models.DeviceCommand
+	createErr error
+	getErr    error
+	listErr   error
+}
+
+func (m *mockCommandRepo) Create(_ context.Context, cmd *models.DeviceCommand) error {
+	if m.createErr != nil {
+		return m.createErr
+	}
+	if cmd.ID == uuid.Nil {
+		cmd.ID = uuid.New()
+	}
+	if cmd.Status == "" {
+		cmd.Status = "pending"
+	}
+	cmd.CreatedAt = time.Now()
+	cmd.UpdatedAt = time.Now()
+	m.commands = append(m.commands, cmd)
+	return nil
+}
+
+func (m *mockCommandRepo) GetByID(_ context.Context, id uuid.UUID) (*models.DeviceCommand, error) {
+	if m.getErr != nil {
+		return nil, m.getErr
+	}
+	for _, c := range m.commands {
+		if c.ID == id {
+			return c, nil
+		}
+	}
+	return nil, fmt.Errorf("command not found")
+}
+
+func (m *mockCommandRepo) ListPending(_ context.Context, deviceID uuid.UUID) ([]*models.DeviceCommand, error) {
+	var result []*models.DeviceCommand
+	for _, c := range m.commands {
+		if c.DeviceID == deviceID && c.Status == "pending" {
+			result = append(result, c)
+		}
+	}
+	return result, nil
+}
+
+func (m *mockCommandRepo) ListByDevice(_ context.Context, deviceID uuid.UUID, limit, offset int) ([]*models.DeviceCommand, int, error) {
+	if m.listErr != nil {
+		return nil, 0, m.listErr
+	}
+	var all []*models.DeviceCommand
+	for _, c := range m.commands {
+		if c.DeviceID == deviceID {
+			all = append(all, c)
+		}
+	}
+	total := len(all)
+	end := offset + limit
+	if end > total {
+		end = total
+	}
+	if offset >= total {
+		return []*models.DeviceCommand{}, total, nil
+	}
+	return all[offset:end], total, nil
+}
+
+func (m *mockCommandRepo) MarkSent(_ context.Context, id uuid.UUID) error {
+	for _, c := range m.commands {
+		if c.ID == id {
+			c.Status = "sent"
+			return nil
+		}
+	}
+	return fmt.Errorf("command not found")
+}
+
+func (m *mockCommandRepo) MarkCompleted(_ context.Context, id uuid.UUID) error {
+	for _, c := range m.commands {
+		if c.ID == id {
+			c.Status = "completed"
+			return nil
+		}
+	}
+	return fmt.Errorf("command not found")
+}
+
+func (m *mockCommandRepo) MarkFailed(_ context.Context, id uuid.UUID, errMsg string) error {
+	for _, c := range m.commands {
+		if c.ID == id {
+			c.Status = "failed"
+			c.ErrorMessage = errMsg
+			return nil
+		}
+	}
+	return fmt.Errorf("command not found")
+}
+
 type mockAuditLogger struct {
 	events []audit.Event
 }
@@ -332,6 +429,81 @@ type mockAuditLogger struct {
 func (m *mockAuditLogger) Log(_ context.Context, event audit.Event) error {
 	m.events = append(m.events, event)
 	return nil
+}
+
+type mockAppRepo struct {
+	apps      []*models.App
+	createErr error
+	getErr    error
+	listErr   error
+	updateErr error
+	deleteErr error
+}
+
+func (m *mockAppRepo) Create(_ context.Context, app *models.App) error {
+	if m.createErr != nil {
+		return m.createErr
+	}
+	if app.ID == uuid.Nil {
+		app.ID = uuid.New()
+	}
+	app.CreatedAt = time.Now()
+	app.UpdatedAt = time.Now()
+	m.apps = append(m.apps, app)
+	return nil
+}
+
+func (m *mockAppRepo) GetByID(_ context.Context, id uuid.UUID) (*models.App, error) {
+	if m.getErr != nil {
+		return nil, m.getErr
+	}
+	for _, a := range m.apps {
+		if a.ID == id {
+			return a, nil
+		}
+	}
+	return nil, fmt.Errorf("app not found")
+}
+
+func (m *mockAppRepo) List(_ context.Context, _ uuid.UUID, limit, offset int) ([]*models.App, int, error) {
+	if m.listErr != nil {
+		return nil, 0, m.listErr
+	}
+	total := len(m.apps)
+	end := offset + limit
+	if end > total {
+		end = total
+	}
+	if offset >= total {
+		return []*models.App{}, total, nil
+	}
+	return m.apps[offset:end], total, nil
+}
+
+func (m *mockAppRepo) Update(_ context.Context, app *models.App) error {
+	if m.updateErr != nil {
+		return m.updateErr
+	}
+	for i, a := range m.apps {
+		if a.ID == app.ID {
+			m.apps[i] = app
+			return nil
+		}
+	}
+	return fmt.Errorf("app not found")
+}
+
+func (m *mockAppRepo) Delete(_ context.Context, id uuid.UUID) error {
+	if m.deleteErr != nil {
+		return m.deleteErr
+	}
+	for i, a := range m.apps {
+		if a.ID == id {
+			m.apps = append(m.apps[:i], m.apps[i+1:]...)
+			return nil
+		}
+	}
+	return fmt.Errorf("app not found")
 }
 
 // --- Test Helper ---
@@ -344,6 +516,8 @@ type testServer struct {
 	certRepo       *mockCertRepo
 	auditLogRepo   *mockAuditLogRepo
 	auditLogger    *mockAuditLogger
+	commandRepo    *mockCommandRepo
+	appRepo        *mockAppRepo
 }
 
 func newTestServer(t *testing.T) *testServer {
@@ -355,6 +529,8 @@ func newTestServer(t *testing.T) *testServer {
 	cr := &mockCertRepo{}
 	ar := &mockAuditLogRepo{}
 	al := &mockAuditLogger{}
+	cmdr := &mockCommandRepo{}
+	appr := &mockAppRepo{}
 
 	s := &Server{
 		router:           mux.NewRouter(),
@@ -367,6 +543,8 @@ func newTestServer(t *testing.T) *testServer {
 		policyRepo:       pr,
 		certRepo:         cr,
 		auditLogRepo:     ar,
+		cmdRepo:          cmdr,
+		appRepo:          appr,
 		enrollmentLimiter: newRateLimiterWithSize(10, time.Minute, 100),
 		depService:       macos.NewDEPService(&testDEPStorage{}, slog.New(slog.NewTextHandler(bytes.NewBuffer(nil), nil))),
 	}
@@ -384,6 +562,7 @@ func newTestServer(t *testing.T) *testServer {
 	api.HandleFunc("/devices/{id}", s.handleDeleteDevice).Methods("DELETE")
 	api.HandleFunc("/devices/{id}/lock", s.handleLockDevice).Methods("POST")
 	api.HandleFunc("/devices/{id}/wipe", s.handleWipeDevice).Methods("POST")
+	api.HandleFunc("/devices/{id}/restart", s.handleRestartDevice).Methods("POST")
 	api.HandleFunc("/policies", s.handleListPolicies).Methods("GET")
 	api.HandleFunc("/policies", s.handleCreatePolicy).Methods("POST")
 	api.HandleFunc("/policies/{id}", s.handleGetPolicy).Methods("GET")
@@ -399,6 +578,24 @@ func newTestServer(t *testing.T) *testServer {
 	api.HandleFunc("/dep/{name}/assigner", s.handleDEPAssignerProfile).Methods("GET", "PUT")
 	api.HandleFunc("/dep/{name}/devices", s.handleDEPDevices).Methods("GET")
 
+	// Sprint 3: Command and profile routes
+	api.HandleFunc("/devices/{id}/commands", s.handleSendCommand).Methods("POST")
+	api.HandleFunc("/devices/{id}/commands", s.handleListCommands).Methods("GET")
+	api.HandleFunc("/devices/{id}/profiles", s.handleInstallProfile).Methods("POST")
+	api.HandleFunc("/devices/{id}/profiles/{profile_id}", s.handleRemoveProfile).Methods("DELETE")
+
+	// Sprint 3: App management routes
+	api.HandleFunc("/apps", s.handleListApps).Methods("GET")
+	api.HandleFunc("/apps", s.handleCreateApp).Methods("POST")
+	api.HandleFunc("/apps/{id}", s.handleGetApp).Methods("GET")
+	api.HandleFunc("/apps/{id}", s.handleUpdateApp).Methods("PUT")
+	api.HandleFunc("/apps/{id}", s.handleDeleteApp).Methods("DELETE")
+	api.HandleFunc("/apps/{id}/deploy", s.handleDeployApp).Methods("POST")
+
+	// Sprint 3: Windows PPKG routes
+	api.HandleFunc("/windows/ppkg/generate", s.handleWindowsPPKGGenerate).Methods("POST")
+	api.HandleFunc("/windows/ppkg/templates", s.handleWindowsPPKGTemplates).Methods("GET")
+
 	return &testServer{
 		server:         s,
 		enterpriseRepo: er,
@@ -407,6 +604,8 @@ func newTestServer(t *testing.T) *testServer {
 		certRepo:       cr,
 		auditLogRepo:   ar,
 		auditLogger:    al,
+		commandRepo:    cmdr,
+		appRepo:        appr,
 	}
 }
 
