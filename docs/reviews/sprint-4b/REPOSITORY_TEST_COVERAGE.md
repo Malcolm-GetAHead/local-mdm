@@ -62,47 +62,47 @@ The service-layer tests use mocks that return canned data, so they validate busi
 Each repo needs a test file following the existing pattern in `repository_test.go` and `new_repos_test.go`:
 
 ### app_integration_test.go
-- [ ] Create app with valid data
-- [ ] GetByID returns created app
-- [ ] List returns apps for enterprise (pagination)
-- [ ] Update modifies fields
-- [ ] Delete soft-deletes (not found after delete)
-- [ ] Create with duplicate name (if constrained)
+- [x] Create app with valid data
+- [x] GetByID returns created app
+- [x] List returns apps for enterprise (pagination)
+- [x] Update modifies fields
+- [x] Delete soft-deletes (not found after delete)
+- [x] Create with duplicate name (if constrained)
 
 ### compliance_integration_test.go
-- [ ] Upsert creates new compliance result
-- [ ] Upsert updates existing result (same device + policy)
-- [ ] GetByDevice returns results for device
-- [ ] GetSummary returns enterprise-level counts
+- [x] Upsert creates new compliance result
+- [x] Upsert updates existing result (same device + policy)
+- [x] GetByDevice returns results for device
+- [x] GetSummary returns enterprise-level counts
 
 ### group_integration_test.go
-- [ ] Create group
-- [ ] GetByID returns group
-- [ ] List groups for enterprise
-- [ ] Update group name/description
-- [ ] Delete group (soft delete)
-- [ ] AddMember adds device to group
-- [ ] RemoveMember removes device from group
-- [ ] ListMembers returns group members
-- [ ] ListGroupsForDevice returns groups a device belongs to
-- [ ] AddMember with duplicate device (idempotent or error?)
+- [x] Create group
+- [x] GetByID returns group
+- [x] List groups for enterprise
+- [x] Update group name/description
+- [x] Delete group (soft delete)
+- [x] AddMember adds device to group
+- [x] RemoveMember removes device from group
+- [x] ListMembers returns group members
+- [x] ListGroupsForDevice returns groups a device belongs to
+- [x] AddMember with duplicate device (idempotent or error?)
 
 ### policy_assignment_integration_test.go
-- [ ] Create assignment (device target)
-- [ ] Create assignment (group target)
-- [ ] Create assignment (enterprise target)
-- [ ] Delete assignment
-- [ ] ListByTarget returns assignments for a target
-- [ ] ListByPolicy returns assignments for a policy
-- [ ] GetEffectivePolicies resolves priority correctly (lower number = higher priority? or higher number?)
-- [ ] GetEffectivePolicies with overlapping group + device assignments
+- [x] Create assignment (device target)
+- [x] Create assignment (group target)
+- [x] Create assignment (enterprise target)
+- [x] Delete assignment
+- [x] ListByTarget returns assignments for a target
+- [x] ListByPolicy returns assignments for a policy
+- [x] GetEffectivePolicies resolves priority correctly (lower number = higher priority? or higher number?)
+- [x] GetEffectivePolicies with overlapping group + device assignments
 
 ### policy_version_integration_test.go
-- [ ] Create version snapshot
-- [ ] ListByPolicy returns versions in order
-- [ ] GetByVersion returns specific version
-- [ ] LatestVersion returns most recent
-- [ ] Version data (JSONB) round-trips correctly
+- [x] Create version snapshot
+- [x] ListByPolicy returns versions in order
+- [x] GetByVersion returns specific version
+- [x] LatestVersion returns most recent
+- [x] Version data (JSONB) round-trips correctly
 
 ---
 
@@ -122,8 +122,8 @@ The existing `repository_test.go` and `new_repos_test.go` serve as templates.
 
 These aren't zero-coverage but have gaps worth filling opportunistically:
 
-- [ ] `device.GetByPlatformID` — 0% (used by Windows/Android enrollment handlers)
-- [ ] `command.GetByID` — 0% (used by command status checking)
-- [ ] `command.ListByDevice` — 0% (used by command history endpoint)
-- [ ] `certificate.GetBySerial` — 0% (used by cert revocation)
-- [ ] `audit_log.List` — 46.2% (error paths untested)
+- [x] `device.GetByPlatformID` — 0% (used by Windows/Android enrollment handlers)
+- [x] `command.GetByID` — 0% (used by command status checking) **BUG FOUND: NULL error_message scan fails**
+- [x] `command.ListByDevice` — 0% (used by command history endpoint) **BUG FOUND: NULL error_message scan fails**
+- [x] `certificate.GetBySerial` — 0% (used by cert revocation)
+- [x] `audit_log.List` — 46.2% (error paths untested)
