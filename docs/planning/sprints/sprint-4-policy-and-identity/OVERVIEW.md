@@ -14,7 +14,7 @@
 | S4-03 | [Compliance Engine](S4-03-compliance.md) | ⚠️ Partial | S4-01, S4-02 | 3-4 days |
 | S4-05 | [Device Lifecycle Hooks](S4-05-keycloak-device-sync.md) | ✅ Yes | None | 1-2 days |
 
-> **Note**: S4-04 (macOS Platform SSO) moved to Sprint 4b. S4-05 rescoped 2026-04-20: Keycloak PSSO admin client, device registry sync, and reconciliation moved to Sprint 4b. S4-05 now covers only the lifecycle hook infrastructure (interface + wiring CheckOut/wipe/delete handlers).
+> **Note**: S4-04 (macOS Platform SSO) moved to Sprint 4c. S4-05 rescoped 2026-04-20: Keycloak PSSO admin client, device registry sync, and reconciliation moved to Sprint 4c. S4-05 now covers only the lifecycle hook infrastructure (interface + wiring CheckOut/wipe/delete handlers).
 
 ## Dependency Graph
 
