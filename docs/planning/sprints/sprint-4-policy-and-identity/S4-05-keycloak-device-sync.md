@@ -6,16 +6,16 @@
 
 ## Objective
 
-Wire device lifecycle events (unenrollment, wipe, delete) to extensible hook points so that Sprint 4b's Keycloak PSSO sync (and future integrations) can plug in without modifying handler code.
+Wire device lifecycle events (unenrollment, wipe, delete) to extensible hook points so that Sprint 4c's Keycloak PSSO sync (and future integrations) can plug in without modifying handler code.
 
-> **Rescoped 2026-04-20**: Keycloak PSSO admin client, device registry sync, and reconciliation moved to Sprint 4b. This task now focuses only on the hook infrastructure and making CheckOut/wipe/delete handlers call it.
+> **Rescoped 2026-04-20**: Keycloak PSSO admin client, device registry sync, and reconciliation moved to Sprint 4c. This task now focuses only on the hook infrastructure and making CheckOut/wipe/delete handlers call it.
 
 ## Tasks
 
 ### 1. Device Lifecycle Hook Interface
 - Define a `DeviceLifecycleHook` interface: `OnUnenroll(ctx, device)`, `OnWipe(ctx, device)`, `OnDelete(ctx, device)`
 - Register hooks as EventBus subscribers for `device.unenrolled`, `device.wiped`, `device.deleted`
-- No-op by default — Sprint 4b adds the Keycloak hook implementation
+- No-op by default — Sprint 4c adds the Keycloak hook implementation
 - Files: `internal/service/lifecycle.go`
 
 ### 2. Wire CheckOut Handler
@@ -42,9 +42,9 @@ The following are now part of Sprint 4c (Platform SSO):
 
 ## Acceptance Criteria
 
-- [ ] `DeviceLifecycleHook` interface defined with `OnUnenroll`, `OnWipe`, `OnDelete`
-- [ ] macOS CheckOut event updates device status and calls hooks
-- [ ] Wipe handler calls hooks after status update
-- [ ] Delete handler calls hooks after deletion
-- [ ] Audit log entry for each lifecycle event
-- [ ] Hook slice is empty by default (no external calls until 4b adds Keycloak hook)
+- [x] `DeviceLifecycleHook` interface defined with `OnUnenroll`, `OnWipe`, `OnDelete`
+- [x] macOS CheckOut event updates device status and calls hooks
+- [x] Wipe handler calls hooks after status update
+- [x] Delete handler calls hooks after deletion
+- [x] Audit log entry for each lifecycle event
+- [x] Hook slice is empty by default (no external calls until 4c adds Keycloak hook)

@@ -1,6 +1,8 @@
 # S4-04: macOS Platform SSO Profile & Keycloak PSSO
 
-**Sprint**: 4 — Policy & Identity
+> **Moved to Sprint 4c.** See [Sprint 4c: Platform SSO](../sprint-4c-platform-sso/OVERVIEW.md). This file is kept for historical reference.
+
+**Sprint**: 4c — Platform SSO (formerly Sprint 4)  
 **Parallel**: ✅ Yes (independent of policy tasks)
 **Depends on**: S2-01 (macOS enrollment), S1-04 (Keycloak running)
 **Effort**: 4-5 days

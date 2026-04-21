@@ -31,7 +31,7 @@
 
 ## Acceptance Criteria
 
-- [ ] Device with correct password policy shows as compliant
-- [ ] Device missing required WiFi profile shows as non-compliant with reason
-- [ ] Compliance summary shows counts per status
-- [ ] Compliance re-evaluated on policy change
+- [ ] Device with correct password policy shows as compliant (deferred to S5-09 — needs device state parsing)
+- [ ] Device missing required WiFi profile shows as non-compliant with reason (deferred to S5-09)
+- [x] Compliance summary shows counts per status
+- [ ] Compliance re-evaluated on policy change (deferred to Sprint 5 — EventBus listener)

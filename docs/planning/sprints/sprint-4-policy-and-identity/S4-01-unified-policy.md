@@ -43,8 +43,8 @@
 
 ## Acceptance Criteria
 
-- [ ] Create a WiFi policy, translators produce correct output for all 3 platforms
-- [ ] Unsupported fields logged but don't block deployment
-- [ ] Policy version created on each update
-- [ ] Rollback restores previous version
-- [ ] Templates can be cloned into enterprise policies
+- [x] Create a WiFi policy, translators produce correct output for all 3 platforms
+- [x] Unsupported fields logged but don't block deployment
+- [x] Policy version created on each update
+- [x] Rollback restores previous version
+- [x] Templates can be cloned into enterprise policies

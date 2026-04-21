@@ -32,11 +32,11 @@
 
 ## Acceptance Criteria
 
-- [ ] Device group created with static members
-- [ ] Devices added to and removed from groups
-- [ ] Policy assigned to group, all member devices receive it
-- [ ] New device added to group receives existing group policies
-- [ ] Policy conflict resolved correctly (priority-based)
+- [x] Device group created with static members
+- [x] Devices added to and removed from groups
+- [x] Policy assigned to group, all member devices receive it
+- [x] New device added to group receives existing group policies
+- [x] Policy conflict resolved correctly (priority-based)
 
 ## Out of Scope (Deferred to F-07)
 
