@@ -3,7 +3,8 @@
 **Priority**: High  
 **Effort**: 2-3 days  
 **Score Impact**: +0.20 points  
-**Status**: Future (Kubernetes marked as future in scope)
+**Status**: Future  
+**Last Updated**: 2026-04-21
 
 ---
 
@@ -16,31 +17,397 @@
 - Basic deployment documentation (S5-04)
 
 ### Missing
-- Kubernetes manifests
-- Helm charts for easy deployment
-- High availability configuration
-- Load balancer setup
-- Zero-downtime deployment strategy
+- Production container orchestration (ECS Fargate)
+- Managed database with read replicas (RDS)
+- Secrets management integration (SSM Parameter Store)
+- TLS termination (ACM + ALB)
 - Auto-scaling configuration
+- Zero-downtime deployment strategy
+- CloudWatch logging and metrics forwarding
 - Production troubleshooting guide
-
-### Impact
-Without production deployment tooling:
-- Manual deployment is error-prone
-- No horizontal scaling capability
-- Downtime during updates
-- No automatic failover
-- Difficult to manage multiple environments
 
 ---
 
-## Proposed Solution
+## Proposed Solution: AWS ECS Fargate
 
-### 1. Kubernetes Manifests
+Local MDM is a single Go binary with a PostgreSQL dependency. ECS Fargate is the right fit — no cluster management overhead, pay-per-task pricing, and native integration with ALB, RDS, SSM, ACM, and CloudWatch.
 
-**Deployments**:
+### Architecture Overview
+
+```
+                    ┌─────────────────────┐
+                    │   Route 53 (DNS)    │
+                    └──────────┬──────────┘
+                               │
+                    ┌──────────▼──────────┐
+                    │   ACM Certificate   │
+                    │   (auto-renewing)   │
+                    └──────────┬──────────┘
+                               │
+                    ┌──────────▼──────────┐
+                    │   ALB (public)      │
+                    │   TLS termination   │
+                    └──────────┬──────────┘
+                               │
+              ┌────────────────┼────────────────┐
+              │                │                │
+     ┌────────▼───────┐ ┌─────▼────────┐ ┌─────▼────────┐
+     │  ECS Task 1    │ │  ECS Task 2  │ │  ECS Task 3  │
+     │  localmdm:8080 │ │  localmdm    │ │  localmdm    │
+     │  cw-agent:9090 │ │  cw-agent    │ │  cw-agent    │
+     └────────┬───────┘ └─────┬────────┘ └─────┬────────┘
+              │               │                │
+              └───────────────┼────────────────┘
+                              │
+              ┌───────────────┼────────────────┐
+              │                                │
+     ┌────────▼───────┐              ┌─────────▼────────┐
+     │  RDS Primary   │──replication──▶  RDS Read Replica │
+     │  (Writer pool) │              │  (Reader pool)    │
+     └────────────────┘              └──────────────────┘
+```
+
+Each ECS task runs two containers:
+- **localmdm**: the Go application (port 8080 for API, port 9090 for Prometheus metrics)
+- **cloudwatch-agent**: sidecar that scrapes Prometheus metrics from localhost:9090 and forwards to CloudWatch Metrics
+
+---
+
+### 1. ECS Task Definition
+
+```json
+{
+  "family": "localmdm",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": ["FARGATE"],
+  "cpu": "512",
+  "memory": "1024",
+  "executionRoleArn": "arn:aws:iam::ACCOUNT:role/localmdm-execution",
+  "taskRoleArn": "arn:aws:iam::ACCOUNT:role/localmdm-task",
+  "containerDefinitions": [
+    {
+      "name": "localmdm",
+      "image": "ACCOUNT.dkr.ecr.REGION.amazonaws.com/localmdm:latest",
+      "essential": true,
+      "portMappings": [
+        {"containerPort": 8080, "protocol": "tcp"},
+        {"containerPort": 9090, "protocol": "tcp"}
+      ],
+      "healthCheck": {
+        "command": ["CMD-SHELL", "curl -f http://localhost:8080/health || exit 1"],
+        "interval": 30,
+        "timeout": 5,
+        "retries": 3,
+        "startPeriod": 60
+      },
+      "secrets": [
+        {"name": "DB_PASSWORD", "valueFrom": "arn:aws:ssm:REGION:ACCOUNT:parameter/localmdm/db-password"},
+        {"name": "JWT_SECRET", "valueFrom": "arn:aws:ssm:REGION:ACCOUNT:parameter/localmdm/jwt-secret"},
+        {"name": "KEYCLOAK_CLIENT_SECRET", "valueFrom": "arn:aws:ssm:REGION:ACCOUNT:parameter/localmdm/keycloak-secret"},
+        {"name": "DEP_ENCRYPTION_KEY", "valueFrom": "arn:aws:ssm:REGION:ACCOUNT:parameter/localmdm/dep-encryption-key"}
+      ],
+      "environment": [
+        {"name": "ENVIRONMENT", "value": "production"},
+        {"name": "DB_HOST", "value": "localmdm-primary.XXXXX.REGION.rds.amazonaws.com"},
+        {"name": "DB_PORT", "value": "5432"},
+        {"name": "DB_USER", "value": "localmdm"},
+        {"name": "DB_NAME", "value": "localmdm"},
+        {"name": "DB_READER_HOST", "value": "localmdm-replica.XXXXX.REGION.rds.amazonaws.com"},
+        {"name": "DB_READER_PORT", "value": "5432"}
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/localmdm",
+          "awslogs-region": "REGION",
+          "awslogs-stream-prefix": "app"
+        }
+      }
+    },
+    {
+      "name": "cloudwatch-agent",
+      "image": "public.ecr.aws/cloudwatch-agent/cloudwatch-agent:latest",
+      "essential": false,
+      "portMappings": [],
+      "secrets": [],
+      "environment": [
+        {"name": "CW_CONFIG_CONTENT", "value": "{\"metrics\":{\"namespace\":\"LocalMDM\",\"metrics_collected\":{\"prometheus\":{\"prometheus_config_path\":\"/opt/aws/amazon-cloudwatch-agent/etc/prometheus.yaml\",\"emf_processor\":{\"metric_declaration\":[{\"source_labels\":[\"job\"],\"label_matcher\":\"localmdm\",\"dimensions\":[[\"instance\"]],\"metric_selectors\":[\".*\"]}]}}}}}"}
+      ],
+      "mountPoints": [
+        {
+          "sourceVolume": "prometheus-config",
+          "containerPath": "/opt/aws/amazon-cloudwatch-agent/etc"
+        }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/localmdm",
+          "awslogs-region": "REGION",
+          "awslogs-stream-prefix": "cw-agent"
+        }
+      }
+    }
+  ],
+  "volumes": [
+    {
+      "name": "prometheus-config",
+      "host": {}
+    }
+  ]
+}
+```
+
+**CloudWatch Agent Prometheus config** (`prometheus.yaml` — baked into image or injected via init container):
 ```yaml
-# k8s/deployment.yaml
+global:
+  scrape_interval: 30s
+scrape_configs:
+  - job_name: localmdm
+    static_configs:
+      - targets: ["localhost:9090"]
+```
+
+### 2. ECS Service & ALB
+
+```json
+{
+  "serviceName": "localmdm",
+  "cluster": "localmdm-cluster",
+  "taskDefinition": "localmdm",
+  "desiredCount": 3,
+  "launchType": "FARGATE",
+  "networkConfiguration": {
+    "awsvpcConfiguration": {
+      "subnets": ["subnet-private-1a", "subnet-private-1b", "subnet-private-1c"],
+      "securityGroups": ["sg-localmdm-tasks"],
+      "assignPublicIp": "DISABLED"
+    }
+  },
+  "loadBalancers": [
+    {
+      "targetGroupArn": "arn:aws:elasticloadbalancing:REGION:ACCOUNT:targetgroup/localmdm/XXXXX",
+      "containerName": "localmdm",
+      "containerPort": 8080
+    }
+  ],
+  "deploymentConfiguration": {
+    "maximumPercent": 200,
+    "minimumHealthyPercent": 100,
+    "deploymentCircuitBreaker": {
+      "enable": true,
+      "rollback": true
+    }
+  },
+  "healthCheckGracePeriodSeconds": 60
+}
+```
+
+**ALB Configuration**:
+- **Listener**: HTTPS:443 → target group (ACM certificate attached)
+- **Target group**: port 8080, health check on `/health`, healthy threshold 2, interval 15s
+- **Security group**: allow 443 inbound from 0.0.0.0/0, allow 8080 from ALB SG only
+
+### 3. Auto-Scaling
+
+```json
+{
+  "ServiceNamespace": "ecs",
+  "ResourceId": "service/localmdm-cluster/localmdm",
+  "ScalableDimension": "ecs:service:DesiredCount",
+  "MinCapacity": 2,
+  "MaxCapacity": 10
+}
+```
+
+**Scaling policies**:
+- **CPU target tracking**: scale when average CPU > 70%
+- **Request count**: scale when ALB requests per target > 1000/min
+- **Scale-in cooldown**: 300s (prevent flapping)
+
+### 4. RDS PostgreSQL
+
+| Setting | Value |
+|---------|-------|
+| Engine | PostgreSQL 15+ |
+| Instance class | db.t4g.medium (production) / db.t4g.micro (staging) |
+| Multi-AZ | Yes (primary) |
+| Read replica | 1 (maps to `DB_READER_HOST`) |
+| Storage | gp3, 50GB, auto-scaling to 200GB |
+| Backup retention | 7 days |
+| Encryption | AES-256 (default KMS key) |
+| Parameter group | `max_connections=200`, `shared_buffers=256MB` |
+
+The Writer/Reader pool split from Sprint 4b maps directly:
+- `DB_HOST` → RDS primary endpoint (writes + transactions)
+- `DB_READER_HOST` → RDS reader endpoint (read queries)
+
+### 5. Secrets Management (SSM Parameter Store)
+
+All secrets stored as `SecureString` parameters:
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `/localmdm/db-password` | SecureString | RDS master password |
+| `/localmdm/jwt-secret` | SecureString | JWT signing key |
+| `/localmdm/keycloak-secret` | SecureString | Keycloak client secret |
+| `/localmdm/dep-encryption-key` | SecureString | DEP token encryption key |
+
+ECS task execution role needs `ssm:GetParameters` permission on these paths. Secrets are injected as environment variables at task launch — the Go app reads them via `os.Getenv()` (already implemented in `config.go`).
+
+### 6. TLS (ACM + ALB)
+
+- Request certificate in ACM for `mdm.example.com`
+- DNS validation via Route 53 (auto-renewing, zero maintenance)
+- Attach certificate to ALB HTTPS listener
+- ALB terminates TLS; traffic to ECS tasks is HTTP on port 8080 within the VPC
+
+### 7. CloudWatch Integration
+
+**Logs**: ECS `awslogs` driver sends container stdout/stderr to CloudWatch Logs. The Go app uses structured JSON logging — CloudWatch Logs Insights can query by field.
+
+**Metrics**: CloudWatch Agent sidecar scrapes Prometheus metrics from `localhost:9090` and publishes to CloudWatch Metrics under the `LocalMDM` namespace. This gives you:
+- All existing Prometheus metrics (request rate, latency, error rate) in CloudWatch dashboards
+- CloudWatch Alarms on any metric (e.g., error rate > 5%)
+- No need to run a separate Prometheus server in production
+
+**Dashboard**: CloudWatch dashboard with panels for:
+- Request rate and latency (p50, p95, p99)
+- Error rate by endpoint
+- ECS task count and CPU/memory utilization
+- RDS connections, read/write IOPS, replication lag
+- ALB request count, 5xx rate, target response time
+
+### 8. Networking
+
+```
+VPC (10.0.0.0/16)
+├── Public subnets (10.0.1.0/24, 10.0.2.0/24, 10.0.3.0/24)
+│   └── ALB (internet-facing)
+├── Private subnets (10.0.10.0/24, 10.0.20.0/24, 10.0.30.0/24)
+│   └── ECS tasks (no public IP)
+└── Database subnets (10.0.100.0/24, 10.0.200.0/24)
+    └── RDS (private, no internet access)
+```
+
+Security groups:
+- **ALB SG**: inbound 443 from 0.0.0.0/0
+- **ECS SG**: inbound 8080 from ALB SG only
+- **RDS SG**: inbound 5432 from ECS SG only
+
+---
+
+## Implementation Tasks
+
+### Task 1: Infrastructure (1 day)
+- Create ECR repository, push Docker image
+- Create ECS cluster (Fargate)
+- Create task definition with app + CloudWatch Agent sidecar
+- Create ECS service with ALB target group
+- Configure auto-scaling policies
+
+### Task 2: Database & Secrets (0.5 days)
+- Create RDS PostgreSQL with read replica
+- Store secrets in SSM Parameter Store
+- Run migrations against RDS
+- Verify Writer/Reader pool connectivity
+
+### Task 3: Networking & TLS (0.5 days)
+- Create VPC with public/private/database subnets
+- Configure ALB with ACM certificate
+- Set up security groups
+- Configure Route 53 DNS
+
+### Task 4: Monitoring & Operations (0.5 days)
+- Verify CloudWatch Agent scrapes Prometheus metrics
+- Create CloudWatch dashboard
+- Set up alarms (error rate, latency, task health)
+- Write production troubleshooting guide
+
+### Task 5: Deployment Pipeline (0.5 days)
+- ECR image build and push (GitHub Actions or CodePipeline)
+- ECS service update (rolling deployment with circuit breaker)
+- Database migration step (run before deploy)
+- Rollback procedure documentation
+
+---
+
+## Zero-Downtime Deployment
+
+ECS handles this natively with the deployment configuration above:
+- `minimumHealthyPercent: 100` — never fewer tasks than desired count
+- `maximumPercent: 200` — spin up new tasks before draining old ones
+- `deploymentCircuitBreaker` — auto-rollback if new tasks fail health checks
+- ALB drains connections from old tasks (deregistration delay: 30s)
+
+**Deployment flow**:
+1. Push new image to ECR
+2. Update ECS service (new task definition revision)
+3. ECS launches new tasks with new image
+4. ALB health checks pass → new tasks receive traffic
+5. Old tasks drain and stop
+6. If health checks fail → circuit breaker rolls back automatically
+
+---
+
+## Cost Estimate
+
+### Staging
+| Resource | Spec | Monthly Cost |
+|----------|------|-------------|
+| ECS Fargate | 1 task, 0.25 vCPU, 0.5GB | ~$9 |
+| RDS | db.t4g.micro, single-AZ, no replica | ~$13 |
+| ALB | minimal traffic | ~$16 |
+| CloudWatch | logs + metrics | ~$5 |
+| **Total** | | **~$43/mo** |
+
+### Production
+| Resource | Spec | Monthly Cost |
+|----------|------|-------------|
+| ECS Fargate | 3 tasks, 0.5 vCPU, 1GB | ~$55 |
+| RDS | db.t4g.medium, Multi-AZ + 1 replica | ~$140 |
+| ALB | moderate traffic | ~$25 |
+| CloudWatch | logs + metrics + dashboards | ~$15 |
+| SSM | parameter reads | ~$0 |
+| ACM | certificate | $0 |
+| **Total** | | **~$235/mo** |
+
+---
+
+## Security Hardening (from SECURITY.md TODOs)
+
+- **Dependency scanning**: `govulncheck` in CI pipeline
+- **Image scanning**: ECR image scanning on push
+- **Network segmentation**: VPC with private subnets, no public IPs on tasks
+- **Secrets**: SSM Parameter Store with KMS encryption, never in task definition plaintext
+- **IAM**: least-privilege task role and execution role
+- **Security contact**: set up `security@localmdm.dev` for responsible disclosure
+
+---
+
+## Acceptance Criteria
+
+- [ ] ECS service running with 3 tasks behind ALB
+- [ ] Health checks pass (ALB target group healthy)
+- [ ] Zero-downtime rolling deployment works
+- [ ] Auto-scaling triggers on CPU threshold
+- [ ] Circuit breaker rolls back failed deployments
+- [ ] RDS primary + read replica connected (Writer/Reader pools)
+- [ ] Secrets loaded from SSM Parameter Store
+- [ ] TLS termination at ALB with ACM certificate
+- [ ] CloudWatch Agent forwards Prometheus metrics to CloudWatch Metrics
+- [ ] CloudWatch dashboard shows request rate, latency, error rate
+- [ ] CloudWatch Alarms configured for error rate and task health
+
+---
+
+## Appendix: Kubernetes Deployment (Alternative)
+
+For teams that prefer Kubernetes or already have a K8s cluster, the same application can be deployed with standard Kubernetes resources. The core concepts (health checks, rolling deploys, read replicas, secrets) are identical — only the orchestration layer differs.
+
+### Deployment
+
+```yaml
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -78,27 +445,44 @@ spec:
           limits:
             memory: "512Mi"
             cpu: "500m"
+        envFrom:
+        - configMapRef:
+            name: localmdm-config
+        - secretRef:
+            name: localmdm-secrets
 ```
 
-**Services**:
+### ConfigMap
+
 ```yaml
-# k8s/service.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: localmdm-config
+data:
+  ENVIRONMENT: "production"
+  DB_HOST: "postgres-primary.default.svc.cluster.local"
+  DB_PORT: "5432"
+  DB_NAME: "localmdm"
+  DB_READER_HOST: "postgres-replica.default.svc.cluster.local"
+  DB_READER_PORT: "5432"
+```
+
+### Service, Ingress, HPA
+
+```yaml
 apiVersion: v1
 kind: Service
 metadata:
   name: localmdm
 spec:
-  type: LoadBalancer
+  type: ClusterIP
   ports:
-  - port: 443
+  - port: 8080
     targetPort: 8080
   selector:
     app: localmdm
-```
-
-**Ingress**:
-```yaml
-# k8s/ingress.yaml
+---
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -121,146 +505,7 @@ spec:
             name: localmdm
             port:
               number: 8080
-```
-
-**ConfigMap**:
-```yaml
-# k8s/configmap.yaml
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: localmdm-config
-data:
-  config.yaml: |
-    server:
-      port: 8080
-    database:
-      host: postgres-primary.default.svc.cluster.local
-      port: 5432
-      name: localmdm
-      # Reader pool overrides for read replica (Sprint 4b)
-      reader:
-        host: postgres-replica.default.svc.cluster.local
-```
-
-**Secrets**:
-```yaml
-# k8s/secret.yaml
-apiVersion: v1
-kind: Secret
-metadata:
-  name: localmdm-secrets
-type: Opaque
-data:
-  db_password: <base64-encoded>
-  jwt_secret: <base64-encoded>
-```
-
-### 2. Helm Chart
-
-**Chart Structure**:
-```
-helm/localmdm/
-├── Chart.yaml
-├── values.yaml
-├── values-production.yaml
-├── values-staging.yaml
-├── templates/
-│   ├── deployment.yaml
-│   ├── service.yaml
-│   ├── ingress.yaml
-│   ├── configmap.yaml
-│   ├── secret.yaml
-│   ├── hpa.yaml
-│   ├── pdb.yaml
-│   └── serviceaccount.yaml
-```
-
-**values.yaml**:
-```yaml
-replicaCount: 3
-
-image:
-  repository: localmdm
-  tag: latest
-  pullPolicy: IfNotPresent
-
-service:
-  type: LoadBalancer
-  port: 443
-
-ingress:
-  enabled: true
-  className: nginx
-  annotations:
-    cert-manager.io/cluster-issuer: letsencrypt-prod
-  hosts:
-    - host: mdm.example.com
-      paths:
-        - path: /
-          pathType: Prefix
-  tls:
-    - secretName: localmdm-tls
-      hosts:
-        - mdm.example.com
-
-resources:
-  requests:
-    memory: 256Mi
-    cpu: 250m
-  limits:
-    memory: 512Mi
-    cpu: 500m
-
-autoscaling:
-  enabled: true
-  minReplicas: 3
-  maxReplicas: 10
-  targetCPUUtilizationPercentage: 70
-  targetMemoryUtilizationPercentage: 80
-
-database:
-  host: postgres-primary.default.svc.cluster.local
-  port: 5432
-  name: localmdm
-  # Password from secret
-  # Reader pool overrides for read replica (Sprint 4b)
-  # Unset fields inherit from base config above
-  reader:
-    host: postgres-replica.default.svc.cluster.local
-
-keycloak:
-  url: https://keycloak.example.com
-  realm: localmdm
-  clientId: localmdm-api
-  # Client secret from secret
-```
-
-### 3. High Availability Configuration
-
-**Components**:
-- 3+ application replicas
-- Load balancer (AWS ALB, GCP Load Balancer, NGINX Ingress)
-- PostgreSQL with read replicas (managed service: RDS, Cloud SQL)
-- PostgreSQL-backed token cache and idempotency keys (no external cache dependency)
-- Horizontal Pod Autoscaler (HPA)
-- Pod Disruption Budget (PDB)
-
-**PDB Example**:
-```yaml
-apiVersion: policy/v1
-kind: PodDisruptionBudget
-metadata:
-  name: localmdm-pdb
-spec:
-  minAvailable: 2
-  selector:
-    matchLabels:
-      app: localmdm
-```
-
-**HPA Example**:
-```yaml
+---
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
@@ -279,205 +524,33 @@ spec:
       target:
         type: Utilization
         averageUtilization: 70
-  - type: Resource
-    resource:
-      name: memory
-      target:
-        type: Utilization
-        averageUtilization: 80
 ```
 
-### 4. Zero-Downtime Deployment
+### Helm Chart
 
-**Strategy**: Rolling Update
-- Deploy new version gradually
-- Health checks ensure new pods are ready
-- Old pods terminated only after new pods healthy
-- Rollback capability if health checks fail
+For repeated deployments, a Helm chart parameterizes the above manifests. Structure:
 
-**Blue-Green Deployment** (alternative):
-- Deploy new version alongside old version
-- Switch traffic to new version
-- Keep old version for quick rollback
-- Remove old version after validation
-
-**Canary Deployment** (advanced):
-- Deploy new version to small percentage of traffic (10%)
-- Monitor metrics and errors
-- Gradually increase traffic to new version
-- Rollback if issues detected
-
----
-
-## Implementation Tasks
-
-### Task 1: Kubernetes Manifests (1 day)
-- Create deployment, service, ingress, configmap, secret manifests
-- Configure health checks and resource limits
-- Set up HPA and PDB
-- Test on local Kubernetes (minikube, kind)
-
-### Task 2: Helm Chart (1 day)
-- Create Helm chart structure
-- Parameterize all configuration
-- Create values files for dev, staging, production
-- Test Helm install/upgrade/rollback
-- Package and publish chart
-
-### Task 3: Production Setup Guide (0.5 days)
-- Document cloud provider setup (AWS EKS, GCP GKE, Azure AKS)
-- Load balancer configuration
-- TLS certificate setup (cert-manager)
-- Database connection (RDS, Cloud SQL)
-- Secrets management (AWS Secrets Manager, GCP Secret Manager)
-- Monitoring integration (Prometheus, Grafana)
-
-### Task 4: Troubleshooting Guide (0.5 days)
-- Common deployment issues
-- Pod crash loop debugging
-- Database connection issues
-- Certificate problems
-- Performance tuning
-- Scaling issues
-
----
-
-## Security Hardening (from SECURITY.md TODOs)
-
-The following items were identified as TODOs in `docs/SECURITY.md` during Sprint 4 retrospective and belong in this production deployment scope:
-
-- **Dependency scanning**: Set up automated vulnerability scanning (Dependabot, Snyk, or `govulncheck`) in CI pipeline
-- **Code signing**: Sign release binaries and container images for supply chain integrity
-- **Network segmentation**: Document production network architecture (VPC, security groups, private subnets for DB/services)
-- **Security contact email**: Set up `security@localmdm.dev` for responsible disclosure
-
----
-
-## Acceptance Criteria
-
-- [ ] Kubernetes manifests deploy successfully
-- [ ] Helm chart installs with custom values
-- [ ] 3 replicas running with load balancing
-- [ ] Health checks pass (liveness and readiness)
-- [ ] Zero-downtime rolling update works
-- [ ] HPA scales up under load
-- [ ] PDB prevents all pods from being evicted
-- [ ] TLS termination at ingress works
-- [ ] Secrets loaded from external secret manager
-- [ ] Prometheus metrics scraped successfully
-
----
-
-## Cloud Provider Examples
-
-### AWS EKS
-```bash
-# Create EKS cluster
-eksctl create cluster --name localmdm --region us-east-1 --nodes 3
-
-# Install cert-manager
-kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.13.0/cert-manager.yaml
-
-# Install NGINX Ingress
-kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/aws/deploy.yaml
-
-# Deploy Local MDM
-helm install localmdm ./helm/localmdm -f values-production.yaml
+```
+helm/localmdm/
+├── Chart.yaml
+├── values.yaml
+├── values-production.yaml
+├── templates/
+│   ├── deployment.yaml
+│   ├── service.yaml
+│   ├── ingress.yaml
+│   ├── configmap.yaml
+│   ├── hpa.yaml
+│   └── pdb.yaml
 ```
 
-### GCP GKE
-```bash
-# Create GKE cluster
-gcloud container clusters create localmdm --num-nodes=3 --region=us-central1
-
-# Install cert-manager
-kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.13.0/cert-manager.yaml
-
-# Deploy Local MDM
-helm install localmdm ./helm/localmdm -f values-production.yaml
-```
-
-### Azure AKS
-```bash
-# Create AKS cluster
-az aks create --resource-group localmdm --name localmdm --node-count 3
-
-# Get credentials
-az aks get-credentials --resource-group localmdm --name localmdm
-
-# Deploy Local MDM
-helm install localmdm ./helm/localmdm -f values-production.yaml
-```
-
----
-
-## Monitoring & Alerting
-
-**Prometheus ServiceMonitor**:
-```yaml
-apiVersion: monitoring.coreos.com/v1
-kind: ServiceMonitor
-metadata:
-  name: localmdm
-spec:
-  selector:
-    matchLabels:
-      app: localmdm
-  endpoints:
-  - port: http
-    path: /metrics
-    interval: 30s
-```
-
-**Grafana Dashboard**:
-- Import dashboard from S5-06 metrics
-- Add Kubernetes-specific metrics (pod restarts, CPU/memory usage)
-
----
-
-## Cost Optimization
-
-**Development**:
-- 1 replica, smaller instance types
-- Spot instances (AWS, GCP)
-- Auto-shutdown during off-hours
-
-**Staging**:
-- 2 replicas, medium instance types
-- Shared database with development
-
-**Production**:
-- 3+ replicas, production-grade instances
-- Dedicated database with read replicas
-- Multi-AZ deployment
-
----
-
-## Security Considerations
-
-- Network policies to restrict pod-to-pod communication
-- Pod security policies/standards
-- RBAC for Kubernetes API access
-- Secrets encryption at rest
-- Image scanning (Trivy, Snyk)
-- Runtime security (Falco)
-
----
-
-## Future Enhancements
-
-- Multi-region deployment
-- GitOps with ArgoCD or Flux
-- Service mesh (Istio, Linkerd)
-- Chaos engineering (Chaos Mesh)
-- Cost monitoring and optimization
-- Automated backup and restore
+See the Kubernetes documentation and Helm docs for details on managing chart releases.
 
 ---
 
 ## References
 
-- [Kubernetes Documentation](https://kubernetes.io/docs/)
-- [Helm Documentation](https://helm.sh/docs/)
+- [ECS Fargate Documentation](https://docs.aws.amazon.com/AmazonECS/latest/developerguide/AWS_Fargate.html)
+- [CloudWatch Agent with Prometheus](https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/ContainerInsights-Prometheus.html)
 - [S5-04: Deployment Guide](../sprint-5-ui-and-polish/S5-04-deployment.md)
 - [S5-06: Observability](../sprint-5-ui-and-polish/S5-06-observability.md)
