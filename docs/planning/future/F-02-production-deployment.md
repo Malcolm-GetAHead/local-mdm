@@ -55,29 +55,35 @@ Local MDM is a single Go binary with a PostgreSQL dependency. ECS Fargate is the
      │  ECS Task 1    │ │  ECS Task 2  │ │  ECS Task 3  │
      │  localmdm:8080 │ │  localmdm    │ │  localmdm    │
      │  cw-agent:9090 │ │  cw-agent    │ │  cw-agent    │
-     └────────┬───────┘ └─────┬────────┘ └─────┬────────┘
-              │               │                │
-              └───────┬───────┴────────┬───────┘
-                      │                │
-             ┌────────▼───────┐        │
-             │  NanoMDM (ECS) │        │
-             │  Apple MDM     │        │
-             │  protocol +    │        │
-             │  APNs push     │        │
-             └────────┬───────┘        │
-                      │                │
-              ┌───────┴────────────────┼───────┐
-              │                                │
-     ┌────────▼───────┐              ┌─────────▼────────┐
-     │  RDS Primary   │──replication──▶  RDS Read Replica │
-     │  (Writer pool) │              │  (Reader pool)    │
-     └────────────────┘              └──────────────────┘
+     └──┬──────┬──────┘ └──┬──────┬────┘ └──┬──────┬────┘
+        │      │           │      │          │      │
+        │      └───────────┼──────┴──────────┼──────┘
+        │                  │          ┌──────┘
+        │    ┌─────────────┼──────────┤
+        │    │             │          │
+        │  ┌─▼────────────┐  ┌───────▼────────┐
+        │  │ NanoMDM (ECS) │  │ Keycloak (ECS) │
+        │  │ Apple MDM     │  │ OIDC IdP       │
+        │  │ protocol +    │  │ admin login,   │
+        │  │ APNs push     │  │ JWT, RBAC      │
+        │  └───────┬───────┘  └───────┬────────┘
+        │          │                  │
+        └──────────┼──────────────────┘
+                   │
+     ┌─────────────┼─────────────┐
+     │                           │
+     ▼                           ▼
+┌────────────────┐    ┌──────────────────┐
+│  RDS Primary   │────▶  RDS Read Replica │
+│  (Writer pool) │    │  (Reader pool)    │
+└────────────────┘    └──────────────────┘
 ```
 
 **Services**:
 - **localmdm** (ECS Fargate): the Go application — API server, policy engine, enrollment handlers. Each task runs a CloudWatch Agent sidecar for Prometheus metrics forwarding.
 - **nanomdm** (ECS Fargate): Apple MDM protocol handler — receives device check-ins, delivers commands via APNs, calls back to Local MDM webhooks (`/checkin`, `/mdm`). Shares the same RDS database (NanoMDM's PostgreSQL schema coexists with Local MDM's tables). Configured with `NANOMDM_API_KEY` for authenticated command submission from Local MDM.
-- **RDS PostgreSQL**: primary for writes, read replica for Local MDM's Reader pool. NanoMDM uses the primary only.
+- **keycloak** (ECS Fargate): OIDC identity provider — admin/operator login, JWT issuance, role management (super_admin, admin, operator, viewer). Uses the same RDS instance (separate `keycloak` database). Exposed via ALB on a dedicated host or path (e.g., `auth.mdm.example.com`).
+- **RDS PostgreSQL**: primary for writes, read replica for Local MDM's Reader pool. NanoMDM and Keycloak use the primary only (separate databases on the same instance).
 
 ---
 
@@ -413,22 +419,24 @@ ECS handles this natively with the deployment configuration above:
 |----------|------|-------------|
 | ECS Fargate (localmdm) | 1 task, 0.25 vCPU, 0.5GB | ~$9 |
 | ECS Fargate (nanomdm) | 1 task, 0.25 vCPU, 0.5GB | ~$9 |
+| ECS Fargate (keycloak) | 1 task, 0.5 vCPU, 1GB | ~$18 |
 | RDS | db.t4g.micro, single-AZ, no replica | ~$13 |
 | ALB | minimal traffic | ~$16 |
 | CloudWatch | logs + metrics | ~$5 |
-| **Total** | | **~$52/mo** |
+| **Total** | | **~$70/mo** |
 
 ### Production
 | Resource | Spec | Monthly Cost |
 |----------|------|-------------|
 | ECS Fargate (localmdm) | 3 tasks, 0.5 vCPU, 1GB | ~$55 |
 | ECS Fargate (nanomdm) | 2 tasks, 0.25 vCPU, 0.5GB | ~$18 |
+| ECS Fargate (keycloak) | 2 tasks, 1 vCPU, 2GB | ~$72 |
 | RDS | db.t4g.medium, Multi-AZ + 1 replica | ~$140 |
 | ALB | moderate traffic | ~$25 |
 | CloudWatch | logs + metrics + dashboards | ~$15 |
 | SSM | parameter reads | ~$0 |
 | ACM | certificate | $0 |
-| **Total** | | **~$253/mo** |
+| **Total** | | **~$325/mo** |
 
 ---
 
