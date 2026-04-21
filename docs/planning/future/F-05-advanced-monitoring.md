@@ -96,9 +96,8 @@ func (h *Handler) GetDevice(w http.ResponseWriter, r *http.Request) {
 Request: GET /api/v1/devices/123
 ├── api.GetDevice (15ms)
 │   ├── service.GetByID (12ms)
-│   │   ├── repository.GetByID (10ms)
-│   │   │   └── database.Query (8ms)
-│   │   └── cache.Get (2ms)
+│   │   └── repository.GetByID (10ms)
+│   │       └── database.Query (8ms)
 │   └── json.Encode (3ms)
 ```
 

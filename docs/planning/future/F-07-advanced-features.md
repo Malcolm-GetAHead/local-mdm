@@ -92,7 +92,7 @@ func (s *LocationService) UpdateDeviceLocation(deviceID uuid.UUID, location Loca
     // Check geofences
     geofences := s.geofenceRepo.GetAll()
     for _, fence := range geofences {
-        wasInside := s.cache.Get(deviceID, fence.ID)
+        wasInside := s.geofenceRepo.WasInside(deviceID, fence.ID)
         isInside := fence.Contains(location)
         
         if !wasInside && isInside {

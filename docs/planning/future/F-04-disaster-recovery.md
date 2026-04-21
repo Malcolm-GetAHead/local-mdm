@@ -264,13 +264,12 @@ func (s *DeviceService) GetDevice(ctx context.Context, id uuid.UUID) (*Device, e
         return device, nil
     }
     
-    // If database unavailable, try cache
+    // If database unavailable, return error with context.
+    // Note: Redis was removed in Sprint 4. If a degraded-read fallback is
+    // needed, consider an in-process cache (sync.Map or similar) that holds
+    // recently-accessed records. Do not add an external cache dependency.
     if errors.Is(err, ErrDatabaseUnavailable) {
-        device, err := s.cache.Get(id)
-        if err == nil {
-            log.Warn("Serving device from cache (database unavailable)")
-            return device, nil
-        }
+        return nil, fmt.Errorf("database unavailable and no fallback cache configured: %w", err)
     }
     
     return nil, err
