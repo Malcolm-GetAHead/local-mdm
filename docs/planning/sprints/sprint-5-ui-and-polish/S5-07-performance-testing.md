@@ -99,7 +99,7 @@ database:
 - Identify cacheable data (device status, policy definitions)
 - Implement in-memory cache with TTL
 - Cache invalidation strategy
-- Optional: Redis for distributed caching
+- Note: Redis was removed in Sprint 4 — use PostgreSQL-backed or in-memory caching only
 - Files: `internal/cache/cache.go`
 
 **Cache Candidates**:
@@ -211,7 +211,7 @@ Add to Grafana dashboard:
 
 ## Future Optimizations
 
-- Read replicas for device list queries
+- ~~Read replicas for device list queries~~ (Sprint 4b: Writer/Reader pool split is in place)
 - Horizontal scaling with load balancer
 - CDN for web dashboard static assets
 - Database partitioning for audit logs
