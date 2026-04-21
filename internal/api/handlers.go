@@ -300,7 +300,7 @@ func (s *Server) handleListDevices(w http.ResponseWriter, r *http.Request) {
 
 	limit, offset := parsePagination(r)
 
-	devices, total, err := s.deviceRepo.List(r.Context(), user.EnterpriseID, limit, offset)
+	devices, total, err := s.deviceService.List(r.Context(), user.EnterpriseID, limit, offset)
 	if err != nil {
 		s.logger.Error("failed to list devices", "error", err)
 		respondError(w, r, http.StatusInternalServerError, "internal_error", "Failed to list devices")
@@ -317,7 +317,7 @@ func (s *Server) handleGetDevice(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	device, err := s.deviceRepo.GetByID(r.Context(), id)
+	device, err := s.deviceService.Get(r.Context(), id)
 	if err != nil {
 		if strings.Contains(err.Error(), "not found") {
 			respondError(w, r, http.StatusNotFound, "not_found", "Device not found")
@@ -338,45 +338,25 @@ func (s *Server) handleLockDevice(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	device, err := s.deviceRepo.GetByID(r.Context(), id)
+	result, err := s.deviceService.Lock(r.Context(), id)
 	if err != nil {
 		if strings.Contains(err.Error(), "not found") {
 			respondError(w, r, http.StatusNotFound, "not_found", "Device not found")
 			return
 		}
-		s.logger.Error("failed to get device for lock", "error", err, "id", id)
-		respondError(w, r, http.StatusInternalServerError, "internal_error", "Failed to lock device")
-		return
-	}
-
-	// Create command for platform dispatch
-	cmd := &models.DeviceCommand{
-		DeviceID:    device.ID,
-		CommandType: models.CommandTypeLock,
-	}
-	if err := s.cmdRepo.Create(r.Context(), cmd); err != nil {
-		s.logger.Error("failed to create lock command", "error", err, "id", id)
-		respondError(w, r, http.StatusInternalServerError, "internal_error", "Failed to lock device")
-		return
-	}
-
-	device.Status = models.DeviceStatusLost
-	if err := s.deviceRepo.Update(r.Context(), device); err != nil {
 		s.logger.Error("failed to lock device", "error", err, "id", id)
 		respondError(w, r, http.StatusInternalServerError, "internal_error", "Failed to lock device")
 		return
 	}
 
-	s.cmdDispatcher.Enqueue(device, cmd)
-
 	s.logAudit(r, "device.lock", "device", id, map[string]interface{}{
-		"platform":   device.Platform,
-		"command_id": cmd.ID,
+		"platform":   result.Device.Platform,
+		"command_id": result.Command.ID,
 	})
 
 	respondJSON(w, r, http.StatusOK, map[string]interface{}{
-		"device":  device,
-		"command": cmd,
+		"device":  result.Device,
+		"command": result.Command,
 	})
 }
 
@@ -387,50 +367,25 @@ func (s *Server) handleWipeDevice(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	device, err := s.deviceRepo.GetByID(r.Context(), id)
+	result, err := s.deviceService.Wipe(r.Context(), id)
 	if err != nil {
 		if strings.Contains(err.Error(), "not found") {
 			respondError(w, r, http.StatusNotFound, "not_found", "Device not found")
 			return
 		}
-		s.logger.Error("failed to get device for wipe", "error", err, "id", id)
-		respondError(w, r, http.StatusInternalServerError, "internal_error", "Failed to wipe device")
-		return
-	}
-
-	cmd := &models.DeviceCommand{
-		DeviceID:    device.ID,
-		CommandType: models.CommandTypeWipe,
-	}
-	if err := s.cmdRepo.Create(r.Context(), cmd); err != nil {
-		s.logger.Error("failed to create wipe command", "error", err, "id", id)
-		respondError(w, r, http.StatusInternalServerError, "internal_error", "Failed to wipe device")
-		return
-	}
-
-	device.Status = models.DeviceStatusWiped
-	if err := s.deviceRepo.Update(r.Context(), device); err != nil {
 		s.logger.Error("failed to wipe device", "error", err, "id", id)
 		respondError(w, r, http.StatusInternalServerError, "internal_error", "Failed to wipe device")
 		return
 	}
 
-	s.cmdDispatcher.Enqueue(device, cmd)
-
-	s.lifecycleService.OnWipe(r.Context(), device)
-
 	s.logAudit(r, "device.wipe", "device", id, map[string]interface{}{
-		"platform":   device.Platform,
-		"command_id": cmd.ID,
-	})
-
-	s.logAudit(r, "device.lifecycle.wipe", "device", id, map[string]interface{}{
-		"platform": device.Platform,
+		"platform":   result.Device.Platform,
+		"command_id": result.Command.ID,
 	})
 
 	respondJSON(w, r, http.StatusOK, map[string]interface{}{
-		"device":  device,
-		"command": cmd,
+		"device":  result.Device,
+		"command": result.Command,
 	})
 }
 
@@ -441,22 +396,11 @@ func (s *Server) handleUpdateDevice(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	device, err := s.deviceRepo.GetByID(r.Context(), id)
-	if err != nil {
-		if strings.Contains(err.Error(), "not found") {
-			respondError(w, r, http.StatusNotFound, "not_found", "Device not found")
-			return
-		}
-		s.logger.Error("failed to get device", "error", err, "id", id)
-		respondError(w, r, http.StatusInternalServerError, "internal_error", "Failed to get device")
-		return
-	}
-
 	var req struct {
-		Name         *string      `json:"name"`
-		Model        *string      `json:"model"`
-		OSVersion    *string      `json:"os_version"`
-		Status       *string      `json:"status"`
+		Name         *string       `json:"name"`
+		Model        *string       `json:"model"`
+		OSVersion    *string       `json:"os_version"`
+		Status       *string       `json:"status"`
 		PlatformData *models.JSONB `json:"platform_data"`
 	}
 	if err := parseJSONBody(r, &req); err != nil {
@@ -464,23 +408,12 @@ func (s *Server) handleUpdateDevice(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if req.Name != nil {
-		device.Name = *req.Name
-	}
-	if req.Model != nil {
-		device.Model = *req.Model
-	}
-	if req.OSVersion != nil {
-		device.OSVersion = *req.OSVersion
-	}
-	if req.Status != nil {
-		device.Status = *req.Status
-	}
-	if req.PlatformData != nil {
-		device.PlatformData = *req.PlatformData
-	}
-
-	if err := s.deviceRepo.Update(r.Context(), device); err != nil {
+	device, err := s.deviceService.Update(r.Context(), id, req.Name, req.Model, req.OSVersion, req.Status, req.PlatformData)
+	if err != nil {
+		if strings.Contains(err.Error(), "not found") {
+			respondError(w, r, http.StatusNotFound, "not_found", "Device not found")
+			return
+		}
 		s.logger.Error("failed to update device", "error", err, "id", id)
 		respondError(w, r, http.StatusInternalServerError, "internal_error", "Failed to update device")
 		return
@@ -500,31 +433,17 @@ func (s *Server) handleDeleteDevice(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Fetch device before deletion for lifecycle hooks
-	device, err := s.deviceRepo.GetByID(r.Context(), id)
-	if err != nil {
+	if err := s.deviceService.Delete(r.Context(), id); err != nil {
 		if strings.Contains(err.Error(), "not found") {
 			respondError(w, r, http.StatusNotFound, "not_found", "Device not found")
 			return
 		}
-		s.logger.Error("failed to get device for delete", "error", err, "id", id)
-		respondError(w, r, http.StatusInternalServerError, "internal_error", "Failed to delete device")
-		return
-	}
-
-	if err := s.deviceRepo.Delete(r.Context(), id); err != nil {
 		s.logger.Error("failed to delete device", "error", err, "id", id)
 		respondError(w, r, http.StatusInternalServerError, "internal_error", "Failed to delete device")
 		return
 	}
 
-	s.lifecycleService.OnDelete(r.Context(), device)
-
 	s.logAudit(r, "device.delete", "device", id, nil)
-	s.logAudit(r, "device.lifecycle.delete", "device", id, map[string]interface{}{
-		"platform": device.Platform,
-	})
-
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -1426,7 +1345,7 @@ func (s *Server) handleListApps(w http.ResponseWriter, r *http.Request) {
 	}
 
 	limit, offset := parsePagination(r)
-	apps, total, err := s.appRepo.List(r.Context(), user.EnterpriseID, limit, offset)
+	apps, total, err := s.appService.List(r.Context(), user.EnterpriseID, limit, offset)
 	if err != nil {
 		s.logger.Error("failed to list apps", "error", err)
 		respondError(w, r, http.StatusInternalServerError, "internal_error", "Failed to list apps")
@@ -1444,11 +1363,11 @@ func (s *Server) handleCreateApp(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req struct {
-		Name        string      `json:"name"`
-		Platform    string      `json:"platform"`
-		Identifier  string      `json:"identifier"`
-		Version     string      `json:"version"`
-		InstallType string      `json:"install_type"`
+		Name        string       `json:"name"`
+		Platform    string       `json:"platform"`
+		Identifier  string       `json:"identifier"`
+		Version     string       `json:"version"`
+		InstallType string       `json:"install_type"`
 		AppConfig   models.JSONB `json:"app_config"`
 	}
 	if err := parseJSONBody(r, &req); err != nil {
@@ -1456,16 +1375,9 @@ func (s *Server) handleCreateApp(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if req.Name == "" || req.Platform == "" || req.Identifier == "" {
-		respondError(w, r, http.StatusBadRequest, "validation_failed", "name, platform, and identifier are required")
-		return
-	}
 	if !isValidPlatform(req.Platform) {
 		respondError(w, r, http.StatusBadRequest, "validation_failed", "Invalid platform")
 		return
-	}
-	if req.InstallType == "" {
-		req.InstallType = models.AppInstallRequired
 	}
 
 	app := &models.App{
@@ -1478,7 +1390,11 @@ func (s *Server) handleCreateApp(w http.ResponseWriter, r *http.Request) {
 		AppConfig:    req.AppConfig,
 	}
 
-	if err := s.appRepo.Create(r.Context(), app); err != nil {
+	if err := s.appService.Create(r.Context(), app); err != nil {
+		if strings.Contains(err.Error(), "required") {
+			respondError(w, r, http.StatusBadRequest, "validation_failed", err.Error())
+			return
+		}
 		if isDuplicateError(err) {
 			respondError(w, r, http.StatusConflict, "duplicate", "App already exists for this platform")
 			return
@@ -1504,7 +1420,7 @@ func (s *Server) handleGetApp(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	app, err := s.appRepo.GetByID(r.Context(), id)
+	app, err := s.appService.Get(r.Context(), id)
 	if err != nil {
 		if strings.Contains(err.Error(), "not found") {
 			respondError(w, r, http.StatusNotFound, "not_found", "App not found")
@@ -1524,20 +1440,10 @@ func (s *Server) handleUpdateApp(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	app, err := s.appRepo.GetByID(r.Context(), id)
-	if err != nil {
-		if strings.Contains(err.Error(), "not found") {
-			respondError(w, r, http.StatusNotFound, "not_found", "App not found")
-			return
-		}
-		respondError(w, r, http.StatusInternalServerError, "internal_error", "Failed to get app")
-		return
-	}
-
 	var req struct {
-		Name        *string      `json:"name"`
-		Version     *string      `json:"version"`
-		InstallType *string      `json:"install_type"`
+		Name        *string       `json:"name"`
+		Version     *string       `json:"version"`
+		InstallType *string       `json:"install_type"`
 		AppConfig   *models.JSONB `json:"app_config"`
 	}
 	if err := parseJSONBody(r, &req); err != nil {
@@ -1545,20 +1451,12 @@ func (s *Server) handleUpdateApp(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if req.Name != nil {
-		app.Name = *req.Name
-	}
-	if req.Version != nil {
-		app.Version = *req.Version
-	}
-	if req.InstallType != nil {
-		app.InstallType = *req.InstallType
-	}
-	if req.AppConfig != nil {
-		app.AppConfig = *req.AppConfig
-	}
-
-	if err := s.appRepo.Update(r.Context(), app); err != nil {
+	app, err := s.appService.Update(r.Context(), id, req.Name, req.Version, req.InstallType, req.AppConfig)
+	if err != nil {
+		if strings.Contains(err.Error(), "not found") {
+			respondError(w, r, http.StatusNotFound, "not_found", "App not found")
+			return
+		}
 		s.logger.Error("failed to update app", "error", err)
 		respondError(w, r, http.StatusInternalServerError, "internal_error", "Failed to update app")
 		return
@@ -1575,7 +1473,7 @@ func (s *Server) handleDeleteApp(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := s.appRepo.Delete(r.Context(), id); err != nil {
+	if err := s.appService.Delete(r.Context(), id); err != nil {
 		if strings.Contains(err.Error(), "not found") {
 			respondError(w, r, http.StatusNotFound, "not_found", "App not found")
 			return
@@ -1596,16 +1494,6 @@ func (s *Server) handleDeployApp(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	app, err := s.appRepo.GetByID(r.Context(), appID)
-	if err != nil {
-		if strings.Contains(err.Error(), "not found") {
-			respondError(w, r, http.StatusNotFound, "not_found", "App not found")
-			return
-		}
-		respondError(w, r, http.StatusInternalServerError, "internal_error", "Failed to get app")
-		return
-	}
-
 	var req struct {
 		DeviceIDs []uuid.UUID `json:"device_ids"`
 	}
@@ -1614,42 +1502,29 @@ func (s *Server) handleDeployApp(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if len(req.DeviceIDs) == 0 {
-		respondError(w, r, http.StatusBadRequest, "validation_failed", "device_ids is required")
+	result, err := s.appService.Deploy(r.Context(), appID, req.DeviceIDs)
+	if err != nil {
+		if strings.Contains(err.Error(), "not found") {
+			respondError(w, r, http.StatusNotFound, "not_found", "App not found")
+			return
+		}
+		if strings.Contains(err.Error(), "required") {
+			respondError(w, r, http.StatusBadRequest, "validation_failed", err.Error())
+			return
+		}
+		s.logger.Error("failed to deploy app", "error", err)
+		respondError(w, r, http.StatusInternalServerError, "internal_error", "Failed to deploy app")
 		return
-	}
-
-	var commands []*models.DeviceCommand
-	for _, deviceID := range req.DeviceIDs {
-		cmd := &models.DeviceCommand{
-			DeviceID:    deviceID,
-			CommandType: models.CommandTypeInstallApp,
-			CommandData: models.JSONB{
-				"app_id":     app.ID,
-				"identifier": app.Identifier,
-				"name":       app.Name,
-				"platform":   app.Platform,
-			},
-		}
-		if err := s.cmdRepo.Create(r.Context(), cmd); err != nil {
-			s.logger.Error("failed to create deploy command", "error", err, "device_id", deviceID)
-			continue
-		}
-		// Dispatch to platform async
-		if device, err := s.deviceRepo.GetByID(r.Context(), deviceID); err == nil {
-			s.cmdDispatcher.Enqueue(device, cmd)
-		}
-		commands = append(commands, cmd)
 	}
 
 	s.logAudit(r, "app.deploy", "app", appID, map[string]interface{}{
 		"device_ids": req.DeviceIDs,
-		"commands":   len(commands),
+		"commands":   len(result.Commands),
 	})
 
 	respondJSON(w, r, http.StatusOK, map[string]interface{}{
-		"app":      app,
-		"commands": commands,
+		"app":      result.App,
+		"commands": result.Commands,
 	})
 }
 
@@ -1783,42 +1658,29 @@ func (s *Server) handleRestartDevice(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	device, err := s.deviceRepo.GetByID(r.Context(), id)
+	result, err := s.deviceService.Restart(r.Context(), id)
 	if err != nil {
 		if strings.Contains(err.Error(), "not found") {
 			respondError(w, r, http.StatusNotFound, "not_found", "Device not found")
 			return
 		}
-		respondError(w, r, http.StatusInternalServerError, "internal_error", "Failed to get device")
-		return
-	}
-
-	// Restart is supported on macOS and Android only
-	if device.Platform == models.PlatformWindows {
-		respondError(w, r, http.StatusBadRequest, "unsupported", "Restart is not supported on Windows devices")
-		return
-	}
-
-	cmd := &models.DeviceCommand{
-		DeviceID:    device.ID,
-		CommandType: models.CommandTypeRestart,
-	}
-	if err := s.cmdRepo.Create(r.Context(), cmd); err != nil {
-		s.logger.Error("failed to create restart command", "error", err, "id", id)
+		if strings.Contains(err.Error(), "not supported") {
+			respondError(w, r, http.StatusBadRequest, "unsupported", err.Error())
+			return
+		}
+		s.logger.Error("failed to restart device", "error", err, "id", id)
 		respondError(w, r, http.StatusInternalServerError, "internal_error", "Failed to restart device")
 		return
 	}
 
-	s.cmdDispatcher.Enqueue(device, cmd)
-
 	s.logAudit(r, "device.restart", "device", id, map[string]interface{}{
-		"platform":   device.Platform,
-		"command_id": cmd.ID,
+		"platform":   result.Device.Platform,
+		"command_id": result.Command.ID,
 	})
 
 	respondJSON(w, r, http.StatusOK, map[string]interface{}{
-		"device":  device,
-		"command": cmd,
+		"device":  result.Device,
+		"command": result.Command,
 	})
 }
 

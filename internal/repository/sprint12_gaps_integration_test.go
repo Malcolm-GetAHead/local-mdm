@@ -90,10 +90,8 @@ func TestCommandRepository_GetByID(t *testing.T) {
 	require.NoError(t, err)
 	ctx := context.Background()
 
-	// BUG: GetByID scans error_message (nullable TEXT) into string, which fails
-	// when error_message is NULL. This affects pending/sent commands.
-	// Commands with non-NULL error_message (failed) work correctly.
-	t.Run("pending command fails scan due to NULL error_message", func(t *testing.T) {
+	// Fixed: GetByID now uses COALESCE(error_message, '') to handle NULL.
+	t.Run("pending command with NULL error_message succeeds", func(t *testing.T) {
 		cmd := &models.DeviceCommand{
 			DeviceID:    device.ID,
 			CommandType: models.CommandTypeLock,
@@ -101,11 +99,10 @@ func TestCommandRepository_GetByID(t *testing.T) {
 		}
 		require.NoError(t, repo.Create(ctx, cmd))
 
-		_, err := repo.GetByID(ctx, cmd.ID)
-		// This SHOULD succeed but fails because error_message is NULL
-		// and the scan target is string, not *string.
-		// Fix: change ErrorMessage to *string or use sql.NullString in scan.
-		assert.Error(t, err, "known bug: NULL error_message scan fails")
+		fetched, err := repo.GetByID(ctx, cmd.ID)
+		require.NoError(t, err)
+		assert.Equal(t, models.CommandStatusPending, fetched.Status)
+		assert.Equal(t, "", fetched.ErrorMessage)
 	})
 
 	t.Run("returns failed command with error message", func(t *testing.T) {
@@ -166,12 +163,12 @@ func TestCommandRepository_ListByDevice(t *testing.T) {
 		}))
 	}
 
-	// BUG: ListByDevice has the same NULL error_message scan issue as GetByID.
-	// Pending commands have NULL error_message which fails scanning into string.
-	t.Run("fails scan due to NULL error_message", func(t *testing.T) {
-		_, _, err := repo.ListByDevice(ctx, device.ID, 10, 0)
-		assert.Error(t, err, "known bug: NULL error_message scan fails")
-		assert.Contains(t, err.Error(), "error_message")
+	// Fixed: ListByDevice now uses COALESCE(error_message, '') to handle NULL.
+	t.Run("lists commands with NULL error_message", func(t *testing.T) {
+		cmds, total, err := repo.ListByDevice(ctx, device.ID, 10, 0)
+		require.NoError(t, err)
+		assert.Equal(t, 3, total)
+		assert.Len(t, cmds, 3)
 	})
 
 	t.Run("empty device returns zero", func(t *testing.T) {

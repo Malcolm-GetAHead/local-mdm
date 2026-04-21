@@ -62,6 +62,8 @@ type Server struct {
 	cmdDispatcher    *commandDispatcher
 	lifecycleService *service.LifecycleService
 	policyService    *service.PolicyService
+	deviceService    *service.DeviceService
+	appService       *service.AppService
 	policyVersionRepo repository.PolicyVersionRepository
 	groupService     *service.GroupService
 	complianceService *service.ComplianceService
@@ -265,6 +267,9 @@ func New(cfg *config.Config, database *db.DB, logger *slog.Logger) (*Server, err
 		return nil, fmt.Errorf("failed to create compliance repository: %w", err)
 	}
 	s.complianceService = service.NewComplianceService(complianceRepo, s.groupService, s.policyRepo, logger)
+
+	s.deviceService = service.NewDeviceService(s.deviceRepo, s.cmdRepo, s.cmdDispatcher, s.lifecycleService, logger)
+	s.appService = service.NewAppService(s.appRepo, s.deviceRepo, s.cmdRepo, s.cmdDispatcher, logger)
 
 	s.setupRoutes()
 	s.setupMiddleware()

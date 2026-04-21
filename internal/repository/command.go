@@ -59,7 +59,7 @@ func (r *commandRepository) Create(ctx context.Context, cmd *models.DeviceComman
 
 func (r *commandRepository) GetByID(ctx context.Context, id uuid.UUID) (*models.DeviceCommand, error) {
 	query := `
-		SELECT id, device_id, command_type, command_data, status, sent_at, completed_at, error_message, created_at, updated_at
+		SELECT id, device_id, command_type, command_data, status, sent_at, completed_at, COALESCE(error_message, ''), created_at, updated_at
 		FROM device_commands WHERE id = $1`
 
 	exec := getReadExecutor(ctx, r.reader)
@@ -89,7 +89,7 @@ func (r *commandRepository) ListByDevice(ctx context.Context, deviceID uuid.UUID
 	}
 
 	query := `
-		SELECT id, device_id, command_type, command_data, status, sent_at, completed_at, error_message, created_at, updated_at
+		SELECT id, device_id, command_type, command_data, status, sent_at, completed_at, COALESCE(error_message, ''), created_at, updated_at
 		FROM device_commands WHERE device_id = $1
 		ORDER BY created_at DESC LIMIT $2 OFFSET $3`
 
