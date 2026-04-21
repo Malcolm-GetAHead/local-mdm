@@ -21,8 +21,9 @@
 | S5-09 | [Device State Collection & Compliance Evaluation](S5-09-device-state-compliance.md) | ⚠️ Partial | S4-03 | 3-4 days |
 | S5-10 | [Migrate Remaining Handlers to Service Layer](S5-10-service-layer-migration.md) | ✅ Yes (before S5-08) | S4 service pattern | 2-3 days |
 | S5-11 | [User Management CRUD & API Token Auth](S5-11-user-token-auth.md) | ✅ Yes (before S5-08) | Existing users/api_tokens tables | 2-3 days |
+| S5-12 | [SCEP Server Integration (Embedded)](S5-12-scep-integration.md) | ✅ Yes (before S5-05) | S1-03 CA infrastructure | 0.5-1 day |
 
-**Total effort**: ~20-25 days (most tasks parallel; critical path ~8-10 days)
+**Total effort**: ~21-26 days (most tasks parallel; critical path ~8-10 days)
 
 ## Notes on Overlap with Sprint 2
 
