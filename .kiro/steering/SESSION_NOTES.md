@@ -102,9 +102,17 @@ database:
 
 ## Known Issues
 
-- **Doc debt tracked in `docs/reviews/sprint-4b/DOCUMENTATION_REVIEW.md`** — 23 items across API.md, DATABASE.md, ARCHITECTURE.md, SETUP.md, TESTING.md, QUICK_REFERENCE.md, SECURITY.md, STEERING.md. Checkboxes for tracking.
-- **Repo integration test gap tracked in `docs/reviews/sprint-4b/REPOSITORY_TEST_COVERAGE.md`** — 4 Sprint 3/4 repo files (app, compliance, group, policy_version) have zero integration tests (~590 lines of untested SQL).
-- **`GET /windows/ppkg/templates`** has no auth middleware — either add auth or document as intentionally public.
+- **Doc debt tracked in `docs/reviews/sprint-4b/DOCUMENTATION_REVIEW.md`** — being resolved on `review/documentation-fixes` branch.
+- **Repo integration test gap tracked in `docs/reviews/sprint-4b/REPOSITORY_TEST_COVERAGE.md`** — resolved on `review/repo-integration-tests` branch. All 5 test files written.
+- **`GET /windows/ppkg/templates`** — auth being added on `review/documentation-fixes` branch.
+- **command.GetByID and ListByDevice bug** — `error_message` column is nullable TEXT but scanned into `string` (not `*string`). Fails for pending/sent commands where error_message is NULL. Documented in `sprint12_gaps_integration_test.go`. Fix needed in Sprint 5.
+
+## Sprint 4b Learnings
+
+- **Writer/Reader pool pattern**: `resolveExecutor()` helper resolves `interface{}` to concrete `executor` at construction time. `getExecutor(ctx, r.writer)` for writes (transaction-aware), `getReadExecutor(ctx, r.reader)` for reads (uses tx if active, otherwise reader pool).
+- **ReaderConfig fallback**: `ReaderDSN()` returns writer DSN when no reader config is set. Zero config change needed for dev — both pools point to the same PostgreSQL.
+- **Non-repo consumers** (audit, idempotency, certs, metrics, auth, DEP) use Writer pool directly as `*sql.DB`. They don't need the Writer/Reader split because they either write or need to see their own writes immediately.
+- **Integration tests found real bugs**: NULL column scan failures in command repo. Integration tests against live PostgreSQL catch issues that mock-based tests miss — column type mismatches, FK constraints, JSONB serialization.
 
 ## Sprint Status
 
