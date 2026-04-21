@@ -34,22 +34,22 @@
 
 ### QUICK_REFERENCE.md (`docs/dev/QUICK_REFERENCE.md`)
 
-- [ ] **Missing all Sprint 4 API endpoints** — 15 routes not listed (groups CRUD, group members, policy versions, policy rollback, policy translate, policy templates, policy assignments, effective policies, compliance summary, device compliance, compliance evaluate)
-- [ ] **Missing 8+ database tables** — device_groups, group_memberships, policy_assignments, compliance_results, device_apps, policy_versions, token_cache, idempotency_keys. Also missing users, api_tokens (from migration 000001). Table listed as `commands` should be `device_commands`
-- [ ] **Missing 4 directories from project structure** — `internal/service/`, `internal/apperrors/`, `internal/logging/`, `internal/constants/`. Also `internal/certs/` description says "SCEP" but SCEP is in `internal/scep/` (separate)
+- [x] **Missing all Sprint 4 API endpoints** — 15 routes not listed (groups CRUD, group members, policy versions, policy rollback, policy translate, policy templates, policy assignments, effective policies, compliance summary, device compliance, compliance evaluate)
+- [x] **Missing 8+ database tables** — device_groups, group_memberships, policy_assignments, compliance_results, device_apps, policy_versions, token_cache, idempotency_keys. Also missing users, api_tokens (from migration 000001). Table listed as `commands` should be `device_commands`
+- [x] **Missing 4 directories from project structure** — `internal/service/`, `internal/apperrors/`, `internal/logging/`, `internal/constants/`. Also `internal/certs/` description says "SCEP" but SCEP is in `internal/scep/` (separate)
 
 ### API.md (`docs/schemas/API.md`)
 
-- [ ] **7 phantom routes** documented but don't exist in code:
+- [x] **7 phantom routes** documented but don't exist in code:
   - `POST /api/v1/devices/enroll` — generic enrollment doesn't exist; enrollment is platform-specific
   - `GET/POST/PUT/DELETE /api/v1/users` — no user management handlers exist (Keycloak handles users; S5-11 will build these)
   - `GET /api/v1/openapi.yaml` — no OpenAPI spec endpoint
   - `GET /api/v1/docs` — no Swagger UI endpoint
-- [ ] **3 routes in code but missing from docs**:
+- [x] **3 routes in code but missing from docs**:
   - `GET /version`
   - `GET /api/v1/certificates`
   - `GET /api/v1/audit-logs`
-- [ ] **~10 endpoints missing role requirements** — code enforces roles but docs don't list them:
+- [x] **~10 endpoints missing role requirements** — code enforces roles but docs don't list them:
   - `POST /devices/{id}/lock` — requires `admin, operator`
   - `POST /devices/{id}/restart` — requires `admin, operator`
   - `POST /devices/{id}/wipe` — requires `admin` + IP allowlist (docs don't mention IP allowlist)
@@ -58,28 +58,28 @@
   - `DELETE /policies/{id}` — requires `admin`
   - `POST /policies/{id}/assign` — requires `admin, operator`
   - Sprint 4 endpoints also missing role annotations
-- [ ] **Unprotected endpoint flag** — `GET /windows/ppkg/templates` has no auth middleware in code (unlike `POST /windows/ppkg` which requires `admin, operator`). Either add auth or document as intentionally public.
+- [x] **Unprotected endpoint flag** — `GET /windows/ppkg/templates` has no auth middleware in code (unlike `POST /windows/ppkg` which requires `admin, operator`). **Fixed: added RequireAuth.**
 
 ### DATABASE.md (`docs/schemas/DATABASE.md`)
 
-- [ ] **3 tables completely undocumented**:
+- [x] **3 tables completely undocumented**:
   - `device_commands` (migration 000003) — no CREATE TABLE, no column definitions, no description
   - `dep_names` (migration 000004) — DEP OAuth tokens (pgcrypto encrypted), PKI certs, syncer cursor, assigner profile
   - `dep_devices` (migration 000004) — DEP-synced device tracking with serial numbers, profile status
-- [ ] **Header stale** — says "Version: 1.0, Last Updated: 2026-02-05" — hasn't been updated for Sprint 3/4/4b
+- [x] **Header stale** — says "Version: 1.0, Last Updated: 2026-02-05" — hasn't been updated for Sprint 3/4/4b
 
 ### ARCHITECTURE.md (`docs/architecture/ARCHITECTURE.md`)
 
-- [ ] **Wrong package names** — `internal/services` should be `internal/service/` (singular), `internal/repositories` should be `internal/repository/` (singular)
-- [ ] **"Planned" labels on implemented code** — Services and repos are fully implemented since Sprint 1-4. Sub-lists don't match what was actually built
-- [ ] **Phantom package** — `internal/webhooks` section describes a package that doesn't exist. Webhook handling is in `internal/platform/android/webhook.go` and `internal/platform/macos/webhook.go`
-- [ ] **Stale "Next Steps" section** — says "1. Implement service layer, 2. Add repository layer, 3. Implement authentication, 4. Begin Windows module" — all done since Sprint 1-4. Should be removed or replaced with actual next steps (Sprint 4c/5)
-- [ ] **Missing 7 packages from Component Overview** — `audit/`, `metrics/`, `scep/`, `tracing/`, `constants/`, `apperrors/`, `logging/`
+- [x] **Wrong package names** — `internal/services` should be `internal/service/` (singular), `internal/repositories` should be `internal/repository/` (singular)
+- [x] **"Planned" labels on implemented code** — Services and repos are fully implemented since Sprint 1-4. Sub-lists don't match what was actually built
+- [x] **Phantom package** — `internal/webhooks` section describes a package that doesn't exist. Webhook handling is in `internal/platform/android/webhook.go` and `internal/platform/macos/webhook.go`
+- [x] **Stale "Next Steps" section** — says "1. Implement service layer, 2. Add repository layer, 3. Implement authentication, 4. Begin Windows module" — all done since Sprint 1-4. Should be removed or replaced with actual next steps (Sprint 4c/5)
+- [x] **Missing 7 packages from Component Overview** — `audit/`, `metrics/`, `scep/`, `tracing/`, `constants/`, `apperrors/`, `logging/`
 
 ### SECURITY.md (`docs/SECURITY.md`)
 
-- [ ] **Line ~58** — "In-memory rate limiter (production should use Redis)" — Redis removed in Sprint 4. Should say PostgreSQL-backed or external rate limiting
-- [ ] **Line ~154** — "[ ] Redis-backed rate limiting" in production TODO checklist — remove Redis reference
+- [x] **Line ~58** — "In-memory rate limiter (production should use Redis)" — Redis removed in Sprint 4. Should say PostgreSQL-backed or external rate limiting
+- [x] **Line ~154** — "[ ] Redis-backed rate limiting" in production TODO checklist — remove Redis reference
 
 ---
 
@@ -87,45 +87,45 @@
 
 ### SETUP.md (`docs/dev/SETUP.md`)
 
-- [ ] **Wrong environment variables listed**:
+- [x] **Wrong environment variables listed**:
   - `CONFIG_PATH` — does not exist in config.go
   - `DB_URL` — only used by Makefile for migrations, not by the Go app
-- [ ] **Missing environment variables**:
+- [x] **Missing environment variables**:
   - `ENVIRONMENT` — config.go reads this
   - `KEYCLOAK_CLIENT_SECRET` — config.go reads this
   - `DEP_ENCRYPTION_KEY` — config.go reads this
   - `DB_READER_HOST`, `DB_READER_PORT` — added in Sprint 4b
-- [ ] **Missing Keycloak** — docker-compose starts Keycloak on port 8180 but SETUP.md doesn't mention it
-- [ ] **Password validation gap** — example config uses default password `postgres` but config validation rejects passwords < 16 chars and rejects "postgres" specifically. Quick Start will fail without noting this
-- [ ] **Go version** — says "Go 1.21 or higher" but go.mod declares 1.25
-- [ ] **Last Updated** — says 2026-02-05
+- [x] **Missing Keycloak** — docker-compose starts Keycloak on port 8180 but SETUP.md doesn't mention it
+- [x] **Password validation gap** — example config uses default password `postgres` but config validation rejects passwords < 16 chars and rejects "postgres" specifically. Quick Start will fail without noting this
+- [x] **Go version** — says "Go 1.21 or higher" but go.mod declares 1.25
+- [x] **Last Updated** — says 2026-02-05
 
 ### DATABASE.md (`docs/schemas/DATABASE.md`)
 
-- [ ] **`policies` table main section** missing `is_template BOOLEAN NOT NULL DEFAULT false` column (added in migration 000006). Sprint 4 section mentions it but the main CREATE TABLE block is stale
-- [ ] **"Performance Considerations"** says "Read replicas for reporting queries (future enhancement)" — Sprint 4b implemented Writer/Reader pools, this is no longer future
-- [ ] **No mention of Writer/Reader pool architecture** from Sprint 4b
+- [x] **`policies` table main section** missing `is_template BOOLEAN NOT NULL DEFAULT false` column (added in migration 000006). Sprint 4 section mentions it but the main CREATE TABLE block is stale
+- [x] **"Performance Considerations"** says "Read replicas for reporting queries (future enhancement)" — Sprint 4b implemented Writer/Reader pools, this is no longer future
+- [x] **No mention of Writer/Reader pool architecture** from Sprint 4b
 
 ### TESTING.md (`docs/TESTING.md`)
 
-- [ ] **Coverage table** says "Current Coverage (Sprint 2a)" — should be updated to Sprint 4b with current numbers
-- [ ] **Test structure tree** missing Sprint 3/4/4b test files:
+- [x] **Coverage table** says "Current Coverage (Sprint 2a)" — should be updated to Sprint 4b with current numbers
+- [x] **Test structure tree** missing Sprint 3/4/4b test files:
   - `internal/service/*_test.go` (policy, groups, compliance, lifecycle)
   - `internal/api/idempotency_test.go`, `command_dispatcher_test.go`
   - `internal/config/reader_config_test.go`
   - `internal/db/dual_pool_test.go`
   - `internal/repository/read_executor_test.go`, `new_repos_test.go`
-- [ ] **Sprint 3/4 coverage goals** still shown as targets, not achieved
+- [x] **Sprint 3/4 coverage goals** still shown as targets, not achieved
 
 ### STEERING.md (`.kiro/steering/STEERING.md`)
 
-- [ ] **"Getting Help" section** — references `docs/tasks/` and `docs/tasks/future/` which don't exist. Actual paths: `docs/planning/sprints/` and `docs/planning/future/`
-- [ ] **File Locations tree** missing 6 packages: `audit/`, `metrics/`, `scep/`, `tracing/`, `constants/`, `apperrors/`
+- [x] **"Getting Help" section** — references `docs/tasks/` and `docs/tasks/future/` which don't exist. Actual paths: `docs/planning/sprints/` and `docs/planning/future/`
+- [x] **File Locations tree** missing 6 packages: `audit/`, `metrics/`, `scep/`, `tracing/`, `constants/`, `apperrors/`
 
 ### SESSION_NOTES.md (`.kiro/steering/SESSION_NOTES.md`)
 
-- [ ] **"Implementation Preferences" section** — says "Repos accept `interface{}` and type-switch on `*sql.DB` or `executor`. All use `getExecutor(ctx, r.db)` for transaction awareness." Post-Sprint 4b, repos accept two `interface{}` args (writer, reader). The `r.db` field no longer exists — it's `r.writer` and `r.reader`
-- [ ] **No Sprint 4b Learnings section** — should document: Writer/Reader pool pattern, `getReadExecutor` for reads, `resolveExecutor` helper, ReaderConfig fallback, non-repo consumers use Writer pool
+- [x] **"Implementation Preferences" section** — says "Repos accept `interface{}` and type-switch on `*sql.DB` or `executor`. All use `getExecutor(ctx, r.db)` for transaction awareness." Post-Sprint 4b, repos accept two `interface{}` args (writer, reader). The `r.db` field no longer exists — it's `r.writer` and `r.reader`. **Note: already updated in a prior session.**
+- [x] **No Sprint 4b Learnings section** — should document: Writer/Reader pool pattern, `getReadExecutor` for reads, `resolveExecutor` helper, ReaderConfig fallback, non-repo consumers use Writer pool
 
 ---
 
@@ -133,11 +133,11 @@
 
 ### README.md
 
-- [ ] **Go version** — says "Go 1.21+" but go.mod declares 1.25. Should say "Go 1.25+"
+- [x] **Go version** — says "Go 1.21+" but go.mod declares 1.25. Should say "Go 1.25+"
 
 ### ARCHITECTURE.md
 
-- [ ] **Metrics section** says "(Future)" but Prometheus metrics are implemented in `internal/metrics/` since Sprint 2
+- [x] **Metrics section** says "(Future)" but Prometheus metrics are implemented in `internal/metrics/` since Sprint 2
 
 ---
 

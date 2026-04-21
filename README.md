@@ -109,7 +109,7 @@ Unified Control Plane (Go)
 ## Quick Start
 
 ```bash
-# Prerequisites: Go 1.21+, PostgreSQL 15+
+# Prerequisites: Go 1.25+, PostgreSQL 15+
 
 # Clone and setup
 cd local-mdm
@@ -127,7 +127,7 @@ open http://localhost:8080
 
 ## Technology Stack
 
-- **Language**: Go 1.21+
+- **Language**: Go 1.25+
 - **Database**: PostgreSQL 15+
 - **Protocols**: OMA-DM, MS-MDE2, Apple MDM, Android Management API
 - **Dependencies**: nanoMDM, Google API client

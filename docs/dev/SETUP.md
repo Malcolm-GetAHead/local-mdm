@@ -4,7 +4,7 @@ This guide will help you set up the Local MDM development environment.
 
 ## Prerequisites
 
-- **Go**: 1.21 or higher ([download](https://go.dev/dl/))
+- **Go**: 1.25 or higher ([download](https://go.dev/dl/))
 - **PostgreSQL**: 15 or higher
 - **Docker & Docker Compose**: For local development (optional but recommended)
 - **golang-migrate**: For database migrations
@@ -37,6 +37,7 @@ make docker-up
 
 This starts:
 - PostgreSQL on port 5432
+- Keycloak (OIDC IdP) on port 8180
 - Adminer (database UI) on port 8081
 
 Or install PostgreSQL locally:
@@ -167,26 +168,30 @@ make docker-logs
 You can override configuration with environment variables:
 
 ```bash
+export ENVIRONMENT=development
 export DB_HOST=localhost
 export DB_PORT=5432
 export DB_USER=postgres
 export DB_PASSWORD=postgres
 export DB_NAME=localmdm
 export JWT_SECRET=your-secret-key
-export CONFIG_PATH=./configs/config.yaml
+export KEYCLOAK_CLIENT_SECRET=your-keycloak-secret
+export DEP_ENCRYPTION_KEY=your-dep-key
+# Reader pool overrides (optional, for read replicas)
+export DB_READER_HOST=replica.example.com
+export DB_READER_PORT=5432
 ```
 
 ### Database Connection
 
-Default connection string:
+Default connection string (used by Makefile for migrations):
 ```
 postgres://postgres:postgres@localhost:5432/localmdm?sslmode=disable
 ```
 
-Override with `DB_URL` environment variable:
-```bash
-export DB_URL="postgres://user:pass@host:port/dbname?sslmode=disable"
-```
+**Note**: The Go application reads database config from `configs/config.yaml` and environment variables (`DB_HOST`, `DB_PORT`, etc.), not from `DB_URL`. The `DB_URL` variable is only used by the Makefile for running migrations.
+
+**Important**: Config validation rejects passwords shorter than 16 characters and common defaults like "postgres". For local development, the docker-compose PostgreSQL is pre-configured to accept the default password. For production, use a strong password.
 
 ## Platform-Specific Setup
 
@@ -329,4 +334,4 @@ See [DEPLOYMENT.md](DEPLOYMENT.md) for production deployment guide (coming soon)
 
 ---
 
-**Last Updated**: 2026-02-05
+**Last Updated**: 2026-04-21

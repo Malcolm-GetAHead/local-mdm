@@ -362,14 +362,21 @@ if err != nil {
 ```
 internal/
 ├── api/          - HTTP handlers and middleware
+├── apperrors/    - Structured application errors
+├── audit/        - Async audit logging
 ├── auth/         - OIDC authentication
 ├── certs/        - Certificate management
 ├── config/       - Configuration loading
-├── db/           - Database connection
+├── constants/    - Shared constants
+├── db/           - Database connection (Writer/Reader pools)
+├── logging/      - Structured logging helpers
+├── metrics/      - Prometheus metrics server
 ├── models/       - Data models
 ├── platform/     - Platform-specific code (macos/, windows/, android/)
 ├── repository/   - Data access layer
+├── scep/         - SCEP challenge management
 ├── service/      - Business logic layer (Sprint 4+)
+├── tracing/      - Request tracing
 ├── validation/   - Input validation
 └── testutil/     - Test helpers
 
@@ -428,13 +435,13 @@ make run
 - `GETTING_STARTED.md` - Setup guide
 - `docs/TESTING.md` - Testing guide
 - `docs/SECURITY.md` - Security guidelines
-- `docs/tasks/` - Task tracking and planning
-- `docs/tasks/future/` - Future enhancements roadmap
+- `docs/planning/sprints/` - Sprint plans and task breakdowns
+- `docs/planning/future/` - Future enhancements roadmap
 
 ### Finding Information
-- **Current work**: Check `docs/tasks/` for active tasks
-- **Future plans**: Check `docs/tasks/future/` for roadmap
-- **Code reviews**: Check task directories for review findings
+- **Current work**: Check `docs/planning/sprints/` for active tasks
+- **Future plans**: Check `docs/planning/future/` for roadmap
+- **Code reviews**: Check `docs/reviews/` for review findings
 - **Architecture**: Check `docs/architecture/` for design docs
 
 ---

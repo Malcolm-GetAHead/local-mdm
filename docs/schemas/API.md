@@ -2,7 +2,7 @@
 
 **Version**: 1.0  
 **Base URL**: `https://your-mdm-server.com/api/v1`  
-**Last Updated**: 2026-04-20
+**Last Updated**: 2026-04-21
 
 ## Overview
 
@@ -123,6 +123,20 @@ GET /health
   "version": "1.0.0",
   "database": "connected",
   "timestamp": "2026-02-05T10:30:00Z"
+}
+```
+
+#### Get Version
+
+```http
+GET /version
+```
+
+**Response**:
+```json
+{
+  "version": "1.0.0",
+  "build_time": "2026-04-21T00:00:00Z"
 }
 ```
 
@@ -271,31 +285,6 @@ GET /api/v1/devices/:id
 }
 ```
 
-### Create Enrollment Token
-
-```http
-POST /api/v1/devices/enroll
-Content-Type: application/json
-
-{
-  "platform": "windows",
-  "name": "New Device",
-  "metadata": {}
-}
-```
-
-**Response**:
-```json
-{
-  "data": {
-    "enrollment_token": "eyJhbGc...",
-    "enrollment_url": "https://mdm.example.com/enroll?token=...",
-    "qr_code": "data:image/png;base64,...",
-    "expires_at": "2026-02-06T10:30:00Z"
-  }
-}
-```
-
 ### Update Device
 
 ```http
@@ -335,6 +324,8 @@ Content-Type: application/json
 }
 ```
 
+**Auth**: admin, operator
+
 **Response**:
 ```json
 {
@@ -357,6 +348,8 @@ Content-Type: application/json
   "confirmation": "WIPE"
 }
 ```
+
+**Auth**: admin + IP allowlist
 
 **Wipe Types**:
 - `full`: Complete device wipe
@@ -458,6 +451,8 @@ Content-Type: application/json
 }
 ```
 
+**Auth**: admin, operator
+
 **Response**:
 ```json
 {
@@ -493,11 +488,15 @@ Content-Type: application/json
 }
 ```
 
+**Auth**: admin, operator
+
 ### Delete Policy
 
 ```http
 DELETE /api/v1/policies/:id
 ```
+
+**Auth**: admin
 
 ### Assign Policy to Device
 
@@ -512,6 +511,8 @@ Content-Type: application/json
   ]
 }
 ```
+
+**Auth**: admin, operator
 
 **Response**:
 ```json
@@ -749,6 +750,8 @@ DELETE /api/v1/devices/:id/profiles/:profile_id
 POST /api/v1/devices/:id/restart
 ```
 
+**Auth**: admin, operator
+
 **Response**:
 ```json
 {
@@ -759,6 +762,39 @@ POST /api/v1/devices/:id/restart
   }
 }
 ```
+
+---
+
+## Certificates
+
+### List Certificates
+
+```http
+GET /api/v1/certificates
+```
+
+**Auth**: any authenticated
+
+**Query Parameters**:
+- `device_id` (optional): Filter by device
+- `limit` (optional): Items per page
+- `offset` (optional): Offset for pagination
+
+---
+
+## Audit Logs
+
+### List Audit Logs
+
+```http
+GET /api/v1/audit-logs
+```
+
+**Auth**: admin, super_admin
+
+**Query Parameters**:
+- `limit` (optional): Items per page
+- `offset` (optional): Offset for pagination
 
 ---
 
@@ -802,42 +838,6 @@ GET /api/v1/windows/ppkg/templates
     }
   ]
 }
-```
-
----
-
-## Users
-
-### List Users
-
-```http
-GET /api/v1/users
-```
-
-### Create User
-
-```http
-POST /api/v1/users
-Content-Type: application/json
-
-{
-  "email": "newadmin@example.com",
-  "password": "SecurePassword123!",
-  "full_name": "New Admin",
-  "role": "admin"
-}
-```
-
-### Update User
-
-```http
-PUT /api/v1/users/:id
-```
-
-### Delete User
-
-```http
-DELETE /api/v1/users/:id
 ```
 
 ---
@@ -1012,28 +1012,6 @@ Configure webhooks to receive real-time events.
   }
 }
 ```
-
----
-
-## OpenAPI Specification
-
-Full OpenAPI 3.0 specification available at:
-```
-GET /api/v1/openapi.yaml
-```
-
-Interactive documentation (Swagger UI):
-```
-GET /api/v1/docs
-```
-
----
-
-**Next Steps**:
-1. Generate OpenAPI spec from code
-2. Set up Swagger UI
-3. Add request/response examples
-4. Document authentication flows
 
 ---
 

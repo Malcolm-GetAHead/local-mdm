@@ -53,7 +53,7 @@ Local MDM follows a layered architecture with clear separation of concerns:
 - `handlers.go` - HTTP handlers
 - `middleware.go` - Middleware functions (future)
 
-### Service Layer (`internal/services`)
+### Service Layer (`internal/service`)
 
 **Responsibilities**:
 - Business logic
@@ -62,14 +62,13 @@ Local MDM follows a layered architecture with clear separation of concerns:
 - Policy enforcement
 - Event publishing
 
-**Planned Services**:
-- `auth/` - Authentication and authorization
-- `device/` - Device management
-- `policy/` - Policy management
-- `enrollment/` - Device enrollment flows
-- `command/` - Device command execution
+**Services**:
+- `policy_service.go` - Policy management, versioning, templates, translation
+- `group_service.go` - Device group management and membership
+- `compliance_service.go` - Compliance evaluation and reporting
+- `lifecycle_service.go` - Device lifecycle hooks (unenroll, wipe, delete)
 
-### Repository Layer (`internal/repositories`)
+### Repository Layer (`internal/repository`)
 
 **Responsibilities**:
 - Database operations (CRUD)
@@ -77,12 +76,17 @@ Local MDM follows a layered architecture with clear separation of concerns:
 - Data mapping
 - Transaction support
 
-**Planned Repositories**:
-- `user.go` - User operations
+**Repositories**:
+- `enterprise.go` - Enterprise operations
 - `device.go` - Device operations
 - `policy.go` - Policy operations
+- `command.go` - Device command queue
 - `certificate.go` - Certificate operations
-- `audit.go` - Audit log operations
+- `audit_log.go` - Audit log operations
+- `app.go` - App catalog operations
+- `group.go` - Device groups and policy assignments
+- `compliance.go` - Compliance results
+- `policy_version.go` - Policy version snapshots
 
 ### Platform Modules (`internal/platform`)
 
@@ -117,6 +121,7 @@ Local MDM follows a layered architecture with clear separation of concerns:
 - YAML configuration loading
 - Environment variable overrides
 - Configuration validation
+- Reader pool config with field-level fallback
 
 #### Database (`internal/db`)
 - Writer/Reader connection pool management (Sprint 4b)
@@ -142,10 +147,29 @@ Local MDM follows a layered architecture with clear separation of concerns:
 - Certificate revocation
 - APNs certificate handling
 
-#### Webhooks (`internal/webhooks`)
-- Webhook registration
-- Event publishing
-- Delivery retry logic
+#### Audit (`internal/audit`)
+- Async audit logging with buffered channel
+- Enterprise-scoped audit trail
+
+#### Metrics (`internal/metrics`)
+- Prometheus metrics server on separate internal port (127.0.0.1:9090)
+- HTTP request metrics middleware
+- Custom business metrics
+
+#### SCEP (`internal/scep`)
+- SCEP challenge management for device certificate enrollment
+
+#### Tracing (`internal/tracing`)
+- Request tracing with unique request IDs
+
+#### Application Errors (`internal/apperrors`)
+- Structured application error types
+
+#### Constants (`internal/constants`)
+- Shared constants (timeouts, limits, defaults)
+
+#### Logging (`internal/logging`)
+- Structured logging helpers
 
 ## Data Flow
 
@@ -316,9 +340,9 @@ GET /health
 - Android API connectivity
 ```
 
-### Metrics (Future)
+### Metrics
 
-- Request rate and latency
+- Request rate and latency (Prometheus on 127.0.0.1:9090)
 - Device enrollment rate
 - Policy application success rate
 - Database query performance
@@ -468,7 +492,6 @@ NanoMDM and NanoDEP both support PostgreSQL backends. Their schemas (see [nanomd
 ---
 
 **Next Steps**:
-1. Implement service layer
-2. Add repository layer
-3. Implement authentication
-4. Begin Windows module
+1. Sprint 4c: macOS Platform SSO (Java/Swift)
+2. Sprint 5: Backend polish, CLI, observability, performance
+3. Sprint 5b: Web dashboard (Go templates + HTMX + Tailwind CSS)

@@ -53,12 +53,14 @@ local-mdm/
 ├── cmd/server/              # Main application entry point
 ├── internal/
 │   ├── api/                 # HTTP handlers, middleware, routing
+│   ├── apperrors/           # Structured application errors
 │   ├── audit/               # Async audit logging
 │   ├── auth/                # OIDC authentication (Keycloak)
-│   ├── certs/               # Certificate management, CA, SCEP
+│   ├── certs/               # Certificate management, CA
 │   ├── config/              # Configuration loading & validation
 │   ├── constants/           # Shared constants
-│   ├── db/                  # Database connection & health
+│   ├── db/                  # Database connection & health (Writer/Reader pools)
+│   ├── logging/             # Structured logging helpers
 │   ├── metrics/             # Prometheus metrics server
 │   ├── models/              # Data models (Device, Policy, etc.)
 │   ├── platform/
@@ -67,6 +69,7 @@ local-mdm/
 │   │   └── windows/         # OMA-DM, SyncML, MS-MDE2
 │   ├── repository/          # Data access layer (PostgreSQL)
 │   ├── scep/                # SCEP challenge management
+│   ├── service/             # Business logic layer (Sprint 4+)
 │   ├── testutil/            # Test helpers
 │   ├── tracing/             # Request tracing
 │   └── validation/          # Input validation (JSONB, pagination)
@@ -176,20 +179,66 @@ local-mdm/
 | POST | `/api/v1/windows/ppkg` | Generate provisioning package |
 | GET | `/api/v1/windows/ppkg/templates` | List ppkg templates |
 
+### Device Groups (Sprint 4)
+| Method | Path | Role | Description |
+|--------|------|------|-------------|
+| GET | `/api/v1/groups` | any authenticated | List groups |
+| POST | `/api/v1/groups` | admin, operator | Create group |
+| GET | `/api/v1/groups/{id}` | any authenticated | Get group |
+| PUT | `/api/v1/groups/{id}` | admin, operator | Update group |
+| DELETE | `/api/v1/groups/{id}` | admin | Delete group |
+| GET | `/api/v1/groups/{id}/members` | any authenticated | List group members |
+| POST | `/api/v1/groups/{id}/members` | admin, operator | Add device to group |
+| DELETE | `/api/v1/groups/{id}/members/{device_id}` | admin, operator | Remove device from group |
+
+### Policy Versioning & Templates (Sprint 4)
+| Method | Path | Role | Description |
+|--------|------|------|-------------|
+| GET | `/api/v1/policies/{id}/versions` | any authenticated | List policy versions |
+| POST | `/api/v1/policies/{id}/rollback` | admin, operator | Rollback to version |
+| GET | `/api/v1/policies/{id}/translate` | any authenticated | Translate policy to platform |
+| GET | `/api/v1/policy-templates` | any authenticated | List policy templates |
+| POST | `/api/v1/policy-templates/{id}/clone` | admin, operator | Clone template |
+
+### Policy Assignments (Sprint 4)
+| Method | Path | Role | Description |
+|--------|------|------|-------------|
+| GET | `/api/v1/policies/{id}/assignments` | any authenticated | List policy assignments |
+| POST | `/api/v1/policies/{id}/assignments` | admin, operator | Assign policy to target |
+| DELETE | `/api/v1/policy-assignments/{assignment_id}` | admin, operator | Remove assignment |
+| GET | `/api/v1/devices/{id}/effective-policies` | any authenticated | Get device effective policies |
+
+### Compliance (Sprint 4)
+| Method | Path | Role | Description |
+|--------|------|------|-------------|
+| GET | `/api/v1/compliance` | any authenticated | Enterprise compliance summary |
+| GET | `/api/v1/devices/{id}/compliance` | any authenticated | Device compliance |
+| POST | `/api/v1/devices/{id}/compliance/evaluate` | admin, operator | Trigger compliance evaluation |
+
 ## Database Tables
 
 | Table | Purpose |
 |-------|---------|
 | `enterprises` | Organizations/tenants |
+| `users` | Admin users (Keycloak-managed) |
 | `devices` | Enrolled devices |
 | `policies` | Management policies |
-| `device_policies` | Device-policy assignments |
+| `device_policies` | Device-policy assignments (Sprint 1/2) |
 | `certificates` | PKI certificates |
-| `commands` | Device command queue |
+| `api_tokens` | API tokens for programmatic access |
+| `device_commands` | Device command queue |
 | `apps` | Application catalog |
+| `device_apps` | App installation state per device |
 | `audit_logs` | Audit trail |
-| `dep_names` | DEP server configurations |
+| `dep_names` | DEP server configurations (encrypted tokens) |
 | `dep_devices` | DEP-synced device inventory |
+| `device_groups` | Static device groups |
+| `group_memberships` | Device-to-group mapping |
+| `policy_assignments` | Policy targeting (device/group/enterprise) |
+| `compliance_results` | Per-device compliance state |
+| `policy_versions` | Policy version snapshots |
+| `token_cache` | PostgreSQL-backed token cache |
+| `idempotency_keys` | Idempotency-Key response cache |
 
 ## Development Workflow
 

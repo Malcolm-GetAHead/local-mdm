@@ -55,7 +55,7 @@ query := "SELECT * FROM devices WHERE id = '" + deviceID + "'"
 
 ### 4. Rate Limiting ✅
 
-In-memory rate limiter (production should use Redis):
+In-memory rate limiter (production should use PostgreSQL-backed or external rate limiting):
 
 ```go
 // Create rate limiter: 100 requests per minute
@@ -151,7 +151,7 @@ Every request gets unique UUID:
 ### Production (TODO)
 - [ ] TLS certificates configured
 - [ ] AWS Secrets Manager integration
-- [ ] Redis-backed rate limiting
+- [ ] PostgreSQL-backed or external rate limiting
 - [ ] WAF (Web Application Firewall)
 - [ ] DDoS protection (CloudFlare, AWS Shield)
 - [ ] Security scanning (Snyk, Dependabot)
