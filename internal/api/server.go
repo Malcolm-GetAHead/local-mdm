@@ -618,7 +618,9 @@ func (s *Server) setupRoutes() {
 		),
 	)).Methods("POST")
 
-	api.HandleFunc("/windows/ppkg/templates", s.handleWindowsPPKGTemplates).Methods("GET")
+	api.Handle("/windows/ppkg/templates", s.authMiddleware.RequireAuth(
+		http.HandlerFunc(s.handleWindowsPPKGTemplates),
+	)).Methods("GET")
 	
 	// Android MDM endpoints
 	api.Handle("/android/enrollment-token/{enterprise_id}", s.authMiddleware.RequireAuth(
