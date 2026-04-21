@@ -57,9 +57,16 @@ Local MDM is a single Go binary with a PostgreSQL dependency. ECS Fargate is the
      │  cw-agent:9090 │ │  cw-agent    │ │  cw-agent    │
      └────────┬───────┘ └─────┬────────┘ └─────┬────────┘
               │               │                │
-              └───────────────┼────────────────┘
-                              │
-              ┌───────────────┼────────────────┐
+              └───────┬───────┴────────┬───────┘
+                      │                │
+             ┌────────▼───────┐        │
+             │  NanoMDM (ECS) │        │
+             │  Apple MDM     │        │
+             │  protocol +    │        │
+             │  APNs push     │        │
+             └────────┬───────┘        │
+                      │                │
+              ┌───────┴────────────────┼───────┐
               │                                │
      ┌────────▼───────┐              ┌─────────▼────────┐
      │  RDS Primary   │──replication──▶  RDS Read Replica │
@@ -67,9 +74,10 @@ Local MDM is a single Go binary with a PostgreSQL dependency. ECS Fargate is the
      └────────────────┘              └──────────────────┘
 ```
 
-Each ECS task runs two containers:
-- **localmdm**: the Go application (port 8080 for API, port 9090 for Prometheus metrics)
-- **cloudwatch-agent**: sidecar that scrapes Prometheus metrics from localhost:9090 and forwards to CloudWatch Metrics
+**Services**:
+- **localmdm** (ECS Fargate): the Go application — API server, policy engine, enrollment handlers. Each task runs a CloudWatch Agent sidecar for Prometheus metrics forwarding.
+- **nanomdm** (ECS Fargate): Apple MDM protocol handler — receives device check-ins, delivers commands via APNs, calls back to Local MDM webhooks (`/checkin`, `/mdm`). Shares the same RDS database (NanoMDM's PostgreSQL schema coexists with Local MDM's tables). Configured with `NANOMDM_API_KEY` for authenticated command submission from Local MDM.
+- **RDS PostgreSQL**: primary for writes, read replica for Local MDM's Reader pool. NanoMDM uses the primary only.
 
 ---
 
@@ -168,7 +176,54 @@ scrape_configs:
       - targets: ["localhost:9090"]
 ```
 
-### 2. ECS Service & ALB
+### 2. NanoMDM Task Definition
+
+NanoMDM is the Apple MDM protocol handler. It runs as a separate ECS service sharing the same RDS database.
+
+```json
+{
+  "family": "nanomdm",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": ["FARGATE"],
+  "cpu": "256",
+  "memory": "512",
+  "executionRoleArn": "arn:aws:iam::ACCOUNT:role/localmdm-execution",
+  "taskRoleArn": "arn:aws:iam::ACCOUNT:role/localmdm-task",
+  "containerDefinitions": [
+    {
+      "name": "nanomdm",
+      "image": "ACCOUNT.dkr.ecr.REGION.amazonaws.com/nanomdm:latest",
+      "essential": true,
+      "portMappings": [
+        {"containerPort": 9000, "protocol": "tcp"}
+      ],
+      "environment": [
+        {"name": "NANOMDM_LISTEN", "value": ":9000"},
+        {"name": "NANOMDM_STORAGE", "value": "pgsql"},
+        {"name": "NANOMDM_STORAGE_DSN", "value": "postgres://nanomdm:PASSWORD@localmdm-primary.XXXXX.REGION.rds.amazonaws.com:5432/localmdm?sslmode=require"},
+        {"name": "NANOMDM_WEBHOOK_URL", "value": "http://localmdm.localmdm-ns:8080"},
+        {"name": "NANOMDM_API", "value": "nanomdm-api-key"}
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/nanomdm",
+          "awslogs-region": "REGION",
+          "awslogs-stream-prefix": "app"
+        }
+      }
+    }
+  ]
+}
+```
+
+**ALB routing** (path-based):
+- `/checkin`, `/mdm` → NanoMDM target group (port 9000) — Apple device check-ins and command responses
+- All other paths → Local MDM target group (port 8080) — API, enrollment, dashboard
+
+Local MDM sends commands to NanoMDM via its internal API (`nanomdm_url` in config), authenticated with `nanomdm_api_key`. NanoMDM pushes commands to devices via APNs and delivers responses back to Local MDM's `/checkin` and `/mdm` webhook endpoints.
+
+### 3. ECS Service & ALB
 
 ```json
 {
@@ -252,6 +307,7 @@ All secrets stored as `SecureString` parameters:
 | `/localmdm/jwt-secret` | SecureString | JWT signing key |
 | `/localmdm/keycloak-secret` | SecureString | Keycloak client secret |
 | `/localmdm/dep-encryption-key` | SecureString | DEP token encryption key |
+| `/localmdm/nanomdm-api-key` | SecureString | NanoMDM API authentication key |
 
 ECS task execution role needs `ssm:GetParameters` permission on these paths. Secrets are injected as environment variables at task launch — the Go app reads them via `os.Getenv()` (already implemented in `config.go`).
 
@@ -355,22 +411,24 @@ ECS handles this natively with the deployment configuration above:
 ### Staging
 | Resource | Spec | Monthly Cost |
 |----------|------|-------------|
-| ECS Fargate | 1 task, 0.25 vCPU, 0.5GB | ~$9 |
+| ECS Fargate (localmdm) | 1 task, 0.25 vCPU, 0.5GB | ~$9 |
+| ECS Fargate (nanomdm) | 1 task, 0.25 vCPU, 0.5GB | ~$9 |
 | RDS | db.t4g.micro, single-AZ, no replica | ~$13 |
 | ALB | minimal traffic | ~$16 |
 | CloudWatch | logs + metrics | ~$5 |
-| **Total** | | **~$43/mo** |
+| **Total** | | **~$52/mo** |
 
 ### Production
 | Resource | Spec | Monthly Cost |
 |----------|------|-------------|
-| ECS Fargate | 3 tasks, 0.5 vCPU, 1GB | ~$55 |
+| ECS Fargate (localmdm) | 3 tasks, 0.5 vCPU, 1GB | ~$55 |
+| ECS Fargate (nanomdm) | 2 tasks, 0.25 vCPU, 0.5GB | ~$18 |
 | RDS | db.t4g.medium, Multi-AZ + 1 replica | ~$140 |
 | ALB | moderate traffic | ~$25 |
 | CloudWatch | logs + metrics + dashboards | ~$15 |
 | SSM | parameter reads | ~$0 |
 | ACM | certificate | $0 |
-| **Total** | | **~$235/mo** |
+| **Total** | | **~$253/mo** |
 
 ---
 
