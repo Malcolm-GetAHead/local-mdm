@@ -165,6 +165,6 @@ database:
 | 4 | ✅ Complete | Policy system, compliance, groups, lifecycle, Redis removal |
 | 4b | ✅ Complete | Writer/Reader DB pools, repo constructor refactor |
 | 4c | 🔲 Not Started | macOS Platform SSO (Java/Swift) — renamed to Sprint 6 |
-| 5 | 🔲 Not Started | Backend polish, CLI, observability, performance |
+| 5 | ✅ Complete | Backend polish, CLI, observability, performance |
 | 5b | 🔲 Not Started | Web dashboard (HTMX) |
 | 6 | 🔲 Not Started | macOS Platform SSO (Java/Swift) — requires Apple Developer account |

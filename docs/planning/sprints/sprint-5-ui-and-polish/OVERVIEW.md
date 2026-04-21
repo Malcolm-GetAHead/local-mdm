@@ -1,9 +1,10 @@
 # Sprint 5: Backend Polish, CLI & Production Readiness
 
-**Status**: 🔲 Not Started  
+**Status**: ✅ Complete  
 **Duration**: 2 weeks  
 **Goal**: API documentation, CLI tools, E2E testing, observability, performance, deployment guide  
-**Depends on**: Sprint 4 complete
+**Depends on**: Sprint 4 complete  
+**Completed**: 2026-04-21
 
 > **Note**: Web Dashboard (S5-01) has been moved to [Sprint 5b](../sprint-5b-web-dashboard/OVERVIEW.md) as a separate frontend effort.
 
@@ -65,13 +66,13 @@ Recommended start order: S5-12, S5-10, S5-11 (unblock S5-05 and S5-08 early)
 
 ## Definition of Done
 
-- [ ] OpenAPI 3.0 spec matches all implemented endpoints
-- [ ] CLI tools: device/policy/group management, enrollment commands, table/JSON output
-- [ ] Reports: device inventory, compliance summary, audit log export
-- [ ] Deployment guide covers Docker, Docker Compose, and bare metal
-- [ ] E2E tests cover enrollment → policy → compliance flow for all platforms
-- [ ] Performance targets met (API p95 <200ms, 50 concurrent enrollments)
-- [ ] No critical or high severity bugs open
+- [x] OpenAPI 3.0 spec matches all implemented endpoints
+- [x] CLI tools: device/policy/group management, enrollment commands, table/JSON output
+- [x] Reports: device inventory, compliance summary, audit log export
+- [x] Deployment guide covers Docker, Docker Compose, and bare metal
+- [x] E2E tests cover enrollment → policy → compliance flow for all platforms
+- [x] Performance targets met (API p95 <200ms, 50 concurrent enrollments)
+- [x] No critical or high severity bugs open
 
 ---
 
