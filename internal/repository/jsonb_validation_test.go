@@ -17,7 +17,7 @@ func TestDeviceRepository_JSONBValidation(t *testing.T) {
 	db := testutil.SetupTestDB(t)
 	defer db.Close()
 
-	repo, err := NewDeviceRepository(db)
+	repo, err := NewDeviceRepository(db.Writer, db.Writer)
 	if err != nil {
 		t.Fatalf("failed to create repository: %v", err)
 	}
@@ -25,7 +25,7 @@ func TestDeviceRepository_JSONBValidation(t *testing.T) {
 	ctx := context.Background()
 	
 	// Create enterprise for foreign key
-	enterpriseRepo, err := NewEnterpriseRepository(db)
+	enterpriseRepo, err := NewEnterpriseRepository(db.Writer, db.Writer)
 	if err != nil {
 		t.Fatalf("failed to create enterprise repository: %v", err)
 	}
@@ -186,7 +186,7 @@ func TestEnterpriseRepository_JSONBValidation(t *testing.T) {
 	db := testutil.SetupTestDB(t)
 	defer db.Close()
 
-	repo, err := NewEnterpriseRepository(db)
+	repo, err := NewEnterpriseRepository(db.Writer, db.Writer)
 	if err != nil {
 		t.Fatalf("failed to create repository: %v", err)
 	}
@@ -253,7 +253,7 @@ func TestPolicyRepository_JSONBValidation(t *testing.T) {
 	db := testutil.SetupTestDB(t)
 	defer db.Close()
 
-	repo, err := NewPolicyRepository(db)
+	repo, err := NewPolicyRepository(db.Writer, db.Reader)
 	if err != nil {
 		t.Fatalf("failed to create repository: %v", err)
 	}
@@ -261,7 +261,7 @@ func TestPolicyRepository_JSONBValidation(t *testing.T) {
 	ctx := context.Background()
 	
 	// Create enterprise for foreign key
-	enterpriseRepo, err := NewEnterpriseRepository(db)
+	enterpriseRepo, err := NewEnterpriseRepository(db.Writer, db.Writer)
 	if err != nil {
 		t.Fatalf("failed to create enterprise repository: %v", err)
 	}

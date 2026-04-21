@@ -1,5 +1,6 @@
 # Sprint 4c: macOS Platform SSO with Keycloak
 
+**Status**: 🔲 Not Started  
 **Duration**: 1-2 weeks  
 **Goal**: Enable passwordless macOS login via Keycloak using Apple's Platform SSO  
 **Depends on**: Sprint 4 complete (policy system for pushing SSO profiles), Sprint 4b (DB pools), S2-01 (macOS enrollment)

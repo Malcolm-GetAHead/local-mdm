@@ -20,6 +20,7 @@ Build the minimum needed for CLI and dashboard auth. Keycloak user provisioning 
 - `internal/repository/user.go` — DB queries against existing `users` table
 - Methods: `Create`, `Get`, `List` (by enterprise), `Update` (role, active status), `Deactivate` (soft delete)
 - Password hashing not needed — auth is via Keycloak OIDC or API tokens
+- **Constructor pattern**: `NewUserRepository(writer, reader interface{})` — follows Sprint 4b Writer/Reader pool convention. Writes use `getExecutor(ctx, r.writer)`, reads use `getReadExecutor(ctx, r.reader)`.
 
 ### 2. API Token Service & Repository
 - `internal/service/token.go` — generate, validate, revoke
@@ -28,6 +29,7 @@ Build the minimum needed for CLI and dashboard auth. Keycloak user provisioning 
 - Storage: hash with pgcrypto `crypt()`/`gen_salt()` — plaintext returned once at creation, never stored
 - Validation: hash incoming token, compare against stored hash
 - Scoping: enterprise_id, role (inherited from creating user), optional expiration
+- **Constructor pattern**: `NewTokenRepository(writer, reader interface{})` — same as UserRepository above.
 
 ### 3. Token Auth Middleware
 - Alternative to OIDC JWT — check `Authorization: Bearer <token>` against `api_tokens` table

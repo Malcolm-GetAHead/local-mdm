@@ -15,23 +15,22 @@ type AuditLogRepository interface {
 }
 
 type auditLogRepository struct {
-	db executor
+	writer executor
+	reader executor
 }
 
 // NewAuditLogRepository creates a new audit log repository instance.
-func NewAuditLogRepository(db interface{}) (AuditLogRepository, error) {
-	if db == nil {
-		return nil, fmt.Errorf("database cannot be nil")
+// writer is used for Create operations, reader for List queries.
+func NewAuditLogRepository(writer, reader interface{}) (AuditLogRepository, error) {
+	w, err := resolveExecutor(writer, "writer")
+	if err != nil {
+		return nil, err
 	}
-
-	switch v := db.(type) {
-	case *sql.DB:
-		return &auditLogRepository{db: v}, nil
-	case executor:
-		return &auditLogRepository{db: v}, nil
-	default:
-		return nil, fmt.Errorf("unsupported database type: %T", db)
+	r, err := resolveExecutor(reader, "reader")
+	if err != nil {
+		return nil, err
 	}
+	return &auditLogRepository{writer: w, reader: r}, nil
 }
 
 func (r *auditLogRepository) List(ctx context.Context, enterpriseID uuid.UUID, limit, offset int) ([]*models.AuditLog, int, error) {
@@ -64,7 +63,7 @@ func (r *auditLogRepository) List(ctx context.Context, enterpriseID uuid.UUID, l
 
 	return ExecutePaginatedQuery(
 		ctx,
-		getExecutor(ctx, r.db),
+		getReadExecutor(ctx, r.reader),
 		countQuery, []interface{}{enterpriseID},
 		dataQuery, []interface{}{enterpriseID, limit, offset},
 		scanFn,

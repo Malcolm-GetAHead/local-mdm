@@ -46,6 +46,12 @@ database:
   max_idle_conns: 5
   conn_max_lifetime: 5m
   query_timeout: 30s
+  # Optional: reader pool overrides for read replicas (Aurora, etc.)
+  # Unset fields inherit from the base config above.
+  # reader:
+  #   host: "replica.example.com"
+  #   max_open_conns: 10
+  #   max_idle_conns: 3
 
 auth:
   jwt_secret: "REPLACE_WITH_ENV_VAR"  # CRITICAL: Set JWT_SECRET environment variable (min 32 chars)

@@ -135,9 +135,12 @@ data:
     server:
       port: 8080
     database:
-      host: postgres.default.svc.cluster.local
+      host: postgres-primary.default.svc.cluster.local
       port: 5432
       name: localmdm
+      # Reader pool overrides for read replica (Sprint 4b)
+      reader:
+        host: postgres-replica.default.svc.cluster.local
 ```
 
 **Secrets**:
@@ -217,10 +220,14 @@ autoscaling:
   targetMemoryUtilizationPercentage: 80
 
 database:
-  host: postgres.default.svc.cluster.local
+  host: postgres-primary.default.svc.cluster.local
   port: 5432
   name: localmdm
   # Password from secret
+  # Reader pool overrides for read replica (Sprint 4b)
+  # Unset fields inherit from base config above
+  reader:
+    host: postgres-replica.default.svc.cluster.local
 
 keycloak:
   url: https://keycloak.example.com
@@ -235,7 +242,7 @@ keycloak:
 - 3+ application replicas
 - Load balancer (AWS ALB, GCP Load Balancer, NGINX Ingress)
 - PostgreSQL with read replicas (managed service: RDS, Cloud SQL)
-- Redis for session/cache (optional, ElastiCache, Memorystore)
+- PostgreSQL-backed token cache and idempotency keys (no external cache dependency)
 - Horizontal Pod Autoscaler (HPA)
 - Pod Disruption Budget (PDB)
 

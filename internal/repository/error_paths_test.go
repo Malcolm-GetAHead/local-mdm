@@ -12,7 +12,7 @@ import (
 // Test Update method error paths
 func TestDeviceRepository_Update_NotFound(t *testing.T) {
 	db := testutil.SetupTestDB(t)
-	repo, err := NewDeviceRepository(db)
+	repo, err := NewDeviceRepository(db.Writer, db.Writer)
 	if err != nil {
 		t.Fatalf("failed to create repository: %v", err)
 	}
@@ -33,7 +33,7 @@ func TestDeviceRepository_Update_NotFound(t *testing.T) {
 
 func TestEnterpriseRepository_Update_NotFound(t *testing.T) {
 	db := testutil.SetupTestDB(t)
-	repo, err := NewEnterpriseRepository(db)
+	repo, err := NewEnterpriseRepository(db.Writer, db.Writer)
 	if err != nil {
 		t.Fatalf("failed to create repository: %v", err)
 	}
@@ -55,7 +55,7 @@ func TestEnterpriseRepository_Update_NotFound(t *testing.T) {
 
 func TestPolicyRepository_Update_NotFound(t *testing.T) {
 	db := testutil.SetupTestDB(t)
-	repo, err := NewPolicyRepository(db)
+	repo, err := NewPolicyRepository(db.Writer, db.Reader)
 	if err != nil {
 		t.Fatalf("failed to create repository: %v", err)
 	}
@@ -78,7 +78,7 @@ func TestPolicyRepository_Update_NotFound(t *testing.T) {
 // Test Delete method error paths
 func TestDeviceRepository_Delete_NotFound(t *testing.T) {
 	db := testutil.SetupTestDB(t)
-	repo, err := NewDeviceRepository(db)
+	repo, err := NewDeviceRepository(db.Writer, db.Writer)
 	if err != nil {
 		t.Fatalf("failed to create repository: %v", err)
 	}
@@ -94,7 +94,7 @@ func TestDeviceRepository_Delete_NotFound(t *testing.T) {
 
 func TestEnterpriseRepository_Delete_NotFound(t *testing.T) {
 	db := testutil.SetupTestDB(t)
-	repo, err := NewEnterpriseRepository(db)
+	repo, err := NewEnterpriseRepository(db.Writer, db.Writer)
 	if err != nil {
 		t.Fatalf("failed to create repository: %v", err)
 	}
@@ -110,7 +110,7 @@ func TestEnterpriseRepository_Delete_NotFound(t *testing.T) {
 
 func TestPolicyRepository_Delete_NotFound(t *testing.T) {
 	db := testutil.SetupTestDB(t)
-	repo, err := NewPolicyRepository(db)
+	repo, err := NewPolicyRepository(db.Writer, db.Reader)
 	if err != nil {
 		t.Fatalf("failed to create repository: %v", err)
 	}
@@ -127,7 +127,7 @@ func TestPolicyRepository_Delete_NotFound(t *testing.T) {
 // Test GetBySlug error path
 func TestEnterpriseRepository_GetBySlug_NotFound(t *testing.T) {
 	db := testutil.SetupTestDB(t)
-	repo, err := NewEnterpriseRepository(db)
+	repo, err := NewEnterpriseRepository(db.Writer, db.Writer)
 	if err != nil {
 		t.Fatalf("failed to create repository: %v", err)
 	}
@@ -141,13 +141,13 @@ func TestEnterpriseRepository_GetBySlug_NotFound(t *testing.T) {
 // Test soft delete behavior
 func TestDeviceRepository_Delete_SoftDelete(t *testing.T) {
 	db := testutil.SetupTestDB(t)
-	repo, err := NewDeviceRepository(db)
+	repo, err := NewDeviceRepository(db.Writer, db.Writer)
 	if err != nil {
 		t.Fatalf("failed to create repository: %v", err)
 	}
 
 	// Create enterprise
-	enterpriseRepo, err := NewEnterpriseRepository(db)
+	enterpriseRepo, err := NewEnterpriseRepository(db.Writer, db.Writer)
 	if err != nil {
 		t.Fatalf("failed to create enterprise repository: %v", err)
 	}
@@ -203,7 +203,7 @@ func TestDeviceRepository_Delete_SoftDelete(t *testing.T) {
 // Test List with empty results
 func TestDeviceRepository_List_EmptyResults(t *testing.T) {
 	db := testutil.SetupTestDB(t)
-	repo, err := NewDeviceRepository(db)
+	repo, err := NewDeviceRepository(db.Writer, db.Writer)
 	if err != nil {
 		t.Fatalf("failed to create repository: %v", err)
 	}
@@ -222,7 +222,7 @@ func TestDeviceRepository_List_EmptyResults(t *testing.T) {
 
 func TestEnterpriseRepository_List_EmptyResults(t *testing.T) {
 	db := testutil.SetupTestDB(t)
-	repo, err := NewEnterpriseRepository(db)
+	repo, err := NewEnterpriseRepository(db.Writer, db.Writer)
 	if err != nil {
 		t.Fatalf("failed to create repository: %v", err)
 	}
@@ -249,7 +249,7 @@ func TestEnterpriseRepository_List_EmptyResults(t *testing.T) {
 
 func TestPolicyRepository_List_EmptyResults(t *testing.T) {
 	db := testutil.SetupTestDB(t)
-	repo, err := NewPolicyRepository(db)
+	repo, err := NewPolicyRepository(db.Writer, db.Reader)
 	if err != nil {
 		t.Fatalf("failed to create repository: %v", err)
 	}

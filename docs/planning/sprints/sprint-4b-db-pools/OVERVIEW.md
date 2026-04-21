@@ -1,8 +1,10 @@
 # Sprint 4b: Read/Write Database Pools
 
-**Duration**: 1-2 days  
+**Status**: ✅ Complete  
+**Duration**: 1 session  
 **Goal**: Split single DB connection into separate Writer and Reader pools to prepare for Aurora read replicas  
-**Depends on**: Sprint 4 complete
+**Depends on**: Sprint 4 complete  
+**Branch**: `sprint-4b/read-write-pools`
 
 > **Created 2026-04-20.** Extracted from Sprint 4 prerequisites to keep the pool refactor isolated from feature work.
 
@@ -20,24 +22,53 @@ Read/Write pool splitting touches every repository constructor and the server in
 
 ## Tasks
 
-| ID | Task | Effort |
+| ID | Task | Status |
 |---|---|---|
-| S4b-01 | Update `internal/db/db.go`: `DB` struct holds `Writer *sql.DB` and `Reader *sql.DB` | 0.5 day |
-| S4b-02 | Add `writer_dsn` and `reader_dsn` to `DatabaseConfig` (fall back to single DSN if reader not set) | 0.5 day |
-| S4b-03 | Update all repository constructors to accept both pools — writes use Writer, reads use Reader | 0.5 day |
-| S4b-04 | Update server.go wiring, tests, verify all pass with `-race` | 0.5 day |
+| S4b-01 | Update `internal/db/db.go`: `DB` struct holds `Writer *sql.DB` and `Reader *sql.DB` | ✅ |
+| S4b-02 | Add `ReaderConfig` to `DatabaseConfig` with field-level fallback | ✅ |
+| S4b-03 | Update all 11 repository constructors to accept `(writer, reader interface{})` | ✅ |
+| S4b-04 | Update server.go wiring, non-repo consumers, all tests pass with `-race` | ✅ |
 
 ### Design
 
-- `getExecutor(ctx, db)` pattern continues to work for transaction-aware writes
+- `getExecutor(ctx, r.writer)` for write methods — transaction-aware via context
+- `getReadExecutor(ctx, r.reader)` for read methods — returns tx if active (reads see uncommitted writes within transactions), otherwise uses reader pool
+- `resolveExecutor` helper for DRY constructor validation
+- Non-repo consumers (audit, idempotency, certs, metrics, auth, DEP) use Writer pool
 - In dev, both pools point to the same PostgreSQL instance
 - In production, Reader points to Aurora read replica
 - Existing `Transactor` uses Writer pool exclusively
 
+### Config
+
+```yaml
+database:
+  # Base config (used for writer pool, and reader pool if no overrides)
+  host: "localhost"
+  port: 5432
+  user: "postgres"
+  password: "secure-password"
+  database: "localmdm"
+  sslmode: "disable"
+  max_open_conns: 25
+  max_idle_conns: 5
+  conn_max_lifetime: 5m
+  query_timeout: 30s
+
+  # Optional: reader pool overrides (for Aurora read replica)
+  # Unset fields inherit from base config
+  # reader:
+  #   host: "replica.example.com"
+  #   max_open_conns: 10
+  #   max_idle_conns: 3
+```
+
+Environment variable overrides: `DB_READER_HOST`, `DB_READER_PORT`
+
 ## Definition of Done
 
-- [ ] `DB` struct exposes `Writer` and `Reader` pools
-- [ ] Config supports `writer_dsn` / `reader_dsn` with single-DSN fallback
-- [ ] All repository reads use Reader pool, writes use Writer pool
-- [ ] All tests pass with `-race`
-- [ ] No functional change — purely structural prep
+- [x] `DB` struct exposes `Writer` and `Reader` pools
+- [x] Config supports `ReaderConfig` with field-level fallback to base config
+- [x] All repository reads use Reader pool, writes use Writer pool
+- [x] All tests pass with `-race`
+- [x] No functional change — purely structural prep

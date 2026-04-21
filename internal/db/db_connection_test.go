@@ -335,7 +335,7 @@ func TestNew_AcceptsValidConfiguration(t *testing.T) {
 	defer db.Close()
 
 	// Verify connection pool settings
-	stats := db.Stats()
+	stats := db.Writer.Stats()
 	assert.Equal(t, 25, stats.MaxOpenConnections)
 }
 

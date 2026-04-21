@@ -17,15 +17,15 @@ func TestTransactionCommit(t *testing.T) {
 	db := testutil.SetupTestDB(t)
 	defer db.Close()
 
-	transactor, err := NewTransactor(db)
+	transactor, err := NewTransactor(db.Writer)
 	if err != nil {
 		t.Fatalf("Failed to create transactor: %v", err)
 	}
-	deviceRepo, err := NewDeviceRepository(db)
+	deviceRepo, err := NewDeviceRepository(db.Writer, db.Writer)
 	if err != nil {
 		t.Fatalf("Failed to create device repository: %v", err)
 	}
-	enterpriseRepo, err := NewEnterpriseRepository(db)
+	enterpriseRepo, err := NewEnterpriseRepository(db.Writer, db.Writer)
 	if err != nil {
 		t.Fatalf("Failed to create enterprise repository: %v", err)
 	}
@@ -89,7 +89,7 @@ func TestTransactionRollback(t *testing.T) {
 	db := testutil.SetupTestDB(t)
 	defer db.Close()
 
-	transactor, err := NewTransactor(db)
+	transactor, err := NewTransactor(db.Writer)
 	if err != nil {
 		t.Fatalf("Failed to create transactor: %v", err)
 	}
@@ -102,7 +102,7 @@ func TestTransactionRollback(t *testing.T) {
 
 
 	}
-	deviceRepo, err := NewDeviceRepository(db)
+	deviceRepo, err := NewDeviceRepository(db.Writer, db.Writer)
 	if err != nil {
 		t.Fatalf("Failed to create device repository: %v", err)
 	}
@@ -112,7 +112,7 @@ func TestTransactionRollback(t *testing.T) {
 		t.Fatalf("Failed to create device repository: %v", err)
 
 	}
-	enterpriseRepo, err := NewEnterpriseRepository(db)
+	enterpriseRepo, err := NewEnterpriseRepository(db.Writer, db.Writer)
 	if err != nil {
 		t.Fatalf("Failed to create enterprise repository: %v", err)
 	}
@@ -169,7 +169,7 @@ func TestTransactionRollbackOnPanic(t *testing.T) {
 	db := testutil.SetupTestDB(t)
 	defer db.Close()
 
-	transactor, err := NewTransactor(db)
+	transactor, err := NewTransactor(db.Writer)
 	if err != nil {
 		t.Fatalf("Failed to create transactor: %v", err)
 	}
@@ -182,7 +182,7 @@ func TestTransactionRollbackOnPanic(t *testing.T) {
 
 
 	}
-	deviceRepo, err := NewDeviceRepository(db)
+	deviceRepo, err := NewDeviceRepository(db.Writer, db.Writer)
 	if err != nil {
 		t.Fatalf("Failed to create device repository: %v", err)
 	}
@@ -192,7 +192,7 @@ func TestTransactionRollbackOnPanic(t *testing.T) {
 		t.Fatalf("Failed to create device repository: %v", err)
 
 	}
-	enterpriseRepo, err := NewEnterpriseRepository(db)
+	enterpriseRepo, err := NewEnterpriseRepository(db.Writer, db.Writer)
 	if err != nil {
 		t.Fatalf("Failed to create enterprise repository: %v", err)
 	}
@@ -251,7 +251,7 @@ func TestNestedTransactions(t *testing.T) {
 	db := testutil.SetupTestDB(t)
 	defer db.Close()
 
-	transactor, err := NewTransactor(db)
+	transactor, err := NewTransactor(db.Writer)
 	if err != nil {
 		t.Fatalf("Failed to create transactor: %v", err)
 	}
@@ -264,7 +264,7 @@ func TestNestedTransactions(t *testing.T) {
 
 
 	}
-	deviceRepo, err := NewDeviceRepository(db)
+	deviceRepo, err := NewDeviceRepository(db.Writer, db.Writer)
 	if err != nil {
 		t.Fatalf("Failed to create device repository: %v", err)
 	}
@@ -274,7 +274,7 @@ func TestNestedTransactions(t *testing.T) {
 		t.Fatalf("Failed to create device repository: %v", err)
 
 	}
-	enterpriseRepo, err := NewEnterpriseRepository(db)
+	enterpriseRepo, err := NewEnterpriseRepository(db.Writer, db.Writer)
 	if err != nil {
 		t.Fatalf("Failed to create enterprise repository: %v", err)
 	}
@@ -338,7 +338,7 @@ func TestTransactionWithMultipleOperations(t *testing.T) {
 	db := testutil.SetupTestDB(t)
 	defer db.Close()
 
-	transactor, err := NewTransactor(db)
+	transactor, err := NewTransactor(db.Writer)
 	if err != nil {
 		t.Fatalf("Failed to create transactor: %v", err)
 	}
@@ -351,7 +351,7 @@ func TestTransactionWithMultipleOperations(t *testing.T) {
 
 
 	}
-	deviceRepo, err := NewDeviceRepository(db)
+	deviceRepo, err := NewDeviceRepository(db.Writer, db.Writer)
 	if err != nil {
 		t.Fatalf("Failed to create device repository: %v", err)
 	}
@@ -361,7 +361,7 @@ func TestTransactionWithMultipleOperations(t *testing.T) {
 		t.Fatalf("Failed to create device repository: %v", err)
 
 	}
-	enterpriseRepo, err := NewEnterpriseRepository(db)
+	enterpriseRepo, err := NewEnterpriseRepository(db.Writer, db.Writer)
 	if err != nil {
 		t.Fatalf("Failed to create enterprise repository: %v", err)
 	}
@@ -371,7 +371,7 @@ func TestTransactionWithMultipleOperations(t *testing.T) {
 		t.Fatalf("Failed to create enterprise repository: %v", err)
 
 	}
-	policyRepo, err := NewPolicyRepository(db)
+	policyRepo, err := NewPolicyRepository(db.Writer, db.Reader)
 	if err != nil {
 		t.Fatalf("Failed to create policy repository: %v", err)
 	}
@@ -460,21 +460,21 @@ func TestGetExecutor(t *testing.T) {
 
 	ctx := context.Background()
 
-	// Without transaction, should return db
-	exec := getExecutor(ctx, db)
-	if exec != db {
-		t.Error("Expected executor to be db when no transaction in context")
+	// Without transaction, should return db.Writer
+	exec := getExecutor(ctx, db.Writer)
+	if exec != db.Writer {
+		t.Error("Expected executor to be db.Writer when no transaction in context")
 	}
 
 	// With transaction, should return tx
-	tx, err := db.Begin()
+	tx, err := db.Writer.Begin()
 	if err != nil {
 		t.Fatalf("Failed to begin transaction: %v", err)
 	}
 	defer tx.Rollback()
 
 	txCtx := context.WithValue(ctx, txKey{}, tx)
-	exec = getExecutor(txCtx, db)
+	exec = getExecutor(txCtx, db.Writer)
 	if exec != tx {
 		t.Error("Expected executor to be tx when transaction in context")
 	}
@@ -493,7 +493,7 @@ func TestGetTx(t *testing.T) {
 	}
 
 	// With transaction
-	dbTx, err := db.Begin()
+	dbTx, err := db.Writer.Begin()
 	if err != nil {
 		t.Fatalf("Failed to begin transaction: %v", err)
 	}
@@ -510,7 +510,7 @@ func TestTransactionUpdateOperations(t *testing.T) {
 	db := testutil.SetupTestDB(t)
 	defer db.Close()
 
-	transactor, err := NewTransactor(db)
+	transactor, err := NewTransactor(db.Writer)
 	if err != nil {
 		t.Fatalf("Failed to create transactor: %v", err)
 	}
@@ -523,7 +523,7 @@ func TestTransactionUpdateOperations(t *testing.T) {
 
 
 	}
-	deviceRepo, err := NewDeviceRepository(db)
+	deviceRepo, err := NewDeviceRepository(db.Writer, db.Writer)
 	if err != nil {
 		t.Fatalf("Failed to create device repository: %v", err)
 	}
@@ -533,7 +533,7 @@ func TestTransactionUpdateOperations(t *testing.T) {
 		t.Fatalf("Failed to create device repository: %v", err)
 
 	}
-	enterpriseRepo, err := NewEnterpriseRepository(db)
+	enterpriseRepo, err := NewEnterpriseRepository(db.Writer, db.Writer)
 	if err != nil {
 		t.Fatalf("Failed to create enterprise repository: %v", err)
 	}
@@ -608,7 +608,7 @@ func TestTransactionUpdateRollback(t *testing.T) {
 	db := testutil.SetupTestDB(t)
 	defer db.Close()
 
-	transactor, err := NewTransactor(db)
+	transactor, err := NewTransactor(db.Writer)
 	if err != nil {
 		t.Fatalf("Failed to create transactor: %v", err)
 	}
@@ -621,7 +621,7 @@ func TestTransactionUpdateRollback(t *testing.T) {
 
 
 	}
-	deviceRepo, err := NewDeviceRepository(db)
+	deviceRepo, err := NewDeviceRepository(db.Writer, db.Writer)
 	if err != nil {
 		t.Fatalf("Failed to create device repository: %v", err)
 	}
@@ -631,7 +631,7 @@ func TestTransactionUpdateRollback(t *testing.T) {
 		t.Fatalf("Failed to create device repository: %v", err)
 
 	}
-	enterpriseRepo, err := NewEnterpriseRepository(db)
+	enterpriseRepo, err := NewEnterpriseRepository(db.Writer, db.Writer)
 	if err != nil {
 		t.Fatalf("Failed to create enterprise repository: %v", err)
 	}
@@ -695,7 +695,7 @@ func TestTransactionDeleteOperations(t *testing.T) {
 	db := testutil.SetupTestDB(t)
 	defer db.Close()
 
-	transactor, err := NewTransactor(db)
+	transactor, err := NewTransactor(db.Writer)
 	if err != nil {
 		t.Fatalf("Failed to create transactor: %v", err)
 	}
@@ -708,7 +708,7 @@ func TestTransactionDeleteOperations(t *testing.T) {
 
 
 	}
-	deviceRepo, err := NewDeviceRepository(db)
+	deviceRepo, err := NewDeviceRepository(db.Writer, db.Writer)
 	if err != nil {
 		t.Fatalf("Failed to create device repository: %v", err)
 	}
@@ -718,7 +718,7 @@ func TestTransactionDeleteOperations(t *testing.T) {
 		t.Fatalf("Failed to create device repository: %v", err)
 
 	}
-	policyRepo, err := NewPolicyRepository(db)
+	policyRepo, err := NewPolicyRepository(db.Writer, db.Reader)
 	if err != nil {
 		t.Fatalf("Failed to create policy repository: %v", err)
 	}
@@ -728,7 +728,7 @@ func TestTransactionDeleteOperations(t *testing.T) {
 		t.Fatalf("Failed to create policy repository: %v", err)
 
 	}
-	enterpriseRepo, err := NewEnterpriseRepository(db)
+	enterpriseRepo, err := NewEnterpriseRepository(db.Writer, db.Writer)
 	if err != nil {
 		t.Fatalf("Failed to create enterprise repository: %v", err)
 	}
@@ -805,7 +805,7 @@ func TestTransactionDeleteRollback(t *testing.T) {
 	db := testutil.SetupTestDB(t)
 	defer db.Close()
 
-	transactor, err := NewTransactor(db)
+	transactor, err := NewTransactor(db.Writer)
 	if err != nil {
 		t.Fatalf("Failed to create transactor: %v", err)
 	}
@@ -818,7 +818,7 @@ func TestTransactionDeleteRollback(t *testing.T) {
 
 
 	}
-	deviceRepo, err := NewDeviceRepository(db)
+	deviceRepo, err := NewDeviceRepository(db.Writer, db.Writer)
 	if err != nil {
 		t.Fatalf("Failed to create device repository: %v", err)
 	}
@@ -828,7 +828,7 @@ func TestTransactionDeleteRollback(t *testing.T) {
 		t.Fatalf("Failed to create device repository: %v", err)
 
 	}
-	enterpriseRepo, err := NewEnterpriseRepository(db)
+	enterpriseRepo, err := NewEnterpriseRepository(db.Writer, db.Writer)
 	if err != nil {
 		t.Fatalf("Failed to create enterprise repository: %v", err)
 	}
@@ -886,7 +886,7 @@ func TestTransactionErrorPaths(t *testing.T) {
 	db := testutil.SetupTestDB(t)
 	defer db.Close()
 
-	transactor, err := NewTransactor(db)
+	transactor, err := NewTransactor(db.Writer)
 	if err != nil {
 		t.Fatalf("Failed to create transactor: %v", err)
 	}
@@ -899,7 +899,7 @@ func TestTransactionErrorPaths(t *testing.T) {
 
 
 	}
-	deviceRepo, err := NewDeviceRepository(db)
+	deviceRepo, err := NewDeviceRepository(db.Writer, db.Writer)
 	if err != nil {
 		t.Fatalf("Failed to create device repository: %v", err)
 	}
@@ -973,7 +973,7 @@ func TestNewTransactorWithExecutor(t *testing.T) {
 	defer db.Close()
 	
 	// Start a transaction to get an executor
-	tx, err := db.Begin()
+	tx, err := db.Writer.Begin()
 	if err != nil {
 		t.Fatalf("Failed to begin transaction: %v", err)
 	}
@@ -992,39 +992,39 @@ func TestNewTransactorWithExecutor(t *testing.T) {
 
 func TestNewRepositoryWithInvalidType(t *testing.T) {
 	t.Run("device_repository", func(t *testing.T) {
-		_, err := NewDeviceRepository("invalid type")
+		_, err := NewDeviceRepository("invalid type", "invalid type")
 		if err == nil {
 			t.Error("Expected error when creating device repository with invalid type")
 		}
-		if err != nil && !strings.Contains(err.Error(), "unsupported database type") {
-			t.Errorf("Expected 'unsupported database type' error, got: %v", err)
+		if err != nil && !strings.Contains(err.Error(), "unsupported writer type") {
+			t.Errorf("Expected 'unsupported writer type' error, got: %v", err)
 		}
 	})
 
 	t.Run("enterprise_repository", func(t *testing.T) {
-		_, err := NewEnterpriseRepository("invalid type")
+		_, err := NewEnterpriseRepository("invalid type", "invalid type")
 		if err == nil {
 			t.Error("Expected error when creating enterprise repository with invalid type")
 		}
-		if err != nil && !strings.Contains(err.Error(), "unsupported database type") {
-			t.Errorf("Expected 'unsupported database type' error, got: %v", err)
+		if err != nil && !strings.Contains(err.Error(), "unsupported writer type") {
+			t.Errorf("Expected 'unsupported writer type' error, got: %v", err)
 		}
 	})
 
 	t.Run("policy_repository", func(t *testing.T) {
-		_, err := NewPolicyRepository("invalid type")
+		_, err := NewPolicyRepository("invalid type", "invalid type")
 		if err == nil {
 			t.Error("Expected error when creating policy repository with invalid type")
 		}
-		if err != nil && !strings.Contains(err.Error(), "unsupported database type") {
-			t.Errorf("Expected 'unsupported database type' error, got: %v", err)
+		if err != nil && !strings.Contains(err.Error(), "unsupported writer type") {
+			t.Errorf("Expected 'unsupported writer type' error, got: %v", err)
 		}
 	})
 }
 
 func TestNewRepositoryWithNil(t *testing.T) {
 	t.Run("device_repository", func(t *testing.T) {
-		_, err := NewDeviceRepository(nil)
+		_, err := NewDeviceRepository(nil, nil)
 		if err == nil {
 			t.Error("Expected error when creating device repository with nil")
 		}
@@ -1034,7 +1034,7 @@ func TestNewRepositoryWithNil(t *testing.T) {
 	})
 
 	t.Run("enterprise_repository", func(t *testing.T) {
-		_, err := NewEnterpriseRepository(nil)
+		_, err := NewEnterpriseRepository(nil, nil)
 		if err == nil {
 			t.Error("Expected error when creating enterprise repository with nil")
 		}
@@ -1044,7 +1044,7 @@ func TestNewRepositoryWithNil(t *testing.T) {
 	})
 
 	t.Run("policy_repository", func(t *testing.T) {
-		_, err := NewPolicyRepository(nil)
+		_, err := NewPolicyRepository(nil, nil)
 		if err == nil {
 			t.Error("Expected error when creating policy repository with nil")
 		}
@@ -1059,14 +1059,14 @@ func TestNewRepositoryWithExecutor(t *testing.T) {
 	defer db.Close()
 	
 	// Start a transaction to get an executor
-	tx, err := db.Begin()
+	tx, err := db.Writer.Begin()
 	if err != nil {
 		t.Fatalf("Failed to begin transaction: %v", err)
 	}
 	defer tx.Rollback()
 	
 	t.Run("device_repository", func(t *testing.T) {
-		repo, err := NewDeviceRepository(tx)
+		repo, err := NewDeviceRepository(tx, tx)
 		if err != nil {
 			t.Fatalf("Failed to create device repository with executor: %v", err)
 		}
@@ -1076,7 +1076,7 @@ func TestNewRepositoryWithExecutor(t *testing.T) {
 	})
 	
 	t.Run("enterprise_repository", func(t *testing.T) {
-		repo, err := NewEnterpriseRepository(tx)
+		repo, err := NewEnterpriseRepository(tx, tx)
 		if err != nil {
 			t.Fatalf("Failed to create enterprise repository with executor: %v", err)
 		}
@@ -1086,7 +1086,7 @@ func TestNewRepositoryWithExecutor(t *testing.T) {
 	})
 	
 	t.Run("policy_repository", func(t *testing.T) {
-		repo, err := NewPolicyRepository(tx)
+		repo, err := NewPolicyRepository(tx, tx)
 		if err != nil {
 			t.Fatalf("Failed to create policy repository with executor: %v", err)
 		}
@@ -1111,7 +1111,7 @@ func TestTransactionWithCancelledContext(t *testing.T) {
 	db := testutil.SetupTestDB(t)
 	defer db.Close()
 
-	transactor, err := NewTransactor(db)
+	transactor, err := NewTransactor(db.Writer)
 	if err != nil {
 		t.Fatalf("Failed to create transactor: %v", err)
 	}
@@ -1124,7 +1124,7 @@ func TestTransactionWithCancelledContext(t *testing.T) {
 
 
 	}
-	enterpriseRepo, err := NewEnterpriseRepository(db)
+	enterpriseRepo, err := NewEnterpriseRepository(db.Writer, db.Writer)
 	if err != nil {
 		t.Fatalf("Failed to create enterprise repository: %v", err)
 	}
@@ -1158,7 +1158,7 @@ func TestTransactionWithTimeout(t *testing.T) {
 	db := testutil.SetupTestDB(t)
 	defer db.Close()
 
-	transactor, err := NewTransactor(db)
+	transactor, err := NewTransactor(db.Writer)
 	if err != nil {
 		t.Fatalf("Failed to create transactor: %v", err)
 	}
@@ -1184,12 +1184,12 @@ func TestTransactionIsolationLevels(t *testing.T) {
 	db := testutil.SetupTestDB(t)
 	defer db.Close()
 
-	transactor, err := NewTransactor(db)
+	transactor, err := NewTransactor(db.Writer)
 	if err != nil {
 		t.Fatalf("Failed to create transactor: %v", err)
 	}
 	
-	enterpriseRepo, err := NewEnterpriseRepository(db)
+	enterpriseRepo, err := NewEnterpriseRepository(db.Writer, db.Writer)
 	if err != nil {
 		t.Fatalf("Failed to create enterprise repository: %v", err)
 	}
@@ -1226,12 +1226,12 @@ func TestSerializableTransactionRetry(t *testing.T) {
 	db := testutil.SetupTestDB(t)
 	defer db.Close()
 
-	transactor, err := NewTransactor(db)
+	transactor, err := NewTransactor(db.Writer)
 	if err != nil {
 		t.Fatalf("Failed to create transactor: %v", err)
 	}
 	
-	enterpriseRepo, err := NewEnterpriseRepository(db)
+	enterpriseRepo, err := NewEnterpriseRepository(db.Writer, db.Writer)
 	if err != nil {
 		t.Fatalf("Failed to create enterprise repository: %v", err)
 	}
@@ -1351,7 +1351,7 @@ func TestTransactionIsolationWithError(t *testing.T) {
 	db := testutil.SetupTestDB(t)
 	defer db.Close()
 
-	transactor, err := NewTransactor(db)
+	transactor, err := NewTransactor(db.Writer)
 	if err != nil {
 		t.Fatalf("Failed to create transactor: %v", err)
 	}
@@ -1376,12 +1376,12 @@ func TestNestedTransactionWithIsolation(t *testing.T) {
 	db := testutil.SetupTestDB(t)
 	defer db.Close()
 
-	transactor, err := NewTransactor(db)
+	transactor, err := NewTransactor(db.Writer)
 	if err != nil {
 		t.Fatalf("Failed to create transactor: %v", err)
 	}
 	
-	enterpriseRepo, err := NewEnterpriseRepository(db)
+	enterpriseRepo, err := NewEnterpriseRepository(db.Writer, db.Writer)
 	if err != nil {
 		t.Fatalf("Failed to create enterprise repository: %v", err)
 	}

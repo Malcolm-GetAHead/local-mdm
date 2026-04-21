@@ -72,14 +72,17 @@ Without DR plan:
 
 #### Scenario 2: Database Failure
 **Detection**: Database connection errors, health check fails  
-**Impact**: Service unavailable  
+**Impact**: Service unavailable (writes fail; reads may continue via Reader pool if only primary is down)  
 **Recovery**:
 1. Check database status (RDS console, Cloud SQL console)
-2. If primary down, initiate failover to read replica
+2. If primary (writer) down, initiate failover to read replica
 3. Promote read replica to primary
-4. Update application connection string
-5. Restart application to pick up new connection
-6. Verify data integrity
+4. Update Writer pool connection string (config `database.host` or `DB_HOST` env var)
+5. Update Reader pool connection string if needed (`database.reader.host` or `DB_READER_HOST`)
+6. Restart application to pick up new connections
+7. Verify data integrity
+
+**Partial availability**: If only the Writer pool is down, the Reader pool may still serve read-only requests (device lists, policy views, compliance reports). The application's `Health()` endpoint will report degraded status ("writer pool" error) but read paths through `getReadExecutor` continue working.
 
 **RTO**: 30 minutes  
 **RPO**: 15 minutes (replication lag)  
@@ -138,16 +141,16 @@ Without DR plan:
 ```
 Primary Region (us-east-1)          DR Region (us-west-2)
 ├── Application (3 replicas)        ├── Application (1 replica, standby)
-├── Database (primary)              ├── Database (read replica)
-├── Redis (primary)                 ├── Redis (replica)
+├── Database (primary/writer)       ├── Database (read replica/reader)
 └── Load Balancer                   └── Load Balancer (standby)
 ```
 
 **Replication**:
 - Database: Continuous replication (RDS cross-region replica)
-- Redis: Replication or backup/restore
 - Secrets: Replicated to DR region
 - Configuration: Stored in git, deployed to both regions
+
+**Note**: Redis was removed in Sprint 4. Token cache and idempotency keys use PostgreSQL, so they replicate automatically with the database.
 
 **Failover Process**:
 1. Detect primary region failure

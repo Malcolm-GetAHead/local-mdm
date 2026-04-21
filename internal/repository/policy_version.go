@@ -18,22 +18,22 @@ type PolicyVersionRepository interface {
 }
 
 type policyVersionRepository struct {
-	db executor
+	writer executor
+	reader executor
 }
 
 // NewPolicyVersionRepository creates a new policy version repository.
-func NewPolicyVersionRepository(db interface{}) (PolicyVersionRepository, error) {
-	if db == nil {
-		return nil, fmt.Errorf("database cannot be nil")
+// writer is used for Create, reader for Get/List queries.
+func NewPolicyVersionRepository(writer, reader interface{}) (PolicyVersionRepository, error) {
+	w, err := resolveExecutor(writer, "writer")
+	if err != nil {
+		return nil, err
 	}
-	switch v := db.(type) {
-	case *sql.DB:
-		return &policyVersionRepository{db: v}, nil
-	case executor:
-		return &policyVersionRepository{db: v}, nil
-	default:
-		return nil, fmt.Errorf("unsupported database type: %T", db)
+	r, err := resolveExecutor(reader, "reader")
+	if err != nil {
+		return nil, err
 	}
+	return &policyVersionRepository{writer: w, reader: r}, nil
 }
 
 func (r *policyVersionRepository) Create(ctx context.Context, v *models.PolicyVersion) error {
@@ -46,7 +46,7 @@ func (r *policyVersionRepository) Create(ctx context.Context, v *models.PolicyVe
 		return fmt.Errorf("failed to marshal policy_config: %w", err)
 	}
 
-	_, err = getExecutor(ctx, r.db).ExecContext(ctx,
+	_, err = getExecutor(ctx, r.writer).ExecContext(ctx,
 		`INSERT INTO policy_versions (id, policy_id, version, policy_config, name, description, platform, policy_type, is_active, created_by)
 		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
 		v.ID, v.PolicyID, v.Version, configVal, v.Name, v.Description, v.Platform, v.PolicyType, v.IsActive, v.CreatedBy,
@@ -61,14 +61,14 @@ func (r *policyVersionRepository) ListByPolicy(ctx context.Context, policyID uui
 	}
 
 	var total int
-	err = getExecutor(ctx, r.db).QueryRowContext(ctx,
+	err = getReadExecutor(ctx, r.reader).QueryRowContext(ctx,
 		`SELECT COUNT(*) FROM policy_versions WHERE policy_id = $1`, policyID,
 	).Scan(&total)
 	if err != nil {
 		return nil, 0, err
 	}
 
-	rows, err := getExecutor(ctx, r.db).QueryContext(ctx,
+	rows, err := getReadExecutor(ctx, r.reader).QueryContext(ctx,
 		`SELECT id, policy_id, version, policy_config, name, description, platform, policy_type, is_active, created_by
 		 FROM policy_versions WHERE policy_id = $1 ORDER BY version DESC LIMIT $2 OFFSET $3`,
 		policyID, limit, offset,
@@ -91,7 +91,7 @@ func (r *policyVersionRepository) ListByPolicy(ctx context.Context, policyID uui
 
 func (r *policyVersionRepository) GetByVersion(ctx context.Context, policyID uuid.UUID, version int) (*models.PolicyVersion, error) {
 	v := &models.PolicyVersion{}
-	err := getExecutor(ctx, r.db).QueryRowContext(ctx,
+	err := getReadExecutor(ctx, r.reader).QueryRowContext(ctx,
 		`SELECT id, policy_id, version, policy_config, name, description, platform, policy_type, is_active, created_by
 		 FROM policy_versions WHERE policy_id = $1 AND version = $2`,
 		policyID, version,
@@ -104,7 +104,7 @@ func (r *policyVersionRepository) GetByVersion(ctx context.Context, policyID uui
 
 func (r *policyVersionRepository) LatestVersion(ctx context.Context, policyID uuid.UUID) (int, error) {
 	var version int
-	err := getExecutor(ctx, r.db).QueryRowContext(ctx,
+	err := getReadExecutor(ctx, r.reader).QueryRowContext(ctx,
 		`SELECT COALESCE(MAX(version), 0) FROM policy_versions WHERE policy_id = $1`, policyID,
 	).Scan(&version)
 	return version, err

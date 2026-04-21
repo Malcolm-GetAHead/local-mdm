@@ -17,7 +17,7 @@ func createTestEnterprise(t testing.TB, database *db.DB) uuid.UUID {
 	t.Helper()
 
 	enterpriseID := uuid.New()
-	_, err := database.DB.Exec(`
+	_, err := database.Writer.Exec(`
 		INSERT INTO enterprises (id, name, slug)
 		VALUES ($1, $2, $3)
 	`, enterpriseID, "Test Enterprise", "test-"+enterpriseID.String())
@@ -31,7 +31,7 @@ func createTestUser(t testing.TB, database *db.DB, enterpriseID uuid.UUID) uuid.
 	t.Helper()
 
 	userID := uuid.New()
-	_, err := database.DB.Exec(`
+	_, err := database.Writer.Exec(`
 		INSERT INTO users (id, enterprise_id, email, password_hash, role)
 		VALUES ($1, $2, $3, 'hash', 'admin')
 	`, userID, enterpriseID, "test-"+userID.String()+"@example.com")
@@ -45,7 +45,7 @@ func TestAsyncLogger_Shutdown_DrainsQueue(t *testing.T) {
 	db := setupTestDB(t)
 	defer db.Close()
 
-	logger := NewAsyncLogger(db.DB, 100, 3, nil)
+	logger := NewAsyncLogger(db.Writer, 100, 3, nil)
 
 	// Create test enterprise and user
 	enterpriseID := createTestEnterprise(t, db)
@@ -72,7 +72,7 @@ func TestAsyncLogger_Shutdown_DrainsQueue(t *testing.T) {
 
 	// Verify all events were written
 	var count int
-	err = db.DB.QueryRow("SELECT COUNT(*) FROM audit_logs WHERE action = 'test.shutdown' AND enterprise_id = $1", enterpriseID).Scan(&count)
+	err = db.Writer.QueryRow("SELECT COUNT(*) FROM audit_logs WHERE action = 'test.shutdown' AND enterprise_id = $1", enterpriseID).Scan(&count)
 	require.NoError(t, err)
 	assert.Equal(t, 10, count, "All events should be written before shutdown")
 }
@@ -84,7 +84,7 @@ func TestAsyncLogger_Shutdown_RespectsTimeout(t *testing.T) {
 
 	// Create logger with slow worker (simulate stuck worker)
 	logger := &AsyncLogger{
-		logger:     NewLogger(db.DB),
+		logger:     NewLogger(db.Writer),
 		eventQueue: make(chan Event, 100),
 		slogger:    slog.Default(),
 	}
@@ -128,7 +128,7 @@ func TestAsyncLogger_Shutdown_Idempotent(t *testing.T) {
 	db := setupTestDB(t)
 	defer db.Close()
 
-	logger := NewAsyncLogger(db.DB, 10, 1, nil)
+	logger := NewAsyncLogger(db.Writer, 10, 1, nil)
 
 	// First shutdown
 	ctx := context.Background()
@@ -149,7 +149,7 @@ func TestAsyncLogger_Close_CallsShutdown(t *testing.T) {
 	db := setupTestDB(t)
 	defer db.Close()
 
-	logger := NewAsyncLogger(db.DB, 10, 1, nil)
+	logger := NewAsyncLogger(db.Writer, 10, 1, nil)
 
 	// Create test enterprise and user
 	enterpriseID := createTestEnterprise(t, db)
@@ -171,7 +171,7 @@ func TestAsyncLogger_Close_CallsShutdown(t *testing.T) {
 
 	// Verify event was written
 	var count int
-	err = db.DB.QueryRow("SELECT COUNT(*) FROM audit_logs WHERE action = 'test.close' AND enterprise_id = $1", enterpriseID).Scan(&count)
+	err = db.Writer.QueryRow("SELECT COUNT(*) FROM audit_logs WHERE action = 'test.close' AND enterprise_id = $1", enterpriseID).Scan(&count)
 	require.NoError(t, err)
 	assert.Equal(t, 1, count)
 }
@@ -181,7 +181,7 @@ func TestAsyncLogger_Shutdown_EmptyQueue(t *testing.T) {
 	db := setupTestDB(t)
 	defer db.Close()
 
-	logger := NewAsyncLogger(db.DB, 10, 3, nil)
+	logger := NewAsyncLogger(db.Writer, 10, 3, nil)
 
 	// Shutdown immediately (no events queued)
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
@@ -196,7 +196,7 @@ func TestAsyncLogger_Shutdown_LargeQueue(t *testing.T) {
 	db := setupTestDB(t)
 	defer db.Close()
 
-	logger := NewAsyncLogger(db.DB, 1000, 5, nil) // More workers for speed
+	logger := NewAsyncLogger(db.Writer, 1000, 5, nil) // More workers for speed
 
 	// Create test enterprise
 	enterpriseID := createTestEnterprise(t, db)
@@ -234,7 +234,7 @@ func TestAsyncLogger_Shutdown_RejectsNewEvents(t *testing.T) {
 	db := setupTestDB(t)
 	defer db.Close()
 
-	logger := NewAsyncLogger(db.DB, 10, 1, nil)
+	logger := NewAsyncLogger(db.Writer, 10, 1, nil)
 
 	// Shutdown
 	ctx := context.Background()
@@ -253,7 +253,7 @@ func TestAsyncLogger_Shutdown_RejectsNewEvents(t *testing.T) {
 
 	// Verify event was NOT written
 	var count int
-	err = db.DB.QueryRow("SELECT COUNT(*) FROM audit_logs WHERE action = 'test.after.shutdown'").Scan(&count)
+	err = db.Writer.QueryRow("SELECT COUNT(*) FROM audit_logs WHERE action = 'test.after.shutdown'").Scan(&count)
 	require.NoError(t, err)
 	assert.Equal(t, 0, count, "Events after shutdown should be ignored")
 }
@@ -263,7 +263,7 @@ func TestAsyncLogger_Shutdown_ConcurrentShutdowns(t *testing.T) {
 	db := setupTestDB(t)
 	defer db.Close()
 
-	logger := NewAsyncLogger(db.DB, 100, 3, nil)
+	logger := NewAsyncLogger(db.Writer, 100, 3, nil)
 
 	// Create test enterprise
 	enterpriseID := createTestEnterprise(t, db)
@@ -304,7 +304,7 @@ func BenchmarkAsyncLogger_Shutdown(b *testing.B) {
 
 	b.Run("empty_queue", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
-			logger := NewAsyncLogger(db.DB, 100, 3, nil)
+			logger := NewAsyncLogger(db.Writer, 100, 3, nil)
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 			_ = logger.Shutdown(ctx)
 			cancel()
@@ -313,7 +313,7 @@ func BenchmarkAsyncLogger_Shutdown(b *testing.B) {
 
 	b.Run("small_queue", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
-			logger := NewAsyncLogger(db.DB, 100, 3, nil)
+			logger := NewAsyncLogger(db.Writer, 100, 3, nil)
 
 			// Queue 10 events
 			for j := 0; j < 10; j++ {
@@ -334,7 +334,7 @@ func BenchmarkAsyncLogger_Shutdown(b *testing.B) {
 
 	b.Run("large_queue", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
-			logger := NewAsyncLogger(db.DB, 1000, 5, nil)
+			logger := NewAsyncLogger(db.Writer, 1000, 5, nil)
 
 			// Queue 100 events
 			for j := 0; j < 100; j++ {
@@ -358,7 +358,7 @@ func TestAsyncLogger_Shutdown_NilContext(t *testing.T) {
 	db := setupTestDB(t)
 	defer db.Close()
 
-	logger := NewAsyncLogger(db.DB, 100, 2, nil)
+	logger := NewAsyncLogger(db.Writer, 100, 2, nil)
 
 	// Create test enterprise and user
 	enterpriseID := createTestEnterprise(t, db)
@@ -380,7 +380,7 @@ func TestAsyncLogger_Shutdown_NilContext(t *testing.T) {
 
 	// Verify event was logged
 	var count int
-	err = db.DB.QueryRow("SELECT COUNT(*) FROM audit_logs WHERE action = 'test.action' AND user_id = $1", userID).Scan(&count)
+	err = db.Writer.QueryRow("SELECT COUNT(*) FROM audit_logs WHERE action = 'test.action' AND user_id = $1", userID).Scan(&count)
 	require.NoError(t, err)
 	assert.Equal(t, 1, count)
 }

@@ -37,7 +37,7 @@ func TestDB_QueryTimeout(t *testing.T) {
 
 		// Try to run a query that takes longer than timeout
 		ctx := context.Background()
-		_, err = db.ExecContext(ctx, "SELECT pg_sleep(5)")
+		_, err = db.Writer.ExecContext(ctx, "SELECT pg_sleep(5)")
 
 		// Should fail with timeout error
 		require.Error(t, err)
@@ -64,7 +64,7 @@ func TestDB_QueryTimeout(t *testing.T) {
 
 		// Run a quick query
 		ctx := context.Background()
-		_, err = db.ExecContext(ctx, "SELECT 1")
+		_, err = db.Writer.ExecContext(ctx, "SELECT 1")
 
 		// Should succeed
 		require.NoError(t, err)
@@ -92,7 +92,7 @@ func TestDB_QueryTimeout(t *testing.T) {
 
 		// Run slow queries on multiple connections
 		for i := 0; i < 5; i++ {
-			_, err = db.ExecContext(ctx, "SELECT pg_sleep(3)")
+			_, err = db.Writer.ExecContext(ctx, "SELECT pg_sleep(3)")
 			require.Error(t, err, "attempt %d should timeout", i+1)
 			assert.Contains(t, strings.ToLower(err.Error()), "timeout")
 		}
@@ -122,7 +122,7 @@ func TestDB_QueryTimeout(t *testing.T) {
 		done := make(chan bool, 5)
 		for i := 0; i < 5; i++ {
 			go func() {
-				_, err := db.ExecContext(ctx, "SELECT pg_sleep(10)")
+				_, err := db.Writer.ExecContext(ctx, "SELECT pg_sleep(10)")
 				assert.Error(t, err) // Should timeout
 				done <- true
 			}()
@@ -134,7 +134,7 @@ func TestDB_QueryTimeout(t *testing.T) {
 		}
 
 		// Connection pool should still be available
-		_, err = db.ExecContext(ctx, "SELECT 1")
+		_, err = db.Writer.ExecContext(ctx, "SELECT 1")
 		require.NoError(t, err, "connection pool should be available after timeouts")
 	})
 }

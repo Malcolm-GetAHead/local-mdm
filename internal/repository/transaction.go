@@ -189,9 +189,42 @@ func getExecutor(ctx context.Context, db interface{}) executor {
 	}
 }
 
+// getReadExecutor returns the transaction if one is active (so reads see
+// uncommitted writes within the same tx), otherwise returns the reader pool.
+func getReadExecutor(ctx context.Context, reader interface{}) executor {
+	if tx := getTx(ctx); tx != nil {
+		return tx
+	}
+
+	switch v := reader.(type) {
+	case *sql.DB:
+		return v
+	case executor:
+		return v
+	default:
+		panic(fmt.Sprintf("unsupported database type: %T", reader))
+	}
+}
+
 // executor is an interface that both *sql.DB and *sql.Tx implement
 type executor interface {
 	ExecContext(ctx context.Context, query string, args ...interface{}) (sql.Result, error)
 	QueryContext(ctx context.Context, query string, args ...interface{}) (*sql.Rows, error)
 	QueryRowContext(ctx context.Context, query string, args ...interface{}) *sql.Row
+}
+
+// resolveExecutor converts an interface{} to an executor, returning an error
+// if the type is nil or unsupported. Used by repository constructors.
+func resolveExecutor(db interface{}, name string) (executor, error) {
+	if db == nil {
+		return nil, fmt.Errorf("%s cannot be nil", name)
+	}
+	switch v := db.(type) {
+	case *sql.DB:
+		return v, nil
+	case executor:
+		return v, nil
+	default:
+		return nil, fmt.Errorf("unsupported %s type: %T", name, db)
+	}
 }

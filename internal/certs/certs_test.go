@@ -48,7 +48,7 @@ func setupTestCerts(t *testing.T) (*certs.CAManager, *certs.CertificateService, 
 	}
 	
 	// Create certificate service
-	service := certs.NewCertificateService(ca, database.DB)
+	service := certs.NewCertificateService(ca, database.Writer)
 	
 	return ca, service, database
 }
@@ -56,7 +56,7 @@ func setupTestCerts(t *testing.T) (*certs.CAManager, *certs.CertificateService, 
 func createTestDevice(t *testing.T, database *db.DB) uuid.UUID {
 	// Create enterprise first
 	enterpriseID := uuid.New()
-	_, err := database.ExecContext(context.Background(),
+	_, err := database.Writer.ExecContext(context.Background(),
 		`INSERT INTO enterprises (id, name, slug) VALUES ($1, $2, $3)`,
 		enterpriseID, "Test Enterprise", "test-"+uuid.New().String()[:8])
 	if err != nil {
@@ -65,7 +65,7 @@ func createTestDevice(t *testing.T, database *db.DB) uuid.UUID {
 	
 	// Create device
 	deviceID := uuid.New()
-	_, err = database.ExecContext(context.Background(),
+	_, err = database.Writer.ExecContext(context.Background(),
 		`INSERT INTO devices (id, enterprise_id, platform, device_id, serial_number, name, status) 
 		 VALUES ($1, $2, $3, $4, $5, $6, $7)`,
 		deviceID, enterpriseID, "macos", "test-"+uuid.New().String(), "SN"+uuid.New().String()[:8], "Test Device", "enrolled")

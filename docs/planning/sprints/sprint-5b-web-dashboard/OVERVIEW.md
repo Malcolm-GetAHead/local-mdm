@@ -1,5 +1,6 @@
 # Sprint 5b: Web Dashboard
 
+**Status**: 🔲 Not Started  
 **Duration**: 1-2 weeks  
 **Goal**: Web-based admin dashboard for device management, policy management, and compliance monitoring  
 **Depends on**: Sprint 5 complete (API docs, CLI tools, and backend polish provide a stable API surface)  

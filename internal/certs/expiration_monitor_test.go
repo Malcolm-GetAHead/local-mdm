@@ -35,11 +35,11 @@ func setupTestDB(t testing.TB) *db.DB {
 	}
 
 	// Clean up certificates and devices before test
-	_, err = database.DB.Exec("DELETE FROM certificates")
+	_, err = database.Writer.Exec("DELETE FROM certificates")
 	if err != nil {
 		t.Fatalf("Failed to clean certificates: %v", err)
 	}
-	_, err = database.DB.Exec("DELETE FROM devices")
+	_, err = database.Writer.Exec("DELETE FROM devices")
 	if err != nil {
 		t.Fatalf("Failed to clean devices: %v", err)
 	}
@@ -115,7 +115,7 @@ func TestExpirationMonitor_Start(t *testing.T) {
 	database := setupTestDB(t)
 	defer database.Close()
 
-	monitor := NewExpirationMonitor(database.DB, nil, 100*time.Millisecond, 30*24*time.Hour)
+	monitor := NewExpirationMonitor(database.Writer, nil, 100*time.Millisecond, 30*24*time.Hour)
 	
 	monitor.Start()
 	defer monitor.Stop()
@@ -133,7 +133,7 @@ func TestExpirationMonitor_Stop(t *testing.T) {
 	database := setupTestDB(t)
 	defer database.Close()
 
-	monitor := NewExpirationMonitor(database.DB, nil, 100*time.Millisecond, 30*24*time.Hour)
+	monitor := NewExpirationMonitor(database.Writer, nil, 100*time.Millisecond, 30*24*time.Hour)
 	
 	monitor.Start()
 	time.Sleep(50 * time.Millisecond) // Let it start
@@ -153,7 +153,7 @@ func TestExpirationMonitor_IdempotentStart(t *testing.T) {
 	database := setupTestDB(t)
 	defer database.Close()
 
-	monitor := NewExpirationMonitor(database.DB, nil, 100*time.Millisecond, 30*24*time.Hour)
+	monitor := NewExpirationMonitor(database.Writer, nil, 100*time.Millisecond, 30*24*time.Hour)
 	
 	monitor.Start()
 	monitor.Start() // Second start should be no-op
@@ -174,7 +174,7 @@ func TestExpirationMonitor_IdempotentStop(t *testing.T) {
 	database := setupTestDB(t)
 	defer database.Close()
 
-	monitor := NewExpirationMonitor(database.DB, nil, 100*time.Millisecond, 30*24*time.Hour)
+	monitor := NewExpirationMonitor(database.Writer, nil, 100*time.Millisecond, 30*24*time.Hour)
 	
 	monitor.Start()
 	monitor.Stop()
@@ -201,9 +201,9 @@ func TestExpirationMonitor_DetectsExpiringCertificates(t *testing.T) {
 
 	// Create certificate expiring in 15 days
 	expiresAt := time.Now().Add(15 * 24 * time.Hour)
-	certID := createTestCertificateWithDevice(t, database.DB, expiresAt, false)
+	certID := createTestCertificateWithDevice(t, database.Writer, expiresAt, false)
 
-	monitor := NewExpirationMonitor(database.DB, logger, 100*time.Millisecond, 30*24*time.Hour)
+	monitor := NewExpirationMonitor(database.Writer, logger, 100*time.Millisecond, 30*24*time.Hour)
 	
 	monitor.Start()
 	time.Sleep(150 * time.Millisecond) // Wait for check
@@ -228,9 +228,9 @@ func TestExpirationMonitor_IgnoresNonExpiringCertificates(t *testing.T) {
 
 	// Create certificate expiring in 60 days (beyond threshold)
 	expiresAt := time.Now().Add(60 * 24 * time.Hour)
-	createTestCertificateWithDevice(t, database.DB, expiresAt, false)
+	createTestCertificateWithDevice(t, database.Writer, expiresAt, false)
 
-	monitor := NewExpirationMonitor(database.DB, logger, 100*time.Millisecond, 30*24*time.Hour)
+	monitor := NewExpirationMonitor(database.Writer, logger, 100*time.Millisecond, 30*24*time.Hour)
 	
 	monitor.Start()
 	time.Sleep(150 * time.Millisecond) // Wait for check
@@ -253,9 +253,9 @@ func TestExpirationMonitor_IgnoresRevokedCertificates(t *testing.T) {
 
 	// Create revoked certificate expiring in 15 days
 	expiresAt := time.Now().Add(15 * 24 * time.Hour)
-	certID := createTestCertificateWithDevice(t, database.DB, expiresAt, true)
+	certID := createTestCertificateWithDevice(t, database.Writer, expiresAt, true)
 
-	monitor := NewExpirationMonitor(database.DB, logger, 100*time.Millisecond, 30*24*time.Hour)
+	monitor := NewExpirationMonitor(database.Writer, logger, 100*time.Millisecond, 30*24*time.Hour)
 	
 	monitor.Start()
 	time.Sleep(150 * time.Millisecond) // Wait for check
@@ -278,9 +278,9 @@ func TestExpirationMonitor_IgnoresExpiredCertificates(t *testing.T) {
 
 	// Create already expired certificate
 	expiresAt := time.Now().Add(-1 * 24 * time.Hour)
-	certID := createTestCertificateWithDevice(t, database.DB, expiresAt, false)
+	certID := createTestCertificateWithDevice(t, database.Writer, expiresAt, false)
 
-	monitor := NewExpirationMonitor(database.DB, logger, 100*time.Millisecond, 30*24*time.Hour)
+	monitor := NewExpirationMonitor(database.Writer, logger, 100*time.Millisecond, 30*24*time.Hour)
 	
 	monitor.Start()
 	time.Sleep(150 * time.Millisecond) // Wait for check
@@ -302,11 +302,11 @@ func TestExpirationMonitor_MultipleExpiringCertificates(t *testing.T) {
 	}))
 
 	// Create 3 expiring certificates
-	cert1 := createTestCertificateWithDevice(t, database.DB, time.Now().Add(5*24*time.Hour), false)
-	cert2 := createTestCertificateWithDevice(t, database.DB, time.Now().Add(15*24*time.Hour), false)
-	cert3 := createTestCertificateWithDevice(t, database.DB, time.Now().Add(25*24*time.Hour), false)
+	cert1 := createTestCertificateWithDevice(t, database.Writer, time.Now().Add(5*24*time.Hour), false)
+	cert2 := createTestCertificateWithDevice(t, database.Writer, time.Now().Add(15*24*time.Hour), false)
+	cert3 := createTestCertificateWithDevice(t, database.Writer, time.Now().Add(25*24*time.Hour), false)
 
-	monitor := NewExpirationMonitor(database.DB, logger, 100*time.Millisecond, 30*24*time.Hour)
+	monitor := NewExpirationMonitor(database.Writer, logger, 100*time.Millisecond, 30*24*time.Hour)
 	
 	monitor.Start()
 	time.Sleep(150 * time.Millisecond) // Wait for check
@@ -332,10 +332,10 @@ func TestExpirationMonitor_CustomThreshold(t *testing.T) {
 
 	// Create certificate expiring in 5 days
 	expiresAt := time.Now().Add(5 * 24 * time.Hour)
-	certID := createTestCertificateWithDevice(t, database.DB, expiresAt, false)
+	certID := createTestCertificateWithDevice(t, database.Writer, expiresAt, false)
 
 	// Use 7-day threshold (should warn since 5 < 7)
-	monitor := NewExpirationMonitor(database.DB, logger, 100*time.Millisecond, 7*24*time.Hour)
+	monitor := NewExpirationMonitor(database.Writer, logger, 100*time.Millisecond, 7*24*time.Hour)
 	
 	monitor.Start()
 	time.Sleep(150 * time.Millisecond) // Wait for check
@@ -358,10 +358,10 @@ func TestExpirationMonitor_PeriodicChecks(t *testing.T) {
 
 	// Create expiring certificate
 	expiresAt := time.Now().Add(15 * 24 * time.Hour)
-	createTestCertificateWithDevice(t, database.DB, expiresAt, false)
+	createTestCertificateWithDevice(t, database.Writer, expiresAt, false)
 
 	// Check every 50ms
-	monitor := NewExpirationMonitor(database.DB, logger, 50*time.Millisecond, 30*24*time.Hour)
+	monitor := NewExpirationMonitor(database.Writer, logger, 50*time.Millisecond, 30*24*time.Hour)
 	
 	monitor.Start()
 	time.Sleep(200 * time.Millisecond) // Wait for multiple checks
@@ -383,7 +383,7 @@ func TestExpirationMonitor_DatabaseError(t *testing.T) {
 		Level: slog.LevelError,
 	}))
 
-	monitor := NewExpirationMonitor(database.DB, logger, 100*time.Millisecond, 30*24*time.Hour)
+	monitor := NewExpirationMonitor(database.Writer, logger, 100*time.Millisecond, 30*24*time.Hour)
 	
 	monitor.Start()
 	time.Sleep(150 * time.Millisecond) // Wait for check
@@ -400,7 +400,7 @@ func TestExpirationMonitor_DefaultValues(t *testing.T) {
 	defer database.Close()
 
 	// Pass zero values to trigger defaults
-	monitor := NewExpirationMonitor(database.DB, nil, 0, 0)
+	monitor := NewExpirationMonitor(database.Writer, nil, 0, 0)
 
 	assert.Equal(t, 24*time.Hour, monitor.checkInterval, "Should use default check interval")
 	assert.Equal(t, 30*24*time.Hour, monitor.warningThreshold, "Should use default warning threshold")
@@ -413,10 +413,10 @@ func TestExpirationMonitor_NilLogger(t *testing.T) {
 
 	// Create expiring certificate
 	expiresAt := time.Now().Add(15 * 24 * time.Hour)
-	createTestCertificateWithDevice(t, database.DB, expiresAt, false)
+	createTestCertificateWithDevice(t, database.Writer, expiresAt, false)
 
 	// No logger provided
-	monitor := NewExpirationMonitor(database.DB, nil, 100*time.Millisecond, 30*24*time.Hour)
+	monitor := NewExpirationMonitor(database.Writer, nil, 100*time.Millisecond, 30*24*time.Hour)
 	
 	monitor.Start()
 	time.Sleep(150 * time.Millisecond) // Wait for check
@@ -430,7 +430,7 @@ func TestExpirationMonitor_ConcurrentStartStop(t *testing.T) {
 	database := setupTestDB(t)
 	defer database.Close()
 
-	monitor := NewExpirationMonitor(database.DB, nil, 100*time.Millisecond, 30*24*time.Hour)
+	monitor := NewExpirationMonitor(database.Writer, nil, 100*time.Millisecond, 30*24*time.Hour)
 
 	// Start and stop concurrently from multiple goroutines
 	done := make(chan bool, 10)
@@ -472,10 +472,10 @@ func BenchmarkExpirationMonitor_Check(b *testing.B) {
 	// Create 100 expiring certificates
 	for i := 0; i < 100; i++ {
 		expiresAt := time.Now().Add(time.Duration(i) * 24 * time.Hour)
-		createTestCertificateWithDevice(b, database.DB, expiresAt, false)
+		createTestCertificateWithDevice(b, database.Writer, expiresAt, false)
 	}
 
-	monitor := NewExpirationMonitor(database.DB, nil, 24*time.Hour, 30*24*time.Hour)
+	monitor := NewExpirationMonitor(database.Writer, nil, 24*time.Hour, 30*24*time.Hour)
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {

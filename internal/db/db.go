@@ -11,39 +11,65 @@ import (
 	_ "github.com/lib/pq"
 )
 
-// DB wraps the database connection
+// DB wraps the database connection pools for read/write splitting.
+// Writer is used for all writes and transactions.
+// Reader is used for read-only queries in repositories.
+// In development, both pools point to the same PostgreSQL instance.
 type DB struct {
-	*sql.DB
+	Writer *sql.DB
+	Reader *sql.DB
 }
 
-// New creates a new database connection
+// New creates writer and reader database connection pools.
+// If no reader config is provided, both pools use the same DSN.
 func New(cfg config.DatabaseConfig) (*DB, error) {
-	// Validate connection pool limits
 	if err := validateConnectionLimits(cfg); err != nil {
 		return nil, err
 	}
 
-	db, err := sql.Open("postgres", cfg.DSN())
+	writer, err := openPool(cfg.DSN(), cfg.MaxOpenConns, cfg.MaxIdleConns, cfg.ConnMaxLifetime)
 	if err != nil {
-		return nil, fmt.Errorf("failed to open database: %w", err)
+		return nil, fmt.Errorf("failed to open writer pool: %w", err)
 	}
 
-	// Configure connection pool
-	db.SetMaxOpenConns(cfg.MaxOpenConns)
-	db.SetMaxIdleConns(cfg.MaxIdleConns)
-	db.SetConnMaxLifetime(cfg.ConnMaxLifetime)
+	// Validate reader pool limits
+	rMaxOpen, rMaxIdle, rMaxLifetime := cfg.ReaderPoolConfig()
+	rCfg := config.DatabaseConfig{
+		MaxOpenConns:    rMaxOpen,
+		MaxIdleConns:    rMaxIdle,
+		ConnMaxLifetime: rMaxLifetime,
+	}
+	if err := validateConnectionLimits(rCfg); err != nil {
+		writer.Close()
+		return nil, fmt.Errorf("reader pool: %w", err)
+	}
+
+	reader, err := openPool(cfg.ReaderDSN(), rMaxOpen, rMaxIdle, rMaxLifetime)
+	if err != nil {
+		writer.Close()
+		return nil, fmt.Errorf("failed to open reader pool: %w", err)
+	}
+
+	return &DB{Writer: writer, Reader: reader}, nil
+}
+
+func openPool(dsn string, maxOpen, maxIdle int, maxLifetime time.Duration) (*sql.DB, error) {
+	db, err := sql.Open("postgres", dsn)
+	if err != nil {
+		return nil, err
+	}
+	db.SetMaxOpenConns(maxOpen)
+	db.SetMaxIdleConns(maxIdle)
+	db.SetConnMaxLifetime(maxLifetime)
 	db.SetConnMaxIdleTime(10 * time.Minute)
 
-	// Test connection
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-
 	if err := db.PingContext(ctx); err != nil {
 		db.Close()
-		return nil, fmt.Errorf("failed to ping database: %w", err)
+		return nil, err
 	}
-
-	return &DB{db}, nil
+	return db, nil
 }
 
 // validateConnectionLimits ensures database connection pool configuration is safe
@@ -75,12 +101,23 @@ func validateConnectionLimits(cfg config.DatabaseConfig) error {
 	return nil
 }
 
-// Health checks database connectivity
+// Health checks database connectivity for both pools
 func (db *DB) Health(ctx context.Context) error {
-	return db.PingContext(ctx)
+	if err := db.Writer.PingContext(ctx); err != nil {
+		return fmt.Errorf("writer pool: %w", err)
+	}
+	if err := db.Reader.PingContext(ctx); err != nil {
+		return fmt.Errorf("reader pool: %w", err)
+	}
+	return nil
 }
 
-// Close closes the database connection
+// Close closes both database connection pools
 func (db *DB) Close() error {
-	return db.DB.Close()
+	wErr := db.Writer.Close()
+	rErr := db.Reader.Close()
+	if wErr != nil {
+		return wErr
+	}
+	return rErr
 }

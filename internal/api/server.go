@@ -89,56 +89,56 @@ func New(cfg *config.Config, database *db.DB, logger *slog.Logger) (*Server, err
 
 	// Initialize audit logger (conditional on feature flag)
 	if cfg.Features.EnableAuditLog {
-		s.auditLogger = audit.NewAsyncLogger(database.DB, bufferSize, workerCount, logger)
+		s.auditLogger = audit.NewAsyncLogger(database.Writer, bufferSize, workerCount, logger)
 		logger.Info("Audit logging enabled")
 	} else {
 		s.auditLogger = audit.NopAuditLogger{}
 	}
 
 	// Initialize repositories
-	deviceRepo, err := repository.NewDeviceRepository(database.DB)
+	deviceRepo, err := repository.NewDeviceRepository(database.Writer, database.Reader)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create device repository: %w", err)
 	}
 	s.deviceRepo = deviceRepo
 
-	enterpriseRepo, err := repository.NewEnterpriseRepository(database.DB)
+	enterpriseRepo, err := repository.NewEnterpriseRepository(database.Writer, database.Reader)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create enterprise repository: %w", err)
 	}
 	s.enterpriseRepo = enterpriseRepo
 
-	policyRepo, err := repository.NewPolicyRepository(database.DB)
+	policyRepo, err := repository.NewPolicyRepository(database.Writer, database.Reader)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create policy repository: %w", err)
 	}
 	s.policyRepo = policyRepo
 
-	transactor, err := repository.NewTransactor(database.DB)
+	transactor, err := repository.NewTransactor(database.Writer)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create transactor: %w", err)
 	}
 	s.transactor = transactor
 
-	certRepo, err := repository.NewCertificateRepository(database.DB)
+	certRepo, err := repository.NewCertificateRepository(database.Writer, database.Reader)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create certificate repository: %w", err)
 	}
 	s.certRepo = certRepo
 
-	auditLogRepo, err := repository.NewAuditLogRepository(database.DB)
+	auditLogRepo, err := repository.NewAuditLogRepository(database.Writer, database.Reader)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create audit log repository: %w", err)
 	}
 	s.auditLogRepo = auditLogRepo
 
-	cmdRepo, err := repository.NewCommandRepository(database.DB)
+	cmdRepo, err := repository.NewCommandRepository(database.Writer, database.Reader)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create command repository: %w", err)
 	}
 	s.cmdRepo = cmdRepo
 
-	appRepo, err := repository.NewAppRepository(database.DB)
+	appRepo, err := repository.NewAppRepository(database.Writer, database.Reader)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create app repository: %w", err)
 	}
@@ -149,7 +149,7 @@ func New(cfg *config.Config, database *db.DB, logger *slog.Logger) (*Server, err
 	if err != nil {
 		logger.Warn("CA manager not available, certificate operations disabled", "error", err)
 	} else {
-		s.certService = certs.NewCertificateService(caManager, database.DB)
+		s.certService = certs.NewCertificateService(caManager, database.Writer)
 	}
 	
 	// Create certificate expiration monitor if enabled
@@ -163,7 +163,7 @@ func New(cfg *config.Config, database *db.DB, logger *slog.Logger) (*Server, err
 			warningThreshold = 30 * 24 * time.Hour // Default: warn 30 days before
 		}
 		
-		s.certMonitor = certs.NewExpirationMonitor(database.DB, logger, checkInterval, warningThreshold)
+		s.certMonitor = certs.NewExpirationMonitor(database.Writer, logger, checkInterval, warningThreshold)
 		logger.Info("Certificate expiration monitor configured",
 			"check_interval", checkInterval,
 			"warning_threshold", warningThreshold,
@@ -174,7 +174,7 @@ func New(cfg *config.Config, database *db.DB, logger *slog.Logger) (*Server, err
 	validator, err := auth.NewOIDCValidator(
 		cfg.Keycloak.IssuerURL(), 
 		cfg.Keycloak.ClientID, 
-		database.DB, 
+		database.Writer, 
 		cfg.Auth.CircuitBreaker.MaxFailures,
 		cfg.Auth.CircuitBreaker.Timeout,
 		cfg.Auth.TokenCache.TTL,
@@ -196,14 +196,14 @@ func New(cfg *config.Config, database *db.DB, logger *slog.Logger) (*Server, err
 
 	// Initialize metrics
 	if cfg.Metrics.Enabled {
-		s.metrics = metrics.New(database.DB)
+		s.metrics = metrics.New(database.Writer)
 		s.metricsServer = metrics.NewServer(cfg.Metrics.Host, cfg.Metrics.Port, s.metrics, logger)
 		logger.Info("Metrics enabled", "host", cfg.Metrics.Host, "port", cfg.Metrics.Port)
 	}
 
 	// Initialize DEP service if encryption key is configured
 	if cfg.MacOS.DEPEncryptionKey != "" {
-		depStorage := macos.NewDEPStorage(database.DB, cfg.MacOS.DEPEncryptionKey)
+		depStorage := macos.NewDEPStorage(database.Writer, cfg.MacOS.DEPEncryptionKey)
 		s.depService = macos.NewDEPService(depStorage, logger)
 		logger.Info("DEP service initialized")
 	}
@@ -241,24 +241,24 @@ func New(cfg *config.Config, database *db.DB, logger *slog.Logger) (*Server, err
 
 	s.lifecycleService = service.NewLifecycleService(logger)
 
-	policyVersionRepo, err := repository.NewPolicyVersionRepository(database.DB)
+	policyVersionRepo, err := repository.NewPolicyVersionRepository(database.Writer, database.Reader)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create policy version repository: %w", err)
 	}
 	s.policyVersionRepo = policyVersionRepo
 	s.policyService = service.NewPolicyService(s.policyRepo, policyVersionRepo, logger)
 
-	groupRepo, err := repository.NewGroupRepository(database.DB)
+	groupRepo, err := repository.NewGroupRepository(database.Writer, database.Reader)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create group repository: %w", err)
 	}
-	assignmentRepo, err := repository.NewPolicyAssignmentRepository(database.DB)
+	assignmentRepo, err := repository.NewPolicyAssignmentRepository(database.Writer, database.Reader)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create policy assignment repository: %w", err)
 	}
 	s.groupService = service.NewGroupService(groupRepo, assignmentRepo, logger)
 
-	complianceRepo, err := repository.NewComplianceRepository(database.DB)
+	complianceRepo, err := repository.NewComplianceRepository(database.Writer, database.Reader)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create compliance repository: %w", err)
 	}
@@ -670,7 +670,7 @@ func (s *Server) setupMiddleware() {
 	s.router.Use(requestIDMiddleware)
 	s.router.Use(s.loggingMiddleware)
 	s.router.Use(recoveryMiddleware(s.logger))
-	s.router.Use(idempotencyMiddleware(s.db.DB))
+	s.router.Use(idempotencyMiddleware(s.db.Writer))
 	s.router.Use(securityHeadersMiddleware)
 	s.router.Use(corsMiddleware(s.config.Server.CORS))
 }
@@ -780,7 +780,7 @@ func (s *Server) startCleanupTicker() {
 			case <-ctx.Done():
 				return
 			case <-ticker.C:
-				if n, err := cleanupIdempotencyKeys(s.db.DB); err != nil {
+				if n, err := cleanupIdempotencyKeys(s.db.Writer); err != nil {
 					s.logger.Warn("idempotency key cleanup failed", "error", err)
 				} else if n > 0 {
 					s.logger.Info("cleaned up expired idempotency keys", "count", n)

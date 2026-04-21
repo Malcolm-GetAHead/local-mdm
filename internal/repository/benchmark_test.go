@@ -37,7 +37,7 @@ func setupBenchDB(b *testing.B) *db.DB {
 // createBenchEnterprise creates a test enterprise for benchmarks
 func createBenchEnterprise(b *testing.B, database *db.DB) uuid.UUID {
 	b.Helper()
-	repo, _ := NewEnterpriseRepository(database)
+	repo, _ := NewEnterpriseRepository(database, database)
 	enterprise := &models.Enterprise{
 		Name: "Bench Enterprise " + uuid.New().String()[:8],
 		Slug: "bench-" + uuid.New().String()[:8],
@@ -49,7 +49,7 @@ func createBenchEnterprise(b *testing.B, database *db.DB) uuid.UUID {
 // createBenchDevice creates a test device for benchmarks
 func createBenchDevice(b *testing.B, database *db.DB, enterpriseID uuid.UUID) *models.Device {
 	b.Helper()
-	repo, _ := NewDeviceRepository(database)
+	repo, _ := NewDeviceRepository(database, database)
 	device := &models.Device{
 		EnterpriseID: enterpriseID,
 		SerialNumber: uuid.New().String(),
@@ -65,7 +65,7 @@ func BenchmarkDeviceRepository_Create(b *testing.B) {
 	database := setupBenchDB(b)
 	defer database.Close()
 
-	repo, err := NewDeviceRepository(database.DB)
+	repo, err := NewDeviceRepository(database.Writer, database.Reader)
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -90,7 +90,7 @@ func BenchmarkDeviceRepository_GetByID(b *testing.B) {
 	database := setupBenchDB(b)
 	defer database.Close()
 
-	repo, err := NewDeviceRepository(database.DB)
+	repo, err := NewDeviceRepository(database.Writer, database.Reader)
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -110,7 +110,7 @@ func BenchmarkDeviceRepository_List(b *testing.B) {
 	database := setupBenchDB(b)
 	defer database.Close()
 
-	repo, err := NewDeviceRepository(database.DB)
+	repo, err := NewDeviceRepository(database.Writer, database.Reader)
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -135,7 +135,7 @@ func BenchmarkDeviceRepository_List_SmallPage(b *testing.B) {
 	database := setupBenchDB(b)
 	defer database.Close()
 
-	repo, err := NewDeviceRepository(database.DB)
+	repo, err := NewDeviceRepository(database.Writer, database.Reader)
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -159,7 +159,7 @@ func BenchmarkDeviceRepository_List_LargePage(b *testing.B) {
 	database := setupBenchDB(b)
 	defer database.Close()
 
-	repo, err := NewDeviceRepository(database.DB)
+	repo, err := NewDeviceRepository(database.Writer, database.Reader)
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -183,7 +183,7 @@ func BenchmarkDeviceRepository_Update(b *testing.B) {
 	database := setupBenchDB(b)
 	defer database.Close()
 
-	repo, err := NewDeviceRepository(database.DB)
+	repo, err := NewDeviceRepository(database.Writer, database.Reader)
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -205,7 +205,7 @@ func BenchmarkEnterpriseRepository_Create(b *testing.B) {
 	database := setupBenchDB(b)
 	defer database.Close()
 
-	repo, err := NewEnterpriseRepository(database.DB)
+	repo, err := NewEnterpriseRepository(database.Writer, database.Reader)
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -227,7 +227,7 @@ func BenchmarkEnterpriseRepository_GetByID(b *testing.B) {
 	database := setupBenchDB(b)
 	defer database.Close()
 
-	repo, err := NewEnterpriseRepository(database.DB)
+	repo, err := NewEnterpriseRepository(database.Writer, database.Reader)
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -246,7 +246,7 @@ func BenchmarkPolicyRepository_Create(b *testing.B) {
 	database := setupBenchDB(b)
 	defer database.Close()
 
-	repo, err := NewPolicyRepository(database.DB)
+	repo, err := NewPolicyRepository(database.Writer, database.Reader)
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -271,7 +271,7 @@ func BenchmarkPolicyRepository_List(b *testing.B) {
 	database := setupBenchDB(b)
 	defer database.Close()
 
-	repo, err := NewPolicyRepository(database.DB)
+	repo, err := NewPolicyRepository(database.Writer, database.Reader)
 	if err != nil {
 		b.Fatal(err)
 	}
