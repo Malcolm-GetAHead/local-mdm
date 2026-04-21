@@ -15,6 +15,15 @@
 - Owner has strong architectural instincts. Watch for signals like "would it make more sense to..." — these are directional decisions, not questions. Confirm and execute.
 - Owner values honest pushback. Explain why an alternative is better. The owner redirects when they disagree.
 
+## Lessons for Future Agents
+
+- **Don't accept "acceptable for now" without verifying.** If coverage is low or tests use mocks for database code, investigate *why*. Run the actual tests, check what's uncovered, and look at the uncovered code. In this session, "macos 59% — borderline" turned into 2 real JSONB serialization bugs that would have broken DEP sync in production. The owner will push you on this — get ahead of it.
+- **Verify claims from earlier sprints.** Sprint completion docs may say "deferred — not critical for MVP" about things that are now critical. The SCEP server was deferred in Sprint 1 and nobody tracked it since. Check deferred items against current requirements.
+- **The owner thinks in infrastructure, not code.** When presenting solutions, frame them in terms of services, data flow, failure modes, and deployment topology — not Go function signatures. The owner catches architectural gaps (missing NanoMDM in diagrams, no Keycloak service, SCEP not wired up) that code-focused analysis misses.
+- **Don't default to Kubernetes.** The owner's instinct is toward lighter orchestration (ECS Fargate). If a doc or plan assumes K8s, flag it and propose the simpler alternative.
+- **Integration tests find real bugs that mocks hide.** Every time we wrote integration tests against live PostgreSQL, we found bugs — NULL column scans in command repo, JSONB serialization in DEP storage. When the owner asks "why don't we have tests for this?", the answer should be "let me write them now" not "it's tested through mocks."
+- **The owner asks probing questions that look simple but aren't.** "Don't we have real PostgreSQL?" and "Is this SCEP work detailed anywhere?" both led to significant findings. Take these questions seriously — investigate fully before answering.
+
 ## Session Closeout Process
 
 After every sprint, the owner expects:
