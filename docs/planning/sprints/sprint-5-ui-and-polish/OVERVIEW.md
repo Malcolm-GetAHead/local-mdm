@@ -1,5 +1,6 @@
 # Sprint 5: Backend Polish, CLI & Production Readiness
 
+**Status**: 🔲 Not Started  
 **Duration**: 2 weeks  
 **Goal**: API documentation, CLI tools, E2E testing, observability, performance, deployment guide  
 **Depends on**: Sprint 4 complete

@@ -1,7 +1,7 @@
 # Architecture Documentation
 
 **Version**: 1.0  
-**Last Updated**: 2026-02-05
+**Last Updated**: 2026-04-20
 
 ## System Architecture
 
@@ -119,8 +119,10 @@ Local MDM follows a layered architecture with clear separation of concerns:
 - Configuration validation
 
 #### Database (`internal/db`)
-- Connection management
-- Health checks
+- Writer/Reader connection pool management (Sprint 4b)
+- Writer pool: all writes, transactions, non-repo consumers
+- Reader pool: repository read queries (falls back to writer DSN if no reader config)
+- Health checks (both pools)
 - Migration support
 
 #### Models (`internal/models`)
@@ -291,17 +293,16 @@ viewer (per enterprise)
 
 ### Database Scaling
 
-- Read replicas for reporting
-- Connection pooling
+- Read replicas supported via Writer/Reader pool split (Sprint 4b)
+- Connection pooling with configurable limits per pool
 - Prepared statements
 - Index optimization
 
-### Caching Strategy (Future)
+### Caching Strategy
 
-- Redis for session data
-- Device status cache
-- Policy cache
-- Certificate cache
+- PostgreSQL-backed token cache with TTL (Sprint 4, replaced Redis)
+- PostgreSQL-backed idempotency key cache with 24h TTL (Sprint 4)
+- No external cache dependency — PostgreSQL handles all caching needs at current scale
 
 ## Monitoring & Observability
 

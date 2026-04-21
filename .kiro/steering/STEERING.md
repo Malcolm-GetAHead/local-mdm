@@ -1,7 +1,7 @@
 # Development Steering Guide
 
 **Project**: Local MDM  
-**Last Updated**: 2026-02-07  
+**Last Updated**: 2026-04-20  
 **Purpose**: Guide for AI agents and developers working on this codebase
 
 ---
@@ -254,7 +254,7 @@ func TestDeviceRepository_Create(t *testing.T) {
     // Setup
     db := testutil.SetupTestDB(t)
     defer db.Close()
-    repo := NewDeviceRepository(db)
+    repo := NewDeviceRepository(db.Writer, db.Reader)
     
     // Execute
     device := &Device{Name: "Test"}
@@ -454,6 +454,7 @@ When making significant decisions, document them here:
 ## Version History
 
 - **2026-02-07**: Initial steering guide created
+- **2026-04-20**: Updated for Sprint 4b (Writer/Reader pool pattern, repo constructor changes)
 
 ---
 

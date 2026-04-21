@@ -77,6 +77,13 @@ Unified Control Plane (Go)
 - PostgreSQL event triggers for LISTEN/NOTIFY (Go listener in Sprint 5)
 - See [Sprint 4 Plan](docs/planning/sprints/sprint-4-policy-and-identity/OVERVIEW.md)
 
+✅ **Sprint 4b Complete** - 4/4 tasks done (Read/Write Database Pools)
+- DB struct split into Writer and Reader pools for Aurora read replica readiness
+- All repository reads use Reader pool, writes use Writer pool
+- ReaderConfig with field-level fallback (zero config change needed for dev)
+- Transactor uses Writer pool exclusively; reads within transactions see uncommitted writes
+- See [Sprint 4b Plan](docs/planning/sprints/sprint-4b-db-pools/OVERVIEW.md)
+
 ## Documentation
 
 ### Getting Started
