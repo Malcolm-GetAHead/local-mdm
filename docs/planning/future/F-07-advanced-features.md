@@ -536,6 +536,8 @@ webhooks:
 ### 9. User Management CRUD
 
 > **Gap identified in Sprint 2a audit.** The CLI (S5-08) and web dashboard (S5b) both assume user management API endpoints exist, but no sprint task builds them. The `api_tokens` table exists in the schema but has no server-side implementation.
+>
+> **Update (Sprint 5):** S5-11 now handles the base case — CRUD endpoints, role assignment, and audit logging. F-07 retains ownership of the **advanced features**: Keycloak user provisioning integration and cross-enterprise user management.
 
 **Endpoints needed**:
 ```
@@ -555,6 +557,8 @@ DELETE /api/v1/users/{id}             → Deactivate user
 ### 10. API Token Authentication
 
 > **Gap identified in Sprint 2a audit.** S5-08 (CLI) consumes API tokens but no task builds the server-side token infrastructure.
+>
+> **Update (Sprint 5):** S5-11 now handles the base case — token generation, hash-based storage, validation middleware, and revocation. F-07 retains ownership of **advanced features**: token scoping by resource/action, rate limiting per token, and token usage analytics.
 
 **Endpoints needed**:
 ```
