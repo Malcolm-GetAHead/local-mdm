@@ -173,7 +173,7 @@ func TestService_CreateDevice(t *testing.T) {
 | service | 67.5% | |
 | metrics | 65.0% | |
 | android | 61.9% | |
-| macos | 59.0% | Borderline — 1% below 60% target, no tests skipped |
+| macos | 79.8% | Above target — DEP storage integration tests added |
 | api | 56.5% | Below 70% handler target |
 | repository | 87.3% | Integration tests need Docker PostgreSQL |
 
