@@ -1,7 +1,7 @@
 # Database Schema
 
-**Version**: 1.0  
-**Last Updated**: 2026-02-05
+**Version**: 2.0  
+**Last Updated**: 2026-04-21
 
 ## Overview
 
@@ -183,6 +183,7 @@ CREATE TABLE policies (
     policy_type VARCHAR(50) NOT NULL,
     policy_config JSONB NOT NULL,
     is_active BOOLEAN DEFAULT true,
+    is_template BOOLEAN NOT NULL DEFAULT false,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     deleted_at TIMESTAMP WITH TIME ZONE
@@ -372,6 +373,109 @@ CREATE INDEX idx_audit_logs_created_at ON audit_logs(created_at);
 - `user_agent`: Client user agent
 - `created_at`: Action timestamp
 
+### device_commands
+
+Device management command queue (migration 000003).
+
+```sql
+CREATE TABLE device_commands (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    device_id UUID NOT NULL REFERENCES devices(id) ON DELETE CASCADE,
+    command_type VARCHAR(50) NOT NULL,
+    command_data JSONB DEFAULT '{}',
+    status VARCHAR(20) NOT NULL DEFAULT 'pending',
+    sent_at TIMESTAMP WITH TIME ZONE,
+    completed_at TIMESTAMP WITH TIME ZONE,
+    error_message TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    -- Added in migration 000006:
+    enterprise_id UUID REFERENCES enterprises(id) ON DELETE CASCADE,
+    expires_at TIMESTAMP WITH TIME ZONE,
+    batch_id UUID
+);
+
+CREATE INDEX idx_device_commands_device_id ON device_commands(device_id);
+CREATE INDEX idx_device_commands_status ON device_commands(status);
+CREATE INDEX idx_device_commands_device_pending ON device_commands(device_id, status) WHERE status = 'pending';
+CREATE INDEX idx_device_commands_enterprise_id ON device_commands(enterprise_id);
+CREATE INDEX idx_device_commands_batch_id ON device_commands(batch_id) WHERE batch_id IS NOT NULL;
+```
+
+**Fields**:
+- `id`: Unique identifier
+- `device_id`: Target device
+- `command_type`: Command type (lock, wipe, restart, device_info, install_profile, etc.)
+- `command_data`: Command parameters (JSONB)
+- `status`: Command status (pending, sent, completed, failed)
+- `sent_at`: When command was sent to device
+- `completed_at`: When command completed or failed
+- `error_message`: Error details if failed
+- `enterprise_id`: Enterprise scope for queries (added Sprint 4)
+- `expires_at`: Command expiration time (added Sprint 4)
+- `batch_id`: Groups bulk operations (added Sprint 4)
+
+### dep_names
+
+DEP (Device Enrollment Program) server configurations with encrypted OAuth tokens (migration 000004).
+
+```sql
+CREATE TABLE dep_names (
+    name VARCHAR(255) NOT NULL PRIMARY KEY,
+    consumer_key BYTEA NULL,
+    consumer_secret BYTEA NULL,
+    access_token BYTEA NULL,
+    access_secret BYTEA NULL,
+    access_token_expiry TIMESTAMPTZ NULL,
+    config_base_url VARCHAR(255) NULL,
+    tokenpki_cert_pem TEXT NULL,
+    tokenpki_key_pem BYTEA NULL,
+    tokenpki_staging_cert_pem TEXT NULL,
+    tokenpki_staging_key_pem BYTEA NULL,
+    syncer_cursor VARCHAR(1024) NULL,
+    assigner_profile_uuid TEXT NULL,
+    assigner_profile_uuid_at TIMESTAMPTZ NULL,
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+**Fields**:
+- `name`: DEP server name (primary key)
+- `consumer_key/secret`, `access_token/secret`: OAuth1 tokens encrypted with pgp_sym_encrypt
+- `access_token_expiry`: Token expiration
+- `config_base_url`: Apple DEP API base URL
+- `tokenpki_*`: Token PKI certificates and keys for Apple portal exchange
+- `syncer_cursor`: Cursor for incremental DEP device sync
+- `assigner_profile_uuid`: Auto-assign MDM profile UUID
+
+### dep_devices
+
+DEP-synced device tracking with serial numbers and profile assignment status (migration 000004).
+
+```sql
+CREATE TABLE dep_devices (
+    serial_number VARCHAR(255) NOT NULL,
+    dep_name VARCHAR(255) NOT NULL REFERENCES dep_names(name) ON DELETE CASCADE,
+    profile_uuid TEXT NULL,
+    profile_status VARCHAR(50) DEFAULT 'empty',
+    device_data JSONB DEFAULT '{}',
+    synced_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    assigned_at TIMESTAMPTZ NULL,
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (serial_number, dep_name)
+);
+```
+
+**Fields**:
+- `serial_number`: Device serial number (from Apple)
+- `dep_name`: Associated DEP server
+- `profile_uuid`: Assigned MDM profile UUID
+- `profile_status`: Profile assignment status (empty, assigned, pushed, removed)
+- `device_data`: Device metadata from Apple (JSONB)
+- `synced_at`: Last sync from Apple DEP
+
 ### apps
 
 Application catalog for managed app deployment.
@@ -514,7 +618,8 @@ All foreign keys have indexes for query performance. Additional indexes are crea
 
 - JSONB fields indexed with GIN indexes where needed
 - Partitioning audit_logs by date (future enhancement)
-- Read replicas for reporting queries (future enhancement)
+- **Writer/Reader pool split** (Sprint 4b): all writes go to Writer pool, reads go to Reader pool. In dev both point to the same PostgreSQL; in production Reader points to Aurora read replica
+- Connection pooling with configurable limits per pool (MaxOpenConns, MaxIdleConns, ConnMaxLifetime)
 
 ---
 
