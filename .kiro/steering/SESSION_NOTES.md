@@ -78,6 +78,37 @@ database:
 - `ReaderDSN()` falls back to `DSN()` when no reader config.
 - Env overrides: `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`, `DB_NAME`, `DB_READER_HOST`, `DB_READER_PORT`.
 
+## Production Architecture (decided Sprint 4b session)
+
+### Deployment: AWS ECS Fargate (not Kubernetes)
+- **ECS Fargate** is the primary deployment target. Kubernetes manifests exist as an appendix in F-02 but are not the default.
+- Single Go binary per service — no sidecar proxies or service mesh needed.
+- ALB for TLS termination (ACM certificates, auto-renewing) and path-based routing.
+
+### Services (3 ECS services + RDS)
+- **localmdm** — the Go application (API, policy engine, enrollment). Multiple tasks behind ALB.
+- **nanomdm** — Apple MDM protocol handler (separate ECS service). Receives `/checkin` and `/mdm` via ALB path routing. Shares RDS database. Local MDM sends commands to NanoMDM via HTTP API (`nanomdm_url` config).
+- **keycloak** — OIDC identity provider (separate ECS service). Admin login, JWT issuance, RBAC. Uses same RDS instance, separate database.
+- **RDS PostgreSQL** — primary (Writer pool) + read replica (Reader pool). NanoMDM and Keycloak use primary only.
+
+### Supporting AWS Services
+- **SSM Parameter Store** — all secrets (DB password, JWT secret, Keycloak secret, DEP encryption key, NanoMDM API key). Injected as env vars at task launch.
+- **CloudWatch Logs** — ECS `awslogs` driver for container stdout/stderr.
+- **CloudWatch Metrics** — CloudWatch Agent sidecar in each localmdm task scrapes Prometheus metrics from localhost:9090 and forwards to CloudWatch. No separate Prometheus server needed.
+- **AWS WAF** — rate-based rules on ALB for production rate limiting. In-memory rate limiters in the Go app remain as defense-in-depth fallback.
+- **ACM** — TLS certificates (free, auto-renewing, attached to ALB).
+
+### Multi-Instance Safety
+- **Stateless by design** — all shared state is in PostgreSQL (token cache, idempotency keys, SCEP challenges after S5-12).
+- **In-memory rate limiters** are per-instance (imprecise across instances, acceptable as fallback behind WAF).
+- **JWKS cache** and **circuit breaker** are per-instance by design (correct behavior — each instance independently caches Keycloak public keys).
+- **No sticky sessions required** — any instance can handle any request.
+
+### What NOT to do
+- Don't add Redis or any external cache — PostgreSQL handles all caching.
+- Don't default to Kubernetes — ECS Fargate is the target unless explicitly changed.
+- Don't assume single-instance — all code must work behind a load balancer with multiple instances.
+
 ## Project-Specific Knowledge
 
 - **Redis is gone.** Fully removed in Sprint 4. Token cache and idempotency keys use PostgreSQL. No Redis in docker-compose, config, or go.mod. Don't add it back.
