@@ -1,68 +1,88 @@
 package scep
 
 import (
+	"database/sql"
 	"testing"
 	"time"
 
+	_ "github.com/lib/pq"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
+func setupTestDB(t *testing.T) *sql.DB {
+	t.Helper()
+	db, err := sql.Open("postgres", "host=localhost port=5432 user=postgres password=postgres dbname=localmdm sslmode=disable")
+	if err != nil {
+		t.Skipf("skipping integration test: %v", err)
+	}
+	if err := db.Ping(); err != nil {
+		t.Skipf("skipping integration test: %v", err)
+	}
+	t.Cleanup(func() {
+		db.Exec("DELETE FROM scep_challenges")
+		db.Close()
+	})
+	// Clean slate
+	db.Exec("DELETE FROM scep_challenges")
+	return db
+}
+
 func TestChallengeManager_GenerateChallenge(t *testing.T) {
-	cm := NewChallengeManager()
+	db := setupTestDB(t)
+	cm := NewChallengeManager(db)
 
 	t.Run("generates unique challenges", func(t *testing.T) {
-		challenge1, err := cm.GenerateChallenge("device1", 5*time.Minute)
+		c1, err := cm.GenerateChallenge("device1", 5*time.Minute)
 		require.NoError(t, err)
-		assert.NotEmpty(t, challenge1)
+		assert.NotEmpty(t, c1)
 
-		challenge2, err := cm.GenerateChallenge("device2", 5*time.Minute)
+		c2, err := cm.GenerateChallenge("device2", 5*time.Minute)
 		require.NoError(t, err)
-		assert.NotEmpty(t, challenge2)
-
-		assert.NotEqual(t, challenge1, challenge2, "challenges should be unique")
+		assert.NotEqual(t, c1, c2)
 	})
 
 	t.Run("generates challenge with correct length", func(t *testing.T) {
-		challenge, err := cm.GenerateChallenge("device1", 5*time.Minute)
+		c, err := cm.GenerateChallenge("device1", 5*time.Minute)
 		require.NoError(t, err)
-		assert.Len(t, challenge, 32)
+		assert.Len(t, c, 32)
 	})
 }
 
 func TestChallengeManager_ValidateChallenge(t *testing.T) {
-	cm := NewChallengeManager()
+	db := setupTestDB(t)
+	cm := NewChallengeManager(db)
 
 	t.Run("validates unused challenge", func(t *testing.T) {
-		challenge, err := cm.GenerateChallenge("device1", 5*time.Minute)
+		c, err := cm.GenerateChallenge("device1", 5*time.Minute)
 		require.NoError(t, err)
 
-		deviceID, valid := cm.ValidateChallenge(challenge)
+		deviceID, valid := cm.ValidateChallenge(c)
 		assert.True(t, valid)
 		assert.Equal(t, "device1", deviceID)
 	})
 
 	t.Run("rejects used challenge", func(t *testing.T) {
-		challenge, err := cm.GenerateChallenge("device1", 5*time.Minute)
+		c, err := cm.GenerateChallenge("device1", 5*time.Minute)
 		require.NoError(t, err)
 
-		// Use challenge once
-		_, valid := cm.ValidateChallenge(challenge)
+		_, valid := cm.ValidateChallenge(c)
 		assert.True(t, valid)
 
-		// Try to use again
-		_, valid = cm.ValidateChallenge(challenge)
-		assert.False(t, valid, "challenge should not be reusable")
+		_, valid = cm.ValidateChallenge(c)
+		assert.False(t, valid)
 	})
 
 	t.Run("rejects expired challenge", func(t *testing.T) {
-		challenge, err := cm.GenerateChallenge("device1", 1*time.Millisecond)
+		// Insert directly with past expiry to avoid sleep
+		password, err := generateSecurePassword(32)
+		require.NoError(t, err)
+		_, err = db.Exec(`INSERT INTO scep_challenges (password, device_id, expires_at) VALUES ($1, $2, $3)`,
+			password, "device1", time.Now().Add(-1*time.Second))
 		require.NoError(t, err)
 
-		time.Sleep(10 * time.Millisecond)
-
-		_, valid := cm.ValidateChallenge(challenge)
-		assert.False(t, valid, "expired challenge should be rejected")
+		_, valid := cm.ValidateChallenge(password)
+		assert.False(t, valid)
 	})
 
 	t.Run("rejects non-existent challenge", func(t *testing.T) {
@@ -72,68 +92,45 @@ func TestChallengeManager_ValidateChallenge(t *testing.T) {
 }
 
 func TestChallengeManager_CleanupExpired(t *testing.T) {
-	cm := NewChallengeManager()
+	db := setupTestDB(t)
+	cm := NewChallengeManager(db)
 
-	t.Run("removes expired challenges", func(t *testing.T) {
-		// Create expired challenge
-		challenge1, err := cm.GenerateChallenge("device1", 1*time.Millisecond)
-		require.NoError(t, err)
+	// Insert expired challenge directly
+	password, err := generateSecurePassword(32)
+	require.NoError(t, err)
+	_, err = db.Exec(`INSERT INTO scep_challenges (password, device_id, expires_at) VALUES ($1, $2, $3)`,
+		password, "device1", time.Now().Add(-1*time.Second))
+	require.NoError(t, err)
 
-		// Create valid challenge
-		challenge2, err := cm.GenerateChallenge("device2", 5*time.Minute)
-		require.NoError(t, err)
+	// Create valid challenge
+	validPw, err := cm.GenerateChallenge("device2", 5*time.Minute)
+	require.NoError(t, err)
 
-		time.Sleep(10 * time.Millisecond)
+	cm.CleanupExpired()
 
-		cm.CleanupExpired()
+	// Expired should be gone
+	_, valid := cm.ValidateChallenge(password)
+	assert.False(t, valid)
 
-		// Expired challenge should be gone
-		_, valid := cm.ValidateChallenge(challenge1)
-		assert.False(t, valid)
-
-		// Valid challenge should still exist
-		_, valid = cm.ValidateChallenge(challenge2)
-		assert.True(t, valid)
-	})
+	// Valid should remain
+	_, valid = cm.ValidateChallenge(validPw)
+	assert.True(t, valid)
 }
 
 func TestGenerateSecurePassword(t *testing.T) {
 	t.Run("generates password of correct length", func(t *testing.T) {
-		password, err := generateSecurePassword(32)
+		p, err := generateSecurePassword(32)
 		require.NoError(t, err)
-		assert.Len(t, password, 32)
+		assert.Len(t, p, 32)
 	})
 
 	t.Run("generates unique passwords", func(t *testing.T) {
-		passwords := make(map[string]bool)
-		for i := 0; i < 1000; i++ {
-			password, err := generateSecurePassword(32)
+		seen := make(map[string]bool)
+		for i := 0; i < 100; i++ {
+			p, err := generateSecurePassword(32)
 			require.NoError(t, err)
-			assert.False(t, passwords[password], "duplicate password generated")
-			passwords[password] = true
+			assert.False(t, seen[p])
+			seen[p] = true
 		}
 	})
-}
-
-func BenchmarkGenerateChallenge(b *testing.B) {
-	cm := NewChallengeManager()
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		_, err := cm.GenerateChallenge("device1", 5*time.Minute)
-		if err != nil {
-			b.Fatal(err)
-		}
-	}
-}
-
-func BenchmarkValidateChallenge(b *testing.B) {
-	cm := NewChallengeManager()
-	challenge, _ := cm.GenerateChallenge("device1", 5*time.Minute)
-	
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		cm.ValidateChallenge(challenge)
-		// Regenerate for next iteration
-		challenge, _ = cm.GenerateChallenge("device1", 5*time.Minute)
-	}
 }

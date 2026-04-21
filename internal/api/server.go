@@ -40,12 +40,13 @@ type Server struct {
 	metrics           *metrics.Metrics
 	metricsServer     *metrics.Server
 	certMonitor      *certs.ExpirationMonitor
-	challengeManager *scep.ChallengeManager
+	challengeManager scep.ChallengeStore
 	deviceRepo       repository.DeviceRepository
 	enterpriseRepo   repository.EnterpriseRepository
 	policyRepo       repository.PolicyRepository
 	transactor       repository.Transactor
 	certService      *certs.CertificateService
+	caManager        *certs.CAManager
 	certRepo         repository.CertificateRepository
 	auditLogRepo     repository.AuditLogRepository
 	cmdRepo          repository.CommandRepository
@@ -84,7 +85,7 @@ func New(cfg *config.Config, database *db.DB, logger *slog.Logger) (*Server, err
 		db:               database,
 		config:           cfg,
 		logger:           logger,
-		challengeManager: scep.NewChallengeManager(),
+		challengeManager: scep.NewChallengeManager(database.Writer),
 	}
 
 	// Initialize audit logger (conditional on feature flag)
@@ -149,6 +150,7 @@ func New(cfg *config.Config, database *db.DB, logger *slog.Logger) (*Server, err
 	if err != nil {
 		logger.Warn("CA manager not available, certificate operations disabled", "error", err)
 	} else {
+		s.caManager = caManager
 		s.certService = certs.NewCertificateService(caManager, database.Writer)
 	}
 	
@@ -583,6 +585,12 @@ func (s *Server) setupRoutes() {
 	// Platform-specific routes (Sprint 2)
 	enrollLimiter := rateLimitMiddleware(s.enrollmentLimiter)
 	
+	// SCEP endpoint (public — devices use this during enrollment)
+	if s.caManager != nil {
+		scepHandler := scep.NewHandler(s.caManager, s.challengeManager, s.logger)
+		s.router.Handle("/scep", scepHandler).Methods("GET", "POST")
+	}
+
 	// macOS MDM endpoints
 	api.Handle("/macos/enroll/{enterprise_id}", enrollLimiter(http.HandlerFunc(s.handleMacOSEnrollmentProfile))).Methods("GET")
 
@@ -787,6 +795,7 @@ func (s *Server) startCleanupTicker() {
 				} else if n > 0 {
 					s.logger.Info("cleaned up expired idempotency keys", "count", n)
 				}
+				s.challengeManager.CleanupExpired()
 			}
 		}
 	}()

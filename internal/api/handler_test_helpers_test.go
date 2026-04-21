@@ -18,12 +18,21 @@ import (
 	"github.com/malcolm-getahead/local-mdm/internal/config"
 	"github.com/malcolm-getahead/local-mdm/internal/models"
 	"github.com/malcolm-getahead/local-mdm/internal/platform/macos"
-	"github.com/malcolm-getahead/local-mdm/internal/scep"
 	"github.com/malcolm-getahead/local-mdm/internal/service"
 	depClient "github.com/micromdm/nanodep/client"
 )
 
 // --- Mock Repositories ---
+
+type mockChallengeStore struct{}
+
+func (m *mockChallengeStore) GenerateChallenge(deviceID string, ttl time.Duration) (string, error) {
+	return "test-challenge-password", nil
+}
+func (m *mockChallengeStore) ValidateChallenge(password string) (string, bool) {
+	return "test-device", password == "test-challenge-password"
+}
+func (m *mockChallengeStore) CleanupExpired() {}
 
 type mockEnterpriseRepo struct {
 	enterprises []*models.Enterprise
@@ -593,7 +602,7 @@ func newTestServer(t *testing.T) *testServer {
 		config:           &config.Config{},
 		logger:           slog.New(slog.NewTextHandler(bytes.NewBuffer(nil), &slog.HandlerOptions{Level: slog.LevelError})),
 		auditLogger:      al,
-		challengeManager: scep.NewChallengeManager(),
+		challengeManager: &mockChallengeStore{},
 		enterpriseRepo:   er,
 		deviceRepo:       dr,
 		policyRepo:       pr,
