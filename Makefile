@@ -22,7 +22,7 @@ run: ## Run the application
 
 test: ## Run tests
 	@echo "Running tests..."
-	@go test -v -race -coverprofile=coverage.out ./...
+	@go test -v -race -p 4 -coverprofile=coverage.out ./...
 
 test-unit: ## Run unit tests only
 	@echo "Running unit tests..."

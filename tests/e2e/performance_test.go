@@ -23,7 +23,13 @@ func TestPerformance_DeviceListLatency(t *testing.T) {
 
 	enterprise := &models.Enterprise{Name: "perf-" + uuid.New().String()[:8], Slug: "perf-" + uuid.New().String()[:8]}
 	require.NoError(t, entRepo.Create(ctx, enterprise))
-	t.Cleanup(func() { entRepo.Delete(ctx, enterprise.ID) })
+	t.Cleanup(func() {
+		devices, _, _ := deviceRepo.List(ctx, enterprise.ID, 1000, 0)
+		for _, d := range devices {
+			deviceRepo.Delete(ctx, d.ID)
+		}
+		entRepo.Delete(ctx, enterprise.ID)
+	})
 
 	// Create 100 devices
 	for i := 0; i < 100; i++ {
@@ -36,7 +42,6 @@ func TestPerformance_DeviceListLatency(t *testing.T) {
 			PlatformData: models.JSONB{},
 		}
 		require.NoError(t, deviceRepo.Create(ctx, d))
-		t.Cleanup(func() { deviceRepo.Delete(ctx, d.ID) })
 	}
 
 	// Measure list latency
@@ -64,7 +69,14 @@ func TestPerformance_ConcurrentEnrollments(t *testing.T) {
 
 	enterprise := &models.Enterprise{Name: "conc-" + uuid.New().String()[:8], Slug: "conc-" + uuid.New().String()[:8]}
 	require.NoError(t, entRepo.Create(ctx, enterprise))
-	t.Cleanup(func() { entRepo.Delete(ctx, enterprise.ID) })
+	t.Cleanup(func() {
+		// Clean up devices first (soft delete doesn't cascade)
+		devices, _, _ := deviceRepo.List(ctx, enterprise.ID, 1000, 0)
+		for _, d := range devices {
+			deviceRepo.Delete(ctx, d.ID)
+		}
+		entRepo.Delete(ctx, enterprise.ID)
+	})
 
 	// Simulate 50 concurrent enrollments
 	var wg sync.WaitGroup
@@ -106,10 +118,4 @@ func TestPerformance_ConcurrentEnrollments(t *testing.T) {
 	_, total, err := deviceRepo.List(ctx, enterprise.ID, 1, 0)
 	require.NoError(t, err)
 	require.Equal(t, 50, total)
-
-	// Cleanup
-	devices, _, _ := deviceRepo.List(ctx, enterprise.ID, 100, 0)
-	for _, d := range devices {
-		deviceRepo.Delete(ctx, d.ID)
-	}
 }

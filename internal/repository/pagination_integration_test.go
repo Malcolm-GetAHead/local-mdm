@@ -21,7 +21,6 @@ func TestDeviceRepository_List_PaginationValidation(t *testing.T) {
 	require.NoError(t, err)
 	ctx := context.Background()
 
-	// Create test enterprise
 	enterprise := &models.Enterprise{
 		Name: "Test Enterprise",
 		Slug: fmt.Sprintf("test-enterprise-%d", time.Now().UnixNano()),
@@ -30,6 +29,7 @@ func TestDeviceRepository_List_PaginationValidation(t *testing.T) {
 	require.NoError(t, err)
 	err = enterpriseRepo.Create(ctx, enterprise)
 	require.NoError(t, err)
+	t.Cleanup(func() { enterpriseRepo.Delete(ctx, enterprise.ID) })
 
 	t.Run("excessive limit rejected", func(t *testing.T) {
 		_, _, err := repo.List(ctx, enterprise.ID, 10000, 0)
@@ -94,7 +94,6 @@ func TestPolicyRepository_List_PaginationValidation(t *testing.T) {
 	require.NoError(t, err)
 	ctx := context.Background()
 
-	// Create test enterprise
 	enterprise := &models.Enterprise{
 		Name: "Test Enterprise Policy",
 		Slug: fmt.Sprintf("test-enterprise-policy-%d", time.Now().UnixNano()),
@@ -103,6 +102,7 @@ func TestPolicyRepository_List_PaginationValidation(t *testing.T) {
 	require.NoError(t, err)
 	err = enterpriseRepo.Create(ctx, enterprise)
 	require.NoError(t, err)
+	t.Cleanup(func() { enterpriseRepo.Delete(ctx, enterprise.ID) })
 
 	t.Run("excessive limit rejected", func(t *testing.T) {
 		_, _, err := repo.List(ctx, enterprise.ID, 10000, 0)
@@ -141,18 +141,27 @@ func TestPaginationValidation_DoSPrevention(t *testing.T) {
 	require.NoError(t, err)
 	err = enterpriseRepo.Create(ctx, enterprise)
 	require.NoError(t, err)
+	t.Cleanup(func() { enterpriseRepo.Delete(ctx, enterprise.ID) })
 
 	// Create some test devices
+	var deviceIDs []uuid.UUID
 	for i := 0; i < 10; i++ {
 		device := &models.Device{
 			EnterpriseID: enterprise.ID,
 			SerialNumber: uuid.New().String(),
 			DeviceID:     uuid.New().String(),
 			Platform:     "windows",
+			PlatformData: models.JSONB{},
 		}
 		err := deviceRepo.Create(ctx, device)
 		require.NoError(t, err)
+		deviceIDs = append(deviceIDs, device.ID)
 	}
+	t.Cleanup(func() {
+		for _, id := range deviceIDs {
+			deviceRepo.Delete(ctx, id)
+		}
+	})
 
 	t.Run("attacker cannot request millions of records", func(t *testing.T) {
 		// Attempt to request 1 million records

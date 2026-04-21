@@ -20,7 +20,7 @@ func setupDB(t *testing.T) *db.DB {
 	t.Helper()
 	cfg := config.DatabaseConfig{
 		Host: "localhost", Port: 5432, User: "postgres", Password: "postgres",
-		Database: "localmdm", SSLMode: "disable", MaxOpenConns: 5, MaxIdleConns: 2, ConnMaxLifetime: 5 * time.Minute,
+		Database: "localmdm", SSLMode: "disable", MaxOpenConns: 2, MaxIdleConns: 1, ConnMaxLifetime: 5 * time.Minute,
 	}
 	database, err := db.New(cfg)
 	if err != nil {

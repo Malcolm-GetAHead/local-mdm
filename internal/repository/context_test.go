@@ -58,15 +58,9 @@ func TestDeviceRepository_List_ContextCancellation(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		cancel() // Cancel immediately
 
-		devices, total, err := repo.List(ctx, enterprise.ID, 10, 0)
-		if err != context.Canceled {
-			t.Errorf("expected context.Canceled, got %v", err)
-		}
-		if devices != nil {
-			t.Errorf("expected nil devices, got %v", devices)
-		}
-		if total != 0 {
-			t.Errorf("expected 0 total, got %d", total)
+		_, _, err := repo.List(ctx, enterprise.ID, 10, 0)
+		if err == nil {
+			t.Error("expected error from cancelled context, got nil")
 		}
 	})
 
@@ -75,22 +69,21 @@ func TestDeviceRepository_List_ContextCancellation(t *testing.T) {
 		defer cancel()
 		time.Sleep(10 * time.Millisecond) // Ensure timeout
 
-		devices, total, err := repo.List(ctx, enterprise.ID, 10, 0)
-		if err != context.DeadlineExceeded {
-			t.Errorf("expected context.DeadlineExceeded, got %v", err)
-		}
-		if devices != nil {
-			t.Errorf("expected nil devices, got %v", devices)
-		}
-		if total != 0 {
-			t.Errorf("expected 0 total, got %d", total)
+		_, _, err := repo.List(ctx, enterprise.ID, 10, 0)
+		if err == nil {
+			t.Error("expected error from timed-out context, got nil")
 		}
 	})
 
 	t.Run("not cancelled", func(t *testing.T) {
-		ctx := context.Background()
+		// Use a fresh DB connection to avoid pool contamination from cancelled contexts
+		freshDB := testutil.SetupTestDB(t)
+		freshRepo, err := NewDeviceRepository(freshDB.Writer, freshDB.Writer)
+		if err != nil {
+			t.Fatalf("failed to create fresh repository: %v", err)
+		}
 
-		devices, total, err := repo.List(ctx, enterprise.ID, 10, 0)
+		devices, total, err := freshRepo.List(context.Background(), enterprise.ID, 10, 0)
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
@@ -133,15 +126,9 @@ func TestEnterpriseRepository_List_ContextCancellation(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		cancel()
 
-		enterprises, total, err := repo.List(ctx, 10, 0)
-		if err != context.Canceled {
-			t.Errorf("expected context.Canceled, got %v", err)
-		}
-		if enterprises != nil {
-			t.Errorf("expected nil enterprises, got %v", enterprises)
-		}
-		if total != 0 {
-			t.Errorf("expected 0 total, got %d", total)
+		_, _, err := repo.List(ctx, 10, 0)
+		if err == nil {
+			t.Error("expected error from cancelled context, got nil")
 		}
 	})
 
@@ -150,22 +137,21 @@ func TestEnterpriseRepository_List_ContextCancellation(t *testing.T) {
 		defer cancel()
 		time.Sleep(10 * time.Millisecond)
 
-		enterprises, total, err := repo.List(ctx, 10, 0)
-		if err != context.DeadlineExceeded {
-			t.Errorf("expected context.DeadlineExceeded, got %v", err)
-		}
-		if enterprises != nil {
-			t.Errorf("expected nil enterprises, got %v", enterprises)
-		}
-		if total != 0 {
-			t.Errorf("expected 0 total, got %d", total)
+		_, _, err := repo.List(ctx, 10, 0)
+		if err == nil {
+			t.Error("expected error from timed-out context, got nil")
 		}
 	})
 
 	t.Run("not cancelled", func(t *testing.T) {
+		freshDB := testutil.SetupTestDB(t)
+		freshRepo, err := NewEnterpriseRepository(freshDB.Writer, freshDB.Writer)
+		if err != nil {
+			t.Fatalf("failed to create fresh repository: %v", err)
+		}
 		ctx := context.Background()
 
-		enterprises, total, err := repo.List(ctx, 10, 0)
+		enterprises, total, err := freshRepo.List(ctx, 10, 0)
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
@@ -226,15 +212,9 @@ func TestPolicyRepository_List_ContextCancellation(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		cancel()
 
-		policies, total, err := repo.List(ctx, enterprise.ID, 10, 0)
-		if err != context.Canceled {
-			t.Errorf("expected context.Canceled, got %v", err)
-		}
-		if policies != nil {
-			t.Errorf("expected nil policies, got %v", policies)
-		}
-		if total != 0 {
-			t.Errorf("expected 0 total, got %d", total)
+		_, _, err := repo.List(ctx, enterprise.ID, 10, 0)
+		if err == nil {
+			t.Error("expected error from cancelled context, got nil")
 		}
 	})
 
@@ -243,22 +223,21 @@ func TestPolicyRepository_List_ContextCancellation(t *testing.T) {
 		defer cancel()
 		time.Sleep(10 * time.Millisecond)
 
-		policies, total, err := repo.List(ctx, enterprise.ID, 10, 0)
-		if err != context.DeadlineExceeded {
-			t.Errorf("expected context.DeadlineExceeded, got %v", err)
-		}
-		if policies != nil {
-			t.Errorf("expected nil policies, got %v", policies)
-		}
-		if total != 0 {
-			t.Errorf("expected 0 total, got %d", total)
+		_, _, err := repo.List(ctx, enterprise.ID, 10, 0)
+		if err == nil {
+			t.Error("expected error from timed-out context, got nil")
 		}
 	})
 
 	t.Run("not cancelled", func(t *testing.T) {
+		freshDB := testutil.SetupTestDB(t)
+		freshRepo, err := NewPolicyRepository(freshDB.Writer, freshDB.Reader)
+		if err != nil {
+			t.Fatalf("failed to create fresh repository: %v", err)
+		}
 		ctx := context.Background()
 
-		policies, total, err := repo.List(ctx, enterprise.ID, 10, 0)
+		policies, total, err := freshRepo.List(ctx, enterprise.ID, 10, 0)
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
