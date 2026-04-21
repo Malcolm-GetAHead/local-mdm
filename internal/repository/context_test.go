@@ -30,8 +30,10 @@ func TestDeviceRepository_List_ContextCancellation(t *testing.T) {
 	if err := enterpriseRepo.Create(context.Background(), enterprise); err != nil {
 		t.Fatalf("failed to create enterprise: %v", err)
 	}
+	t.Cleanup(func() { enterpriseRepo.Delete(context.Background(), enterprise.ID) })
 
 	// Create test devices
+	deviceIDs := make([]uuid.UUID, 5)
 	for i := 0; i < 5; i++ {
 		device := &models.Device{
 			BaseModel:    models.BaseModel{ID: uuid.New()},
@@ -44,7 +46,13 @@ func TestDeviceRepository_List_ContextCancellation(t *testing.T) {
 		if err := repo.Create(context.Background(), device); err != nil {
 			t.Fatalf("failed to create device: %v", err)
 		}
+		deviceIDs[i] = device.ID
 	}
+	t.Cleanup(func() {
+		for _, id := range deviceIDs {
+			repo.Delete(context.Background(), id)
+		}
+	})
 
 	t.Run("cancelled before operation", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
@@ -103,6 +111,7 @@ func TestEnterpriseRepository_List_ContextCancellation(t *testing.T) {
 	}
 
 	// Create test enterprises
+	entIDs := make([]uuid.UUID, 3)
 	for i := 0; i < 3; i++ {
 		enterprise := &models.Enterprise{
 			BaseModel: models.BaseModel{ID: uuid.New()},
@@ -112,7 +121,13 @@ func TestEnterpriseRepository_List_ContextCancellation(t *testing.T) {
 		if err := repo.Create(context.Background(), enterprise); err != nil {
 			t.Fatalf("failed to create enterprise: %v", err)
 		}
+		entIDs[i] = enterprise.ID
 	}
+	t.Cleanup(func() {
+		for _, id := range entIDs {
+			repo.Delete(context.Background(), id)
+		}
+	})
 
 	t.Run("cancelled before operation", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
@@ -183,8 +198,10 @@ func TestPolicyRepository_List_ContextCancellation(t *testing.T) {
 	if err := enterpriseRepo.Create(context.Background(), enterprise); err != nil {
 		t.Fatalf("failed to create enterprise: %v", err)
 	}
+	t.Cleanup(func() { enterpriseRepo.Delete(context.Background(), enterprise.ID) })
 
 	// Create test policies
+	policyIDs := make([]uuid.UUID, 4)
 	for i := 0; i < 4; i++ {
 		policy := &models.Policy{
 			BaseModel:    models.BaseModel{ID: uuid.New()},
@@ -197,7 +214,13 @@ func TestPolicyRepository_List_ContextCancellation(t *testing.T) {
 		if err := repo.Create(context.Background(), policy); err != nil {
 			t.Fatalf("failed to create policy: %v", err)
 		}
+		policyIDs[i] = policy.ID
 	}
+	t.Cleanup(func() {
+		for _, id := range policyIDs {
+			repo.Delete(context.Background(), id)
+		}
+	})
 
 	t.Run("cancelled before operation", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
