@@ -16,23 +16,22 @@ type CertificateRepository interface {
 }
 
 type certificateRepository struct {
-	db executor
+	writer executor
+	reader executor
 }
 
 // NewCertificateRepository creates a new certificate repository instance.
-func NewCertificateRepository(db interface{}) (CertificateRepository, error) {
-	if db == nil {
-		return nil, fmt.Errorf("database cannot be nil")
+// writer is used for Create/Revoke, reader for Get/List queries.
+func NewCertificateRepository(writer, reader interface{}) (CertificateRepository, error) {
+	w, err := resolveExecutor(writer, "writer")
+	if err != nil {
+		return nil, err
 	}
-
-	switch v := db.(type) {
-	case *sql.DB:
-		return &certificateRepository{db: v}, nil
-	case executor:
-		return &certificateRepository{db: v}, nil
-	default:
-		return nil, fmt.Errorf("unsupported database type: %T", db)
+	r, err := resolveExecutor(reader, "reader")
+	if err != nil {
+		return nil, err
 	}
+	return &certificateRepository{writer: w, reader: r}, nil
 }
 
 func (r *certificateRepository) GetBySerial(ctx context.Context, serialNumber string) (*models.Certificate, error) {
@@ -43,7 +42,7 @@ func (r *certificateRepository) GetBySerial(ctx context.Context, serialNumber st
 		WHERE serial_number = $1`
 
 	cert := &models.Certificate{}
-	exec := getExecutor(ctx, r.db)
+	exec := getReadExecutor(ctx, r.reader)
 	err := exec.QueryRowContext(ctx, query, serialNumber).Scan(
 		&cert.ID, &cert.DeviceID, &cert.CertType, &cert.Subject, &cert.SerialNumber,
 		&cert.CertData, &cert.IssuedAt, &cert.ExpiresAt, &cert.RevokedAt,
@@ -99,7 +98,7 @@ func (r *certificateRepository) List(ctx context.Context, deviceID *uuid.UUID, l
 
 	return ExecutePaginatedQuery(
 		ctx,
-		getExecutor(ctx, r.db),
+		getReadExecutor(ctx, r.reader),
 		countQuery, countArgs,
 		dataQuery, dataArgs,
 		scanFn,

@@ -32,28 +32,27 @@ type PolicyAssignmentRepository interface {
 }
 
 type groupRepository struct {
-	db executor
+	writer executor
+	reader executor
 }
 
-func NewGroupRepository(db interface{}) (GroupRepository, error) {
-	if db == nil {
-		return nil, fmt.Errorf("database cannot be nil")
+func NewGroupRepository(writer, reader interface{}) (GroupRepository, error) {
+	w, err := resolveExecutor(writer, "writer")
+	if err != nil {
+		return nil, err
 	}
-	switch v := db.(type) {
-	case *sql.DB:
-		return &groupRepository{db: v}, nil
-	case executor:
-		return &groupRepository{db: v}, nil
-	default:
-		return nil, fmt.Errorf("unsupported database type: %T", db)
+	r, err := resolveExecutor(reader, "reader")
+	if err != nil {
+		return nil, err
 	}
+	return &groupRepository{writer: w, reader: r}, nil
 }
 
 func (r *groupRepository) Create(ctx context.Context, group *models.DeviceGroup) error {
 	if group.ID == uuid.Nil {
 		group.ID = uuid.New()
 	}
-	return getExecutor(ctx, r.db).QueryRowContext(ctx,
+	return getExecutor(ctx, r.writer).QueryRowContext(ctx,
 		`INSERT INTO device_groups (id, enterprise_id, name, description) VALUES ($1, $2, $3, $4) RETURNING created_at, updated_at`,
 		group.ID, group.EnterpriseID, group.Name, group.Description,
 	).Scan(&group.CreatedAt, &group.UpdatedAt)
@@ -61,7 +60,7 @@ func (r *groupRepository) Create(ctx context.Context, group *models.DeviceGroup)
 
 func (r *groupRepository) GetByID(ctx context.Context, id uuid.UUID) (*models.DeviceGroup, error) {
 	g := &models.DeviceGroup{}
-	err := getExecutor(ctx, r.db).QueryRowContext(ctx,
+	err := getReadExecutor(ctx, r.reader).QueryRowContext(ctx,
 		`SELECT id, enterprise_id, name, description, created_at, updated_at FROM device_groups WHERE id = $1 AND deleted_at IS NULL`, id,
 	).Scan(&g.ID, &g.EnterpriseID, &g.Name, &g.Description, &g.CreatedAt, &g.UpdatedAt)
 	if err == sql.ErrNoRows {
@@ -77,14 +76,14 @@ func (r *groupRepository) List(ctx context.Context, enterpriseID uuid.UUID, limi
 	}
 
 	var total int
-	err = getExecutor(ctx, r.db).QueryRowContext(ctx,
+	err = getReadExecutor(ctx, r.reader).QueryRowContext(ctx,
 		`SELECT COUNT(*) FROM device_groups WHERE enterprise_id = $1 AND deleted_at IS NULL`, enterpriseID,
 	).Scan(&total)
 	if err != nil {
 		return nil, 0, err
 	}
 
-	rows, err := getExecutor(ctx, r.db).QueryContext(ctx,
+	rows, err := getReadExecutor(ctx, r.reader).QueryContext(ctx,
 		`SELECT id, enterprise_id, name, description, created_at, updated_at FROM device_groups
 		 WHERE enterprise_id = $1 AND deleted_at IS NULL ORDER BY name LIMIT $2 OFFSET $3`,
 		enterpriseID, limit, offset,
@@ -106,7 +105,7 @@ func (r *groupRepository) List(ctx context.Context, enterpriseID uuid.UUID, limi
 }
 
 func (r *groupRepository) Update(ctx context.Context, group *models.DeviceGroup) error {
-	result, err := getExecutor(ctx, r.db).ExecContext(ctx,
+	result, err := getExecutor(ctx, r.writer).ExecContext(ctx,
 		`UPDATE device_groups SET name = $1, description = $2 WHERE id = $3 AND deleted_at IS NULL`,
 		group.Name, group.Description, group.ID,
 	)
@@ -121,7 +120,7 @@ func (r *groupRepository) Update(ctx context.Context, group *models.DeviceGroup)
 }
 
 func (r *groupRepository) Delete(ctx context.Context, id uuid.UUID) error {
-	result, err := getExecutor(ctx, r.db).ExecContext(ctx,
+	result, err := getExecutor(ctx, r.writer).ExecContext(ctx,
 		`UPDATE device_groups SET deleted_at = NOW() WHERE id = $1 AND deleted_at IS NULL`, id,
 	)
 	if err != nil {
@@ -135,7 +134,7 @@ func (r *groupRepository) Delete(ctx context.Context, id uuid.UUID) error {
 }
 
 func (r *groupRepository) AddMember(ctx context.Context, groupID, deviceID uuid.UUID) error {
-	_, err := getExecutor(ctx, r.db).ExecContext(ctx,
+	_, err := getExecutor(ctx, r.writer).ExecContext(ctx,
 		`INSERT INTO group_memberships (group_id, device_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
 		groupID, deviceID,
 	)
@@ -143,7 +142,7 @@ func (r *groupRepository) AddMember(ctx context.Context, groupID, deviceID uuid.
 }
 
 func (r *groupRepository) RemoveMember(ctx context.Context, groupID, deviceID uuid.UUID) error {
-	_, err := getExecutor(ctx, r.db).ExecContext(ctx,
+	_, err := getExecutor(ctx, r.writer).ExecContext(ctx,
 		`DELETE FROM group_memberships WHERE group_id = $1 AND device_id = $2`, groupID, deviceID,
 	)
 	return err
@@ -156,14 +155,14 @@ func (r *groupRepository) ListMembers(ctx context.Context, groupID uuid.UUID, li
 	}
 
 	var total int
-	err = getExecutor(ctx, r.db).QueryRowContext(ctx,
+	err = getReadExecutor(ctx, r.reader).QueryRowContext(ctx,
 		`SELECT COUNT(*) FROM group_memberships WHERE group_id = $1`, groupID,
 	).Scan(&total)
 	if err != nil {
 		return nil, 0, err
 	}
 
-	rows, err := getExecutor(ctx, r.db).QueryContext(ctx,
+	rows, err := getReadExecutor(ctx, r.reader).QueryContext(ctx,
 		`SELECT d.id, d.enterprise_id, d.platform, d.device_id, d.serial_number, d.name, d.model,
 		        d.os_version, d.enrollment_date, d.last_seen, d.status, d.platform_data, d.created_at, d.updated_at, d.deleted_at
 		 FROM devices d JOIN group_memberships gm ON d.id = gm.device_id
@@ -189,7 +188,7 @@ func (r *groupRepository) ListMembers(ctx context.Context, groupID uuid.UUID, li
 }
 
 func (r *groupRepository) ListGroupsForDevice(ctx context.Context, deviceID uuid.UUID) ([]*models.DeviceGroup, error) {
-	rows, err := getExecutor(ctx, r.db).QueryContext(ctx,
+	rows, err := getReadExecutor(ctx, r.reader).QueryContext(ctx,
 		`SELECT g.id, g.enterprise_id, g.name, g.description, g.created_at, g.updated_at
 		 FROM device_groups g JOIN group_memberships gm ON g.id = gm.group_id
 		 WHERE gm.device_id = $1 AND g.deleted_at IS NULL`, deviceID,
@@ -213,28 +212,27 @@ func (r *groupRepository) ListGroupsForDevice(ctx context.Context, deviceID uuid
 // --- Policy Assignment Repository ---
 
 type policyAssignmentRepository struct {
-	db executor
+	writer executor
+	reader executor
 }
 
-func NewPolicyAssignmentRepository(db interface{}) (PolicyAssignmentRepository, error) {
-	if db == nil {
-		return nil, fmt.Errorf("database cannot be nil")
+func NewPolicyAssignmentRepository(writer, reader interface{}) (PolicyAssignmentRepository, error) {
+	w, err := resolveExecutor(writer, "writer")
+	if err != nil {
+		return nil, err
 	}
-	switch v := db.(type) {
-	case *sql.DB:
-		return &policyAssignmentRepository{db: v}, nil
-	case executor:
-		return &policyAssignmentRepository{db: v}, nil
-	default:
-		return nil, fmt.Errorf("unsupported database type: %T", db)
+	r, err := resolveExecutor(reader, "reader")
+	if err != nil {
+		return nil, err
 	}
+	return &policyAssignmentRepository{writer: w, reader: r}, nil
 }
 
 func (r *policyAssignmentRepository) Create(ctx context.Context, a *models.PolicyAssignment) error {
 	if a.ID == uuid.Nil {
 		a.ID = uuid.New()
 	}
-	return getExecutor(ctx, r.db).QueryRowContext(ctx,
+	return getExecutor(ctx, r.writer).QueryRowContext(ctx,
 		`INSERT INTO policy_assignments (id, policy_id, target_type, target_id, priority)
 		 VALUES ($1, $2, $3, $4, $5) ON CONFLICT (policy_id, target_type, target_id) DO NOTHING RETURNING created_at`,
 		a.ID, a.PolicyID, a.TargetType, a.TargetID, a.Priority,
@@ -242,7 +240,7 @@ func (r *policyAssignmentRepository) Create(ctx context.Context, a *models.Polic
 }
 
 func (r *policyAssignmentRepository) Delete(ctx context.Context, id uuid.UUID) error {
-	result, err := getExecutor(ctx, r.db).ExecContext(ctx,
+	result, err := getExecutor(ctx, r.writer).ExecContext(ctx,
 		`DELETE FROM policy_assignments WHERE id = $1`, id,
 	)
 	if err != nil {
@@ -256,7 +254,7 @@ func (r *policyAssignmentRepository) Delete(ctx context.Context, id uuid.UUID) e
 }
 
 func (r *policyAssignmentRepository) ListByTarget(ctx context.Context, targetType string, targetID uuid.UUID) ([]*models.PolicyAssignment, error) {
-	rows, err := getExecutor(ctx, r.db).QueryContext(ctx,
+	rows, err := getReadExecutor(ctx, r.reader).QueryContext(ctx,
 		`SELECT id, policy_id, target_type, target_id, priority, created_at
 		 FROM policy_assignments WHERE target_type = $1 AND target_id = $2 ORDER BY priority, created_at`,
 		targetType, targetID,
@@ -269,7 +267,7 @@ func (r *policyAssignmentRepository) ListByTarget(ctx context.Context, targetTyp
 }
 
 func (r *policyAssignmentRepository) ListByPolicy(ctx context.Context, policyID uuid.UUID) ([]*models.PolicyAssignment, error) {
-	rows, err := getExecutor(ctx, r.db).QueryContext(ctx,
+	rows, err := getReadExecutor(ctx, r.reader).QueryContext(ctx,
 		`SELECT id, policy_id, target_type, target_id, priority, created_at
 		 FROM policy_assignments WHERE policy_id = $1 ORDER BY priority, created_at`, policyID,
 	)
@@ -297,7 +295,7 @@ func (r *policyAssignmentRepository) GetEffectivePolicies(ctx context.Context, d
 
 	query += ` ORDER BY policy_id, priority, created_at`
 
-	rows, err := getExecutor(ctx, r.db).QueryContext(ctx, query, args...)
+	rows, err := getReadExecutor(ctx, r.reader).QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, err
 	}

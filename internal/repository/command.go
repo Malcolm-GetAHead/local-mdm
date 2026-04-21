@@ -2,7 +2,6 @@ package repository
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"time"
 
@@ -22,22 +21,21 @@ type CommandRepository interface {
 }
 
 type commandRepository struct {
-	db executor
+	writer executor
+	reader executor
 }
 
 // NewCommandRepository creates a new command repository instance.
-func NewCommandRepository(db interface{}) (CommandRepository, error) {
-	if db == nil {
-		return nil, fmt.Errorf("database cannot be nil")
+func NewCommandRepository(writer, reader interface{}) (CommandRepository, error) {
+	w, err := resolveExecutor(writer, "writer")
+	if err != nil {
+		return nil, err
 	}
-	switch v := db.(type) {
-	case *sql.DB:
-		return &commandRepository{db: v}, nil
-	case executor:
-		return &commandRepository{db: v}, nil
-	default:
-		return nil, fmt.Errorf("unsupported database type: %T", db)
+	r, err := resolveExecutor(reader, "reader")
+	if err != nil {
+		return nil, err
 	}
+	return &commandRepository{writer: w, reader: r}, nil
 }
 
 func (r *commandRepository) Create(ctx context.Context, cmd *models.DeviceCommand) error {
@@ -53,7 +51,7 @@ func (r *commandRepository) Create(ctx context.Context, cmd *models.DeviceComman
 		VALUES ($1, $2, $3, $4, $5)
 		RETURNING created_at, updated_at`
 
-	exec := getExecutor(ctx, r.db)
+	exec := getExecutor(ctx, r.writer)
 	return exec.QueryRowContext(ctx, query,
 		cmd.ID, cmd.DeviceID, cmd.CommandType, cmd.CommandData, cmd.Status,
 	).Scan(&cmd.CreatedAt, &cmd.UpdatedAt)
@@ -64,7 +62,7 @@ func (r *commandRepository) GetByID(ctx context.Context, id uuid.UUID) (*models.
 		SELECT id, device_id, command_type, command_data, status, sent_at, completed_at, error_message, created_at, updated_at
 		FROM device_commands WHERE id = $1`
 
-	exec := getExecutor(ctx, r.db)
+	exec := getReadExecutor(ctx, r.reader)
 	cmd := &models.DeviceCommand{}
 	err := exec.QueryRowContext(ctx, query, id).Scan(
 		&cmd.ID, &cmd.DeviceID, &cmd.CommandType, &cmd.CommandData,
@@ -84,7 +82,7 @@ func (r *commandRepository) ListByDevice(ctx context.Context, deviceID uuid.UUID
 	}
 
 	countQuery := `SELECT COUNT(*) FROM device_commands WHERE device_id = $1`
-	exec := getExecutor(ctx, r.db)
+	exec := getReadExecutor(ctx, r.reader)
 	var total int
 	if err := exec.QueryRowContext(ctx, countQuery, deviceID).Scan(&total); err != nil {
 		return nil, 0, fmt.Errorf("failed to count commands: %w", err)
@@ -123,7 +121,7 @@ func (r *commandRepository) ListPending(ctx context.Context, deviceID uuid.UUID)
 		WHERE device_id = $1 AND status = 'pending'
 		ORDER BY created_at ASC`
 
-	exec := getExecutor(ctx, r.db)
+	exec := getReadExecutor(ctx, r.reader)
 	rows, err := exec.QueryContext(ctx, query, deviceID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list pending commands: %w", err)
@@ -175,7 +173,7 @@ func (r *commandRepository) updateStatus(ctx context.Context, id uuid.UUID, stat
 		return fmt.Errorf("unsupported status: %s", status)
 	}
 
-	exec := getExecutor(ctx, r.db)
+	exec := getExecutor(ctx, r.writer)
 	result, err := exec.ExecContext(ctx, query, args...)
 	if err != nil {
 		return fmt.Errorf("failed to update command status: %w", err)

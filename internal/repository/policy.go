@@ -23,25 +23,23 @@ type PolicyRepository interface {
 }
 
 type policyRepository struct {
-	db executor
+	writer executor
+	reader executor
 }
 
 // NewPolicyRepository creates a new policy repository instance.
-// The db parameter must be either *sql.DB or an executor interface.
-// Returns an error if db is nil or of an unsupported type.
-func NewPolicyRepository(db interface{}) (PolicyRepository, error) {
-	if db == nil {
-		return nil, fmt.Errorf("database cannot be nil")
+// writer is used for Create/Update/Delete, reader for Get/List queries.
+// Both must be *sql.DB or an executor interface.
+func NewPolicyRepository(writer, reader interface{}) (PolicyRepository, error) {
+	w, err := resolveExecutor(writer, "writer")
+	if err != nil {
+		return nil, err
 	}
-	
-	switch v := db.(type) {
-	case *sql.DB:
-		return &policyRepository{db: v}, nil
-	case executor:
-		return &policyRepository{db: v}, nil
-	default:
-		return nil, fmt.Errorf("unsupported database type: %T", db)
+	r, err := resolveExecutor(reader, "reader")
+	if err != nil {
+		return nil, err
 	}
+	return &policyRepository{writer: w, reader: r}, nil
 }
 
 func (r *policyRepository) Create(ctx context.Context, policy *models.Policy) error {
@@ -58,7 +56,7 @@ func (r *policyRepository) Create(ctx context.Context, policy *models.Policy) er
 		policy.ID = uuid.New()
 	}
 	
-	return getExecutor(ctx, r.db).QueryRowContext(ctx, query,
+	return getExecutor(ctx, r.writer).QueryRowContext(ctx, query,
 		policy.ID, policy.EnterpriseID, policy.Name, policy.Description,
 		policy.Platform, policy.PolicyType, policy.PolicyConfig, policy.IsActive,
 	).Scan(&policy.CreatedAt, &policy.UpdatedAt)
@@ -72,7 +70,7 @@ func (r *policyRepository) GetByID(ctx context.Context, id uuid.UUID) (*models.P
 		WHERE id = $1 AND deleted_at IS NULL`
 	
 	policy := &models.Policy{}
-	err := getExecutor(ctx, r.db).QueryRowContext(ctx, query, id).Scan(
+	err := getReadExecutor(ctx, r.reader).QueryRowContext(ctx, query, id).Scan(
 		&policy.ID, &policy.EnterpriseID, &policy.Name, &policy.Description,
 		&policy.Platform, &policy.PolicyType, &policy.PolicyConfig, &policy.IsActive,
 		&policy.CreatedAt, &policy.UpdatedAt, &policy.DeletedAt,
@@ -111,7 +109,7 @@ func (r *policyRepository) List(ctx context.Context, enterpriseID uuid.UUID, lim
 
 	return ExecutePaginatedQuery(
 		ctx,
-		getExecutor(ctx, r.db),
+		getReadExecutor(ctx, r.reader),
 		countQuery,
 		[]interface{}{enterpriseID},
 		dataQuery,
@@ -130,7 +128,7 @@ func (r *policyRepository) Update(ctx context.Context, policy *models.Policy) er
 		SET name = $1, description = $2, policy_config = $3, is_active = $4
 		WHERE id = $5 AND deleted_at IS NULL`
 	
-	result, err := getExecutor(ctx, r.db).ExecContext(ctx, query,
+	result, err := getExecutor(ctx, r.writer).ExecContext(ctx, query,
 		policy.Name, policy.Description, policy.PolicyConfig, policy.IsActive, policy.ID,
 	)
 	if err != nil {
@@ -150,7 +148,7 @@ func (r *policyRepository) Update(ctx context.Context, policy *models.Policy) er
 
 func (r *policyRepository) Delete(ctx context.Context, id uuid.UUID) error {
 	query := `UPDATE policies SET deleted_at = NOW() WHERE id = $1 AND deleted_at IS NULL`
-	result, err := getExecutor(ctx, r.db).ExecContext(ctx, query, id)
+	result, err := getExecutor(ctx, r.writer).ExecContext(ctx, query, id)
 	if err != nil {
 		return err
 	}
@@ -172,12 +170,12 @@ func (r *policyRepository) AssignToDevice(ctx context.Context, deviceID, policyI
 		VALUES ($1, $2, $3, 'pending')
 		ON CONFLICT (device_id, policy_id) DO NOTHING`
 	
-	_, err := getExecutor(ctx, r.db).ExecContext(ctx, query, uuid.New(), deviceID, policyID)
+	_, err := getExecutor(ctx, r.writer).ExecContext(ctx, query, uuid.New(), deviceID, policyID)
 	return err
 }
 
 func (r *policyRepository) UnassignFromDevice(ctx context.Context, deviceID, policyID uuid.UUID) error {
 	query := `DELETE FROM device_policies WHERE device_id = $1 AND policy_id = $2`
-	_, err := getExecutor(ctx, r.db).ExecContext(ctx, query, deviceID, policyID)
+	_, err := getExecutor(ctx, r.writer).ExecContext(ctx, query, deviceID, policyID)
 	return err
 }

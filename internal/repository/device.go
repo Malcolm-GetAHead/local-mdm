@@ -23,25 +23,23 @@ type DeviceRepository interface {
 }
 
 type deviceRepository struct {
-	db executor
+	writer executor
+	reader executor
 }
 
 // NewDeviceRepository creates a new device repository instance.
-// The db parameter must be either *sql.DB or an executor interface.
-// Returns an error if db is nil or of an unsupported type.
-func NewDeviceRepository(db interface{}) (DeviceRepository, error) {
-	if db == nil {
-		return nil, fmt.Errorf("database cannot be nil")
+// writer is used for Create/Update/Delete, reader for Get/List queries.
+// Both must be *sql.DB or an executor interface.
+func NewDeviceRepository(writer, reader interface{}) (DeviceRepository, error) {
+	w, err := resolveExecutor(writer, "writer")
+	if err != nil {
+		return nil, err
 	}
-	
-	switch v := db.(type) {
-	case *sql.DB:
-		return &deviceRepository{db: v}, nil
-	case executor:
-		return &deviceRepository{db: v}, nil
-	default:
-		return nil, fmt.Errorf("unsupported database type: %T", db)
+	r, err := resolveExecutor(reader, "reader")
+	if err != nil {
+		return nil, err
 	}
+	return &deviceRepository{writer: w, reader: r}, nil
 }
 
 func (r *deviceRepository) Create(ctx context.Context, device *models.Device) error {
@@ -58,7 +56,7 @@ func (r *deviceRepository) Create(ctx context.Context, device *models.Device) er
 		device.ID = uuid.New()
 	}
 	
-	exec := getExecutor(ctx, r.db)
+	exec := getExecutor(ctx, r.writer)
 	return exec.QueryRowContext(ctx, query,
 		device.ID, device.EnterpriseID, device.Platform, device.DeviceID,
 		device.SerialNumber, device.Name, device.Model, device.OSVersion,
@@ -74,7 +72,7 @@ func (r *deviceRepository) GetByID(ctx context.Context, id uuid.UUID) (*models.D
 		WHERE id = $1 AND deleted_at IS NULL`
 	
 	device := &models.Device{}
-	exec := getExecutor(ctx, r.db)
+	exec := getReadExecutor(ctx, r.reader)
 	err := exec.QueryRowContext(ctx, query, id).Scan(
 		&device.ID, &device.EnterpriseID, &device.Platform, &device.DeviceID,
 		&device.SerialNumber, &device.Name, &device.Model, &device.OSVersion,
@@ -95,7 +93,7 @@ func (r *deviceRepository) GetBySerial(ctx context.Context, enterpriseID uuid.UU
 		WHERE enterprise_id = $1 AND serial_number = $2 AND deleted_at IS NULL`
 	
 	device := &models.Device{}
-	exec := getExecutor(ctx, r.db)
+	exec := getReadExecutor(ctx, r.reader)
 	err := exec.QueryRowContext(ctx, query, enterpriseID, serial).Scan(
 		&device.ID, &device.EnterpriseID, &device.Platform, &device.DeviceID,
 		&device.SerialNumber, &device.Name, &device.Model, &device.OSVersion,
@@ -116,7 +114,7 @@ func (r *deviceRepository) GetByPlatformID(ctx context.Context, platform, device
 		WHERE platform = $1 AND device_id = $2 AND deleted_at IS NULL`
 
 	device := &models.Device{}
-	err := getExecutor(ctx, r.db).QueryRowContext(ctx, query, platform, deviceID).Scan(
+	err := getReadExecutor(ctx, r.reader).QueryRowContext(ctx, query, platform, deviceID).Scan(
 		&device.ID, &device.EnterpriseID, &device.Platform, &device.DeviceID,
 		&device.SerialNumber, &device.Name, &device.Model, &device.OSVersion,
 		&device.EnrollmentDate, &device.LastSeen, &device.Status, &device.PlatformData,
@@ -157,7 +155,7 @@ func (r *deviceRepository) List(ctx context.Context, enterpriseID uuid.UUID, lim
 
 	return ExecutePaginatedQuery(
 		ctx,
-		getExecutor(ctx, r.db),
+		getReadExecutor(ctx, r.reader),
 		countQuery,
 		[]interface{}{enterpriseID},
 		dataQuery,
@@ -176,7 +174,7 @@ func (r *deviceRepository) Update(ctx context.Context, device *models.Device) er
 		SET name = $1, model = $2, os_version = $3, last_seen = $4, status = $5, platform_data = $6
 		WHERE id = $7 AND deleted_at IS NULL`
 	
-	exec := getExecutor(ctx, r.db)
+	exec := getExecutor(ctx, r.writer)
 	result, err := exec.ExecContext(ctx, query,
 		device.Name, device.Model, device.OSVersion, device.LastSeen,
 		device.Status, device.PlatformData, device.ID,
@@ -198,7 +196,7 @@ func (r *deviceRepository) Update(ctx context.Context, device *models.Device) er
 
 func (r *deviceRepository) Delete(ctx context.Context, id uuid.UUID) error {
 	query := `UPDATE devices SET deleted_at = NOW() WHERE id = $1 AND deleted_at IS NULL`
-	exec := getExecutor(ctx, r.db)
+	exec := getExecutor(ctx, r.writer)
 	result, err := exec.ExecContext(ctx, query, id)
 	if err != nil {
 		return err

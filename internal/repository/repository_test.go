@@ -37,7 +37,7 @@ func TestEnterpriseRepository(t *testing.T) {
 	database := setupTestDB(t)
 	defer database.Close()
 	
-	repo, err := repository.NewEnterpriseRepository(database.DB)
+	repo, err := repository.NewEnterpriseRepository(database.Writer, database.Reader)
 	if err != nil {
 		t.Fatalf("Failed to create repository: %v", err)
 	}
@@ -125,7 +125,7 @@ func TestDeviceRepository(t *testing.T) {
 	defer database.Close()
 	
 	// Create enterprise first
-	enterpriseRepo, err := repository.NewEnterpriseRepository(database.DB)
+	enterpriseRepo, err := repository.NewEnterpriseRepository(database.Writer, database.Reader)
 	if err != nil {
 		t.Fatalf("Failed to create enterprise repository: %v", err)
 	}
@@ -135,7 +135,7 @@ func TestDeviceRepository(t *testing.T) {
 	}
 	enterpriseRepo.Create(context.Background(), enterprise)
 	
-	repo, err := repository.NewDeviceRepository(database.DB)
+	repo, err := repository.NewDeviceRepository(database.Writer, database.Reader)
 	if err != nil {
 		t.Fatalf("Failed to create device repository: %v", err)
 	}
@@ -215,7 +215,7 @@ func TestPolicyRepository(t *testing.T) {
 	defer database.Close()
 	
 	// Create enterprise first
-	enterpriseRepo, err := repository.NewEnterpriseRepository(database.DB)
+	enterpriseRepo, err := repository.NewEnterpriseRepository(database.Writer, database.Reader)
 	if err != nil {
 		t.Fatalf("Failed to create enterprise repository: %v", err)
 	}
@@ -226,7 +226,7 @@ func TestPolicyRepository(t *testing.T) {
 	enterpriseRepo.Create(context.Background(), enterprise)
 	
 	// Create device for assignment tests
-	deviceRepo, err := repository.NewDeviceRepository(database.DB)
+	deviceRepo, err := repository.NewDeviceRepository(database.Writer, database.Reader)
 	if err != nil {
 		t.Fatalf("Failed to create device repository: %v", err)
 	}
@@ -240,7 +240,7 @@ func TestPolicyRepository(t *testing.T) {
 	}
 	deviceRepo.Create(context.Background(), device)
 	
-	repo, err := repository.NewPolicyRepository(database.DB)
+	repo, err := repository.NewPolicyRepository(database.Writer, database.Reader)
 	if err != nil {
 		t.Fatalf("Failed to create policy repository: %v", err)
 	}

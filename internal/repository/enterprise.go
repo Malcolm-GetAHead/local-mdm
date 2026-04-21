@@ -22,25 +22,23 @@ type EnterpriseRepository interface {
 }
 
 type enterpriseRepository struct {
-	db executor
+	writer executor
+	reader executor
 }
 
 // NewEnterpriseRepository creates a new enterprise repository instance.
-// The db parameter must be either *sql.DB or an executor interface.
-// Returns an error if db is nil or of an unsupported type.
-func NewEnterpriseRepository(db interface{}) (EnterpriseRepository, error) {
-	if db == nil {
-		return nil, fmt.Errorf("database cannot be nil")
+// The writer and reader parameters must be either *sql.DB or an executor interface.
+// Returns an error if either is nil or of an unsupported type.
+func NewEnterpriseRepository(writer, reader interface{}) (EnterpriseRepository, error) {
+	w, err := resolveExecutor(writer, "writer")
+	if err != nil {
+		return nil, err
 	}
-	
-	switch v := db.(type) {
-	case *sql.DB:
-		return &enterpriseRepository{db: v}, nil
-	case executor:
-		return &enterpriseRepository{db: v}, nil
-	default:
-		return nil, fmt.Errorf("unsupported database type: %T", db)
+	r, err := resolveExecutor(reader, "reader")
+	if err != nil {
+		return nil, err
 	}
+	return &enterpriseRepository{writer: w, reader: r}, nil
 }
 
 func (r *enterpriseRepository) Create(ctx context.Context, enterprise *models.Enterprise) error {
@@ -57,7 +55,7 @@ func (r *enterpriseRepository) Create(ctx context.Context, enterprise *models.En
 		enterprise.ID = uuid.New()
 	}
 	
-	return getExecutor(ctx, r.db).QueryRowContext(ctx, query,
+	return getExecutor(ctx, r.writer).QueryRowContext(ctx, query,
 		enterprise.ID, enterprise.Name, enterprise.Slug, enterprise.Settings,
 	).Scan(&enterprise.CreatedAt, &enterprise.UpdatedAt)
 }
@@ -69,7 +67,7 @@ func (r *enterpriseRepository) GetByID(ctx context.Context, id uuid.UUID) (*mode
 		WHERE id = $1 AND deleted_at IS NULL`
 	
 	enterprise := &models.Enterprise{}
-	err := getExecutor(ctx, r.db).QueryRowContext(ctx, query, id).Scan(
+	err := getReadExecutor(ctx, r.reader).QueryRowContext(ctx, query, id).Scan(
 		&enterprise.ID, &enterprise.Name, &enterprise.Slug, &enterprise.Settings,
 		&enterprise.CreatedAt, &enterprise.UpdatedAt, &enterprise.DeletedAt,
 	)
@@ -86,7 +84,7 @@ func (r *enterpriseRepository) GetBySlug(ctx context.Context, slug string) (*mod
 		WHERE slug = $1 AND deleted_at IS NULL`
 	
 	enterprise := &models.Enterprise{}
-	err := getExecutor(ctx, r.db).QueryRowContext(ctx, query, slug).Scan(
+	err := getReadExecutor(ctx, r.reader).QueryRowContext(ctx, query, slug).Scan(
 		&enterprise.ID, &enterprise.Name, &enterprise.Slug, &enterprise.Settings,
 		&enterprise.CreatedAt, &enterprise.UpdatedAt, &enterprise.DeletedAt,
 	)
@@ -122,7 +120,7 @@ func (r *enterpriseRepository) List(ctx context.Context, limit, offset int) ([]*
 
 	return ExecutePaginatedQuery(
 		ctx,
-		getExecutor(ctx, r.db),
+		getReadExecutor(ctx, r.reader),
 		countQuery,
 		nil, // no count args
 		dataQuery,
@@ -141,7 +139,7 @@ func (r *enterpriseRepository) Update(ctx context.Context, enterprise *models.En
 		SET name = $1, settings = $2
 		WHERE id = $3 AND deleted_at IS NULL`
 	
-	result, err := getExecutor(ctx, r.db).ExecContext(ctx, query,
+	result, err := getExecutor(ctx, r.writer).ExecContext(ctx, query,
 		enterprise.Name, enterprise.Settings, enterprise.ID,
 	)
 	if err != nil {
@@ -161,7 +159,7 @@ func (r *enterpriseRepository) Update(ctx context.Context, enterprise *models.En
 
 func (r *enterpriseRepository) Delete(ctx context.Context, id uuid.UUID) error {
 	query := `UPDATE enterprises SET deleted_at = NOW() WHERE id = $1 AND deleted_at IS NULL`
-	result, err := getExecutor(ctx, r.db).ExecContext(ctx, query, id)
+	result, err := getExecutor(ctx, r.writer).ExecContext(ctx, query, id)
 	if err != nil {
 		return err
 	}

@@ -15,14 +15,14 @@ func TestCommandRepository(t *testing.T) {
 	database := setupTestDB(t)
 	defer database.Close()
 
-	repo, err := repository.NewCommandRepository(database.DB)
+	repo, err := repository.NewCommandRepository(database.Writer, database.Reader)
 	require.NoError(t, err)
 
 	// Create a device to reference
-	deviceRepo, err := repository.NewDeviceRepository(database.DB)
+	deviceRepo, err := repository.NewDeviceRepository(database.Writer, database.Reader)
 	require.NoError(t, err)
 
-	entRepo, err := repository.NewEnterpriseRepository(database.DB)
+	entRepo, err := repository.NewEnterpriseRepository(database.Writer, database.Reader)
 	require.NoError(t, err)
 
 	enterprise := &models.Enterprise{
@@ -118,36 +118,36 @@ func TestCommandRepository(t *testing.T) {
 
 func TestCommandRepository_Constructor(t *testing.T) {
 	t.Run("nil db returns error", func(t *testing.T) {
-		_, err := repository.NewCommandRepository(nil)
+		_, err := repository.NewCommandRepository(nil, nil)
 		assert.Error(t, err)
 	})
 
 	t.Run("unsupported type returns error", func(t *testing.T) {
-		_, err := repository.NewCommandRepository("not a db")
+		_, err := repository.NewCommandRepository("not a db", "not a db")
 		assert.Error(t, err)
 	})
 }
 
 func TestCertificateRepository_Constructor(t *testing.T) {
 	t.Run("nil db returns error", func(t *testing.T) {
-		_, err := repository.NewCertificateRepository(nil)
+		_, err := repository.NewCertificateRepository(nil, nil)
 		assert.Error(t, err)
 	})
 
 	t.Run("unsupported type returns error", func(t *testing.T) {
-		_, err := repository.NewCertificateRepository("not a db")
+		_, err := repository.NewCertificateRepository("not a db", "not a db")
 		assert.Error(t, err)
 	})
 }
 
 func TestAuditLogRepository_Constructor(t *testing.T) {
 	t.Run("nil db returns error", func(t *testing.T) {
-		_, err := repository.NewAuditLogRepository(nil)
+		_, err := repository.NewAuditLogRepository(nil, nil)
 		assert.Error(t, err)
 	})
 
 	t.Run("unsupported type returns error", func(t *testing.T) {
-		_, err := repository.NewAuditLogRepository("not a db")
+		_, err := repository.NewAuditLogRepository("not a db", "not a db")
 		assert.Error(t, err)
 	})
 }
@@ -156,7 +156,7 @@ func TestCertificateRepository_List(t *testing.T) {
 	database := setupTestDB(t)
 	defer database.Close()
 
-	repo, err := repository.NewCertificateRepository(database.DB)
+	repo, err := repository.NewCertificateRepository(database.Writer, database.Reader)
 	require.NoError(t, err)
 
 	t.Run("empty list returns no error", func(t *testing.T) {
@@ -179,7 +179,7 @@ func TestAuditLogRepository_List(t *testing.T) {
 	database := setupTestDB(t)
 	defer database.Close()
 
-	repo, err := repository.NewAuditLogRepository(database.DB)
+	repo, err := repository.NewAuditLogRepository(database.Writer, database.Reader)
 	require.NoError(t, err)
 
 	t.Run("empty list returns no error", func(t *testing.T) {

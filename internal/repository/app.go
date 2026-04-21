@@ -2,7 +2,6 @@ package repository
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 
 	"github.com/google/uuid"
@@ -19,22 +18,22 @@ type AppRepository interface {
 }
 
 type appRepository struct {
-	db executor
+	writer executor
+	reader executor
 }
 
 // NewAppRepository creates a new app repository instance.
-func NewAppRepository(db interface{}) (AppRepository, error) {
-	if db == nil {
-		return nil, fmt.Errorf("database cannot be nil")
+// writer is used for Create/Update/Delete, reader for Get/List queries.
+func NewAppRepository(writer, reader interface{}) (AppRepository, error) {
+	w, err := resolveExecutor(writer, "writer")
+	if err != nil {
+		return nil, err
 	}
-	switch v := db.(type) {
-	case *sql.DB:
-		return &appRepository{db: v}, nil
-	case executor:
-		return &appRepository{db: v}, nil
-	default:
-		return nil, fmt.Errorf("unsupported database type: %T", db)
+	r, err := resolveExecutor(reader, "reader")
+	if err != nil {
+		return nil, err
 	}
+	return &appRepository{writer: w, reader: r}, nil
 }
 
 func (r *appRepository) Create(ctx context.Context, app *models.App) error {
@@ -47,7 +46,7 @@ func (r *appRepository) Create(ctx context.Context, app *models.App) error {
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 		RETURNING created_at, updated_at`
 
-	exec := getExecutor(ctx, r.db)
+	exec := getExecutor(ctx, r.writer)
 	return exec.QueryRowContext(ctx, query,
 		app.ID, app.EnterpriseID, app.Name, app.Platform,
 		app.Identifier, app.Version, app.InstallType, app.AppConfig,
@@ -59,7 +58,7 @@ func (r *appRepository) GetByID(ctx context.Context, id uuid.UUID) (*models.App,
 		SELECT id, enterprise_id, name, platform, identifier, version, install_type, app_config, created_at, updated_at
 		FROM apps WHERE id = $1 AND deleted_at IS NULL`
 
-	exec := getExecutor(ctx, r.db)
+	exec := getReadExecutor(ctx, r.reader)
 	app := &models.App{}
 	err := exec.QueryRowContext(ctx, query, id).Scan(
 		&app.ID, &app.EnterpriseID, &app.Name, &app.Platform,
@@ -79,7 +78,7 @@ func (r *appRepository) List(ctx context.Context, enterpriseID uuid.UUID, limit,
 	}
 
 	countQuery := `SELECT COUNT(*) FROM apps WHERE enterprise_id = $1 AND deleted_at IS NULL`
-	exec := getExecutor(ctx, r.db)
+	exec := getReadExecutor(ctx, r.reader)
 	var total int
 	if err := exec.QueryRowContext(ctx, countQuery, enterpriseID).Scan(&total); err != nil {
 		return nil, 0, fmt.Errorf("failed to count apps: %w", err)
@@ -116,7 +115,7 @@ func (r *appRepository) Update(ctx context.Context, app *models.App) error {
 		UPDATE apps SET name = $1, version = $2, install_type = $3, app_config = $4
 		WHERE id = $5 AND deleted_at IS NULL`
 
-	exec := getExecutor(ctx, r.db)
+	exec := getExecutor(ctx, r.writer)
 	result, err := exec.ExecContext(ctx, query, app.Name, app.Version, app.InstallType, app.AppConfig, app.ID)
 	if err != nil {
 		return fmt.Errorf("failed to update app: %w", err)
@@ -130,7 +129,7 @@ func (r *appRepository) Update(ctx context.Context, app *models.App) error {
 
 func (r *appRepository) Delete(ctx context.Context, id uuid.UUID) error {
 	query := `UPDATE apps SET deleted_at = NOW() WHERE id = $1 AND deleted_at IS NULL`
-	exec := getExecutor(ctx, r.db)
+	exec := getExecutor(ctx, r.writer)
 	result, err := exec.ExecContext(ctx, query, id)
 	if err != nil {
 		return fmt.Errorf("failed to delete app: %w", err)

@@ -17,7 +17,7 @@ func TestDeviceRepository_List_PaginationValidation(t *testing.T) {
 	db := testutil.SetupTestDB(t)
 	defer db.Close()
 
-	repo, err := NewDeviceRepository(db)
+	repo, err := NewDeviceRepository(db.Writer, db.Writer)
 	require.NoError(t, err)
 	ctx := context.Background()
 
@@ -26,7 +26,7 @@ func TestDeviceRepository_List_PaginationValidation(t *testing.T) {
 		Name: "Test Enterprise",
 		Slug: fmt.Sprintf("test-enterprise-%d", time.Now().UnixNano()),
 	}
-	enterpriseRepo, err := NewEnterpriseRepository(db)
+	enterpriseRepo, err := NewEnterpriseRepository(db.Writer, db.Writer)
 	require.NoError(t, err)
 	err = enterpriseRepo.Create(ctx, enterprise)
 	require.NoError(t, err)
@@ -62,7 +62,7 @@ func TestEnterpriseRepository_List_PaginationValidation(t *testing.T) {
 	db := testutil.SetupTestDB(t)
 	defer db.Close()
 
-	repo, err := NewEnterpriseRepository(db)
+	repo, err := NewEnterpriseRepository(db.Writer, db.Writer)
 	require.NoError(t, err)
 	ctx := context.Background()
 
@@ -90,7 +90,7 @@ func TestPolicyRepository_List_PaginationValidation(t *testing.T) {
 	db := testutil.SetupTestDB(t)
 	defer db.Close()
 
-	repo, err := NewPolicyRepository(db)
+	repo, err := NewPolicyRepository(db.Writer, db.Reader)
 	require.NoError(t, err)
 	ctx := context.Background()
 
@@ -99,7 +99,7 @@ func TestPolicyRepository_List_PaginationValidation(t *testing.T) {
 		Name: "Test Enterprise Policy",
 		Slug: fmt.Sprintf("test-enterprise-policy-%d", time.Now().UnixNano()),
 	}
-	enterpriseRepo, err := NewEnterpriseRepository(db)
+	enterpriseRepo, err := NewEnterpriseRepository(db.Writer, db.Writer)
 	require.NoError(t, err)
 	err = enterpriseRepo.Create(ctx, enterprise)
 	require.NoError(t, err)
@@ -128,7 +128,7 @@ func TestPaginationValidation_DoSPrevention(t *testing.T) {
 	db := testutil.SetupTestDB(t)
 	defer db.Close()
 
-	deviceRepo, err := NewDeviceRepository(db)
+	deviceRepo, err := NewDeviceRepository(db.Writer, db.Writer)
 	require.NoError(t, err)
 	ctx := context.Background()
 
@@ -137,7 +137,7 @@ func TestPaginationValidation_DoSPrevention(t *testing.T) {
 		Name: "Test Enterprise DoS",
 		Slug: fmt.Sprintf("test-enterprise-dos-%d", time.Now().UnixNano()),
 	}
-	enterpriseRepo, err := NewEnterpriseRepository(db)
+	enterpriseRepo, err := NewEnterpriseRepository(db.Writer, db.Writer)
 	require.NoError(t, err)
 	err = enterpriseRepo.Create(ctx, enterprise)
 	require.NoError(t, err)

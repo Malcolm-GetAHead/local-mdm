@@ -12,13 +12,13 @@ import (
 
 func TestDeviceRepository_List_ContextCancellation(t *testing.T) {
 	db := testutil.SetupTestDB(t)
-	repo, err := NewDeviceRepository(db)
+	repo, err := NewDeviceRepository(db.Writer, db.Writer)
 	if err != nil {
 		t.Fatalf("failed to create repository: %v", err)
 	}
 
 	// Create test enterprise
-	enterpriseRepo, err := NewEnterpriseRepository(db)
+	enterpriseRepo, err := NewEnterpriseRepository(db.Writer, db.Writer)
 	if err != nil {
 		t.Fatalf("failed to create enterprise repository: %v", err)
 	}
@@ -97,7 +97,7 @@ func TestDeviceRepository_List_ContextCancellation(t *testing.T) {
 
 func TestEnterpriseRepository_List_ContextCancellation(t *testing.T) {
 	db := testutil.SetupTestDB(t)
-	repo, err := NewEnterpriseRepository(db)
+	repo, err := NewEnterpriseRepository(db.Writer, db.Writer)
 	if err != nil {
 		t.Fatalf("failed to create repository: %v", err)
 	}
@@ -165,13 +165,13 @@ func TestEnterpriseRepository_List_ContextCancellation(t *testing.T) {
 
 func TestPolicyRepository_List_ContextCancellation(t *testing.T) {
 	db := testutil.SetupTestDB(t)
-	repo, err := NewPolicyRepository(db)
+	repo, err := NewPolicyRepository(db.Writer, db.Reader)
 	if err != nil {
 		t.Fatalf("failed to create repository: %v", err)
 	}
 
 	// Create test enterprise
-	enterpriseRepo, err := NewEnterpriseRepository(db)
+	enterpriseRepo, err := NewEnterpriseRepository(db.Writer, db.Writer)
 	if err != nil {
 		t.Fatalf("failed to create enterprise repository: %v", err)
 	}
