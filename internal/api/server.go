@@ -306,6 +306,7 @@ func New(cfg *config.Config, database *db.DB, logger *slog.Logger) (*Server, err
 func (s *Server) setupRoutes() {
 	// Public routes (no auth)
 	s.router.HandleFunc("/health", s.handleHealth).Methods("GET")
+	s.router.HandleFunc("/health/ready", s.handleHealthReady).Methods("GET")
 	s.router.HandleFunc("/version", s.handleVersion).Methods("GET")
 
 	// API v1 routes

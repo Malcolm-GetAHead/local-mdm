@@ -67,6 +67,43 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 	respondJSON(w, r, httpStatus, health)
 }
 
+func (s *Server) handleHealthReady(w http.ResponseWriter, r *http.Request) {
+	timeout := s.config.Server.HealthCheckTimeout
+	if timeout == 0 {
+		timeout = 5 * time.Second
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), timeout)
+	defer cancel()
+
+	type depCheck struct {
+		Status  string `json:"status"`
+		Latency string `json:"latency"`
+	}
+	checks := make(map[string]depCheck)
+	ready := true
+
+	start := time.Now()
+	if err := s.db.Health(ctx); err != nil {
+		checks["database"] = depCheck{Status: "unhealthy", Latency: time.Since(start).String()}
+		ready = false
+	} else {
+		checks["database"] = depCheck{Status: "healthy", Latency: time.Since(start).String()}
+	}
+
+	start = time.Now()
+	if err := s.authMiddleware.HealthCheck(ctx); err != nil {
+		checks["keycloak"] = depCheck{Status: "degraded", Latency: time.Since(start).String()}
+	} else {
+		checks["keycloak"] = depCheck{Status: "healthy", Latency: time.Since(start).String()}
+	}
+
+	status := http.StatusOK
+	if !ready {
+		status = http.StatusServiceUnavailable
+	}
+	respondJSON(w, r, status, map[string]interface{}{"ready": ready, "checks": checks, "timestamp": time.Now()})
+}
+
 // Version handler
 func (s *Server) handleVersion(w http.ResponseWriter, r *http.Request) {
 	respondJSON(w, r, http.StatusOK, map[string]string{

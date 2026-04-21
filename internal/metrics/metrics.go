@@ -31,6 +31,11 @@ type Metrics struct {
 	CommandsQueued       *prometheus.CounterVec
 	CommandsPending      prometheus.Gauge
 
+	// Device inventory (S5-06)
+	DevicesTotal         *prometheus.GaugeVec
+	CertsExpiringSoon    *prometheus.GaugeVec
+	EnrollmentDuration   *prometheus.HistogramVec
+
 	registry *prometheus.Registry
 }
 
@@ -70,6 +75,22 @@ func New(db *sql.DB) *Metrics {
 			Help: "Number of pending commands in the queue.",
 		}),
 
+		DevicesTotal: prometheus.NewGaugeVec(prometheus.GaugeOpts{
+			Name: "devices_total",
+			Help: "Total devices by platform and status.",
+		}, []string{"platform", "status"}),
+
+		CertsExpiringSoon: prometheus.NewGaugeVec(prometheus.GaugeOpts{
+			Name: "certificates_expiring_soon",
+			Help: "Certificates expiring within threshold by days bucket.",
+		}, []string{"days"}),
+
+		EnrollmentDuration: prometheus.NewHistogramVec(prometheus.HistogramOpts{
+			Name:    "enrollment_duration_seconds",
+			Help:    "Enrollment duration in seconds by platform.",
+			Buckets: []float64{1, 5, 10, 15, 20, 30, 60},
+		}, []string{"platform"}),
+
 		registry: reg,
 	}
 
@@ -80,6 +101,9 @@ func New(db *sql.DB) *Metrics {
 		m.EnrollmentsTotal,
 		m.CommandsQueued,
 		m.CommandsPending,
+		m.DevicesTotal,
+		m.CertsExpiringSoon,
+		m.EnrollmentDuration,
 	)
 
 	// DB pool metrics (only if db is provided)
