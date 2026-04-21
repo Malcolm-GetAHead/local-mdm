@@ -1,11 +1,11 @@
-# Sprint 4c: macOS Platform SSO with Keycloak
+# Sprint 6: macOS Platform SSO with Keycloak
 
 **Status**: 🔲 Not Started  
 **Duration**: 1-2 weeks  
 **Goal**: Enable passwordless macOS login via Keycloak using Apple's Platform SSO  
 **Depends on**: Sprint 4 complete (policy system for pushing SSO profiles), Sprint 4b (DB pools), S2-01 (macOS enrollment)
 
-> **Renamed from Sprint 4b → 4c on 2026-04-20.** Sprint 4b is now Read/Write Database Pools.
+> **Renamed from Sprint 4b → 4c → Sprint 6 on 2026-04-21.** Sprint 4b is now Read/Write Database Pools. Moved to Sprint 6 to decouple from Go backend work (requires Apple Developer account, Java + Swift toolchains).
 
 ---
 
@@ -25,38 +25,38 @@ Keeping this separate from Sprint 4's pure Go policy work avoids context-switchi
 
 | ID | Task | Stack | Effort |
 |---|---|---|---|
-| S4c-01 | Keycloak PSSO Extension | Java | 2-3 days |
-| S4c-02 | macOS SSO Extension App | Swift | 2-3 days |
-| S4c-03 | PSSO MDM Profile Generation & Delivery | Go | 1-2 days |
-| S4c-04 | Integration Testing & Documentation | All | 1-2 days |
-| S4c-05 | Keycloak Device Lifecycle Sync | Go | 1-2 days |
+| S6-01 | Keycloak PSSO Extension | Java | 2-3 days |
+| S6-02 | macOS SSO Extension App | Swift | 2-3 days |
+| S6-03 | PSSO MDM Profile Generation & Delivery | Go | 1-2 days |
+| S6-04 | Integration Testing & Documentation | All | 1-2 days |
+| S6-05 | Keycloak Device Lifecycle Sync | Go | 1-2 days |
 
-### S4c-01: Keycloak PSSO Extension
+### S6-01: Keycloak PSSO Extension
 - Implement Keycloak SPI for device-based authentication
 - PSSO token endpoint for macOS SSO Extension
 - Device registration and validation
 - Deploy as JAR to Keycloak providers directory
 
-### S4c-02: macOS SSO Extension App
+### S6-02: macOS SSO Extension App
 - Implement `ASAuthorizationSingleSignOnProvider` protocol
 - Register with Keycloak PSSO endpoint
 - Handle authentication challenges
 - Requires Apple Developer account and enterprise signing
 
-### S4c-03: PSSO MDM Profile Generation & Delivery
+### S6-03: PSSO MDM Profile Generation & Delivery
 - Generate Extensible SSO configuration profile
 - Push via MDM command (InstallProfile) using Sprint 4 policy system
 - Apple App Site Association serving
 
-### S4c-04: Integration Testing
+### S6-04: Integration Testing
 - End-to-end: macOS device enrolls → receives PSSO profile → SSO Extension registers → user authenticates passwordless
 - Unenrollment removes device from Keycloak PSSO
 
-### S4c-05: Keycloak Device Lifecycle Sync (moved from S4-05)
+### S6-05: Keycloak Device Lifecycle Sync (moved from S4-05)
 - Keycloak PSSO admin client (`internal/auth/keycloak_client.go`) — service account with `psso-admin` client
 - Implement `DeviceLifecycleHook` interface (from Sprint 4's S4-05) to call Keycloak `DELETE /device/{serial}` on unenroll/wipe/delete
 - Optional: reconciliation job comparing MDM enrolled devices vs Keycloak registered devices
-- Depends on: S4-05 lifecycle hook infrastructure, S4c-01 Keycloak PSSO extension running
+- Depends on: S4-05 lifecycle hook infrastructure, S6-01 Keycloak PSSO extension running
 
 ## Prerequisites
 - Apple Developer account with enterprise team ID
@@ -71,4 +71,4 @@ Keeping this separate from Sprint 4's pure Go policy work avoids context-switchi
 
 ---
 
-*Moved from Sprint 4 (S4-04) on 2026-04-18 to reduce context-switching. Renamed from Sprint 4b → 4c on 2026-04-20.*
+*Moved from Sprint 4 (S4-04) on 2026-04-18. Renamed 4b → 4c on 2026-04-20. Renamed to Sprint 6 on 2026-04-21.*

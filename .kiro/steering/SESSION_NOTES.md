@@ -129,7 +129,7 @@ database:
 - **Policy deployment**: assignments recorded, devices pick up on next check-in. No immediate push (intentional).
 - **Sprint 2 security review docs** contain false claims. Trust the code, not the review narratives.
 - **Dashboard**: Go templates + HTMX + Tailwind CSS (Sprint 5b). Not React.
-- **macOS Platform SSO**: Sprint 4c (Java + Swift, separate from Go work).
+- **macOS Platform SSO**: Sprint 6 (Java + Swift, separate from Go work).
 
 ## What NOT to Do
 
@@ -164,6 +164,7 @@ database:
 | 3 | ✅ Complete | Commands, profiles, apps, CSPs, PPKG |
 | 4 | ✅ Complete | Policy system, compliance, groups, lifecycle, Redis removal |
 | 4b | ✅ Complete | Writer/Reader DB pools, repo constructor refactor |
-| 4c | 🔲 Not Started | macOS Platform SSO (Java/Swift) |
+| 4c | 🔲 Not Started | macOS Platform SSO (Java/Swift) — renamed to Sprint 6 |
 | 5 | 🔲 Not Started | Backend polish, CLI, observability, performance |
 | 5b | 🔲 Not Started | Web dashboard (HTMX) |
+| 6 | 🔲 Not Started | macOS Platform SSO (Java/Swift) — requires Apple Developer account |

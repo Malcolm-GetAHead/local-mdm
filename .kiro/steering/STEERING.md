@@ -385,7 +385,7 @@ docs/planning/
 │   ├── sprint-3-platform-features/
 │   ├── sprint-4-policy-and-identity/
 │   ├── sprint-4b-db-pools/
-│   ├── sprint-4c-platform-sso/
+│   ├── sprint-6-platform-sso/
 │   ├── sprint-5-ui-and-polish/
 │   └── sprint-5b-web-dashboard/
 └── future/               - Future enhancements (F-01 to F-08)

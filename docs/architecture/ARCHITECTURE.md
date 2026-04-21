@@ -498,6 +498,6 @@ NanoMDM and NanoDEP both support PostgreSQL backends. Their schemas (see [nanomd
 ---
 
 **Next Steps**:
-1. Sprint 4c: macOS Platform SSO (Java/Swift)
+1. Sprint 6: macOS Platform SSO (Java/Swift)
 2. Sprint 5: Backend polish, CLI, observability, performance
 3. Sprint 5b: Web dashboard (Go templates + HTMX + Tailwind CSS)

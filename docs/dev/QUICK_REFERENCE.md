@@ -267,7 +267,7 @@ local-mdm/
 
 ## Current Phase
 
-**Sprint 4b complete** — Read/Write Database Pools. DB struct split into Writer/Reader pools, all repository constructors updated, ReaderConfig with field-level fallback. Ready for Sprint 4c (macOS Platform SSO) or Sprint 5 (Backend Polish).
+**Sprint 4b complete** — Read/Write Database Pools. DB struct split into Writer/Reader pools, all repository constructors updated, ReaderConfig with field-level fallback. Ready for Sprint 6 (macOS Platform SSO) or Sprint 5 (Backend Polish).
 
 See [Sprint Planning](../planning/sprints/) for roadmap.
 
