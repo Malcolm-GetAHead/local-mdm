@@ -42,6 +42,10 @@ Confirm all service methods are transport-agnostic (no `net/http` imports in ser
 - Certificate operations — simple repo calls, no business logic to extract
 - Auth handlers (login/refresh) — Keycloak-specific, not reusable from CLI
 
+## Known Bug to Fix During Migration
+
+**command.GetByID and command.ListByDevice NULL scan failure**: The `error_message` column is nullable TEXT but scanned into `string` (not `*string`). This causes scan failures for pending/sent commands where `error_message` is NULL. Discovered during Sprint 4b repo integration testing — documented in `sprint12_gaps_integration_test.go` with assertions proving the bug. Fix: change `ErrorMessage` field in `models.DeviceCommand` to `*string`, or use a `sql.NullString` intermediate in the scan. This should be fixed when building DeviceService (Task 1) since it wraps the command repo.
+
 ## Acceptance Criteria
 
 - [ ] DeviceService and AppService created in `internal/service/`
