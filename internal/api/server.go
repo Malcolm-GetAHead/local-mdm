@@ -21,6 +21,7 @@ import (
 	"github.com/malcolm-getahead/local-mdm/internal/platform/android"
 	"github.com/malcolm-getahead/local-mdm/internal/platform/macos"
 	"github.com/malcolm-getahead/local-mdm/internal/platform/windows"
+	"github.com/malcolm-getahead/local-mdm/internal/reporting"
 	"github.com/malcolm-getahead/local-mdm/internal/repository"
 	"github.com/malcolm-getahead/local-mdm/internal/scep"
 	"github.com/malcolm-getahead/local-mdm/internal/service"
@@ -66,6 +67,7 @@ type Server struct {
 	appService       *service.AppService
 	userService      *service.UserService
 	tokenService     *service.TokenService
+	reportService    *reporting.Service
 	policyVersionRepo repository.PolicyVersionRepository
 	groupService     *service.GroupService
 	complianceService *service.ComplianceService
@@ -284,6 +286,7 @@ func New(cfg *config.Config, database *db.DB, logger *slog.Logger) (*Server, err
 		return nil, fmt.Errorf("failed to create token repository: %w", err)
 	}
 	s.tokenService = service.NewTokenService(tokenRepo, userRepo, logger)
+	s.reportService = reporting.NewService(database.Writer)
 
 	// Wire API token auth into middleware
 	s.authMiddleware.SetTokenValidator(&tokenAuthAdapter{tokenService: s.tokenService})
@@ -568,6 +571,17 @@ func (s *Server) setupRoutes() {
 	api.Handle("/tokens/{id}", s.authMiddleware.RequireAuth(
 		http.HandlerFunc(s.handleRevokeToken),
 	)).Methods("DELETE")
+
+	// Reports (S5-02)
+	api.Handle("/reports/devices", s.authMiddleware.RequireAuth(
+		http.HandlerFunc(s.handleDeviceReport),
+	)).Methods("GET")
+	api.Handle("/reports/compliance", s.authMiddleware.RequireAuth(
+		http.HandlerFunc(s.handleComplianceReport),
+	)).Methods("GET")
+	api.Handle("/reports/enrollments", s.authMiddleware.RequireAuth(
+		http.HandlerFunc(s.handleEnrollmentReport),
+	)).Methods("GET")
 	
 	// Device commands (Sprint 3)
 	api.Handle("/devices/{id}/commands", s.authMiddleware.RequireAuth(
