@@ -442,6 +442,7 @@ ECS handles this natively with the deployment configuration above:
 
 ## Security Hardening (from SECURITY.md TODOs)
 
+- **Rate limiting**: AWS WAF rate-based rules on the ALB for IP-based throttling at the edge. The in-memory per-instance rate limiters in the Go app remain as defense-in-depth fallback — they're imprecise across multiple instances (effective limit = configured limit × instance count) but still provide protection if WAF is bypassed.
 - **Dependency scanning**: `govulncheck` in CI pipeline
 - **Image scanning**: ECR image scanning on push
 - **Network segmentation**: VPC with private subnets, no public IPs on tasks

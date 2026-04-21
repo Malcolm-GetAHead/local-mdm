@@ -55,7 +55,7 @@ query := "SELECT * FROM devices WHERE id = '" + deviceID + "'"
 
 ### 4. Rate Limiting ✅
 
-In-memory rate limiter (production should use PostgreSQL-backed or external rate limiting):
+In-memory rate limiter (production uses AWS WAF on ALB; in-memory remains as fallback):
 
 ```go
 // Create rate limiter: 100 requests per minute
@@ -151,7 +151,7 @@ Every request gets unique UUID:
 ### Production (TODO)
 - [ ] TLS certificates configured
 - [ ] AWS Secrets Manager integration
-- [ ] PostgreSQL-backed or external rate limiting
+- [ ] AWS WAF rate-based rules on ALB (in-memory rate limiters remain as fallback)
 - [ ] WAF (Web Application Firewall)
 - [ ] DDoS protection (CloudFlare, AWS Shield)
 - [ ] Security scanning (Snyk, Dependabot)
