@@ -7,6 +7,7 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"database/sql"
+	"encoding/json"
 	"encoding/pem"
 	"fmt"
 	"math/big"
@@ -237,12 +238,16 @@ func (s *DEPStorage) UpstageTokenPKI(ctx context.Context, name string) error {
 
 // StoreSyncedDevice stores or updates a device from a DEP sync.
 func (s *DEPStorage) StoreSyncedDevice(ctx context.Context, depName, serialNumber string, deviceData map[string]interface{}) error {
+	dataJSON, err := json.Marshal(deviceData)
+	if err != nil {
+		return fmt.Errorf("failed to marshal device data: %w", err)
+	}
 	query := `
 		INSERT INTO dep_devices (serial_number, dep_name, device_data, synced_at)
 		VALUES ($1, $2, $3, NOW())
 		ON CONFLICT (serial_number, dep_name) DO UPDATE SET
 			device_data = $3, synced_at = NOW()`
-	_, err := s.db.ExecContext(ctx, query, serialNumber, depName, deviceData)
+	_, err = s.db.ExecContext(ctx, query, serialNumber, depName, dataJSON)
 	return err
 }
 
@@ -268,8 +273,14 @@ func (s *DEPStorage) ListDEPDevices(ctx context.Context, depName string, limit, 
 	var devices []DEPDevice
 	for rows.Next() {
 		var d DEPDevice
-		if err := rows.Scan(&d.SerialNumber, &d.DEPName, &d.ProfileUUID, &d.ProfileStatus, &d.DeviceData, &d.SyncedAt, &d.AssignedAt); err != nil {
+		var dataBytes []byte
+		if err := rows.Scan(&d.SerialNumber, &d.DEPName, &d.ProfileUUID, &d.ProfileStatus, &dataBytes, &d.SyncedAt, &d.AssignedAt); err != nil {
 			return nil, 0, err
+		}
+		if len(dataBytes) > 0 {
+			if err := json.Unmarshal(dataBytes, &d.DeviceData); err != nil {
+				return nil, 0, fmt.Errorf("failed to unmarshal device data: %w", err)
+			}
 		}
 		devices = append(devices, d)
 	}
