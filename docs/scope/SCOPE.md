@@ -134,7 +134,7 @@ Local MDM is a unified, multi-platform Mobile Device Management solution designe
 #### Deployment
 - Docker support
 - Docker Compose for development
-- Kubernetes manifests (future)
+- Production deployment tooling — ECS Fargate (future, see F-02)
 - Health check endpoints (liveness and readiness)
 - Prometheus metrics (Sprint 5)
 - Structured JSON logging (Sprint 5)

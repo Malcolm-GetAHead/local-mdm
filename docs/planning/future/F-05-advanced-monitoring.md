@@ -272,10 +272,10 @@ runbook: |
   - API returning 5xx errors at high rate (> 5%)
   
   ## Investigation
-  1. Check application logs: kubectl logs -l app=localmdm --tail=100
+  1. Check application logs: aws logs tail /ecs/localmdm --since 15m
   2. Check database connectivity: curl http://localmdm/health/ready
-  3. Check recent deployments: kubectl rollout history deployment/localmdm
-  4. Check resource usage: kubectl top pods -l app=localmdm
+  3. Check recent deployments: aws ecs describe-services --cluster localmdm-cluster --services localmdm
+  4. Check resource usage: aws ecs describe-tasks (or CloudWatch ECS metrics)
   
   ## Resolution
   - If database issue: Check database status, failover if needed

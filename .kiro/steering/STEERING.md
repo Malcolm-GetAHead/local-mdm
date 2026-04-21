@@ -21,7 +21,7 @@
 ### 3. Design Decisions Respect
 - **Local secrets** in `secrets/` directory (dev only, AWS SSM in production)
 - **CA keys** on filesystem (dev only, AWS Secrets Manager in production)
-- **Docker Compose** for local dev (Kubernetes for production)
+- **Docker Compose** for local dev (ECS Fargate for production, Kubernetes as alternative)
 - **Basic monitoring** sufficient for dev (advanced for production)
 
 ### Credential Storage Strategy

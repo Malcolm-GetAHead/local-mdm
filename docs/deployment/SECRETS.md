@@ -290,7 +290,10 @@ aws secretsmanager update-secret \
 3. **Restart application**:
 ```bash
 # Application will load new secret on startup
-kubectl rollout restart deployment/localmdm
+# ECS Fargate (primary):
+aws ecs update-service --cluster localmdm-cluster --service localmdm --force-new-deployment
+# Kubernetes (alternative):
+# kubectl rollout restart deployment/localmdm
 ```
 
 ### Automated Rotation (Future)
@@ -329,8 +332,8 @@ secrets/production/
 ### AWS Secrets Manager (Production)
 
 1. **Use IAM roles, not access keys**:
-   - ECS task role
-   - EKS service account
+   - ECS task role (primary)
+   - EKS service account (if using Kubernetes)
    - EC2 instance profile
 
 2. **Enable encryption at rest**:

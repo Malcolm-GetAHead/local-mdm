@@ -21,7 +21,7 @@
 
 ### 1. Add `/health/ready` Endpoint (0.25 days)
 
-The existing `/health` endpoint checks dependencies but doesn't distinguish between liveness and readiness. Kubernetes and load balancers need both:
+The existing `/health` endpoint checks dependencies but doesn't distinguish between liveness and readiness. Load balancers (ALB, Kubernetes) and container orchestrators need both:
 
 - `/health` (liveness) — "is the process running?" Always returns 200 unless the server is broken
 - `/health/ready` (readiness) — "can this instance serve traffic?" Checks DB, Keycloak
