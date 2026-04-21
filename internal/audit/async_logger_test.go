@@ -24,13 +24,13 @@ func TestAsyncLogger_LogsEventsAsynchronously(t *testing.T) {
 	// Create test enterprise
 	enterpriseID := uuid.New()
 	slug := "test-ent-" + enterpriseID.String()[:8]
-	_, err := db.DB.ExecContext(ctx, `
+	_, err := db.Writer.ExecContext(ctx, `
 		INSERT INTO enterprises (id, name, slug) 
 		VALUES ($1, 'Test Enterprise', $2)
 	`, enterpriseID, slug)
 	require.NoError(t, err)
 
-	logger := NewAsyncLogger(db.DB, 100, 3, slog.Default())
+	logger := NewAsyncLogger(db.Writer, 100, 3, slog.Default())
 	defer logger.Close()
 
 	// Log 10 events
@@ -50,7 +50,7 @@ func TestAsyncLogger_LogsEventsAsynchronously(t *testing.T) {
 
 	// Verify all events were written
 	var count int
-	err = db.DB.QueryRowContext(ctx, `
+	err = db.Writer.QueryRowContext(ctx, `
 		SELECT COUNT(*) FROM audit_logs 
 		WHERE enterprise_id = $1 AND action = 'test.action'
 	`, enterpriseID).Scan(&count)
@@ -67,7 +67,7 @@ func TestAsyncLogger_HandlesQueueFull(t *testing.T) {
 	// Create test enterprise
 	enterpriseID := uuid.New()
 	slug := "test-ent-" + enterpriseID.String()[:8]
-	_, err := db.DB.ExecContext(ctx, `
+	_, err := db.Writer.ExecContext(ctx, `
 		INSERT INTO enterprises (id, name, slug) 
 		VALUES ($1, 'Test Enterprise', $2)
 	`, enterpriseID, slug)
@@ -80,7 +80,7 @@ func TestAsyncLogger_HandlesQueueFull(t *testing.T) {
 	}))
 
 	// Small buffer to force queue full
-	logger := NewAsyncLogger(db.DB, 5, 3, testLogger)
+	logger := NewAsyncLogger(db.Writer, 5, 3, testLogger)
 	defer logger.Close()
 
 	// Fill queue beyond capacity
@@ -109,13 +109,13 @@ func TestAsyncLogger_MultipleWorkersProcessConcurrently(t *testing.T) {
 	// Create test enterprise
 	enterpriseID := uuid.New()
 	slug := "test-ent-" + enterpriseID.String()[:8]
-	_, err := db.DB.ExecContext(ctx, `
+	_, err := db.Writer.ExecContext(ctx, `
 		INSERT INTO enterprises (id, name, slug) 
 		VALUES ($1, 'Test Enterprise', $2)
 	`, enterpriseID, slug)
 	require.NoError(t, err)
 
-	logger := NewAsyncLogger(db.DB, 1000, 3, slog.Default())
+	logger := NewAsyncLogger(db.Writer, 1000, 3, slog.Default())
 	defer logger.Close()
 
 	// Log 100 events concurrently
@@ -142,7 +142,7 @@ func TestAsyncLogger_MultipleWorkersProcessConcurrently(t *testing.T) {
 
 	// Verify all events were written
 	var count int
-	err = db.DB.QueryRowContext(ctx, `
+	err = db.Writer.QueryRowContext(ctx, `
 		SELECT COUNT(*) FROM audit_logs 
 		WHERE enterprise_id = $1 AND action = 'concurrent.test'
 	`, enterpriseID).Scan(&count)
@@ -159,13 +159,13 @@ func TestAsyncLogger_GracefulShutdownDrainsQueue(t *testing.T) {
 	// Create test enterprise
 	enterpriseID := uuid.New()
 	slug := "test-ent-" + enterpriseID.String()[:8]
-	_, err := db.DB.ExecContext(ctx, `
+	_, err := db.Writer.ExecContext(ctx, `
 		INSERT INTO enterprises (id, name, slug) 
 		VALUES ($1, 'Test Enterprise', $2)
 	`, enterpriseID, slug)
 	require.NoError(t, err)
 
-	logger := NewAsyncLogger(db.DB, 100, 3, slog.Default())
+	logger := NewAsyncLogger(db.Writer, 100, 3, slog.Default())
 
 	// Queue events
 	for i := 0; i < 50; i++ {
@@ -188,7 +188,7 @@ func TestAsyncLogger_GracefulShutdownDrainsQueue(t *testing.T) {
 
 	// Verify all events were written
 	var count int
-	err = db.DB.QueryRowContext(ctx, `
+	err = db.Writer.QueryRowContext(ctx, `
 		SELECT COUNT(*) FROM audit_logs 
 		WHERE enterprise_id = $1 AND action = 'shutdown.test'
 	`, enterpriseID).Scan(&count)
@@ -208,7 +208,7 @@ func TestAsyncLogger_DatabaseFailureDoesNotBlockRequests(t *testing.T) {
 		Level: slog.LevelError,
 	}))
 
-	logger := NewAsyncLogger(db.DB, 100, 3, testLogger)
+	logger := NewAsyncLogger(db.Writer, 100, 3, testLogger)
 	defer logger.Close()
 
 	// Use invalid enterprise ID to trigger database error
@@ -251,7 +251,7 @@ func TestAsyncLogger_WorkerErrorsAreLogged(t *testing.T) {
 		Level: slog.LevelError,
 	}))
 
-	logger := NewAsyncLogger(db.DB, 100, 3, testLogger)
+	logger := NewAsyncLogger(db.Writer, 100, 3, testLogger)
 	defer logger.Close()
 
 	// Log event with invalid data
@@ -282,13 +282,13 @@ func TestAsyncLogger_ConcurrentWritesAreSafe(t *testing.T) {
 	// Create test enterprise
 	enterpriseID := uuid.New()
 	slug := "test-ent-" + enterpriseID.String()[:8]
-	_, err := db.DB.ExecContext(ctx, `
+	_, err := db.Writer.ExecContext(ctx, `
 		INSERT INTO enterprises (id, name, slug) 
 		VALUES ($1, 'Test Enterprise', $2)
 	`, enterpriseID, slug)
 	require.NoError(t, err)
 
-	logger := NewAsyncLogger(db.DB, 1000, 3, slog.Default())
+	logger := NewAsyncLogger(db.Writer, 1000, 3, slog.Default())
 	defer logger.Close()
 
 	// Concurrent writes from multiple goroutines
@@ -321,7 +321,7 @@ func TestAsyncLogger_ConcurrentWritesAreSafe(t *testing.T) {
 
 	// Verify count in database
 	var count int
-	err = db.DB.QueryRowContext(ctx, `
+	err = db.Writer.QueryRowContext(ctx, `
 		SELECT COUNT(*) FROM audit_logs 
 		WHERE enterprise_id = $1 AND action = 'concurrent.write'
 	`, enterpriseID).Scan(&count)
@@ -335,7 +335,7 @@ func TestAsyncLogger_IgnoresEventsAfterClose(t *testing.T) {
 
 	ctx := context.Background()
 
-	logger := NewAsyncLogger(db.DB, 100, 3, slog.Default())
+	logger := NewAsyncLogger(db.Writer, 100, 3, slog.Default())
 
 	// Close immediately
 	err := logger.Close()
@@ -358,13 +358,13 @@ func BenchmarkAsyncLogger_vs_SyncLogger(b *testing.B) {
 	// Create test enterprise
 	enterpriseID := uuid.New()
 	slug := "bench-ent-" + enterpriseID.String()[:8]
-	_, _ = db.DB.ExecContext(ctx, `
+	_, _ = db.Writer.ExecContext(ctx, `
 		INSERT INTO enterprises (id, name, slug) 
 		VALUES ($1, 'Bench Enterprise', $2)
 	`, enterpriseID, slug)
 
 	b.Run("sync_logger", func(b *testing.B) {
-		logger := NewLogger(db.DB)
+		logger := NewLogger(db.Writer)
 		logger.SetLogger(nil) // Disable logging overhead
 
 		b.ResetTimer()
@@ -379,7 +379,7 @@ func BenchmarkAsyncLogger_vs_SyncLogger(b *testing.B) {
 	})
 
 	b.Run("async_logger", func(b *testing.B) {
-		logger := NewAsyncLogger(db.DB, 10000, 3, nil)
+		logger := NewAsyncLogger(db.Writer, 10000, 3, nil)
 		defer logger.Close()
 
 		b.ResetTimer()
@@ -403,12 +403,12 @@ func BenchmarkAsyncLogger_HighThroughput(b *testing.B) {
 	// Create test enterprise
 	enterpriseID := uuid.New()
 	slug := "bench-ent-" + enterpriseID.String()[:8]
-	_, _ = db.DB.ExecContext(ctx, `
+	_, _ = db.Writer.ExecContext(ctx, `
 		INSERT INTO enterprises (id, name, slug) 
 		VALUES ($1, 'Bench Enterprise', $2)
 	`, enterpriseID, slug)
 
-	logger := NewAsyncLogger(db.DB, 10000, 3, nil)
+	logger := NewAsyncLogger(db.Writer, 10000, 3, nil)
 	defer logger.Close()
 
 	b.ResetTimer()

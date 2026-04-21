@@ -24,7 +24,7 @@ func TestStructuredLogging(t *testing.T) {
 	// Create test enterprise with unique slug
 	enterpriseID := uuid.New()
 	slug := "test-ent-" + enterpriseID.String()[:8]
-	_, err := db.DB.ExecContext(ctx, `
+	_, err := db.Writer.ExecContext(ctx, `
 		INSERT INTO enterprises (id, name, slug) 
 		VALUES ($1, 'Test Enterprise', $2)
 	`, enterpriseID, slug)
@@ -32,7 +32,7 @@ func TestStructuredLogging(t *testing.T) {
 
 	// Create test user
 	userID := uuid.New()
-	_, err = db.DB.ExecContext(ctx, `
+	_, err = db.Writer.ExecContext(ctx, `
 		INSERT INTO users (id, enterprise_id, email, password_hash, role) 
 		VALUES ($1, $2, $3, 'hash', 'admin')
 	`, userID, enterpriseID, "test-"+userID.String()[:8]+"@example.com")
@@ -44,7 +44,7 @@ func TestStructuredLogging(t *testing.T) {
 			Level: slog.LevelInfo,
 		}))
 
-		auditLogger := NewLogger(db.DB)
+		auditLogger := NewLogger(db.Writer)
 		auditLogger.SetLogger(logger)
 
 		resourceID := uuid.New()
@@ -95,7 +95,7 @@ func TestStructuredLogging(t *testing.T) {
 			Level: slog.LevelError,
 		}))
 
-		auditLogger := NewLogger(db.DB)
+		auditLogger := NewLogger(db.Writer)
 		auditLogger.SetLogger(logger)
 
 		// Use invalid enterprise ID to trigger error
@@ -132,7 +132,7 @@ func TestStructuredLogging(t *testing.T) {
 	})
 
 	t.Run("works_without_logger_set", func(t *testing.T) {
-		auditLogger := NewLogger(db.DB)
+		auditLogger := NewLogger(db.Writer)
 		// Don't set logger - should use default
 
 		err := auditLogger.Log(ctx, Event{
@@ -146,7 +146,7 @@ func TestStructuredLogging(t *testing.T) {
 	})
 
 	t.Run("handles_nil_logger_gracefully", func(t *testing.T) {
-		auditLogger := NewLogger(db.DB)
+		auditLogger := NewLogger(db.Writer)
 		auditLogger.SetLogger(nil) // Should not panic
 
 		err := auditLogger.Log(ctx, Event{
@@ -165,7 +165,7 @@ func TestStructuredLogging(t *testing.T) {
 			Level: slog.LevelInfo,
 		}))
 
-		auditLogger := NewLogger(db.DB)
+		auditLogger := NewLogger(db.Writer)
 		auditLogger.SetLogger(logger)
 
 		actions := []string{
@@ -203,7 +203,7 @@ func TestStructuredLogging(t *testing.T) {
 			Level: slog.LevelInfo,
 		}))
 
-		auditLogger := NewLogger(db.DB)
+		auditLogger := NewLogger(db.Writer)
 		auditLogger.SetLogger(logger)
 
 		// Log multiple events

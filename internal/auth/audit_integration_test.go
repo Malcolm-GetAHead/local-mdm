@@ -46,7 +46,7 @@ func TestMiddleware_AuditLogging_AuthFailure(t *testing.T) {
 	validator := &OIDCValidator{} // Mock validator
 	logger := slog.Default()
 	middleware := NewMiddleware(validator, logger)
-	auditLogger := audit.NewLogger(database.DB)
+	auditLogger := audit.NewLogger(database.Writer)
 	middleware.SetAuditLogger(auditLogger)
 
 	// Create test handler
@@ -67,7 +67,7 @@ func TestMiddleware_AuditLogging_AuthFailure(t *testing.T) {
 	time.Sleep(100 * time.Millisecond) // Give DB time to write
 
 	var count int
-	err := database.QueryRowContext(context.Background(),
+	err := database.Writer.QueryRowContext(context.Background(),
 		"SELECT COUNT(*) FROM audit_logs WHERE action = $1 AND created_at > NOW() - INTERVAL '5 seconds'",
 		"auth.failure",
 	).Scan(&count)
@@ -75,7 +75,7 @@ func TestMiddleware_AuditLogging_AuthFailure(t *testing.T) {
 	assert.GreaterOrEqual(t, count, 1, "Expected at least one auth.failure audit log")
 
 	// Cleanup
-	_, _ = database.ExecContext(context.Background(),
+	_, _ = database.Writer.ExecContext(context.Background(),
 		"DELETE FROM audit_logs WHERE action = $1 AND created_at > NOW() - INTERVAL '5 seconds'",
 		"auth.failure",
 	)
@@ -89,7 +89,7 @@ func TestMiddleware_AuditLogging_AccessDenied(t *testing.T) {
 	validator := &OIDCValidator{} // Mock validator
 	logger := slog.Default()
 	middleware := NewMiddleware(validator, logger)
-	auditLogger := audit.NewLogger(database.DB)
+	auditLogger := audit.NewLogger(database.Writer)
 	middleware.SetAuditLogger(auditLogger)
 
 	// Create test handler with role requirement
@@ -117,7 +117,7 @@ func TestMiddleware_AuditLogging_AccessDenied(t *testing.T) {
 	time.Sleep(100 * time.Millisecond) // Give DB time to write
 
 	var count int
-	err := database.QueryRowContext(context.Background(),
+	err := database.Writer.QueryRowContext(context.Background(),
 		"SELECT COUNT(*) FROM audit_logs WHERE action = $1 AND created_at > NOW() - INTERVAL '5 seconds'",
 		"auth.access_denied",
 	).Scan(&count)
@@ -125,7 +125,7 @@ func TestMiddleware_AuditLogging_AccessDenied(t *testing.T) {
 	assert.GreaterOrEqual(t, count, 1, "Expected at least one auth.access_denied audit log")
 
 	// Cleanup
-	_, _ = database.ExecContext(context.Background(),
+	_, _ = database.Writer.ExecContext(context.Background(),
 		"DELETE FROM audit_logs WHERE action = $1 AND created_at > NOW() - INTERVAL '5 seconds'",
 		"auth.access_denied",
 	)

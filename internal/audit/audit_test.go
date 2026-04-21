@@ -40,7 +40,7 @@ func TestLogger_Log_Success(t *testing.T) {
 	database := setupTestDB(t)
 	defer database.Close()
 
-	logger := NewLogger(database.DB)
+	logger := NewLogger(database.Writer)
 	ctx := context.Background()
 
 	resourceID := uuid.New()
@@ -62,7 +62,7 @@ func TestLogger_Log_Success(t *testing.T) {
 
 	// Verify the log was written (use resource_id for uniqueness)
 	var count int
-	err = database.QueryRowContext(ctx, "SELECT COUNT(*) FROM audit_logs WHERE resource_id = $1", resourceID).Scan(&count)
+	err = database.Writer.QueryRowContext(ctx, "SELECT COUNT(*) FROM audit_logs WHERE resource_id = $1", resourceID).Scan(&count)
 	require.NoError(t, err)
 	assert.Equal(t, 1, count)
 
@@ -72,7 +72,7 @@ func TestLogger_Log_Success(t *testing.T) {
 		loggedResourceType string
 		loggedIPAddress    string
 	)
-	err = database.QueryRowContext(ctx,
+	err = database.Writer.QueryRowContext(ctx,
 		"SELECT action, resource_type, ip_address FROM audit_logs WHERE action = $1 ORDER BY created_at DESC LIMIT 1",
 		"device.create",
 	).Scan(&loggedAction, &loggedResourceType, &loggedIPAddress)
@@ -82,14 +82,14 @@ func TestLogger_Log_Success(t *testing.T) {
 	assert.Equal(t, "192.168.1.100", loggedIPAddress)
 
 	// Cleanup
-	_, _ = database.ExecContext(ctx, "DELETE FROM audit_logs WHERE action = $1", "device.create")
+	_, _ = database.Writer.ExecContext(ctx, "DELETE FROM audit_logs WHERE action = $1", "device.create")
 }
 
 func TestLogger_Log_MinimalEvent(t *testing.T) {
 	database := setupTestDB(t)
 	defer database.Close()
 
-	logger := NewLogger(database.DB)
+	logger := NewLogger(database.Writer)
 	ctx := context.Background()
 
 	event := Event{
@@ -108,7 +108,7 @@ func TestLogger_Log_MinimalEvent(t *testing.T) {
 		ipAddress    *string
 		userAgent    *string
 	)
-	err = database.QueryRowContext(ctx,
+	err = database.Writer.QueryRowContext(ctx,
 		"SELECT enterprise_id, user_id, resource_id, ip_address, user_agent FROM audit_logs WHERE action = $1 ORDER BY created_at DESC LIMIT 1",
 		"auth.login",
 	).Scan(&enterpriseID, &userID, &resourceID, &ipAddress, &userAgent)
@@ -120,14 +120,14 @@ func TestLogger_Log_MinimalEvent(t *testing.T) {
 	assert.Nil(t, userAgent)
 
 	// Cleanup
-	_, _ = database.ExecContext(ctx, "DELETE FROM audit_logs WHERE action = $1", "auth.login")
+	_, _ = database.Writer.ExecContext(ctx, "DELETE FROM audit_logs WHERE action = $1", "auth.login")
 }
 
 func TestLogger_Log_InvalidAction(t *testing.T) {
 	database := setupTestDB(t)
 	defer database.Close()
 
-	logger := NewLogger(database.DB)
+	logger := NewLogger(database.Writer)
 	ctx := context.Background()
 
 	tests := []struct {
@@ -182,7 +182,7 @@ func TestLogger_Log_WithNilUUIDs(t *testing.T) {
 	database := setupTestDB(t)
 	defer database.Close()
 
-	logger := NewLogger(database.DB)
+	logger := NewLogger(database.Writer)
 	ctx := context.Background()
 
 	event := Event{
@@ -197,14 +197,14 @@ func TestLogger_Log_WithNilUUIDs(t *testing.T) {
 	require.NoError(t, err)
 
 	// Cleanup
-	_, _ = database.ExecContext(ctx, "DELETE FROM audit_logs WHERE action = $1", "system.startup")
+	_, _ = database.Writer.ExecContext(ctx, "DELETE FROM audit_logs WHERE action = $1", "system.startup")
 }
 
 func TestLogger_Log_WithIPv6(t *testing.T) {
 	database := setupTestDB(t)
 	defer database.Close()
 
-	logger := NewLogger(database.DB)
+	logger := NewLogger(database.Writer)
 	ctx := context.Background()
 
 	event := Event{
@@ -218,7 +218,7 @@ func TestLogger_Log_WithIPv6(t *testing.T) {
 
 	// Verify IPv6 was stored
 	var ipAddress string
-	err = database.QueryRowContext(ctx,
+	err = database.Writer.QueryRowContext(ctx,
 		"SELECT ip_address FROM audit_logs WHERE action = $1 ORDER BY created_at DESC LIMIT 1",
 		"device.update",
 	).Scan(&ipAddress)
@@ -226,14 +226,14 @@ func TestLogger_Log_WithIPv6(t *testing.T) {
 	assert.Contains(t, ipAddress, "2001:db8:85a3")
 
 	// Cleanup
-	_, _ = database.ExecContext(ctx, "DELETE FROM audit_logs WHERE action = $1", "device.update")
+	_, _ = database.Writer.ExecContext(ctx, "DELETE FROM audit_logs WHERE action = $1", "device.update")
 }
 
 func TestLogger_Log_WithComplexDetails(t *testing.T) {
 	database := setupTestDB(t)
 	defer database.Close()
 
-	logger := NewLogger(database.DB)
+	logger := NewLogger(database.Writer)
 	ctx := context.Background()
 
 	event := Event{
@@ -257,7 +257,7 @@ func TestLogger_Log_WithComplexDetails(t *testing.T) {
 
 	// Verify details were stored as JSONB
 	var details string
-	err = database.QueryRowContext(ctx,
+	err = database.Writer.QueryRowContext(ctx,
 		"SELECT details::text FROM audit_logs WHERE action = $1 ORDER BY created_at DESC LIMIT 1",
 		"policy.update",
 	).Scan(&details)
@@ -267,14 +267,14 @@ func TestLogger_Log_WithComplexDetails(t *testing.T) {
 	assert.Contains(t, details, "changed_by")
 
 	// Cleanup
-	_, _ = database.ExecContext(ctx, "DELETE FROM audit_logs WHERE action = $1", "policy.update")
+	_, _ = database.Writer.ExecContext(ctx, "DELETE FROM audit_logs WHERE action = $1", "policy.update")
 }
 
 func TestLogger_Log_ConcurrentWrites(t *testing.T) {
 	database := setupTestDB(t)
 	defer database.Close()
 
-	logger := NewLogger(database.DB)
+	logger := NewLogger(database.Writer)
 	ctx := context.Background()
 
 	// Write 10 events concurrently
@@ -300,19 +300,19 @@ func TestLogger_Log_ConcurrentWrites(t *testing.T) {
 
 	// Verify all 10 were written
 	var count int
-	err := database.QueryRowContext(ctx, "SELECT COUNT(*) FROM audit_logs WHERE action = $1", "sync.concurrent.test").Scan(&count)
+	err := database.Writer.QueryRowContext(ctx, "SELECT COUNT(*) FROM audit_logs WHERE action = $1", "sync.concurrent.test").Scan(&count)
 	require.NoError(t, err)
 	assert.Equal(t, 10, count)
 
 	// Cleanup
-	_, _ = database.ExecContext(ctx, "DELETE FROM audit_logs WHERE action = $1", "sync.concurrent.test")
+	_, _ = database.Writer.ExecContext(ctx, "DELETE FROM audit_logs WHERE action = $1", "sync.concurrent.test")
 }
 
 func TestLogger_Log_ContextCancellation(t *testing.T) {
 	database := setupTestDB(t)
 	defer database.Close()
 
-	logger := NewLogger(database.DB)
+	logger := NewLogger(database.Writer)
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel() // Cancel immediately
 
@@ -330,7 +330,7 @@ func TestLogger_Log_EmptyDetails(t *testing.T) {
 	database := setupTestDB(t)
 	defer database.Close()
 
-	logger := NewLogger(database.DB)
+	logger := NewLogger(database.Writer)
 	ctx := context.Background()
 
 	event := Event{
@@ -344,7 +344,7 @@ func TestLogger_Log_EmptyDetails(t *testing.T) {
 
 	// Verify empty details stored as {}
 	var details string
-	err = database.QueryRowContext(ctx,
+	err = database.Writer.QueryRowContext(ctx,
 		"SELECT details::text FROM audit_logs WHERE action = $1 ORDER BY created_at DESC LIMIT 1",
 		"empty.details",
 	).Scan(&details)
@@ -352,14 +352,14 @@ func TestLogger_Log_EmptyDetails(t *testing.T) {
 	assert.Equal(t, "{}", details)
 
 	// Cleanup
-	_, _ = database.ExecContext(ctx, "DELETE FROM audit_logs WHERE action = $1", "empty.details")
+	_, _ = database.Writer.ExecContext(ctx, "DELETE FROM audit_logs WHERE action = $1", "empty.details")
 }
 
 func TestLogger_Log_NilDetails(t *testing.T) {
 	database := setupTestDB(t)
 	defer database.Close()
 
-	logger := NewLogger(database.DB)
+	logger := NewLogger(database.Writer)
 	ctx := context.Background()
 
 	event := Event{
@@ -372,7 +372,7 @@ func TestLogger_Log_NilDetails(t *testing.T) {
 	require.NoError(t, err)
 
 	// Cleanup
-	_, _ = database.ExecContext(ctx, "DELETE FROM audit_logs WHERE action = $1", "nil.details")
+	_, _ = database.Writer.ExecContext(ctx, "DELETE FROM audit_logs WHERE action = $1", "nil.details")
 }
 
 func TestValidateEvent(t *testing.T) {
