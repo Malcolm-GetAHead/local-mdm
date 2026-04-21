@@ -1,0 +1,2470 @@
+openapi: "3.0.3"
+info:
+  title: Local MDM API
+  description: Unified multi-platform Mobile Device Management API supporting Windows, macOS, and Android.
+  version: "1.0.0"
+  license:
+    name: MIT
+
+servers:
+  - url: http://localhost:8080
+    description: Local development
+
+security:
+  - bearerAuth: []
+
+tags:
+  - name: Health
+    description: Health and version checks (public)
+  - name: Auth
+    description: Authentication (rate-limited, no auth required)
+  - name: Enterprises
+    description: Enterprise/tenant management
+  - name: Devices
+    description: Device management and actions
+  - name: Policies
+    description: Policy CRUD, versioning, templates, assignments
+  - name: Groups
+    description: Static device groups
+  - name: Compliance
+    description: Compliance evaluation and reporting
+  - name: Certificates
+    description: Certificate management
+  - name: Commands
+    description: Device commands
+  - name: Profiles
+    description: Device configuration profiles
+  - name: Apps
+    description: Application catalog and deployment
+  - name: Users
+    description: Admin user management
+  - name: Tokens
+    description: API token management
+  - name: Reports
+    description: Reporting endpoints
+  - name: AuditLogs
+    description: Audit log access
+  - name: macOS
+    description: macOS enrollment, DEP, checkin, MDM
+  - name: Windows
+    description: Windows enrollment, management, PPKG
+  - name: Android
+    description: Android enrollment and webhooks
+  - name: SCEP
+    description: SCEP certificate enrollment
+
+paths:
+  # ── Public ──────────────────────────────────────────────
+  /health:
+    get:
+      tags: [Health]
+      summary: Liveness check
+      security: []
+      operationId: getHealth
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+
+  /health/ready:
+    get:
+      tags: [Health]
+      summary: Readiness check (includes DB connectivity)
+      security: []
+      operationId: getHealthReady
+      responses:
+        "200":
+          description: Ready
+        "503":
+          description: Not ready
+
+  /version:
+    get:
+      tags: [Health]
+      summary: Server version
+      security: []
+      operationId: getVersion
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VersionResponse"
+
+  # ── Auth ────────────────────────────────────────────────
+  /api/v1/auth/login:
+    post:
+      tags: [Auth]
+      summary: Login via OIDC credentials
+      security: []
+      operationId: login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+      responses:
+        "200":
+          description: JWT tokens returned
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TokenPairResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+
+  /api/v1/auth/refresh:
+    post:
+      tags: [Auth]
+      summary: Refresh access token
+      security: []
+      operationId: refreshToken
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RefreshRequest"
+      responses:
+        "200":
+          description: New token pair
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TokenPairResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+
+  # ── Enterprises ─────────────────────────────────────────
+  /api/v1/enterprises:
+    get:
+      tags: [Enterprises]
+      summary: List enterprises
+      operationId: listEnterprises
+      parameters:
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Offset"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnterpriseListResponse"
+    post:
+      tags: [Enterprises]
+      summary: Create enterprise (super_admin only)
+      operationId: createEnterprise
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EnterpriseInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnterpriseResponse"
+        "409":
+          $ref: "#/components/responses/Conflict"
+
+  /api/v1/enterprises/{id}:
+    parameters:
+      - $ref: "#/components/parameters/ResourceID"
+    get:
+      tags: [Enterprises]
+      summary: Get enterprise
+      operationId: getEnterprise
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnterpriseResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    put:
+      tags: [Enterprises]
+      summary: Update enterprise
+      operationId: updateEnterprise
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EnterpriseInput"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnterpriseResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    delete:
+      tags: [Enterprises]
+      summary: Delete enterprise (super_admin only)
+      operationId: deleteEnterprise
+      responses:
+        "204":
+          description: Deleted
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  # ── Devices ─────────────────────────────────────────────
+  /api/v1/devices:
+    get:
+      tags: [Devices]
+      summary: List devices
+      operationId: listDevices
+      parameters:
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Offset"
+        - name: enterprise_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: platform
+          in: query
+          schema:
+            type: string
+            enum: [windows, macos, android]
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [pending, enrolled, unenrolled, wiped, lost]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeviceListResponse"
+
+  /api/v1/devices/{id}:
+    parameters:
+      - $ref: "#/components/parameters/ResourceID"
+    get:
+      tags: [Devices]
+      summary: Get device
+      operationId: getDevice
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeviceResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    put:
+      tags: [Devices]
+      summary: Update device
+      operationId: updateDevice
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DeviceInput"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeviceResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    delete:
+      tags: [Devices]
+      summary: Delete device (admin only)
+      operationId: deleteDevice
+      responses:
+        "204":
+          description: Deleted
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/v1/devices/{id}/lock:
+    parameters:
+      - $ref: "#/components/parameters/ResourceID"
+    post:
+      tags: [Devices]
+      summary: Lock device
+      operationId: lockDevice
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                message:
+                  type: string
+                pin:
+                  type: string
+      responses:
+        "200":
+          description: Lock command queued
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CommandResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/v1/devices/{id}/wipe:
+    parameters:
+      - $ref: "#/components/parameters/ResourceID"
+    post:
+      tags: [Devices]
+      summary: Wipe device (admin only, IP-restricted)
+      operationId: wipeDevice
+      responses:
+        "200":
+          description: Wipe command queued
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CommandResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/v1/devices/{id}/restart:
+    parameters:
+      - $ref: "#/components/parameters/ResourceID"
+    post:
+      tags: [Devices]
+      summary: Restart device
+      operationId: restartDevice
+      responses:
+        "200":
+          description: Restart command queued
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CommandResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  # ── Policies ────────────────────────────────────────────
+  /api/v1/policies:
+    get:
+      tags: [Policies]
+      summary: List policies
+      operationId: listPolicies
+      parameters:
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Offset"
+        - name: enterprise_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: platform
+          in: query
+          schema:
+            type: string
+            enum: [windows, macos, android, all]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PolicyListResponse"
+    post:
+      tags: [Policies]
+      summary: Create policy
+      operationId: createPolicy
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PolicyInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PolicyResponse"
+
+  /api/v1/policies/{id}:
+    parameters:
+      - $ref: "#/components/parameters/ResourceID"
+    get:
+      tags: [Policies]
+      summary: Get policy
+      operationId: getPolicy
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PolicyResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    put:
+      tags: [Policies]
+      summary: Update policy (creates new version)
+      operationId: updatePolicy
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PolicyInput"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PolicyResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    delete:
+      tags: [Policies]
+      summary: Delete policy (admin only)
+      operationId: deletePolicy
+      responses:
+        "204":
+          description: Deleted
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/v1/policies/{id}/assign:
+    parameters:
+      - $ref: "#/components/parameters/ResourceID"
+    post:
+      tags: [Policies]
+      summary: Assign policy to device (legacy)
+      operationId: assignPolicy
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [device_id]
+              properties:
+                device_id:
+                  type: string
+                  format: uuid
+      responses:
+        "200":
+          description: Assigned
+
+  /api/v1/policies/{id}/assign/{device_id}:
+    parameters:
+      - $ref: "#/components/parameters/ResourceID"
+      - name: device_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    delete:
+      tags: [Policies]
+      summary: Unassign policy from device (legacy)
+      operationId: unassignPolicy
+      responses:
+        "204":
+          description: Unassigned
+
+  /api/v1/policies/{id}/versions:
+    parameters:
+      - $ref: "#/components/parameters/ResourceID"
+    get:
+      tags: [Policies]
+      summary: List policy versions
+      operationId: listPolicyVersions
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PolicyVersionListResponse"
+
+  /api/v1/policies/{id}/rollback:
+    parameters:
+      - $ref: "#/components/parameters/ResourceID"
+    post:
+      tags: [Policies]
+      summary: Rollback policy to a previous version
+      operationId: rollbackPolicy
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [version]
+              properties:
+                version:
+                  type: integer
+      responses:
+        "200":
+          description: Rolled back
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PolicyResponse"
+
+  /api/v1/policies/{id}/translate:
+    parameters:
+      - $ref: "#/components/parameters/ResourceID"
+    get:
+      tags: [Policies]
+      summary: Translate policy to platform-native format
+      operationId: translatePolicy
+      parameters:
+        - name: platform
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [windows, macos, android]
+      responses:
+        "200":
+          description: Platform-native payload
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+
+  /api/v1/policy-templates:
+    get:
+      tags: [Policies]
+      summary: List policy templates
+      operationId: listPolicyTemplates
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PolicyListResponse"
+
+  /api/v1/policy-templates/{id}/clone:
+    parameters:
+      - $ref: "#/components/parameters/ResourceID"
+    post:
+      tags: [Policies]
+      summary: Clone a policy template into a new policy
+      operationId: clonePolicyTemplate
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, enterprise_id]
+              properties:
+                name:
+                  type: string
+                enterprise_id:
+                  type: string
+                  format: uuid
+      responses:
+        "201":
+          description: Cloned
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PolicyResponse"
+
+  /api/v1/policies/{id}/assignments:
+    parameters:
+      - $ref: "#/components/parameters/ResourceID"
+    get:
+      tags: [Policies]
+      summary: List assignments for a policy
+      operationId: listPolicyAssignments
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PolicyAssignmentListResponse"
+    post:
+      tags: [Policies]
+      summary: Assign policy to target (device, group, or enterprise)
+      operationId: assignPolicyToTarget
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PolicyAssignmentInput"
+      responses:
+        "201":
+          description: Assigned
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PolicyAssignmentResponse"
+
+  /api/v1/policy-assignments/{assignment_id}:
+    parameters:
+      - name: assignment_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    delete:
+      tags: [Policies]
+      summary: Remove a policy assignment
+      operationId: unassignPolicyFromTarget
+      responses:
+        "204":
+          description: Removed
+
+  /api/v1/devices/{id}/effective-policies:
+    parameters:
+      - $ref: "#/components/parameters/ResourceID"
+    get:
+      tags: [Policies]
+      summary: Get effective policies for a device (merged from device, group, enterprise)
+      operationId: getDeviceEffectivePolicies
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PolicyListResponse"
+
+  # ── Groups ──────────────────────────────────────────────
+  /api/v1/groups:
+    get:
+      tags: [Groups]
+      summary: List groups
+      operationId: listGroups
+      parameters:
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Offset"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GroupListResponse"
+    post:
+      tags: [Groups]
+      summary: Create group
+      operationId: createGroup
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GroupInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GroupResponse"
+
+  /api/v1/groups/{id}:
+    parameters:
+      - $ref: "#/components/parameters/ResourceID"
+    get:
+      tags: [Groups]
+      summary: Get group
+      operationId: getGroup
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GroupResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    put:
+      tags: [Groups]
+      summary: Update group
+      operationId: updateGroup
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GroupInput"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GroupResponse"
+    delete:
+      tags: [Groups]
+      summary: Delete group (admin only)
+      operationId: deleteGroup
+      responses:
+        "204":
+          description: Deleted
+
+  /api/v1/groups/{id}/members:
+    parameters:
+      - $ref: "#/components/parameters/ResourceID"
+    get:
+      tags: [Groups]
+      summary: List group members
+      operationId: listGroupMembers
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeviceListResponse"
+    post:
+      tags: [Groups]
+      summary: Add device to group
+      operationId: addGroupMember
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [device_id]
+              properties:
+                device_id:
+                  type: string
+                  format: uuid
+      responses:
+        "201":
+          description: Added
+
+  /api/v1/groups/{id}/members/{device_id}:
+    parameters:
+      - $ref: "#/components/parameters/ResourceID"
+      - name: device_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    delete:
+      tags: [Groups]
+      summary: Remove device from group
+      operationId: removeGroupMember
+      responses:
+        "204":
+          description: Removed
+
+  # ── Compliance ──────────────────────────────────────────
+  /api/v1/compliance:
+    get:
+      tags: [Compliance]
+      summary: Enterprise compliance summary
+      operationId: getComplianceSummary
+      parameters:
+        - name: enterprise_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ComplianceSummaryResponse"
+
+  /api/v1/devices/{id}/compliance:
+    parameters:
+      - $ref: "#/components/parameters/ResourceID"
+    get:
+      tags: [Compliance]
+      summary: Get device compliance results
+      operationId: getDeviceCompliance
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ComplianceResultListResponse"
+
+  /api/v1/devices/{id}/compliance/evaluate:
+    parameters:
+      - $ref: "#/components/parameters/ResourceID"
+    post:
+      tags: [Compliance]
+      summary: Trigger compliance evaluation for device
+      operationId: evaluateDeviceCompliance
+      responses:
+        "200":
+          description: Evaluation results
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ComplianceResultListResponse"
+
+  # ── Certificates ────────────────────────────────────────
+  /api/v1/certificates:
+    get:
+      tags: [Certificates]
+      summary: List certificates
+      operationId: listCertificates
+      parameters:
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Offset"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CertificateListResponse"
+
+  # ── Commands ────────────────────────────────────────────
+  /api/v1/devices/{id}/commands:
+    parameters:
+      - $ref: "#/components/parameters/ResourceID"
+    get:
+      tags: [Commands]
+      summary: List commands for device
+      operationId: listDeviceCommands
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CommandListResponse"
+    post:
+      tags: [Commands]
+      summary: Send command to device
+      operationId: sendDeviceCommand
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CommandInput"
+      responses:
+        "201":
+          description: Command queued
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CommandResponse"
+
+  # ── Profiles ────────────────────────────────────────────
+  /api/v1/devices/{id}/profiles:
+    parameters:
+      - $ref: "#/components/parameters/ResourceID"
+    post:
+      tags: [Profiles]
+      summary: Install profile on device
+      operationId: installProfile
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [profile_data]
+              properties:
+                profile_data:
+                  type: object
+      responses:
+        "201":
+          description: Profile install queued
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CommandResponse"
+
+  /api/v1/devices/{id}/profiles/{profile_id}:
+    parameters:
+      - $ref: "#/components/parameters/ResourceID"
+      - name: profile_id
+        in: path
+        required: true
+        schema:
+          type: string
+    delete:
+      tags: [Profiles]
+      summary: Remove profile from device
+      operationId: removeProfile
+      responses:
+        "200":
+          description: Profile removal queued
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CommandResponse"
+
+  # ── Apps ────────────────────────────────────────────────
+  /api/v1/apps:
+    get:
+      tags: [Apps]
+      summary: List apps
+      operationId: listApps
+      parameters:
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Offset"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AppListResponse"
+    post:
+      tags: [Apps]
+      summary: Create app
+      operationId: createApp
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AppInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AppResponse"
+
+  /api/v1/apps/{id}:
+    parameters:
+      - $ref: "#/components/parameters/ResourceID"
+    get:
+      tags: [Apps]
+      summary: Get app
+      operationId: getApp
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AppResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    put:
+      tags: [Apps]
+      summary: Update app
+      operationId: updateApp
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AppInput"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AppResponse"
+    delete:
+      tags: [Apps]
+      summary: Delete app (admin only)
+      operationId: deleteApp
+      responses:
+        "204":
+          description: Deleted
+
+  /api/v1/apps/{id}/deploy:
+    parameters:
+      - $ref: "#/components/parameters/ResourceID"
+    post:
+      tags: [Apps]
+      summary: Deploy app to devices
+      operationId: deployApp
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [device_ids]
+              properties:
+                device_ids:
+                  type: array
+                  items:
+                    type: string
+                    format: uuid
+      responses:
+        "200":
+          description: Deployment initiated
+
+  # ── Users ───────────────────────────────────────────────
+  /api/v1/users:
+    get:
+      tags: [Users]
+      summary: List users (admin/super_admin)
+      operationId: listUsers
+      parameters:
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Offset"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserListResponse"
+    post:
+      tags: [Users]
+      summary: Create user
+      operationId: createUser
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UserInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserResponse"
+
+  /api/v1/users/{id}:
+    parameters:
+      - $ref: "#/components/parameters/ResourceID"
+    get:
+      tags: [Users]
+      summary: Get user
+      operationId: getUser
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    put:
+      tags: [Users]
+      summary: Update user
+      operationId: updateUser
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UserInput"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserResponse"
+    delete:
+      tags: [Users]
+      summary: Deactivate user
+      operationId: deactivateUser
+      responses:
+        "204":
+          description: Deactivated
+
+  # ── Tokens ──────────────────────────────────────────────
+  /api/v1/tokens:
+    get:
+      tags: [Tokens]
+      summary: List API tokens for current user
+      operationId: listTokens
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TokenListResponse"
+    post:
+      tags: [Tokens]
+      summary: Create API token (plaintext returned once)
+      operationId: createToken
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TokenInput"
+      responses:
+        "201":
+          description: Created — plaintext token in response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TokenCreateResponse"
+
+  /api/v1/tokens/{id}:
+    parameters:
+      - $ref: "#/components/parameters/ResourceID"
+    delete:
+      tags: [Tokens]
+      summary: Revoke API token
+      operationId: revokeToken
+      responses:
+        "204":
+          description: Revoked
+
+  # ── Reports ─────────────────────────────────────────────
+  /api/v1/reports/devices:
+    get:
+      tags: [Reports]
+      summary: Device report
+      operationId: getDeviceReport
+      parameters:
+        - name: enterprise_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+
+  /api/v1/reports/compliance:
+    get:
+      tags: [Reports]
+      summary: Compliance report
+      operationId: getComplianceReport
+      parameters:
+        - name: enterprise_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+
+  /api/v1/reports/enrollments:
+    get:
+      tags: [Reports]
+      summary: Enrollment report
+      operationId: getEnrollmentReport
+      parameters:
+        - name: enterprise_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+
+  # ── Audit Logs ──────────────────────────────────────────
+  /api/v1/audit-logs:
+    get:
+      tags: [AuditLogs]
+      summary: List audit logs (admin/super_admin)
+      operationId: listAuditLogs
+      parameters:
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Offset"
+        - name: action
+          in: query
+          schema:
+            type: string
+        - name: resource_type
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuditLogListResponse"
+
+  # ── macOS Platform ──────────────────────────────────────
+  /api/v1/macos/enroll/{enterprise_id}:
+    parameters:
+      - name: enterprise_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    get:
+      tags: [macOS]
+      summary: Get macOS enrollment profile (.mobileconfig)
+      security: []
+      operationId: getMacOSEnrollmentProfile
+      responses:
+        "200":
+          description: Enrollment profile
+          content:
+            application/x-apple-aspen-config:
+              schema:
+                type: string
+                format: binary
+
+  /api/v1/dep/{name}/tokenpki:
+    parameters:
+      - name: name
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      tags: [macOS]
+      summary: Get DEP token PKI certificate
+      operationId: getDEPTokenPKI
+      responses:
+        "200":
+          description: PKI certificate
+    put:
+      tags: [macOS]
+      summary: Upload DEP token
+      operationId: uploadDEPToken
+      requestBody:
+        required: true
+        content:
+          application/octet-stream:
+            schema:
+              type: string
+              format: binary
+      responses:
+        "200":
+          description: Token uploaded
+
+  /api/v1/dep/{name}/assigner:
+    parameters:
+      - name: name
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      tags: [macOS]
+      summary: Get DEP assigner profile
+      operationId: getDEPAssignerProfile
+      responses:
+        "200":
+          description: Assigner profile
+    put:
+      tags: [macOS]
+      summary: Set DEP assigner profile
+      operationId: setDEPAssignerProfile
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        "200":
+          description: Profile set
+
+  /api/v1/dep/{name}/devices:
+    parameters:
+      - name: name
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      tags: [macOS]
+      summary: List DEP devices
+      operationId: listDEPDevices
+      responses:
+        "200":
+          description: OK
+
+  /checkin:
+    put:
+      tags: [macOS]
+      summary: NanoMDM device check-in
+      security: []
+      operationId: macosCheckin
+      requestBody:
+        required: true
+        content:
+          application/x-apple-aspen-mdm-checkin:
+            schema:
+              type: string
+              format: binary
+      responses:
+        "200":
+          description: OK
+
+  /mdm:
+    put:
+      tags: [macOS]
+      summary: NanoMDM command response / idle poll
+      security: []
+      operationId: macosMDMCommand
+      requestBody:
+        required: true
+        content:
+          application/x-apple-aspen-mdm:
+            schema:
+              type: string
+              format: binary
+      responses:
+        "200":
+          description: Next command or empty
+
+  # ── Windows Platform ────────────────────────────────────
+  /EnrollmentServer/Discovery.svc:
+    get:
+      tags: [Windows]
+      summary: Windows MDM discovery (GET)
+      security: []
+      operationId: windowsDiscoveryGet
+      responses:
+        "200":
+          description: Discovery response
+    post:
+      tags: [Windows]
+      summary: Windows MDM discovery (POST)
+      security: []
+      operationId: windowsDiscoveryPost
+      requestBody:
+        content:
+          application/soap+xml:
+            schema:
+              type: string
+      responses:
+        "200":
+          description: Discovery response
+          content:
+            application/soap+xml:
+              schema:
+                type: string
+
+  /EnrollmentServer/Policy.svc:
+    post:
+      tags: [Windows]
+      summary: Windows MDM policy service (MS-XCEP)
+      security: []
+      operationId: windowsPolicy
+      requestBody:
+        content:
+          application/soap+xml:
+            schema:
+              type: string
+      responses:
+        "200":
+          description: Policy response
+          content:
+            application/soap+xml:
+              schema:
+                type: string
+
+  /EnrollmentServer/Enrollment.svc:
+    post:
+      tags: [Windows]
+      summary: Windows MDM enrollment (MS-WSTEP)
+      security: []
+      operationId: windowsEnrollment
+      requestBody:
+        content:
+          application/soap+xml:
+            schema:
+              type: string
+      responses:
+        "200":
+          description: Enrollment response
+          content:
+            application/soap+xml:
+              schema:
+                type: string
+
+  /ManagementServer/MDM.svc:
+    post:
+      tags: [Windows]
+      summary: Windows OMA-DM management sync
+      security: []
+      operationId: windowsManagementSync
+      requestBody:
+        content:
+          application/vnd.syncml.dm+xml:
+            schema:
+              type: string
+      responses:
+        "200":
+          description: SyncML response
+          content:
+            application/vnd.syncml.dm+xml:
+              schema:
+                type: string
+
+  /api/v1/windows/ppkg:
+    post:
+      tags: [Windows]
+      summary: Generate Windows provisioning package
+      operationId: generatePPKG
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                template:
+                  type: string
+                settings:
+                  type: object
+      responses:
+        "200":
+          description: PPKG file
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+
+  /api/v1/windows/ppkg/templates:
+    get:
+      tags: [Windows]
+      summary: List PPKG templates
+      operationId: listPPKGTemplates
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                        name:
+                          type: string
+                        description:
+                          type: string
+
+  # ── Android Platform ────────────────────────────────────
+  /api/v1/android/enrollment-token/{enterprise_id}:
+    parameters:
+      - name: enterprise_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    post:
+      tags: [Android]
+      summary: Create Android enrollment token
+      operationId: createAndroidEnrollmentToken
+      responses:
+        "201":
+          description: Enrollment token created
+
+  /api/v1/android/enrollment-token/{token_id}/qr:
+    parameters:
+      - name: token_id
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      tags: [Android]
+      summary: Get QR code for Android enrollment
+      security: []
+      operationId: getAndroidEnrollmentQR
+      responses:
+        "200":
+          description: QR code image
+          content:
+            image/png:
+              schema:
+                type: string
+                format: binary
+
+  /api/v1/android/webhook:
+    post:
+      tags: [Android]
+      summary: Android Management API webhook callback
+      security: []
+      operationId: androidWebhook
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        "200":
+          description: OK
+
+  # ── SCEP ────────────────────────────────────────────────
+  /scep:
+    get:
+      tags: [SCEP]
+      summary: SCEP GET operation (GetCACaps, GetCACert, PKIOperation)
+      security: []
+      operationId: scepGet
+      parameters:
+        - name: operation
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [GetCACaps, GetCACert, PKIOperation]
+        - name: message
+          in: query
+          schema:
+            type: string
+            description: Base64-encoded SCEP message (for PKIOperation)
+      responses:
+        "200":
+          description: SCEP response
+    post:
+      tags: [SCEP]
+      summary: SCEP POST operation (PKIOperation)
+      security: []
+      operationId: scepPost
+      requestBody:
+        content:
+          application/x-pki-message:
+            schema:
+              type: string
+              format: binary
+      responses:
+        "200":
+          description: SCEP response
+          content:
+            application/x-pki-message:
+              schema:
+                type: string
+                format: binary
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: OIDC JWT from Keycloak or lmdm_ API token
+
+  parameters:
+    ResourceID:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    Limit:
+      name: limit
+      in: query
+      schema:
+        type: integer
+        default: 50
+        maximum: 1000
+    Offset:
+      name: offset
+      in: query
+      schema:
+        type: integer
+        default: 0
+
+  responses:
+    Unauthorized:
+      description: Authentication required or invalid
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    Conflict:
+      description: Resource already exists
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    RateLimited:
+      description: Too many requests
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+
+  schemas:
+    # ── Response envelope ───────────────────────────────
+    Meta:
+      type: object
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+        request_id:
+          type: string
+        total:
+          type: integer
+        limit:
+          type: integer
+        offset:
+          type: integer
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+            message:
+              type: string
+        meta:
+          $ref: "#/components/schemas/Meta"
+
+    # ── Health / Version ────────────────────────────────
+    HealthResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            status:
+              type: string
+              example: ok
+
+    VersionResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            version:
+              type: string
+            commit:
+              type: string
+            build_time:
+              type: string
+
+    # ── Auth ────────────────────────────────────────────
+    LoginRequest:
+      type: object
+      required: [username, password]
+      properties:
+        username:
+          type: string
+        password:
+          type: string
+          format: password
+
+    RefreshRequest:
+      type: object
+      required: [refresh_token]
+      properties:
+        refresh_token:
+          type: string
+
+    TokenPairResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            access_token:
+              type: string
+            refresh_token:
+              type: string
+            expires_in:
+              type: integer
+
+    # ── Enterprise ──────────────────────────────────────
+    Enterprise:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        slug:
+          type: string
+        settings:
+          type: object
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    EnterpriseInput:
+      type: object
+      required: [name, slug]
+      properties:
+        name:
+          type: string
+        slug:
+          type: string
+        settings:
+          type: object
+
+    EnterpriseResponse:
+      type: object
+      properties:
+        data:
+          $ref: "#/components/schemas/Enterprise"
+        meta:
+          $ref: "#/components/schemas/Meta"
+
+    EnterpriseListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Enterprise"
+        meta:
+          $ref: "#/components/schemas/Meta"
+
+    # ── Device ──────────────────────────────────────────
+    Device:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        enterprise_id:
+          type: string
+          format: uuid
+        platform:
+          type: string
+          enum: [windows, macos, android]
+        device_id:
+          type: string
+        serial_number:
+          type: string
+        name:
+          type: string
+        model:
+          type: string
+        os_version:
+          type: string
+        enrollment_date:
+          type: string
+          format: date-time
+        last_seen:
+          type: string
+          format: date-time
+        status:
+          type: string
+          enum: [pending, enrolled, unenrolled, wiped, lost]
+        platform_data:
+          type: object
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    DeviceInput:
+      type: object
+      properties:
+        name:
+          type: string
+        status:
+          type: string
+
+    DeviceResponse:
+      type: object
+      properties:
+        data:
+          $ref: "#/components/schemas/Device"
+        meta:
+          $ref: "#/components/schemas/Meta"
+
+    DeviceListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Device"
+        meta:
+          $ref: "#/components/schemas/Meta"
+
+    # ── Policy ──────────────────────────────────────────
+    Policy:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        enterprise_id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        description:
+          type: string
+        platform:
+          type: string
+          enum: [windows, macos, android, all]
+        policy_type:
+          type: string
+          enum: [wifi, vpn, security, app, restriction, compliance]
+        policy_config:
+          type: object
+        is_active:
+          type: boolean
+        is_template:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    PolicyInput:
+      type: object
+      required: [name, enterprise_id, platform, policy_type, policy_config]
+      properties:
+        name:
+          type: string
+        enterprise_id:
+          type: string
+          format: uuid
+        description:
+          type: string
+        platform:
+          type: string
+          enum: [windows, macos, android, all]
+        policy_type:
+          type: string
+          enum: [wifi, vpn, security, app, restriction, compliance]
+        policy_config:
+          type: object
+        is_active:
+          type: boolean
+
+    PolicyResponse:
+      type: object
+      properties:
+        data:
+          $ref: "#/components/schemas/Policy"
+        meta:
+          $ref: "#/components/schemas/Meta"
+
+    PolicyListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Policy"
+        meta:
+          $ref: "#/components/schemas/Meta"
+
+    # ── Policy Version ──────────────────────────────────
+    PolicyVersion:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        policy_id:
+          type: string
+          format: uuid
+        version:
+          type: integer
+        name:
+          type: string
+        description:
+          type: string
+        platform:
+          type: string
+        policy_type:
+          type: string
+        policy_config:
+          type: object
+        is_active:
+          type: boolean
+        created_by:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+
+    PolicyVersionListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/PolicyVersion"
+        meta:
+          $ref: "#/components/schemas/Meta"
+
+    # ── Policy Assignment ───────────────────────────────
+    PolicyAssignment:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        policy_id:
+          type: string
+          format: uuid
+        target_type:
+          type: string
+          enum: [device, group, enterprise]
+        target_id:
+          type: string
+          format: uuid
+        priority:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
+
+    PolicyAssignmentInput:
+      type: object
+      required: [target_type, target_id]
+      properties:
+        target_type:
+          type: string
+          enum: [device, group, enterprise]
+        target_id:
+          type: string
+          format: uuid
+        priority:
+          type: integer
+          default: 0
+
+    PolicyAssignmentResponse:
+      type: object
+      properties:
+        data:
+          $ref: "#/components/schemas/PolicyAssignment"
+        meta:
+          $ref: "#/components/schemas/Meta"
+
+    PolicyAssignmentListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/PolicyAssignment"
+        meta:
+          $ref: "#/components/schemas/Meta"
+
+    # ── Group ───────────────────────────────────────────
+    Group:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        enterprise_id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        description:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    GroupInput:
+      type: object
+      required: [name, enterprise_id]
+      properties:
+        name:
+          type: string
+        enterprise_id:
+          type: string
+          format: uuid
+        description:
+          type: string
+
+    GroupResponse:
+      type: object
+      properties:
+        data:
+          $ref: "#/components/schemas/Group"
+        meta:
+          $ref: "#/components/schemas/Meta"
+
+    GroupListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Group"
+        meta:
+          $ref: "#/components/schemas/Meta"
+
+    # ── Compliance ──────────────────────────────────────
+    ComplianceResult:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        device_id:
+          type: string
+          format: uuid
+        policy_id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [compliant, non_compliant, unknown, error]
+        details:
+          type: object
+        evaluated_at:
+          type: string
+          format: date-time
+
+    ComplianceSummary:
+      type: object
+      properties:
+        compliant:
+          type: integer
+        non_compliant:
+          type: integer
+        unknown:
+          type: integer
+        error:
+          type: integer
+        total:
+          type: integer
+
+    ComplianceSummaryResponse:
+      type: object
+      properties:
+        data:
+          $ref: "#/components/schemas/ComplianceSummary"
+        meta:
+          $ref: "#/components/schemas/Meta"
+
+    ComplianceResultListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/ComplianceResult"
+        meta:
+          $ref: "#/components/schemas/Meta"
+
+    # ── Certificate ─────────────────────────────────────
+    Certificate:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        device_id:
+          type: string
+          format: uuid
+        cert_type:
+          type: string
+          enum: [ca, device, apns]
+        subject:
+          type: string
+        serial_number:
+          type: string
+        issued_at:
+          type: string
+          format: date-time
+        expires_at:
+          type: string
+          format: date-time
+        revoked_at:
+          type: string
+          format: date-time
+        created_at:
+          type: string
+          format: date-time
+
+    CertificateListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Certificate"
+        meta:
+          $ref: "#/components/schemas/Meta"
+
+    # ── Command ─────────────────────────────────────────
+    DeviceCommand:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        device_id:
+          type: string
+          format: uuid
+        command_type:
+          type: string
+          enum: [device_info, lock, wipe, restart, shutdown, install_profile, remove_profile, install_app, remove_app, profile_list, app_list, security_info, certificate_list]
+        command_data:
+          type: object
+        status:
+          type: string
+          enum: [pending, sent, completed, failed]
+        sent_at:
+          type: string
+          format: date-time
+        completed_at:
+          type: string
+          format: date-time
+        error_message:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+
+    CommandInput:
+      type: object
+      required: [command_type]
+      properties:
+        command_type:
+          type: string
+        command_data:
+          type: object
+
+    CommandResponse:
+      type: object
+      properties:
+        data:
+          $ref: "#/components/schemas/DeviceCommand"
+        meta:
+          $ref: "#/components/schemas/Meta"
+
+    CommandListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/DeviceCommand"
+        meta:
+          $ref: "#/components/schemas/Meta"
+
+    # ── App ─────────────────────────────────────────────
+    App:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        enterprise_id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        platform:
+          type: string
+          enum: [windows, macos, android]
+        identifier:
+          type: string
+        version:
+          type: string
+        install_type:
+          type: string
+          enum: [required, available]
+        app_config:
+          type: object
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    AppInput:
+      type: object
+      required: [name, enterprise_id, platform, identifier]
+      properties:
+        name:
+          type: string
+        enterprise_id:
+          type: string
+          format: uuid
+        platform:
+          type: string
+          enum: [windows, macos, android]
+        identifier:
+          type: string
+        version:
+          type: string
+        install_type:
+          type: string
+          enum: [required, available]
+        app_config:
+          type: object
+
+    AppResponse:
+      type: object
+      properties:
+        data:
+          $ref: "#/components/schemas/App"
+        meta:
+          $ref: "#/components/schemas/Meta"
+
+    AppListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/App"
+        meta:
+          $ref: "#/components/schemas/Meta"
+
+    # ── User ────────────────────────────────────────────
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        enterprise_id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        full_name:
+          type: string
+        role:
+          type: string
+          enum: [super_admin, admin, operator, viewer]
+        is_active:
+          type: boolean
+        last_login_at:
+          type: string
+          format: date-time
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    UserInput:
+      type: object
+      required: [email, enterprise_id, role]
+      properties:
+        email:
+          type: string
+          format: email
+        enterprise_id:
+          type: string
+          format: uuid
+        full_name:
+          type: string
+        role:
+          type: string
+          enum: [super_admin, admin, operator, viewer]
+        password:
+          type: string
+          format: password
+
+    UserResponse:
+      type: object
+      properties:
+        data:
+          $ref: "#/components/schemas/User"
+        meta:
+          $ref: "#/components/schemas/Meta"
+
+    UserListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/User"
+        meta:
+          $ref: "#/components/schemas/Meta"
+
+    # ── API Token ───────────────────────────────────────
+    APIToken:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        user_id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        scopes:
+          type: object
+        last_used_at:
+          type: string
+          format: date-time
+        expires_at:
+          type: string
+          format: date-time
+        created_at:
+          type: string
+          format: date-time
+
+    TokenInput:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+        scopes:
+          type: object
+        expires_at:
+          type: string
+          format: date-time
+
+    TokenCreateResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            id:
+              type: string
+              format: uuid
+            name:
+              type: string
+            token:
+              type: string
+              description: Plaintext token — shown only once
+            expires_at:
+              type: string
+              format: date-time
+        meta:
+          $ref: "#/components/schemas/Meta"
+
+    TokenListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/APIToken"
+        meta:
+          $ref: "#/components/schemas/Meta"
+
+    # ── Audit Log ───────────────────────────────────────
+    AuditLog:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        enterprise_id:
+          type: string
+          format: uuid
+        user_id:
+          type: string
+          format: uuid
+        action:
+          type: string
+        resource_type:
+          type: string
+        resource_id:
+          type: string
+          format: uuid
+        details:
+          type: object
+        ip_address:
+          type: string
+        user_agent:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+
+    AuditLogListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/AuditLog"
+        meta:
+          $ref: "#/components/schemas/Meta"

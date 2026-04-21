@@ -312,6 +312,20 @@ func (s *Server) setupRoutes() {
 	s.router.HandleFunc("/health/ready", s.handleHealthReady).Methods("GET")
 	s.router.HandleFunc("/version", s.handleVersion).Methods("GET")
 
+	// OpenAPI spec (S5-03)
+	s.router.HandleFunc("/docs/openapi.yaml", func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, "docs/schemas/openapi.yaml")
+	}).Methods("GET")
+	s.router.HandleFunc("/docs", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/html")
+		fmt.Fprint(w, `<!DOCTYPE html><html><head><title>Local MDM API</title>
+<link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@5/swagger-ui.css">
+</head><body><div id="swagger-ui"></div>
+<script src="https://unpkg.com/swagger-ui-dist@5/swagger-ui-bundle.js"></script>
+<script>SwaggerUIBundle({url:"/docs/openapi.yaml",dom_id:"#swagger-ui"})</script>
+</body></html>`)
+	}).Methods("GET")
+
 	// API v1 routes
 	api := s.router.PathPrefix("/api/v1").Subrouter()
 	
