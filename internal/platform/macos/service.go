@@ -53,3 +53,13 @@ func (s *Service) UpdateDeviceStatus(ctx context.Context, deviceID uuid.UUID, st
 
 	return nil
 }
+
+// GetDeviceByUDID finds a macOS device by its UDID (stored as device_id).
+func (s *Service) GetDeviceByUDID(ctx context.Context, udid string) (*models.Device, error) {
+	return s.deviceRepo.GetByPlatformID(ctx, models.PlatformMacOS, udid)
+}
+
+// UpdateDevice updates a device record.
+func (s *Service) UpdateDevice(ctx context.Context, device *models.Device) error {
+	return s.deviceRepo.Update(ctx, device)
+}

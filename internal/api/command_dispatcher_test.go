@@ -3,7 +3,6 @@ package api
 import (
 	"bytes"
 	"log/slog"
-	"sync/atomic"
 	"testing"
 	"time"
 
@@ -44,8 +43,6 @@ func TestCommandDispatcher_Enqueue(t *testing.T) {
 }
 
 func TestCommandDispatcher_ProcessesAll(t *testing.T) {
-	var processed atomic.Int64
-
 	logger := slog.New(slog.NewTextHandler(bytes.NewBuffer(nil), nil))
 	d := newCommandDispatcher(nil, nil, logger)
 
@@ -65,7 +62,6 @@ func TestCommandDispatcher_ProcessesAll(t *testing.T) {
 	d.Stop()
 	// Workers processed all items (queue drained on Stop)
 	// We can't easily count without modifying dispatch, but we verify no hang
-	_ = processed
 }
 
 func TestCommandDispatcher_QueueFull(t *testing.T) {

@@ -52,6 +52,9 @@ Dashboard handlers are separate from API handlers — API returns JSON, dashboar
 | S5b-03 | Device management (list, detail, lock/wipe actions) | 2-3 days |
 | S5b-04 | Policy management (list, create/edit, assign to groups) | 2-3 days |
 | S5b-05 | Compliance & reporting (dashboard, audit log viewer) | 1-2 days |
+| S5b-06 | Seed data for development (mock devices, policies, compliance results) | 0.5 day |
+
+> **Dependency**: S5b-05 (Compliance & reporting) depends on S5-09 (Device State Collection & Compliance Evaluation) for real compliance data. Without S5-09, compliance views will show all "unknown" statuses. If Sprint 5b runs in parallel with Sprint 5, implement S5b-05 last and use seed data (S5b-06) for development.
 
 ### S5b-01: Project Setup
 - Go HTML template layout (base template, partials, components)
@@ -86,6 +89,17 @@ Dashboard handlers are separate from API handlers — API returns JSON, dashboar
 - Device inventory table with CSV export link
 - Audit log viewer with search by actor, action, date range
 - HTMX infinite scroll or pagination for large result sets
+
+### S5b-06: Seed Data for Development
+- SQL script or Go command (`make seed`) that populates the database with realistic mock data
+- Sample enterprise with 20-30 devices across all three platforms (macOS, Windows, Android)
+- Mix of device statuses (enrolled, unenrolled, wiped)
+- 3-4 policy templates and 5-6 enterprise policies (security, WiFi, VPN, restrictions)
+- 2-3 device groups with memberships
+- Policy assignments at device, group, and enterprise levels
+- Compliance results with a mix of compliant, non-compliant, and unknown statuses
+- Audit log entries for recent actions
+- Allows dashboard development and visual testing without real devices or S5-09
 
 ## HTMX Patterns
 

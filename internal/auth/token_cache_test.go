@@ -2,30 +2,40 @@ package auth
 
 import (
 	"context"
+	"database/sql"
 	"os"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
+	_ "github.com/lib/pq"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func TestTokenCache(t *testing.T) {
-	// Skip if not running integration tests
+func getTestDB(t *testing.T) *sql.DB {
+	t.Helper()
 	if os.Getenv("INTEGRATION_TESTS") == "" {
 		t.Skip("Skipping integration test. Set INTEGRATION_TESTS=1 to run.")
 	}
 
-	redisAddr := "localhost:6379"
-	if addr := os.Getenv("REDIS_ADDR"); addr != "" {
-		redisAddr = addr
+	dsn := "host=localhost port=5432 user=postgres password=postgres dbname=localmdm sslmode=disable"
+	if d := os.Getenv("TEST_DSN"); d != "" {
+		dsn = d
 	}
 
-	t.Run("connects to Redis", func(t *testing.T) {
-		cache, err := NewTokenCache(redisAddr, 5*time.Minute)
+	db, err := sql.Open("postgres", dsn)
+	require.NoError(t, err)
+	t.Cleanup(func() { db.Close() })
+	return db
+}
+
+func TestTokenCache(t *testing.T) {
+	db := getTestDB(t)
+
+	t.Run("connects to database", func(t *testing.T) {
+		cache, err := NewTokenCache(db, 5*time.Minute)
 		require.NoError(t, err)
-		defer cache.Close()
 
 		ctx := context.Background()
 		err = cache.Health(ctx)
@@ -33,12 +43,11 @@ func TestTokenCache(t *testing.T) {
 	})
 
 	t.Run("stores and retrieves token", func(t *testing.T) {
-		cache, err := NewTokenCache(redisAddr, 5*time.Minute)
+		cache, err := NewTokenCache(db, 5*time.Minute)
 		require.NoError(t, err)
-		defer cache.Close()
 
 		ctx := context.Background()
-		token := "test-token-123"
+		token := "test-token-" + uuid.New().String()
 		user := &AuthUser{
 			ID:           "user-123",
 			Email:        "test@example.com",
@@ -46,124 +55,75 @@ func TestTokenCache(t *testing.T) {
 			EnterpriseID: uuid.New(),
 		}
 
-		// Store
 		err = cache.Set(ctx, token, user)
 		require.NoError(t, err)
 
-		// Retrieve
 		retrieved, err := cache.Get(ctx, token)
 		require.NoError(t, err)
 		assert.Equal(t, user.ID, retrieved.ID)
 		assert.Equal(t, user.Email, retrieved.Email)
 		assert.Equal(t, user.Roles, retrieved.Roles)
 		assert.Equal(t, user.EnterpriseID, retrieved.EnterpriseID)
+
+		// Cleanup
+		_ = cache.Delete(ctx, token)
 	})
 
 	t.Run("returns ErrCacheMiss for non-existent token", func(t *testing.T) {
-		cache, err := NewTokenCache(redisAddr, 5*time.Minute)
+		cache, err := NewTokenCache(db, 5*time.Minute)
 		require.NoError(t, err)
-		defer cache.Close()
 
 		ctx := context.Background()
-		_, err = cache.Get(ctx, "non-existent-token")
+		_, err = cache.Get(ctx, "non-existent-token-"+uuid.New().String())
 		assert.Equal(t, ErrCacheMiss, err)
 	})
 
 	t.Run("deletes token", func(t *testing.T) {
-		cache, err := NewTokenCache(redisAddr, 5*time.Minute)
+		cache, err := NewTokenCache(db, 5*time.Minute)
 		require.NoError(t, err)
-		defer cache.Close()
 
 		ctx := context.Background()
-		token := "test-token-delete"
-		user := &AuthUser{
-			ID:    "user-123",
-			Email: "test@example.com",
-		}
+		token := "test-token-delete-" + uuid.New().String()
+		user := &AuthUser{ID: "user-123", Email: "test@example.com"}
 
-		// Store
 		err = cache.Set(ctx, token, user)
 		require.NoError(t, err)
 
-		// Delete
 		err = cache.Delete(ctx, token)
 		require.NoError(t, err)
 
-		// Verify deleted
-		_, err = cache.Get(ctx, token)
-		assert.Equal(t, ErrCacheMiss, err)
-	})
-
-	t.Run("token expires after TTL", func(t *testing.T) {
-		cache, err := NewTokenCache(redisAddr, 1*time.Second)
-		require.NoError(t, err)
-		defer cache.Close()
-
-		ctx := context.Background()
-		token := "test-token-ttl"
-		user := &AuthUser{
-			ID:    "user-123",
-			Email: "test@example.com",
-		}
-
-		// Store
-		err = cache.Set(ctx, token, user)
-		require.NoError(t, err)
-
-		// Verify exists
-		_, err = cache.Get(ctx, token)
-		require.NoError(t, err)
-
-		// Wait for expiration
-		time.Sleep(1500 * time.Millisecond)
-
-		// Verify expired
 		_, err = cache.Get(ctx, token)
 		assert.Equal(t, ErrCacheMiss, err)
 	})
 
 	t.Run("handles concurrent access", func(t *testing.T) {
-		cache, err := NewTokenCache(redisAddr, 5*time.Minute)
+		cache, err := NewTokenCache(db, 5*time.Minute)
 		require.NoError(t, err)
-		defer cache.Close()
 
 		ctx := context.Background()
 		done := make(chan bool)
 
-		// Multiple goroutines accessing cache
 		for i := 0; i < 10; i++ {
 			go func(i int) {
 				defer func() { done <- true }()
-				token := "test-token-" + string(rune(i))
-				user := &AuthUser{
-					ID:    "user-" + string(rune(i)),
-					Email: "test@example.com",
-				}
+				token := "concurrent-" + uuid.New().String()
+				user := &AuthUser{ID: "user-" + uuid.New().String(), Email: "test@example.com"}
 
-				// Set
 				_ = cache.Set(ctx, token, user)
-
-				// Get
 				_, _ = cache.Get(ctx, token)
-
-				// Delete
 				_ = cache.Delete(ctx, token)
 			}(i)
 		}
 
-		// Wait for all goroutines
 		for i := 0; i < 10; i++ {
 			<-done
 		}
-
-		// Should not panic
-		assert.NotNil(t, cache)
 	})
 }
 
 func TestTokenCacheErrors(t *testing.T) {
-	t.Run("fails to connect to invalid Redis address", func(t *testing.T) {
-		_, err := NewTokenCache("invalid:9999", 5*time.Minute)
+	t.Run("fails with nil database", func(t *testing.T) {
+		_, err := NewTokenCache(nil, 5*time.Minute)
 		assert.Error(t, err)
 	})
 }

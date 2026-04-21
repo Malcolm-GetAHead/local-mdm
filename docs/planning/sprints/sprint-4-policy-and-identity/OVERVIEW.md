@@ -142,6 +142,8 @@ func (bus *EventBus) listen(ctx context.Context, db *sql.DB) // background gorou
 
 ## Service-Level Dependencies
 
+> **Sprint 5 Note (2026-04-20):** Sprint 4 uses direct service calls for compliance evaluation and policy push triggers. The PostgreSQL LISTEN/NOTIFY event triggers are in place (migration 000007) but the Go-side EventBus listener is deferred to Sprint 5, where outbound webhooks need async event-driven dispatch. Sprint 5 should: (1) implement `internal/service/eventbus.go` with persistent LISTEN connection, reconnection, graceful shutdown; (2) migrate direct compliance calls to EventBus subscribers; (3) add webhook subscriber for outbound notifications.
+
 | This Sprint Produces | Consumed By |
 |---|---|
 | Unified policy model + translators | Sprint 5 (policy UI) |
@@ -166,19 +168,13 @@ Added from Sprint 2 (M-05). Sprint 2 implemented simple duplicate prevention via
 **Decision (2026-04-20):** Replace Redis with PostgreSQL for all caching/storage needs. Redis is currently used only for auth token caching (`internal/auth/token_cache.go`). PostgreSQL is sufficient at our scale and simplifies the stack to a single datastore. Scaling path: PostgreSQL → Aurora PostgreSQL with read replicas.
 
 Tasks:
-- Replace Redis token cache with in-memory `sync.Map` + TTL (token cache doesn't need persistence or cross-instance sharing until F-02)
+- Replace Redis token cache with PostgreSQL `token_cache` table (token_hash, user_data JSONB, expires_at) + periodic cleanup
 - Build Idempotency-Key middleware using PostgreSQL table with `expires_at` + periodic cleanup
 - Remove `go-redis/v9` from `go.mod`
 - Remove Redis from `docker-compose.yml`
 - Update config to remove Redis settings
 
 ### Prerequisite: Read/Write Database Pools
-**Decision (2026-04-20):** Split the single DB connection into separate Writer and Reader pools to prepare for Aurora read replicas in production.
+**Decision (2026-04-20):** Moved to Sprint 4b as a standalone sub-sprint. See [Sprint 4b: DB Pools](../sprint-4b-db-pools/OVERVIEW.md).
 
-Tasks:
-- Update `internal/db/db.go`: `DB` struct holds `Writer *sql.DB` and `Reader *sql.DB`
-- Add `writer_dsn` and `reader_dsn` to DatabaseConfig (fall back to single DSN if reader not set)
-- Update repository constructors to accept both pools — writes use Writer, reads use Reader
-- Existing `getExecutor(ctx, db)` pattern continues to work for transaction-aware writes
-- In dev, both pools point to the same PostgreSQL instance
-- In production, Reader points to Aurora read replica
+> **Sprint renaming (2026-04-20):** Former Sprint 4b (Platform SSO) is now Sprint 4c. Sprint 4b is Read/Write Database Pools. See [Sprint 4c: Platform SSO](../sprint-4c-platform-sso/OVERVIEW.md).

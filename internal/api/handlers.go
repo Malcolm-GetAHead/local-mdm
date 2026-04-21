@@ -417,9 +417,15 @@ func (s *Server) handleWipeDevice(w http.ResponseWriter, r *http.Request) {
 
 	s.cmdDispatcher.Enqueue(device, cmd)
 
+	s.lifecycleService.OnWipe(r.Context(), device)
+
 	s.logAudit(r, "device.wipe", "device", id, map[string]interface{}{
 		"platform":   device.Platform,
 		"command_id": cmd.ID,
+	})
+
+	s.logAudit(r, "device.lifecycle.wipe", "device", id, map[string]interface{}{
+		"platform": device.Platform,
 	})
 
 	respondJSON(w, r, http.StatusOK, map[string]interface{}{
@@ -494,17 +500,30 @@ func (s *Server) handleDeleteDevice(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := s.deviceRepo.Delete(r.Context(), id); err != nil {
+	// Fetch device before deletion for lifecycle hooks
+	device, err := s.deviceRepo.GetByID(r.Context(), id)
+	if err != nil {
 		if strings.Contains(err.Error(), "not found") {
 			respondError(w, r, http.StatusNotFound, "not_found", "Device not found")
 			return
 		}
+		s.logger.Error("failed to get device for delete", "error", err, "id", id)
+		respondError(w, r, http.StatusInternalServerError, "internal_error", "Failed to delete device")
+		return
+	}
+
+	if err := s.deviceRepo.Delete(r.Context(), id); err != nil {
 		s.logger.Error("failed to delete device", "error", err, "id", id)
 		respondError(w, r, http.StatusInternalServerError, "internal_error", "Failed to delete device")
 		return
 	}
 
+	s.lifecycleService.OnDelete(r.Context(), device)
+
 	s.logAudit(r, "device.delete", "device", id, nil)
+	s.logAudit(r, "device.lifecycle.delete", "device", id, map[string]interface{}{
+		"platform": device.Platform,
+	})
 
 	w.WriteHeader(http.StatusNoContent)
 }
@@ -573,7 +592,7 @@ func (s *Server) handleCreatePolicy(w http.ResponseWriter, r *http.Request) {
 		IsActive:     req.IsActive,
 	}
 
-	if err := s.policyRepo.Create(r.Context(), policy); err != nil {
+	if err := s.policyService.Create(r.Context(), policy, user.ID); err != nil {
 		s.logger.Error("failed to create policy", "error", err)
 		respondError(w, r, http.StatusInternalServerError, "internal_error", "Failed to create policy")
 		return
@@ -654,7 +673,13 @@ func (s *Server) handleUpdatePolicy(w http.ResponseWriter, r *http.Request) {
 		policy.IsActive = *req.IsActive
 	}
 
-	if err := s.policyRepo.Update(r.Context(), policy); err != nil {
+	user, _ := auth.UserFromContext(r.Context())
+	userID := ""
+	if user != nil {
+		userID = user.ID
+	}
+
+	if err := s.policyService.Update(r.Context(), policy, userID); err != nil {
 		s.logger.Error("failed to update policy", "error", err, "id", id)
 		respondError(w, r, http.StatusInternalServerError, "internal_error", "Failed to update policy")
 		return
@@ -763,6 +788,488 @@ func (s *Server) handleUnassignPolicy(w http.ResponseWriter, r *http.Request) {
 	})
 
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// Policy versioning handlers (Sprint 4)
+
+func (s *Server) handleListPolicyVersions(w http.ResponseWriter, r *http.Request) {
+	id, err := parseUUIDParam(r, "id")
+	if err != nil {
+		respondError(w, r, http.StatusBadRequest, "invalid_id", "Invalid policy ID format")
+		return
+	}
+
+	limit, offset := parsePagination(r)
+	versions, total, err := s.policyService.ListVersions(r.Context(), id, limit, offset)
+	if err != nil {
+		s.logger.Error("failed to list policy versions", "error", err, "id", id)
+		respondError(w, r, http.StatusInternalServerError, "internal_error", "Failed to list versions")
+		return
+	}
+
+	respondPaginated(w, r, http.StatusOK, versions, total, limit, offset)
+}
+
+func (s *Server) handleRollbackPolicy(w http.ResponseWriter, r *http.Request) {
+	id, err := parseUUIDParam(r, "id")
+	if err != nil {
+		respondError(w, r, http.StatusBadRequest, "invalid_id", "Invalid policy ID format")
+		return
+	}
+
+	var req struct {
+		Version int `json:"version"`
+	}
+	if err := parseJSONBody(r, &req); err != nil {
+		respondError(w, r, http.StatusBadRequest, "invalid_request", err.Error())
+		return
+	}
+	if req.Version < 1 {
+		respondError(w, r, http.StatusBadRequest, "invalid_version", "Version must be >= 1")
+		return
+	}
+
+	user, _ := auth.UserFromContext(r.Context())
+	userID := ""
+	if user != nil {
+		userID = user.ID
+	}
+
+	policy, err := s.policyService.Rollback(r.Context(), id, req.Version, userID)
+	if err != nil {
+		if strings.Contains(err.Error(), "not found") {
+			respondError(w, r, http.StatusNotFound, "not_found", err.Error())
+			return
+		}
+		s.logger.Error("failed to rollback policy", "error", err, "id", id)
+		respondError(w, r, http.StatusInternalServerError, "internal_error", "Failed to rollback")
+		return
+	}
+
+	s.logAudit(r, "policy.rollback", "policy", id, map[string]interface{}{"version": req.Version})
+	respondJSON(w, r, http.StatusOK, policy)
+}
+
+func (s *Server) handleTranslatePolicy(w http.ResponseWriter, r *http.Request) {
+	id, err := parseUUIDParam(r, "id")
+	if err != nil {
+		respondError(w, r, http.StatusBadRequest, "invalid_id", "Invalid policy ID format")
+		return
+	}
+
+	policy, err := s.policyRepo.GetByID(r.Context(), id)
+	if err != nil {
+		if strings.Contains(err.Error(), "not found") {
+			respondError(w, r, http.StatusNotFound, "not_found", "Policy not found")
+			return
+		}
+		respondError(w, r, http.StatusInternalServerError, "internal_error", "Failed to get policy")
+		return
+	}
+
+	platform := r.URL.Query().Get("platform")
+	if platform != "" {
+		result, err := s.policyService.Translate(policy, platform)
+		if err != nil {
+			respondError(w, r, http.StatusBadRequest, "translation_error", err.Error())
+			return
+		}
+		respondJSON(w, r, http.StatusOK, result)
+		return
+	}
+
+	results := s.policyService.TranslateAll(policy)
+	respondJSON(w, r, http.StatusOK, results)
+}
+
+func (s *Server) handleListPolicyTemplates(w http.ResponseWriter, r *http.Request) {
+	user, err := auth.UserFromContext(r.Context())
+	if err != nil {
+		respondError(w, r, http.StatusUnauthorized, "unauthorized", "Authentication required")
+		return
+	}
+
+	limit, offset := parsePagination(r)
+	policies, _, err := s.policyRepo.List(r.Context(), user.EnterpriseID, limit, offset)
+	if err != nil {
+		respondError(w, r, http.StatusInternalServerError, "internal_error", "Failed to list templates")
+		return
+	}
+
+	// Filter to templates only
+	var templates []*models.Policy
+	for _, p := range policies {
+		if p.IsTemplate {
+			templates = append(templates, p)
+		}
+	}
+
+	respondJSON(w, r, http.StatusOK, map[string]interface{}{
+		"templates": templates,
+		"total":     len(templates),
+	})
+}
+
+func (s *Server) handleClonePolicyTemplate(w http.ResponseWriter, r *http.Request) {
+	templateID, err := parseUUIDParam(r, "id")
+	if err != nil {
+		respondError(w, r, http.StatusBadRequest, "invalid_id", "Invalid template ID format")
+		return
+	}
+
+	var req struct {
+		Name string `json:"name"`
+	}
+	if err := parseJSONBody(r, &req); err != nil {
+		respondError(w, r, http.StatusBadRequest, "invalid_request", err.Error())
+		return
+	}
+	if req.Name == "" {
+		respondError(w, r, http.StatusBadRequest, "validation_failed", "Name is required")
+		return
+	}
+
+	user, _ := auth.UserFromContext(r.Context())
+	enterpriseID := uuid.Nil
+	userID := ""
+	if user != nil {
+		enterpriseID = user.EnterpriseID
+		userID = user.ID
+	}
+
+	policy, err := s.policyService.CloneTemplate(r.Context(), templateID, enterpriseID, req.Name, userID)
+	if err != nil {
+		if strings.Contains(err.Error(), "not found") || strings.Contains(err.Error(), "not a template") {
+			respondError(w, r, http.StatusBadRequest, "invalid_template", err.Error())
+			return
+		}
+		respondError(w, r, http.StatusInternalServerError, "internal_error", "Failed to clone template")
+		return
+	}
+
+	s.logAudit(r, "policy.clone_template", "policy", policy.ID, map[string]interface{}{
+		"template_id": templateID,
+	})
+	respondJSON(w, r, http.StatusCreated, policy)
+}
+
+// Device Group handlers (Sprint 4)
+
+func (s *Server) handleListGroups(w http.ResponseWriter, r *http.Request) {
+	user, err := auth.UserFromContext(r.Context())
+	if err != nil {
+		respondError(w, r, http.StatusUnauthorized, "unauthorized", "Authentication required")
+		return
+	}
+	limit, offset := parsePagination(r)
+	groups, total, err := s.groupService.ListGroups(r.Context(), user.EnterpriseID, limit, offset)
+	if err != nil {
+		respondError(w, r, http.StatusInternalServerError, "internal_error", "Failed to list groups")
+		return
+	}
+	respondPaginated(w, r, http.StatusOK, groups, total, limit, offset)
+}
+
+func (s *Server) handleCreateGroup(w http.ResponseWriter, r *http.Request) {
+	user, _ := auth.UserFromContext(r.Context())
+	var req struct {
+		Name        string `json:"name"`
+		Description string `json:"description"`
+	}
+	if err := parseJSONBody(r, &req); err != nil {
+		respondError(w, r, http.StatusBadRequest, "invalid_request", err.Error())
+		return
+	}
+	if req.Name == "" {
+		respondError(w, r, http.StatusBadRequest, "validation_failed", "Name is required")
+		return
+	}
+	enterpriseID := uuid.Nil
+	if user != nil {
+		enterpriseID = user.EnterpriseID
+	}
+	group := &models.DeviceGroup{EnterpriseID: enterpriseID, Name: req.Name, Description: req.Description}
+	if err := s.groupService.CreateGroup(r.Context(), group); err != nil {
+		if isDuplicateError(err) {
+			respondError(w, r, http.StatusConflict, "duplicate", "Group name already exists")
+			return
+		}
+		respondError(w, r, http.StatusInternalServerError, "internal_error", "Failed to create group")
+		return
+	}
+	s.logAudit(r, "group.create", "group", group.ID, map[string]interface{}{"name": group.Name})
+	respondJSON(w, r, http.StatusCreated, group)
+}
+
+func (s *Server) handleGetGroup(w http.ResponseWriter, r *http.Request) {
+	id, err := parseUUIDParam(r, "id")
+	if err != nil {
+		respondError(w, r, http.StatusBadRequest, "invalid_id", "Invalid group ID")
+		return
+	}
+	group, err := s.groupService.GetGroup(r.Context(), id)
+	if err != nil {
+		if strings.Contains(err.Error(), "not found") {
+			respondError(w, r, http.StatusNotFound, "not_found", "Group not found")
+			return
+		}
+		respondError(w, r, http.StatusInternalServerError, "internal_error", "Failed to get group")
+		return
+	}
+	respondJSON(w, r, http.StatusOK, group)
+}
+
+func (s *Server) handleUpdateGroup(w http.ResponseWriter, r *http.Request) {
+	id, err := parseUUIDParam(r, "id")
+	if err != nil {
+		respondError(w, r, http.StatusBadRequest, "invalid_id", "Invalid group ID")
+		return
+	}
+	group, err := s.groupService.GetGroup(r.Context(), id)
+	if err != nil {
+		if strings.Contains(err.Error(), "not found") {
+			respondError(w, r, http.StatusNotFound, "not_found", "Group not found")
+			return
+		}
+		respondError(w, r, http.StatusInternalServerError, "internal_error", "Failed to get group")
+		return
+	}
+	var req struct {
+		Name        *string `json:"name"`
+		Description *string `json:"description"`
+	}
+	if err := parseJSONBody(r, &req); err != nil {
+		respondError(w, r, http.StatusBadRequest, "invalid_request", err.Error())
+		return
+	}
+	if req.Name != nil {
+		group.Name = *req.Name
+	}
+	if req.Description != nil {
+		group.Description = *req.Description
+	}
+	if err := s.groupService.UpdateGroup(r.Context(), group); err != nil {
+		respondError(w, r, http.StatusInternalServerError, "internal_error", "Failed to update group")
+		return
+	}
+	s.logAudit(r, "group.update", "group", id, nil)
+	respondJSON(w, r, http.StatusOK, group)
+}
+
+func (s *Server) handleDeleteGroup(w http.ResponseWriter, r *http.Request) {
+	id, err := parseUUIDParam(r, "id")
+	if err != nil {
+		respondError(w, r, http.StatusBadRequest, "invalid_id", "Invalid group ID")
+		return
+	}
+	if err := s.groupService.DeleteGroup(r.Context(), id); err != nil {
+		if strings.Contains(err.Error(), "not found") {
+			respondError(w, r, http.StatusNotFound, "not_found", "Group not found")
+			return
+		}
+		respondError(w, r, http.StatusInternalServerError, "internal_error", "Failed to delete group")
+		return
+	}
+	s.logAudit(r, "group.delete", "group", id, nil)
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (s *Server) handleListGroupMembers(w http.ResponseWriter, r *http.Request) {
+	id, err := parseUUIDParam(r, "id")
+	if err != nil {
+		respondError(w, r, http.StatusBadRequest, "invalid_id", "Invalid group ID")
+		return
+	}
+	limit, offset := parsePagination(r)
+	devices, total, err := s.groupService.ListMembers(r.Context(), id, limit, offset)
+	if err != nil {
+		respondError(w, r, http.StatusInternalServerError, "internal_error", "Failed to list members")
+		return
+	}
+	respondPaginated(w, r, http.StatusOK, devices, total, limit, offset)
+}
+
+func (s *Server) handleAddGroupMember(w http.ResponseWriter, r *http.Request) {
+	groupID, err := parseUUIDParam(r, "id")
+	if err != nil {
+		respondError(w, r, http.StatusBadRequest, "invalid_id", "Invalid group ID")
+		return
+	}
+	var req struct {
+		DeviceID uuid.UUID `json:"device_id"`
+	}
+	if err := parseJSONBody(r, &req); err != nil {
+		respondError(w, r, http.StatusBadRequest, "invalid_request", err.Error())
+		return
+	}
+	if req.DeviceID == uuid.Nil {
+		respondError(w, r, http.StatusBadRequest, "validation_failed", "device_id is required")
+		return
+	}
+	if err := s.groupService.AddMember(r.Context(), groupID, req.DeviceID); err != nil {
+		respondError(w, r, http.StatusInternalServerError, "internal_error", "Failed to add member")
+		return
+	}
+	s.logAudit(r, "group.add_member", "group", groupID, map[string]interface{}{"device_id": req.DeviceID})
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (s *Server) handleRemoveGroupMember(w http.ResponseWriter, r *http.Request) {
+	groupID, err := parseUUIDParam(r, "id")
+	if err != nil {
+		respondError(w, r, http.StatusBadRequest, "invalid_id", "Invalid group ID")
+		return
+	}
+	deviceID, err := parseUUIDParam(r, "device_id")
+	if err != nil {
+		respondError(w, r, http.StatusBadRequest, "invalid_id", "Invalid device ID")
+		return
+	}
+	if err := s.groupService.RemoveMember(r.Context(), groupID, deviceID); err != nil {
+		respondError(w, r, http.StatusInternalServerError, "internal_error", "Failed to remove member")
+		return
+	}
+	s.logAudit(r, "group.remove_member", "group", groupID, map[string]interface{}{"device_id": deviceID})
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// Policy Assignment handlers (Sprint 4)
+
+func (s *Server) handleAssignPolicyToTarget(w http.ResponseWriter, r *http.Request) {
+	policyID, err := parseUUIDParam(r, "id")
+	if err != nil {
+		respondError(w, r, http.StatusBadRequest, "invalid_id", "Invalid policy ID")
+		return
+	}
+	var req struct {
+		TargetType string    `json:"target_type"`
+		TargetID   uuid.UUID `json:"target_id"`
+		Priority   int       `json:"priority"`
+	}
+	if err := parseJSONBody(r, &req); err != nil {
+		respondError(w, r, http.StatusBadRequest, "invalid_request", err.Error())
+		return
+	}
+
+	assignment, err := s.groupService.AssignPolicy(r.Context(), policyID, req.TargetType, req.TargetID, req.Priority)
+	if err != nil {
+		respondError(w, r, http.StatusBadRequest, "assignment_error", err.Error())
+		return
+	}
+
+	s.logAudit(r, "policy.assign_target", "policy", policyID, map[string]interface{}{
+		"target_type": req.TargetType, "target_id": req.TargetID,
+	})
+	respondJSON(w, r, http.StatusCreated, assignment)
+}
+
+func (s *Server) handleUnassignPolicyFromTarget(w http.ResponseWriter, r *http.Request) {
+	assignmentID, err := parseUUIDParam(r, "assignment_id")
+	if err != nil {
+		respondError(w, r, http.StatusBadRequest, "invalid_id", "Invalid assignment ID")
+		return
+	}
+	if err := s.groupService.UnassignPolicy(r.Context(), assignmentID); err != nil {
+		if strings.Contains(err.Error(), "not found") {
+			respondError(w, r, http.StatusNotFound, "not_found", "Assignment not found")
+			return
+		}
+		respondError(w, r, http.StatusInternalServerError, "internal_error", "Failed to unassign")
+		return
+	}
+	s.logAudit(r, "policy.unassign_target", "policy_assignment", assignmentID, nil)
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (s *Server) handleListPolicyAssignments(w http.ResponseWriter, r *http.Request) {
+	policyID, err := parseUUIDParam(r, "id")
+	if err != nil {
+		respondError(w, r, http.StatusBadRequest, "invalid_id", "Invalid policy ID")
+		return
+	}
+	assignments, err := s.groupService.ListAssignmentsByPolicy(r.Context(), policyID)
+	if err != nil {
+		respondError(w, r, http.StatusInternalServerError, "internal_error", "Failed to list assignments")
+		return
+	}
+	respondJSON(w, r, http.StatusOK, assignments)
+}
+
+func (s *Server) handleGetDeviceEffectivePolicies(w http.ResponseWriter, r *http.Request) {
+	deviceID, err := parseUUIDParam(r, "id")
+	if err != nil {
+		respondError(w, r, http.StatusBadRequest, "invalid_id", "Invalid device ID")
+		return
+	}
+	device, err := s.deviceRepo.GetByID(r.Context(), deviceID)
+	if err != nil {
+		if strings.Contains(err.Error(), "not found") {
+			respondError(w, r, http.StatusNotFound, "not_found", "Device not found")
+			return
+		}
+		respondError(w, r, http.StatusInternalServerError, "internal_error", "Failed to get device")
+		return
+	}
+	assignments, err := s.groupService.GetEffectivePolicies(r.Context(), deviceID, device.EnterpriseID)
+	if err != nil {
+		respondError(w, r, http.StatusInternalServerError, "internal_error", "Failed to get effective policies")
+		return
+	}
+	respondJSON(w, r, http.StatusOK, assignments)
+}
+
+// Compliance handlers (Sprint 4)
+
+func (s *Server) handleComplianceSummary(w http.ResponseWriter, r *http.Request) {
+	user, err := auth.UserFromContext(r.Context())
+	if err != nil {
+		respondError(w, r, http.StatusUnauthorized, "unauthorized", "Authentication required")
+		return
+	}
+	summary, err := s.complianceService.GetSummary(r.Context(), user.EnterpriseID)
+	if err != nil {
+		respondError(w, r, http.StatusInternalServerError, "internal_error", "Failed to get compliance summary")
+		return
+	}
+	respondJSON(w, r, http.StatusOK, summary)
+}
+
+func (s *Server) handleDeviceCompliance(w http.ResponseWriter, r *http.Request) {
+	deviceID, err := parseUUIDParam(r, "id")
+	if err != nil {
+		respondError(w, r, http.StatusBadRequest, "invalid_id", "Invalid device ID")
+		return
+	}
+	results, err := s.complianceService.GetDeviceCompliance(r.Context(), deviceID)
+	if err != nil {
+		respondError(w, r, http.StatusInternalServerError, "internal_error", "Failed to get compliance")
+		return
+	}
+	respondJSON(w, r, http.StatusOK, results)
+}
+
+func (s *Server) handleEvaluateDeviceCompliance(w http.ResponseWriter, r *http.Request) {
+	deviceID, err := parseUUIDParam(r, "id")
+	if err != nil {
+		respondError(w, r, http.StatusBadRequest, "invalid_id", "Invalid device ID")
+		return
+	}
+	device, err := s.deviceRepo.GetByID(r.Context(), deviceID)
+	if err != nil {
+		if strings.Contains(err.Error(), "not found") {
+			respondError(w, r, http.StatusNotFound, "not_found", "Device not found")
+			return
+		}
+		respondError(w, r, http.StatusInternalServerError, "internal_error", "Failed to get device")
+		return
+	}
+	results, err := s.complianceService.EvaluateDevice(r.Context(), deviceID, device.EnterpriseID)
+	if err != nil {
+		respondError(w, r, http.StatusInternalServerError, "internal_error", "Failed to evaluate compliance")
+		return
+	}
+	s.logAudit(r, "compliance.evaluate", "device", deviceID, map[string]interface{}{"results": len(results)})
+	respondJSON(w, r, http.StatusOK, results)
 }
 
 // Certificate handlers

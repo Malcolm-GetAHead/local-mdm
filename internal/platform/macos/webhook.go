@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/malcolm-getahead/local-mdm/internal/models"
 )
 
 // WebhookEvent represents a NanoMDM webhook event
@@ -106,19 +107,26 @@ func (h *WebhookHandler) handleCheckOut(ctx context.Context, event *CheckinEvent
 	return nil
 }
 
+// LifecycleNotifier is called on device lifecycle events.
+type LifecycleNotifier interface {
+	OnUnenroll(ctx context.Context, device *models.Device)
+}
+
 // CheckinHandler handles MDM check-in requests
 type CheckinHandler struct {
-	nanomdm *NanoMDMService
-	service *Service
-	logger  *slog.Logger
+	nanomdm   *NanoMDMService
+	service   *Service
+	lifecycle LifecycleNotifier
+	logger    *slog.Logger
 }
 
 // NewCheckinHandler creates a new check-in handler
-func NewCheckinHandler(nanomdm *NanoMDMService, service *Service, logger *slog.Logger) *CheckinHandler {
+func NewCheckinHandler(nanomdm *NanoMDMService, service *Service, lifecycle LifecycleNotifier, logger *slog.Logger) *CheckinHandler {
 	return &CheckinHandler{
-		nanomdm: nanomdm,
-		service: service,
-		logger:  logger,
+		nanomdm:   nanomdm,
+		service:   service,
+		lifecycle: lifecycle,
+		logger:    logger,
 	}
 }
 
@@ -154,6 +162,20 @@ func (h *CheckinHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 					h.logger.Error("failed to create device on authenticate", "error", err, "udid", ce.UDID)
 				}
 			}
+		}
+	}
+
+	// On CheckOut, update device status and call lifecycle hooks
+	if ce.MessageType == "CheckOut" && ce.UDID != "" {
+		if device, err := h.service.GetDeviceByUDID(r.Context(), ce.UDID); err == nil {
+			device.Status = models.DeviceStatusUnenrolled
+			if err := h.service.UpdateDevice(r.Context(), device); err != nil {
+				h.logger.Error("failed to update device status on checkout", "error", err, "udid", ce.UDID)
+			}
+			if h.lifecycle != nil {
+				h.lifecycle.OnUnenroll(r.Context(), device)
+			}
+			h.logger.Info("device unenrolled via checkout", "udid", ce.UDID, "device_id", device.ID)
 		}
 	}
 

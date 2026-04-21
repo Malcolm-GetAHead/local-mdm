@@ -336,8 +336,7 @@ if err != nil {
 ## What NOT to Do
 
 ### ❌ Don't Add Without Planning
-- Service layer (check architecture docs first)
-- Redis caching (check if needed for current phase)
+- Redis caching (Redis was removed in Sprint 4 — use PostgreSQL for all caching)
 - Distributed tracing (check monitoring requirements)
 - Kubernetes manifests (check deployment plans)
 - HSM integration (check security roadmap)
@@ -378,7 +377,10 @@ docs/planning/
 ├── sprints/              - Sprint plans and task breakdowns
 │   ├── sprint-3-platform-features/
 │   ├── sprint-4-policy-and-identity/
-│   └── sprint-4b-platform-sso/
+│   ├── sprint-4b-db-pools/
+│   ├── sprint-4c-platform-sso/
+│   ├── sprint-5-ui-and-polish/
+│   └── sprint-5b-web-dashboard/
 └── future/               - Future enhancements (F-01 to F-08)
 ```
 

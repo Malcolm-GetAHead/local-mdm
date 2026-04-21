@@ -23,6 +23,7 @@ import (
 	"github.com/malcolm-getahead/local-mdm/internal/platform/windows"
 	"github.com/malcolm-getahead/local-mdm/internal/repository"
 	"github.com/malcolm-getahead/local-mdm/internal/scep"
+	"github.com/malcolm-getahead/local-mdm/internal/service"
 )
 
 // Server represents the HTTP server
@@ -58,6 +59,12 @@ type Server struct {
 	ppkgSigner         *windows.PPKGSigner
 	androidService   *android.Service
 	cmdDispatcher    *commandDispatcher
+	lifecycleService *service.LifecycleService
+	policyService    *service.PolicyService
+	policyVersionRepo repository.PolicyVersionRepository
+	groupService     *service.GroupService
+	complianceService *service.ComplianceService
+	cleanupCancel     context.CancelFunc
 }
 
 // New creates a new API server
@@ -167,7 +174,7 @@ func New(cfg *config.Config, database *db.DB, logger *slog.Logger) (*Server, err
 	validator, err := auth.NewOIDCValidator(
 		cfg.Keycloak.IssuerURL(), 
 		cfg.Keycloak.ClientID, 
-		cfg.Redis.Addr(), 
+		database.DB, 
 		cfg.Auth.CircuitBreaker.MaxFailures,
 		cfg.Auth.CircuitBreaker.Timeout,
 		cfg.Auth.TokenCache.TTL,
@@ -231,6 +238,31 @@ func New(cfg *config.Config, database *db.DB, logger *slog.Logger) (*Server, err
 	s.androidService = android.NewService(s.deviceRepo, s.enterpriseRepo, cfg.Android.ProjectID, cfg.Android.ServiceAccountJSON)
 
 	s.cmdDispatcher = newCommandDispatcher(s.cmdRepo, s.nanomdmService, logger)
+
+	s.lifecycleService = service.NewLifecycleService(logger)
+
+	policyVersionRepo, err := repository.NewPolicyVersionRepository(database.DB)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create policy version repository: %w", err)
+	}
+	s.policyVersionRepo = policyVersionRepo
+	s.policyService = service.NewPolicyService(s.policyRepo, policyVersionRepo, logger)
+
+	groupRepo, err := repository.NewGroupRepository(database.DB)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create group repository: %w", err)
+	}
+	assignmentRepo, err := repository.NewPolicyAssignmentRepository(database.DB)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create policy assignment repository: %w", err)
+	}
+	s.groupService = service.NewGroupService(groupRepo, assignmentRepo, logger)
+
+	complianceRepo, err := repository.NewComplianceRepository(database.DB)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create compliance repository: %w", err)
+	}
+	s.complianceService = service.NewComplianceService(complianceRepo, s.groupService, s.policyRepo, logger)
 
 	s.setupRoutes()
 	s.setupMiddleware()
@@ -374,6 +406,111 @@ func (s *Server) setupRoutes() {
 		),
 	)).Methods("DELETE")
 
+	// Policy versioning & templates (Sprint 4)
+	api.Handle("/policies/{id}/versions", s.authMiddleware.RequireAuth(
+		http.HandlerFunc(s.handleListPolicyVersions),
+	)).Methods("GET")
+
+	api.Handle("/policies/{id}/rollback", s.authMiddleware.RequireAuth(
+		s.authMiddleware.RequireRole("admin", "operator")(
+			http.HandlerFunc(s.handleRollbackPolicy),
+		),
+	)).Methods("POST")
+
+	api.Handle("/policies/{id}/translate", s.authMiddleware.RequireAuth(
+		http.HandlerFunc(s.handleTranslatePolicy),
+	)).Methods("GET")
+
+	api.Handle("/policy-templates", s.authMiddleware.RequireAuth(
+		http.HandlerFunc(s.handleListPolicyTemplates),
+	)).Methods("GET")
+
+	api.Handle("/policy-templates/{id}/clone", s.authMiddleware.RequireAuth(
+		s.authMiddleware.RequireRole("admin", "operator")(
+			http.HandlerFunc(s.handleClonePolicyTemplate),
+		),
+	)).Methods("POST")
+
+	// Policy assignment to targets (Sprint 4)
+	api.Handle("/policies/{id}/assignments", s.authMiddleware.RequireAuth(
+		http.HandlerFunc(s.handleListPolicyAssignments),
+	)).Methods("GET")
+
+	api.Handle("/policies/{id}/assignments", s.authMiddleware.RequireAuth(
+		s.authMiddleware.RequireRole("admin", "operator")(
+			http.HandlerFunc(s.handleAssignPolicyToTarget),
+		),
+	)).Methods("POST")
+
+	api.Handle("/policy-assignments/{assignment_id}", s.authMiddleware.RequireAuth(
+		s.authMiddleware.RequireRole("admin", "operator")(
+			http.HandlerFunc(s.handleUnassignPolicyFromTarget),
+		),
+	)).Methods("DELETE")
+
+	// Device effective policies (Sprint 4)
+	api.Handle("/devices/{id}/effective-policies", s.authMiddleware.RequireAuth(
+		http.HandlerFunc(s.handleGetDeviceEffectivePolicies),
+	)).Methods("GET")
+
+	// Device groups (Sprint 4)
+	api.Handle("/groups", s.authMiddleware.RequireAuth(
+		http.HandlerFunc(s.handleListGroups),
+	)).Methods("GET")
+
+	api.Handle("/groups", s.authMiddleware.RequireAuth(
+		s.authMiddleware.RequireRole("admin", "operator")(
+			http.HandlerFunc(s.handleCreateGroup),
+		),
+	)).Methods("POST")
+
+	api.Handle("/groups/{id}", s.authMiddleware.RequireAuth(
+		http.HandlerFunc(s.handleGetGroup),
+	)).Methods("GET")
+
+	api.Handle("/groups/{id}", s.authMiddleware.RequireAuth(
+		s.authMiddleware.RequireRole("admin", "operator")(
+			http.HandlerFunc(s.handleUpdateGroup),
+		),
+	)).Methods("PUT")
+
+	api.Handle("/groups/{id}", s.authMiddleware.RequireAuth(
+		s.authMiddleware.RequireRole("admin")(
+			http.HandlerFunc(s.handleDeleteGroup),
+		),
+	)).Methods("DELETE")
+
+	api.Handle("/groups/{id}/members", s.authMiddleware.RequireAuth(
+		http.HandlerFunc(s.handleListGroupMembers),
+	)).Methods("GET")
+
+	api.Handle("/groups/{id}/members", s.authMiddleware.RequireAuth(
+		s.authMiddleware.RequireRole("admin", "operator")(
+			http.HandlerFunc(s.handleAddGroupMember),
+		),
+	)).Methods("POST")
+
+	api.Handle("/groups/{id}/members/{device_id}", s.authMiddleware.RequireAuth(
+		s.authMiddleware.RequireRole("admin", "operator")(
+			http.HandlerFunc(s.handleRemoveGroupMember),
+		),
+	)).Methods("DELETE")
+
+	// Compliance (Sprint 4)
+	api.Handle("/compliance", s.authMiddleware.RequireAuth(
+		http.HandlerFunc(s.handleComplianceSummary),
+	)).Methods("GET")
+
+	api.Handle("/devices/{id}/compliance", s.authMiddleware.RequireAuth(
+		http.HandlerFunc(s.handleDeviceCompliance),
+	)).Methods("GET")
+
+	api.Handle("/devices/{id}/compliance/evaluate", s.authMiddleware.RequireAuth(
+		s.authMiddleware.RequireRole("admin", "operator")(
+			http.HandlerFunc(s.handleEvaluateDeviceCompliance),
+		),
+	)).Methods("POST")
+
 	// Certificates
 	api.Handle("/certificates", s.authMiddleware.RequireAuth(
 		http.HandlerFunc(s.handleListCertificates),
@@ -463,7 +600,7 @@ func (s *Server) setupRoutes() {
 	api.Handle("/dep/{name}/devices", s.authMiddleware.RequireAuth(
 		http.HandlerFunc(s.handleDEPDevices),
 	)).Methods("GET")
-	checkinHandler := macos.NewCheckinHandler(s.nanomdmService, s.macosService, s.logger)
+	checkinHandler := macos.NewCheckinHandler(s.nanomdmService, s.macosService, s.lifecycleService, s.logger)
 	commandHandler := macos.NewCommandHandler(s.nanomdmService, s.logger)
 	s.router.Handle("/mdm", commandHandler).Methods("PUT")
 	s.router.Handle("/checkin", checkinHandler).Methods("PUT")
@@ -533,6 +670,7 @@ func (s *Server) setupMiddleware() {
 	s.router.Use(requestIDMiddleware)
 	s.router.Use(s.loggingMiddleware)
 	s.router.Use(recoveryMiddleware(s.logger))
+	s.router.Use(idempotencyMiddleware(s.db.DB))
 	s.router.Use(securityHeadersMiddleware)
 	s.router.Use(corsMiddleware(s.config.Server.CORS))
 }
@@ -564,6 +702,9 @@ func (s *Server) Start() error {
 	if s.cmdDispatcher != nil {
 		s.cmdDispatcher.Start()
 	}
+
+	// Start periodic cleanup for expired token cache and idempotency keys
+	s.startCleanupTicker()
 
 	if s.config.Server.TLS.Enabled {
 		return s.server.ListenAndServeTLS(
@@ -617,8 +758,37 @@ func (s *Server) Shutdown(ctx context.Context) error {
 	if s.cmdDispatcher != nil {
 		s.cmdDispatcher.Stop()
 	}
+
+	// Stop cleanup ticker
+	if s.cleanupCancel != nil {
+		s.cleanupCancel()
+	}
 	
 	return s.server.Shutdown(ctx)
+}
+
+// startCleanupTicker runs periodic cleanup of expired token cache and idempotency keys.
+func (s *Server) startCleanupTicker() {
+	ctx, cancel := context.WithCancel(context.Background())
+	s.cleanupCancel = cancel
+
+	go func() {
+		ticker := time.NewTicker(1 * time.Hour)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				if n, err := cleanupIdempotencyKeys(s.db.DB); err != nil {
+					s.logger.Warn("idempotency key cleanup failed", "error", err)
+				} else if n > 0 {
+					s.logger.Info("cleaned up expired idempotency keys", "count", n)
+				}
+			}
+		}
+	}()
+	s.logger.Info("Periodic cleanup ticker started", "interval", "1h")
 }
 
 // Middleware

@@ -249,6 +249,15 @@ const (
 	ComplianceStatusError        = "error"
 )
 
+// ComplianceSummary holds enterprise-wide compliance counts.
+type ComplianceSummary struct {
+	Compliant    int `json:"compliant"`
+	NonCompliant int `json:"non_compliant"`
+	Unknown      int `json:"unknown"`
+	Error        int `json:"error"`
+	Total        int `json:"total"`
+}
+
 // DeviceApp tracks an app's installation state on a device
 type DeviceApp struct {
 	DeviceID         uuid.UUID  `json:"device_id" db:"device_id"`
@@ -266,6 +275,21 @@ const (
 	DeviceAppFailed    = "failed"
 	DeviceAppRemoved   = "removed"
 )
+
+// PolicyVersion is a snapshot of a policy at a point in time.
+type PolicyVersion struct {
+	ID           uuid.UUID `json:"id" db:"id"`
+	PolicyID     uuid.UUID `json:"policy_id" db:"policy_id"`
+	Version      int       `json:"version" db:"version"`
+	PolicyConfig JSONB     `json:"policy_config" db:"policy_config"`
+	Name         string    `json:"name" db:"name"`
+	Description  string    `json:"description" db:"description"`
+	Platform     string    `json:"platform" db:"platform"`
+	PolicyType   string    `json:"policy_type" db:"policy_type"`
+	IsActive     bool      `json:"is_active" db:"is_active"`
+	CreatedBy    string    `json:"created_by" db:"created_by"`
+	CreatedAt    time.Time `json:"created_at" db:"created_at"`
+}
 
 // DeviceCommand represents a pending or completed management command
 type DeviceCommand struct {

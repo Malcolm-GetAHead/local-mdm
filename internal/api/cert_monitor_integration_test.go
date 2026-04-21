@@ -33,10 +33,6 @@ func TestServer_CertificateMonitorIntegration(t *testing.T) {
 			WriteTimeout: 30 * time.Second,
 			IdleTimeout:  60 * time.Second,
 		},
-		Redis: config.RedisConfig{
-			Host: "localhost",
-			Port: 6379,
-		},
 		Auth: config.AuthConfig{
 			JWTSecret:            "test-secret-key-for-testing-only",
 			AccessTokenDuration:  1 * time.Hour,
@@ -125,10 +121,6 @@ func TestServer_CertificateMonitorDisabled(t *testing.T) {
 			ReadTimeout:  30 * time.Second,
 			WriteTimeout: 30 * time.Second,
 			IdleTimeout:  60 * time.Second,
-		},
-		Redis: config.RedisConfig{
-			Host: "localhost",
-			Port: 6379,
 		},
 		Auth: config.AuthConfig{
 			JWTSecret:            "test-secret-key-for-testing-only",

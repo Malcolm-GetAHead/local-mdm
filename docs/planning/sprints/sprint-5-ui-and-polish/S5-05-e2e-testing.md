@@ -1,16 +1,21 @@
 # S5-05: End-to-End Testing & Hardening
 
 **Sprint**: 5 — UI & Polish
-**Parallel**: ⚠️ Benefits from other S5 tasks but can start with API tests
+**Parallel**: ⚠️ Benefits from other S5 tasks (especially S5-09, S5-10)
+**Depends on**: All platform tasks (Sprints 2-3), Sprint 4 (policy/compliance/groups)
 **Effort**: 4-5 days
 
 ## Tasks
 
 ### 1. E2E Test Suite
-- macOS: enroll → push profile → verify compliance → lock → unenroll
-- Windows: enroll → deploy WiFi CSP → verify inventory → wipe
-- Android: enroll → deploy policy → install app → verify compliance
-- Files: `tests/e2e/`
+Full lifecycle flows incorporating Sprint 4 policy and compliance:
+
+- **macOS**: enroll → add to group → assign policy (via group) → push profile → check-in → compliance evaluation → verify compliant → lock → unenroll → lifecycle hooks fire
+- **Windows**: enroll → assign policy (direct) → deploy WiFi CSP → check-in → compliance evaluation → verify inventory → wipe → lifecycle hooks fire
+- **Android**: enroll → add to group → assign policy (via group) → deploy policy → install app → check-in → compliance evaluation → verify compliant
+- **Cross-platform**: create policy template → clone to enterprise → assign to enterprise-wide → verify all platforms receive translated policy → rollback policy version → verify rollback applied
+
+Files: `tests/e2e/`
 
 ### 2. Security Hardening
 - Input validation on all endpoints

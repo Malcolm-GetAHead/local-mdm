@@ -52,7 +52,7 @@ func TestOIDCValidator(t *testing.T) {
 	}
 	
 	// Create validator
-	validator, err := auth.NewOIDCValidator("http://localhost:8180/realms/localmdm", "localmdm-api", "", 5, 30*time.Second, 5*time.Minute, nil)
+	validator, err := auth.NewOIDCValidator("http://localhost:8180/realms/localmdm", "localmdm-api", nil, 5, 30*time.Second, 5*time.Minute, nil)
 	if err != nil {
 		t.Fatalf("Failed to create validator: %v", err)
 	}
@@ -86,7 +86,7 @@ func TestAuthMiddleware(t *testing.T) {
 	}
 	
 	// Create validator and middleware
-	validator, _ := auth.NewOIDCValidator("http://localhost:8180/realms/localmdm", "localmdm-api", "", 5, 30*time.Second, 5*time.Minute, nil)
+	validator, _ := auth.NewOIDCValidator("http://localhost:8180/realms/localmdm", "localmdm-api", nil, 5, 30*time.Second, 5*time.Minute, nil)
 	
 	logger := logging.New(config.LoggingConfig{Level: "info", Format: "json"})
 	middleware := auth.NewMiddleware(validator, logger)
@@ -139,7 +139,7 @@ func TestRequireRole(t *testing.T) {
 	tokenResp, _ := kc.Login("admin", "admin123")
 	
 	// Create validator and middleware
-	validator, _ := auth.NewOIDCValidator("http://localhost:8180/realms/localmdm", "localmdm-api", "", 5, 30*time.Second, 5*time.Minute, nil)
+	validator, _ := auth.NewOIDCValidator("http://localhost:8180/realms/localmdm", "localmdm-api", nil, 5, 30*time.Second, 5*time.Minute, nil)
 	
 	logger := logging.New(config.LoggingConfig{Level: "info", Format: "json"})
 	middleware := auth.NewMiddleware(validator, logger)
@@ -218,7 +218,7 @@ func TestAuthContext(t *testing.T) {
 
 func TestJWKSRefreshRaceCondition(t *testing.T) {
 	// Create validator
-	validator, err := auth.NewOIDCValidator("http://localhost:8180/realms/localmdm", "localmdm-api", "", 5, 30*time.Second, 5*time.Minute, nil)
+	validator, err := auth.NewOIDCValidator("http://localhost:8180/realms/localmdm", "localmdm-api", nil, 5, 30*time.Second, 5*time.Minute, nil)
 	if err != nil {
 		t.Fatalf("Failed to create validator: %v", err)
 	}
@@ -262,7 +262,7 @@ func TestJWKSRefreshRaceCondition(t *testing.T) {
 
 func TestRefreshJWKSDoubleCheck(t *testing.T) {
 	// Create validator
-	validator, err := auth.NewOIDCValidator("http://localhost:8180/realms/localmdm", "localmdm-api", "", 5, 30*time.Second, 5*time.Minute, nil)
+	validator, err := auth.NewOIDCValidator("http://localhost:8180/realms/localmdm", "localmdm-api", nil, 5, 30*time.Second, 5*time.Minute, nil)
 	if err != nil {
 		t.Fatalf("Failed to create validator: %v", err)
 	}
@@ -305,7 +305,7 @@ func TestOIDCValidatorErrors(t *testing.T) {
 	
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := auth.NewOIDCValidator(tt.issuerURL, tt.clientID, "", 5, 30*time.Second, 5*time.Minute, nil)
+			_, err := auth.NewOIDCValidator(tt.issuerURL, tt.clientID, nil, 5, 30*time.Second, 5*time.Minute, nil)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("NewOIDCValidator() error = %v, wantErr %v", err, tt.wantErr)
 			}
@@ -326,7 +326,7 @@ func TestRefreshJWKSTimeout(t *testing.T) {
 	defer slowServer.Close()
 	
 	// Create validator with slow server URL - should timeout
-	_, err := auth.NewOIDCValidator(slowServer.URL, "test-client", "", 5, 30*time.Second, 5*time.Minute, nil)
+	_, err := auth.NewOIDCValidator(slowServer.URL, "test-client", nil, 5, 30*time.Second, 5*time.Minute, nil)
 	if err == nil {
 		t.Error("Expected timeout error, got nil")
 	}
@@ -345,7 +345,7 @@ func TestRefreshJWKSEmptyKeys(t *testing.T) {
 	defer emptyServer.Close()
 	
 	// Create validator with empty JWKS - should fail
-	_, err := auth.NewOIDCValidator(emptyServer.URL, "test-client", "", 5, 30*time.Second, 5*time.Minute, nil)
+	_, err := auth.NewOIDCValidator(emptyServer.URL, "test-client", nil, 5, 30*time.Second, 5*time.Minute, nil)
 	if err == nil {
 		t.Error("Expected error for empty JWKS, got nil")
 	}
@@ -426,7 +426,7 @@ func TestOptionalAuth(t *testing.T) {
 	}
 	
 	// Create validator and middleware
-	validator, _ := auth.NewOIDCValidator("http://localhost:8180/realms/localmdm", "localmdm-api", "", 5, 30*time.Second, 5*time.Minute, nil)
+	validator, _ := auth.NewOIDCValidator("http://localhost:8180/realms/localmdm", "localmdm-api", nil, 5, 30*time.Second, 5*time.Minute, nil)
 	
 	logger := logging.New(config.LoggingConfig{Level: "info", Format: "json"})
 	middleware := auth.NewMiddleware(validator, logger)

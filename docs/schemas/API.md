@@ -1034,3 +1034,120 @@ GET /api/v1/docs
 2. Set up Swagger UI
 3. Add request/response examples
 4. Document authentication flows
+
+---
+
+## Sprint 4: Policy & Identity Endpoints
+
+### Policy Versioning
+
+#### List Policy Versions
+```http
+GET /api/v1/policies/{id}/versions?limit=20&offset=0
+```
+Returns version history for a policy (newest first).
+
+#### Rollback Policy
+```http
+POST /api/v1/policies/{id}/rollback
+Content-Type: application/json
+
+{"version": 1}
+```
+Restores policy to a previous version. Creates a new version entry.
+
+#### Translate Policy
+```http
+GET /api/v1/policies/{id}/translate?platform=macos
+```
+Returns platform-specific translation. Omit `platform` to get all three.
+
+### Policy Templates
+
+#### List Templates
+```http
+GET /api/v1/policy-templates
+```
+
+#### Clone Template
+```http
+POST /api/v1/policy-templates/{id}/clone
+Content-Type: application/json
+
+{"name": "My Security Policy"}
+```
+
+### Device Groups
+
+#### CRUD
+```http
+GET    /api/v1/groups
+POST   /api/v1/groups                    {"name": "Engineering", "description": "..."}
+GET    /api/v1/groups/{id}
+PUT    /api/v1/groups/{id}               {"name": "Updated Name"}
+DELETE /api/v1/groups/{id}
+```
+
+#### Group Membership
+```http
+GET    /api/v1/groups/{id}/members
+POST   /api/v1/groups/{id}/members       {"device_id": "uuid"}
+DELETE /api/v1/groups/{id}/members/{device_id}
+```
+
+### Policy Assignments
+
+#### Assign Policy to Target
+```http
+POST /api/v1/policies/{id}/assignments
+Content-Type: application/json
+
+{"target_type": "group", "target_id": "group-uuid", "priority": 10}
+```
+`target_type`: `device`, `group`, or `enterprise`. Lower priority number = higher precedence.
+
+#### List Policy Assignments
+```http
+GET /api/v1/policies/{id}/assignments
+```
+
+#### Remove Assignment
+```http
+DELETE /api/v1/policy-assignments/{assignment_id}
+```
+
+#### Get Device Effective Policies
+```http
+GET /api/v1/devices/{id}/effective-policies
+```
+Returns all policies that apply to a device (via direct, group, and enterprise assignments), ordered by priority.
+
+### Compliance
+
+#### Enterprise Compliance Summary
+```http
+GET /api/v1/compliance
+```
+Returns: `{"compliant": 42, "non_compliant": 3, "unknown": 5, "error": 0, "total": 50}`
+
+#### Device Compliance
+```http
+GET /api/v1/devices/{id}/compliance
+```
+
+#### Trigger Compliance Evaluation
+```http
+POST /api/v1/devices/{id}/compliance/evaluate
+```
+
+### Idempotency-Key Header
+
+All `POST`, `PUT`, and `PATCH` requests support the `Idempotency-Key` header. If provided, the server caches the response for 24 hours. Subsequent requests with the same key return the cached response without re-executing the operation.
+
+```http
+POST /api/v1/policies
+Idempotency-Key: unique-client-key-123
+Content-Type: application/json
+
+{"name": "My Policy", ...}
+```

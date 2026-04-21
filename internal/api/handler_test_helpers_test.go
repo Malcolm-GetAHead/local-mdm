@@ -19,6 +19,7 @@ import (
 	"github.com/malcolm-getahead/local-mdm/internal/models"
 	"github.com/malcolm-getahead/local-mdm/internal/platform/macos"
 	"github.com/malcolm-getahead/local-mdm/internal/scep"
+	"github.com/malcolm-getahead/local-mdm/internal/service"
 	depClient "github.com/micromdm/nanodep/client"
 )
 
@@ -140,6 +141,15 @@ func (m *mockDeviceRepo) GetByID(_ context.Context, id uuid.UUID) (*models.Devic
 }
 
 func (m *mockDeviceRepo) GetBySerial(_ context.Context, _ uuid.UUID, _ string) (*models.Device, error) {
+	return nil, fmt.Errorf("device not found")
+}
+
+func (m *mockDeviceRepo) GetByPlatformID(_ context.Context, platform, deviceID string) (*models.Device, error) {
+	for _, d := range m.devices {
+		if d.Platform == platform && d.DeviceID == deviceID {
+			return d, nil
+		}
+	}
 	return nil, fmt.Errorf("device not found")
 }
 
@@ -431,6 +441,52 @@ func (m *mockAuditLogger) Log(_ context.Context, event audit.Event) error {
 	return nil
 }
 
+type mockPolicyVersionRepo struct {
+	versions []*models.PolicyVersion
+}
+
+func (m *mockPolicyVersionRepo) Create(_ context.Context, v *models.PolicyVersion) error {
+	if v.ID == uuid.Nil {
+		v.ID = uuid.New()
+	}
+	m.versions = append(m.versions, v)
+	return nil
+}
+func (m *mockPolicyVersionRepo) ListByPolicy(_ context.Context, policyID uuid.UUID, limit, offset int) ([]*models.PolicyVersion, int, error) {
+	var filtered []*models.PolicyVersion
+	for _, v := range m.versions {
+		if v.PolicyID == policyID {
+			filtered = append(filtered, v)
+		}
+	}
+	total := len(filtered)
+	end := offset + limit
+	if end > total {
+		end = total
+	}
+	if offset >= total {
+		return nil, total, nil
+	}
+	return filtered[offset:end], total, nil
+}
+func (m *mockPolicyVersionRepo) GetByVersion(_ context.Context, policyID uuid.UUID, version int) (*models.PolicyVersion, error) {
+	for _, v := range m.versions {
+		if v.PolicyID == policyID && v.Version == version {
+			return v, nil
+		}
+	}
+	return nil, fmt.Errorf("policy version not found")
+}
+func (m *mockPolicyVersionRepo) LatestVersion(_ context.Context, policyID uuid.UUID) (int, error) {
+	max := 0
+	for _, v := range m.versions {
+		if v.PolicyID == policyID && v.Version > max {
+			max = v.Version
+		}
+	}
+	return max, nil
+}
+
 type mockAppRepo struct {
 	apps      []*models.App
 	createErr error
@@ -548,7 +604,13 @@ func newTestServer(t *testing.T) *testServer {
 		cmdDispatcher:    newCommandDispatcher(cmdr, nil, slog.New(slog.NewTextHandler(bytes.NewBuffer(nil), nil))),
 		enrollmentLimiter: newRateLimiterWithSize(10, time.Minute, 100),
 		depService:       macos.NewDEPService(&testDEPStorage{}, slog.New(slog.NewTextHandler(bytes.NewBuffer(nil), nil))),
+		lifecycleService: service.NewLifecycleService(slog.New(slog.NewTextHandler(bytes.NewBuffer(nil), nil))),
+		policyService:    service.NewPolicyService(pr, &mockPolicyVersionRepo{}, slog.New(slog.NewTextHandler(bytes.NewBuffer(nil), nil))),
+		groupService:     service.NewGroupService(&mockGroupRepo{}, &mockAssignmentRepo{}, slog.New(slog.NewTextHandler(bytes.NewBuffer(nil), nil))),
 	}
+
+	gs := s.groupService
+	s.complianceService = service.NewComplianceService(&mockComplianceRepo{}, gs, pr, slog.New(slog.NewTextHandler(bytes.NewBuffer(nil), nil)))
 
 	// Register only the routes we're testing (no auth middleware)
 	api := s.router.PathPrefix("/api/v1").Subrouter()
@@ -571,6 +633,32 @@ func newTestServer(t *testing.T) *testServer {
 	api.HandleFunc("/policies/{id}", s.handleDeletePolicy).Methods("DELETE")
 	api.HandleFunc("/policies/{id}/assign", s.handleAssignPolicy).Methods("POST")
 	api.HandleFunc("/policies/{id}/assign/{device_id}", s.handleUnassignPolicy).Methods("DELETE")
+
+	// Sprint 4: Policy versioning & templates
+	api.HandleFunc("/policies/{id}/versions", s.handleListPolicyVersions).Methods("GET")
+	api.HandleFunc("/policies/{id}/rollback", s.handleRollbackPolicy).Methods("POST")
+	api.HandleFunc("/policies/{id}/translate", s.handleTranslatePolicy).Methods("GET")
+	api.HandleFunc("/policy-templates", s.handleListPolicyTemplates).Methods("GET")
+	api.HandleFunc("/policy-templates/{id}/clone", s.handleClonePolicyTemplate).Methods("POST")
+
+	// Sprint 4: Groups and policy assignments
+	api.HandleFunc("/groups", s.handleListGroups).Methods("GET")
+	api.HandleFunc("/groups", s.handleCreateGroup).Methods("POST")
+	api.HandleFunc("/groups/{id}", s.handleGetGroup).Methods("GET")
+	api.HandleFunc("/groups/{id}", s.handleUpdateGroup).Methods("PUT")
+	api.HandleFunc("/groups/{id}", s.handleDeleteGroup).Methods("DELETE")
+	api.HandleFunc("/groups/{id}/members", s.handleListGroupMembers).Methods("GET")
+	api.HandleFunc("/groups/{id}/members", s.handleAddGroupMember).Methods("POST")
+	api.HandleFunc("/groups/{id}/members/{device_id}", s.handleRemoveGroupMember).Methods("DELETE")
+	api.HandleFunc("/policies/{id}/assignments", s.handleListPolicyAssignments).Methods("GET")
+	api.HandleFunc("/policies/{id}/assignments", s.handleAssignPolicyToTarget).Methods("POST")
+	api.HandleFunc("/policy-assignments/{assignment_id}", s.handleUnassignPolicyFromTarget).Methods("DELETE")
+	api.HandleFunc("/devices/{id}/effective-policies", s.handleGetDeviceEffectivePolicies).Methods("GET")
+
+	// Sprint 4: Compliance
+	api.HandleFunc("/compliance", s.handleComplianceSummary).Methods("GET")
+	api.HandleFunc("/devices/{id}/compliance", s.handleDeviceCompliance).Methods("GET")
+	api.HandleFunc("/devices/{id}/compliance/evaluate", s.handleEvaluateDeviceCompliance).Methods("POST")
 	api.HandleFunc("/certificates", s.handleListCertificates).Methods("GET")
 	api.HandleFunc("/audit-logs", s.handleListAuditLogs).Methods("GET")
 	api.HandleFunc("/android/webhook", s.handleAndroidWebhook).Methods("POST")
@@ -694,4 +782,127 @@ func (s *testDEPStorage) StoreSyncedDevice(_ context.Context, _, _ string, _ map
 }
 func (s *testDEPStorage) ListDEPDevices(_ context.Context, _ string, _, _ int) ([]macos.DEPDevice, int, error) {
 	return []macos.DEPDevice{}, 0, nil
+}
+
+// --- Mock Group & Assignment Repos ---
+
+type mockGroupRepo struct {
+	groups  []*models.DeviceGroup
+	members map[uuid.UUID][]uuid.UUID // groupID -> deviceIDs
+}
+
+func (m *mockGroupRepo) Create(_ context.Context, g *models.DeviceGroup) error {
+	if g.ID == uuid.Nil {
+		g.ID = uuid.New()
+	}
+	m.groups = append(m.groups, g)
+	return nil
+}
+func (m *mockGroupRepo) GetByID(_ context.Context, id uuid.UUID) (*models.DeviceGroup, error) {
+	for _, g := range m.groups {
+		if g.ID == id {
+			return g, nil
+		}
+	}
+	return nil, fmt.Errorf("group not found")
+}
+func (m *mockGroupRepo) List(_ context.Context, _ uuid.UUID, limit, offset int) ([]*models.DeviceGroup, int, error) {
+	total := len(m.groups)
+	end := offset + limit
+	if end > total {
+		end = total
+	}
+	if offset >= total {
+		return nil, total, nil
+	}
+	return m.groups[offset:end], total, nil
+}
+func (m *mockGroupRepo) Update(_ context.Context, g *models.DeviceGroup) error {
+	for i, existing := range m.groups {
+		if existing.ID == g.ID {
+			m.groups[i] = g
+			return nil
+		}
+	}
+	return fmt.Errorf("group not found")
+}
+func (m *mockGroupRepo) Delete(_ context.Context, id uuid.UUID) error {
+	for i, g := range m.groups {
+		if g.ID == id {
+			m.groups = append(m.groups[:i], m.groups[i+1:]...)
+			return nil
+		}
+	}
+	return fmt.Errorf("group not found")
+}
+func (m *mockGroupRepo) AddMember(_ context.Context, groupID, deviceID uuid.UUID) error {
+	if m.members == nil {
+		m.members = make(map[uuid.UUID][]uuid.UUID)
+	}
+	m.members[groupID] = append(m.members[groupID], deviceID)
+	return nil
+}
+func (m *mockGroupRepo) RemoveMember(_ context.Context, groupID, deviceID uuid.UUID) error {
+	return nil
+}
+func (m *mockGroupRepo) ListMembers(_ context.Context, _ uuid.UUID, _, _ int) ([]*models.Device, int, error) {
+	return nil, 0, nil
+}
+func (m *mockGroupRepo) ListGroupsForDevice(_ context.Context, _ uuid.UUID) ([]*models.DeviceGroup, error) {
+	return nil, nil
+}
+
+type mockAssignmentRepo struct {
+	assignments []*models.PolicyAssignment
+}
+
+func (m *mockAssignmentRepo) Create(_ context.Context, a *models.PolicyAssignment) error {
+	if a.ID == uuid.Nil {
+		a.ID = uuid.New()
+	}
+	a.CreatedAt = time.Now()
+	m.assignments = append(m.assignments, a)
+	return nil
+}
+func (m *mockAssignmentRepo) Delete(_ context.Context, id uuid.UUID) error {
+	for i, a := range m.assignments {
+		if a.ID == id {
+			m.assignments = append(m.assignments[:i], m.assignments[i+1:]...)
+			return nil
+		}
+	}
+	return fmt.Errorf("assignment not found")
+}
+func (m *mockAssignmentRepo) ListByTarget(_ context.Context, _ string, _ uuid.UUID) ([]*models.PolicyAssignment, error) {
+	return m.assignments, nil
+}
+func (m *mockAssignmentRepo) ListByPolicy(_ context.Context, _ uuid.UUID) ([]*models.PolicyAssignment, error) {
+	return m.assignments, nil
+}
+func (m *mockAssignmentRepo) GetEffectivePolicies(_ context.Context, _ uuid.UUID, _ []uuid.UUID, _ uuid.UUID) ([]*models.PolicyAssignment, error) {
+	return m.assignments, nil
+}
+
+type mockComplianceRepo struct {
+	results []*models.ComplianceResult
+}
+
+func (m *mockComplianceRepo) Upsert(_ context.Context, r *models.ComplianceResult) error {
+	if r.ID == uuid.Nil {
+		r.ID = uuid.New()
+	}
+	m.results = append(m.results, r)
+	return nil
+}
+func (m *mockComplianceRepo) GetByDevice(_ context.Context, deviceID uuid.UUID) ([]*models.ComplianceResult, error) {
+	var filtered []*models.ComplianceResult
+	for _, r := range m.results {
+		if r.DeviceID == deviceID {
+			filtered = append(filtered, r)
+		}
+	}
+	return filtered, nil
+}
+func (m *mockComplianceRepo) GetSummary(_ context.Context, _ uuid.UUID) (*models.ComplianceSummary, error) {
+	return &models.ComplianceSummary{}, nil
 }

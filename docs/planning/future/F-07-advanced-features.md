@@ -195,7 +195,7 @@ func (p *ConditionalPolicy) Evaluate(device *Device, context *Context) bool {
 
 > Moved from S4-02 (Sprint 4). S4-02 implements static groups with manual membership. This section adds automatic membership based on filter rules.
 
-**Prerequisite**: S4-02 static groups must be complete. Dynamic groups extend the same `device_groups` table and `device_group_members` junction table with a `rules` JSONB column and a `type` column (static vs dynamic).
+**Prerequisite**: S4-02 static groups must be complete. Dynamic groups extend the same `device_groups` table and `group_memberships` junction table with a `rules` JSONB column and a `type` column (static vs dynamic).
 
 **What changes from static groups**:
 - Static: admin manually adds device IDs to a group

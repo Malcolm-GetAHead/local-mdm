@@ -162,6 +162,9 @@ func (m *mockDeviceRepoForMgmt) GetByID(_ context.Context, id uuid.UUID) (*model
 func (m *mockDeviceRepoForMgmt) GetBySerial(_ context.Context, _ uuid.UUID, _ string) (*models.Device, error) {
 	return nil, fmt.Errorf("not implemented")
 }
+func (m *mockDeviceRepoForMgmt) GetByPlatformID(_ context.Context, _, _ string) (*models.Device, error) {
+	return nil, fmt.Errorf("not implemented")
+}
 func (m *mockDeviceRepoForMgmt) List(_ context.Context, _ uuid.UUID, _, _ int) ([]*models.Device, int, error) {
 	return nil, 0, nil
 }

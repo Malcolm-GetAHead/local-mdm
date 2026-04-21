@@ -64,7 +64,18 @@ Unified Control Plane (Go)
 - App management service (catalog model, CRUD API, deploy to devices)
 - Windows provisioning packages (.ppkg) with ICD XML generation, signing, templates
 - See [Sprint 3 Plan](docs/planning/sprints/sprint-3-platform-features/OVERVIEW.md)
-- Ready to begin Sprint 4 (Policy Engine & Identity)
+
+✅ **Sprint 4 Complete** - 5/5 tasks done + prerequisites (Policy & Identity)
+- Unified policy model with platform translators (macOS/Windows/Android)
+- Policy versioning (full snapshots), rollback to any version, templates
+- Static device groups with membership management
+- Policy assignment to devices, groups, or enterprises (priority-based)
+- Compliance engine with per-device evaluation and enterprise summary
+- Device lifecycle hooks (unenroll/wipe/delete) with extensible hook interface
+- Redis removed — token cache and idempotency keys use PostgreSQL
+- Idempotency-Key header support on all POST/PUT/PATCH endpoints
+- PostgreSQL event triggers for LISTEN/NOTIFY (Go listener in Sprint 5)
+- See [Sprint 4 Plan](docs/planning/sprints/sprint-4-policy-and-identity/OVERVIEW.md)
 
 ## Documentation
 
