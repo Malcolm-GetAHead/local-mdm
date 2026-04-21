@@ -1,5 +1,6 @@
 # Sprint 2: Platform Core — Enrollment & Inventory
 
+**Status**: ✅ Complete  
 **Duration**: 2-3 weeks
 **Goal**: All three platforms can enroll devices and report inventory
 **Depends on**: Sprint 1 complete
@@ -45,10 +46,10 @@ S2-01, S2-02, S2-03, S2-05, and S2-06 can all start in parallel. S2-04 requires 
 
 ## Definition of Done
 
-- [ ] macOS device enrolls via configuration profile, appears in device list
+- [x] macOS device enrolls via configuration profile, appears in device list
 - [x] macOS DEP profile can be defined and assigned to serial numbers
 - [x] Windows device discovers MDM server and completes enrollment
 - [x] Windows device reports DeviceInfo via OMA-DM sync
-- [ ] Android device enrolls via QR code, appears in device list
+- [x] Android device enrolls via QR code, appears in device list
 - [x] `GET /api/v1/devices` returns enrolled devices from all platforms
 - [x] `GET /api/v1/devices/{id}` returns platform-specific inventory data

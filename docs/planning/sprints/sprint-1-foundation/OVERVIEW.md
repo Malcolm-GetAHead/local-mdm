@@ -1,5 +1,6 @@
 # Sprint 1: Foundation
 
+**Status**: ✅ Complete  
 **Duration**: 2 weeks
 **Goal**: Core infrastructure that all subsequent sprints depend on
 
@@ -44,11 +45,11 @@ S1-01 through S1-04 can all start in parallel on day 1. S1-05 depends on S1-02 f
 
 ## Definition of Done
 
-- [ ] `make docker-up` starts PostgreSQL + Keycloak
-- [ ] `make migrate-up` applies all schema migrations
-- [ ] `make run` starts the server with health check passing
-- [ ] OIDC login flow works against local Keycloak
-- [ ] Protected API endpoint rejects unauthenticated requests
-- [ ] CA certificate can be generated and stored
-- [ ] Device certificate can be signed from a CSR
-- [ ] All repository CRUD operations have integration tests
+- [x] `make docker-up` starts PostgreSQL + Keycloak
+- [x] `make migrate-up` applies all schema migrations
+- [x] `make run` starts the server with health check passing
+- [x] OIDC login flow works against local Keycloak
+- [x] Protected API endpoint rejects unauthenticated requests
+- [x] CA certificate can be generated and stored
+- [x] Device certificate can be signed from a CSR
+- [x] All repository CRUD operations have integration tests
