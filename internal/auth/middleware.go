@@ -10,21 +10,30 @@ import (
 	"github.com/malcolm-getahead/local-mdm/internal/audit"
 )
 
+// TokenValidator validates API tokens and returns the associated user.
+type TokenValidator interface {
+	Validate(ctx context.Context, plaintext string) (*AuthUser, error)
+}
+
 // Middleware provides HTTP middleware for authentication and authorization.
-// It validates OIDC tokens, enforces role-based access control, and logs audit events.
 type Middleware struct {
-	validator   *OIDCValidator
-	logger      *slog.Logger
-	auditLogger audit.AuditLogger
+	validator      *OIDCValidator
+	tokenValidator TokenValidator
+	logger         *slog.Logger
+	auditLogger    audit.AuditLogger
 }
 
 // NewMiddleware creates a new authentication middleware instance.
-// The middleware validates OIDC tokens and enforces role-based access control.
 func NewMiddleware(validator *OIDCValidator, logger *slog.Logger) *Middleware {
 	return &Middleware{
 		validator: validator,
 		logger:    logger,
 	}
+}
+
+// SetTokenValidator sets the API token validator for dual auth support.
+func (m *Middleware) SetTokenValidator(tv TokenValidator) {
+	m.tokenValidator = tv
 }
 
 // SetAuditLogger sets the audit logger for the middleware.
@@ -41,65 +50,53 @@ func (m *Middleware) RequireAuth(next http.Handler) http.Handler {
 		tokenString, err := ExtractBearerToken(r)
 		if err != nil {
 			m.logger.Warn("Missing or invalid authorization header", "error", err, "path", r.URL.Path, "request_id", requestID)
-			
-			// Log authentication failure
 			if m.auditLogger != nil {
 				_ = m.auditLogger.Log(r.Context(), audit.Event{
-					Action:       "auth.failure",
-					ResourceType: "user",
-					Details: map[string]interface{}{
-						"reason": "missing_token",
-						"path":   r.URL.Path,
-					},
-					IPAddress: getIP(r),
-					UserAgent: r.UserAgent(),
+					Action: "auth.failure", ResourceType: "user",
+					Details:   map[string]interface{}{"reason": "missing_token", "path": r.URL.Path},
+					IPAddress: getIP(r), UserAgent: r.UserAgent(),
 				})
 			}
-			
 			http.Error(w, "Unauthorized", http.StatusUnauthorized)
 			return
 		}
 		
-		// Validate token
+		// Try API token auth first if it looks like an lmdm_ token
+		if m.tokenValidator != nil && strings.HasPrefix(tokenString, "lmdm_") {
+			user, err := m.tokenValidator.Validate(r.Context(), tokenString)
+			if err == nil {
+				ctx := WithUser(r.Context(), user)
+				next.ServeHTTP(w, r.WithContext(ctx))
+				return
+			}
+			m.logger.Warn("API token validation failed", "error", err, "request_id", requestID)
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			return
+		}
+		
+		// Fall through to OIDC validation
 		user, err := m.validator.ValidateToken(tokenString)
 		if err != nil {
 			m.logger.Warn("Token validation failed", "error", err, "path", r.URL.Path, "request_id", requestID)
-			
-			// Log authentication failure
 			if m.auditLogger != nil {
 				_ = m.auditLogger.Log(r.Context(), audit.Event{
-					Action:       "auth.failure",
-					ResourceType: "user",
-					Details: map[string]interface{}{
-						"reason": "invalid_token",
-						"path":   r.URL.Path,
-					},
-					IPAddress: getIP(r),
-					UserAgent: r.UserAgent(),
+					Action: "auth.failure", ResourceType: "user",
+					Details:   map[string]interface{}{"reason": "invalid_token", "path": r.URL.Path},
+					IPAddress: getIP(r), UserAgent: r.UserAgent(),
 				})
 			}
-			
 			http.Error(w, "Unauthorized", http.StatusUnauthorized)
 			return
 		}
 		
-		// Add user to context
 		ctx := WithUser(r.Context(), user)
-		
 		m.logger.Debug("Authenticated request", "user_id", user.ID, "email", user.Email, "roles", user.Roles, "request_id", requestID)
 		
-		// Log successful authentication
 		if m.auditLogger != nil {
 			_ = m.auditLogger.Log(ctx, audit.Event{
-				Action:       "auth.success",
-				ResourceType: "user",
-				Details: map[string]interface{}{
-					"user_id": user.ID,
-					"email":   user.Email,
-					"path":    r.URL.Path,
-				},
-				IPAddress: getIP(r),
-				UserAgent: r.UserAgent(),
+				Action: "auth.success", ResourceType: "user",
+				Details:   map[string]interface{}{"user_id": user.ID, "email": user.Email, "path": r.URL.Path},
+				IPAddress: getIP(r), UserAgent: r.UserAgent(),
 			})
 		}
 		

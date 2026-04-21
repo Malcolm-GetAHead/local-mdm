@@ -64,6 +64,8 @@ type Server struct {
 	policyService    *service.PolicyService
 	deviceService    *service.DeviceService
 	appService       *service.AppService
+	userService      *service.UserService
+	tokenService     *service.TokenService
 	policyVersionRepo repository.PolicyVersionRepository
 	groupService     *service.GroupService
 	complianceService *service.ComplianceService
@@ -270,6 +272,21 @@ func New(cfg *config.Config, database *db.DB, logger *slog.Logger) (*Server, err
 
 	s.deviceService = service.NewDeviceService(s.deviceRepo, s.cmdRepo, s.cmdDispatcher, s.lifecycleService, logger)
 	s.appService = service.NewAppService(s.appRepo, s.deviceRepo, s.cmdRepo, s.cmdDispatcher, logger)
+
+	userRepo, err := repository.NewUserRepository(database.Writer, database.Reader)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create user repository: %w", err)
+	}
+	s.userService = service.NewUserService(userRepo, logger)
+
+	tokenRepo, err := repository.NewTokenRepository(database.Writer, database.Reader)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create token repository: %w", err)
+	}
+	s.tokenService = service.NewTokenService(tokenRepo, userRepo, logger)
+
+	// Wire API token auth into middleware
+	s.authMiddleware.SetTokenValidator(&tokenAuthAdapter{tokenService: s.tokenService})
 
 	s.setupRoutes()
 	s.setupMiddleware()
@@ -522,6 +539,34 @@ func (s *Server) setupRoutes() {
 	api.Handle("/certificates", s.authMiddleware.RequireAuth(
 		http.HandlerFunc(s.handleListCertificates),
 	)).Methods("GET")
+
+	// Users (S5-11)
+	api.Handle("/users", s.authMiddleware.RequireAuth(
+		s.authMiddleware.RequireRole("admin", "super_admin")(http.HandlerFunc(s.handleListUsers)),
+	)).Methods("GET")
+	api.Handle("/users", s.authMiddleware.RequireAuth(
+		s.authMiddleware.RequireRole("admin", "super_admin")(http.HandlerFunc(s.handleCreateUser)),
+	)).Methods("POST")
+	api.Handle("/users/{id}", s.authMiddleware.RequireAuth(
+		http.HandlerFunc(s.handleGetUser),
+	)).Methods("GET")
+	api.Handle("/users/{id}", s.authMiddleware.RequireAuth(
+		s.authMiddleware.RequireRole("admin", "super_admin")(http.HandlerFunc(s.handleUpdateUser)),
+	)).Methods("PUT")
+	api.Handle("/users/{id}", s.authMiddleware.RequireAuth(
+		s.authMiddleware.RequireRole("admin", "super_admin")(http.HandlerFunc(s.handleDeactivateUser)),
+	)).Methods("DELETE")
+
+	// API Tokens (S5-11)
+	api.Handle("/tokens", s.authMiddleware.RequireAuth(
+		http.HandlerFunc(s.handleCreateToken),
+	)).Methods("POST")
+	api.Handle("/tokens", s.authMiddleware.RequireAuth(
+		http.HandlerFunc(s.handleListTokens),
+	)).Methods("GET")
+	api.Handle("/tokens/{id}", s.authMiddleware.RequireAuth(
+		http.HandlerFunc(s.handleRevokeToken),
+	)).Methods("DELETE")
 	
 	// Device commands (Sprint 3)
 	api.Handle("/devices/{id}/commands", s.authMiddleware.RequireAuth(
@@ -1042,3 +1087,21 @@ func respondError(w http.ResponseWriter, r *http.Request, status int, code, mess
 	json.NewEncoder(w).Encode(response)
 }
 
+
+// tokenAuthAdapter bridges service.TokenService to auth.TokenValidator.
+type tokenAuthAdapter struct {
+	tokenService *service.TokenService
+}
+
+func (a *tokenAuthAdapter) Validate(ctx context.Context, plaintext string) (*auth.AuthUser, error) {
+	user, _, err := a.tokenService.Validate(ctx, plaintext)
+	if err != nil {
+		return nil, err
+	}
+	return &auth.AuthUser{
+		ID:           user.ID.String(),
+		Email:        user.Email,
+		Roles:        []string{user.Role},
+		EnterpriseID: user.EnterpriseID,
+	}, nil
+}
