@@ -619,7 +619,7 @@ func newTestServer(t *testing.T) *testServer {
 	}
 
 	gs := s.groupService
-	s.complianceService = service.NewComplianceService(&mockComplianceRepo{}, gs, pr, slog.New(slog.NewTextHandler(bytes.NewBuffer(nil), nil)))
+	s.complianceService = service.NewComplianceService(&mockComplianceRepo{}, gs, pr, dr, slog.New(slog.NewTextHandler(bytes.NewBuffer(nil), nil)))
 
 	s.deviceService = service.NewDeviceService(dr, cmdr, s.cmdDispatcher, s.lifecycleService, slog.New(slog.NewTextHandler(bytes.NewBuffer(nil), nil)))
 	s.appService = service.NewAppService(appr, dr, cmdr, s.cmdDispatcher, slog.New(slog.NewTextHandler(bytes.NewBuffer(nil), nil)))

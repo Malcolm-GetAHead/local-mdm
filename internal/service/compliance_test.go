@@ -13,6 +13,32 @@ import (
 
 // --- Mock compliance repo ---
 
+type mockComplianceDeviceRepo struct {
+	devices map[uuid.UUID]*models.Device
+}
+
+func newMockComplianceDeviceRepo() *mockComplianceDeviceRepo {
+	return &mockComplianceDeviceRepo{devices: make(map[uuid.UUID]*models.Device)}
+}
+func (m *mockComplianceDeviceRepo) GetByID(_ context.Context, id uuid.UUID) (*models.Device, error) {
+	d, ok := m.devices[id]
+	if !ok {
+		return nil, fmt.Errorf("device not found")
+	}
+	return d, nil
+}
+func (m *mockComplianceDeviceRepo) List(_ context.Context, _ uuid.UUID, _, _ int) ([]*models.Device, int, error) {
+	return nil, 0, nil
+}
+func (m *mockComplianceDeviceRepo) Update(_ context.Context, d *models.Device) error {
+	m.devices[d.ID] = d
+	return nil
+}
+func (m *mockComplianceDeviceRepo) Delete(_ context.Context, id uuid.UUID) error {
+	delete(m.devices, id)
+	return nil
+}
+
 type mockComplianceRepo struct {
 	results map[string]*models.ComplianceResult // "deviceID:policyID" -> result
 }
@@ -65,11 +91,20 @@ func TestComplianceService_EvaluateDevice(t *testing.T) {
 	ar := &mockAssignmentRepo{}
 	gs := NewGroupService(gr, ar, testLogger())
 
-	svc := NewComplianceService(cr, gs, pr, testLogger())
+	dr := newMockComplianceDeviceRepo()
+	svc := NewComplianceService(cr, gs, pr, dr, testLogger())
 
 	eid := uuid.New()
 	deviceID := uuid.New()
 	policyID := uuid.New()
+
+	// Add device to mock repo
+	dr.devices[deviceID] = &models.Device{
+		BaseModel:    models.BaseModel{ID: deviceID},
+		EnterpriseID: eid,
+		Platform:     models.PlatformWindows,
+		PlatformData: models.JSONB{},
+	}
 
 	// Create a policy and assign it to the device
 	policy := &models.Policy{
@@ -91,13 +126,13 @@ func TestComplianceService_EvaluateDevice(t *testing.T) {
 	assert.Equal(t, deviceID, results[0].DeviceID)
 	assert.Equal(t, policyID, results[0].PolicyID)
 	assert.Equal(t, models.ComplianceStatusUnknown, results[0].Status)
-	assert.Equal(t, "awaiting device state report", results[0].Details["reason"])
+	assert.Equal(t, "no device state reported", results[0].Details["reason"])
 }
 
 func TestComplianceService_EvaluateDevice_NoPolicies(t *testing.T) {
 	cr := newMockComplianceRepo()
 	gs := NewGroupService(newMockGroupRepo(), &mockAssignmentRepo{}, testLogger())
-	svc := NewComplianceService(cr, gs, newMockPolicyRepo(), testLogger())
+	svc := NewComplianceService(cr, gs, newMockPolicyRepo(), newMockComplianceDeviceRepo(), testLogger())
 
 	results, err := svc.EvaluateDevice(context.Background(), uuid.New(), uuid.New())
 	require.NoError(t, err)
@@ -110,10 +145,14 @@ func TestComplianceService_EvaluateDevice_MultipleAssignments(t *testing.T) {
 	gr := newMockGroupRepo()
 	ar := &mockAssignmentRepo{}
 	gs := NewGroupService(gr, ar, testLogger())
-	svc := NewComplianceService(cr, gs, pr, testLogger())
+	dr := newMockComplianceDeviceRepo()
+	svc := NewComplianceService(cr, gs, pr, dr, testLogger())
 
 	eid := uuid.New()
 	deviceID := uuid.New()
+
+	// Add device to mock repo
+	dr.devices[deviceID] = &models.Device{BaseModel: models.BaseModel{ID: deviceID}, EnterpriseID: eid, PlatformData: models.JSONB{}}
 
 	// Create group, add device
 	group := &models.DeviceGroup{EnterpriseID: eid, Name: "Eng"}
@@ -139,9 +178,11 @@ func TestComplianceService_EvaluateDevice_PolicyNotFound(t *testing.T) {
 	pr := newMockPolicyRepo()
 	ar := &mockAssignmentRepo{}
 	gs := NewGroupService(newMockGroupRepo(), ar, testLogger())
-	svc := NewComplianceService(cr, gs, pr, testLogger())
+	dr := newMockComplianceDeviceRepo()
+	svc := NewComplianceService(cr, gs, pr, dr, testLogger())
 
 	deviceID := uuid.New()
+	dr.devices[deviceID] = &models.Device{BaseModel: models.BaseModel{ID: deviceID}, PlatformData: models.JSONB{}}
 	// Assign a policy that doesn't exist in the repo
 	gs.AssignPolicy(context.Background(), uuid.New(), models.TargetTypeDevice, deviceID, 1)
 
@@ -154,7 +195,7 @@ func TestComplianceService_EvaluateDevice_PolicyNotFound(t *testing.T) {
 func TestComplianceService_GetDeviceCompliance(t *testing.T) {
 	cr := newMockComplianceRepo()
 	gs := NewGroupService(newMockGroupRepo(), &mockAssignmentRepo{}, testLogger())
-	svc := NewComplianceService(cr, gs, newMockPolicyRepo(), testLogger())
+	svc := NewComplianceService(cr, gs, newMockPolicyRepo(), newMockComplianceDeviceRepo(), testLogger())
 
 	deviceID := uuid.New()
 	cr.Upsert(context.Background(), &models.ComplianceResult{
@@ -174,7 +215,7 @@ func TestComplianceService_GetDeviceCompliance(t *testing.T) {
 func TestComplianceService_GetSummary(t *testing.T) {
 	cr := newMockComplianceRepo()
 	gs := NewGroupService(newMockGroupRepo(), &mockAssignmentRepo{}, testLogger())
-	svc := NewComplianceService(cr, gs, newMockPolicyRepo(), testLogger())
+	svc := NewComplianceService(cr, gs, newMockPolicyRepo(), newMockComplianceDeviceRepo(), testLogger())
 
 	eid := uuid.New()
 	cr.Upsert(context.Background(), &models.ComplianceResult{
@@ -198,7 +239,7 @@ func TestComplianceService_GetSummary(t *testing.T) {
 func TestComplianceService_UpsertOverwrites(t *testing.T) {
 	cr := newMockComplianceRepo()
 	gs := NewGroupService(newMockGroupRepo(), &mockAssignmentRepo{}, testLogger())
-	svc := NewComplianceService(cr, gs, newMockPolicyRepo(), testLogger())
+	svc := NewComplianceService(cr, gs, newMockPolicyRepo(), newMockComplianceDeviceRepo(), testLogger())
 
 	deviceID := uuid.New()
 	policyID := uuid.New()
@@ -219,22 +260,22 @@ func TestComplianceService_UpsertOverwrites(t *testing.T) {
 	assert.Equal(t, models.ComplianceStatusCompliant, results[0].Status)
 }
 
-func TestComplianceService_EvaluatePolicy_ReturnsUnknown(t *testing.T) {
-	// Directly test the evaluatePolicy method to document current behavior
-	// and catch when S5-09 changes it
-	svc := NewComplianceService(nil, nil, nil, testLogger())
+func TestComplianceService_EvaluatePolicy_NoDeviceState(t *testing.T) {
+	svc := NewComplianceService(nil, nil, nil, nil, testLogger())
 
-	deviceID := uuid.New()
+	device := &models.Device{
+		BaseModel:    models.BaseModel{ID: uuid.New()},
+		PlatformData: nil, // no state reported
+	}
 	policy := &models.Policy{
 		BaseModel:    models.BaseModel{ID: uuid.New()},
 		PolicyType:   models.PolicyTypeSecurity,
 		PolicyConfig: models.JSONB{"min_password_length": float64(8)},
 	}
 
-	result := svc.evaluatePolicy(deviceID, policy)
+	result := svc.evaluatePolicy(device, policy)
 	assert.Equal(t, models.ComplianceStatusUnknown, result.Status)
-	assert.Equal(t, "awaiting device state report", result.Details["reason"])
-	assert.Equal(t, models.PolicyTypeSecurity, result.Details["policy_type"])
+	assert.Equal(t, "no device state reported", result.Details["reason"])
 }
 
 // mockComplianceRepoErr simulates a repo that returns errors
@@ -257,10 +298,12 @@ func TestComplianceService_EvaluateDevice_UpsertError(t *testing.T) {
 	pr := newMockPolicyRepo()
 	ar := &mockAssignmentRepo{}
 	gs := NewGroupService(newMockGroupRepo(), ar, testLogger())
-	svc := NewComplianceService(cr, gs, pr, testLogger())
+	dr := newMockComplianceDeviceRepo()
+	svc := NewComplianceService(cr, gs, pr, dr, testLogger())
 
 	deviceID := uuid.New()
 	policyID := uuid.New()
+	dr.devices[deviceID] = &models.Device{BaseModel: models.BaseModel{ID: deviceID}, PlatformData: models.JSONB{}}
 	pr.policies[policyID] = &models.Policy{BaseModel: models.BaseModel{ID: policyID}, PolicyType: models.PolicyTypeSecurity, PolicyConfig: models.JSONB{}}
 	gs.AssignPolicy(context.Background(), policyID, models.TargetTypeDevice, deviceID, 1)
 

@@ -268,7 +268,7 @@ func New(cfg *config.Config, database *db.DB, logger *slog.Logger) (*Server, err
 	if err != nil {
 		return nil, fmt.Errorf("failed to create compliance repository: %w", err)
 	}
-	s.complianceService = service.NewComplianceService(complianceRepo, s.groupService, s.policyRepo, logger)
+	s.complianceService = service.NewComplianceService(complianceRepo, s.groupService, s.policyRepo, s.deviceRepo, logger)
 
 	s.deviceService = service.NewDeviceService(s.deviceRepo, s.cmdRepo, s.cmdDispatcher, s.lifecycleService, logger)
 	s.appService = service.NewAppService(s.appRepo, s.deviceRepo, s.cmdRepo, s.cmdDispatcher, logger)
