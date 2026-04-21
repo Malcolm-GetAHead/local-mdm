@@ -45,7 +45,7 @@ func CleanupTestDB(t *testing.T, database *db.DB) {
 func WithTransaction(t *testing.T, database *db.DB, fn func(ctx context.Context)) {
 	t.Helper()
 	
-	tx, err := database.BeginTx(context.Background(), nil)
+	tx, err := database.Writer.BeginTx(context.Background(), nil)
 	if err != nil {
 		t.Fatalf("Failed to begin transaction: %v", err)
 	}

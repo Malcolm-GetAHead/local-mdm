@@ -88,9 +88,25 @@ type DatabaseConfig struct {
 	MaxIdleConns    int           `yaml:"max_idle_conns"`
 	ConnMaxLifetime time.Duration `yaml:"conn_max_lifetime"`
 	QueryTimeout    time.Duration `yaml:"query_timeout"`
+	Reader          *ReaderConfig `yaml:"reader,omitempty"`
 }
 
-// DSN returns the database connection string
+// ReaderConfig holds optional overrides for the read replica pool.
+// Any field left at its zero value inherits from the parent DatabaseConfig.
+type ReaderConfig struct {
+	Host            string        `yaml:"host,omitempty"`
+	Port            int           `yaml:"port,omitempty"`
+	User            string        `yaml:"user,omitempty"`
+	Password        string        `yaml:"password,omitempty"`
+	Database        string        `yaml:"database,omitempty"`
+	SSLMode         string        `yaml:"sslmode,omitempty"`
+	MaxOpenConns    int           `yaml:"max_open_conns,omitempty"`
+	MaxIdleConns    int           `yaml:"max_idle_conns,omitempty"`
+	ConnMaxLifetime time.Duration `yaml:"conn_max_lifetime,omitempty"`
+	QueryTimeout    time.Duration `yaml:"query_timeout,omitempty"`
+}
+
+// DSN returns the writer database connection string
 func (c DatabaseConfig) DSN() string {
 	timeout := c.QueryTimeout
 	if timeout == 0 {
@@ -99,6 +115,69 @@ func (c DatabaseConfig) DSN() string {
 
 	return fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=%s statement_timeout=%d",
 		c.Host, c.Port, c.User, c.Password, c.Database, c.SSLMode, timeout.Milliseconds())
+}
+
+// ReaderDSN returns the reader database connection string.
+// Falls back to DSN() when no reader overrides are configured.
+func (c DatabaseConfig) ReaderDSN() string {
+	if c.Reader == nil {
+		return c.DSN()
+	}
+	r := c.Reader
+	host := r.Host
+	if host == "" {
+		host = c.Host
+	}
+	port := r.Port
+	if port == 0 {
+		port = c.Port
+	}
+	user := r.User
+	if user == "" {
+		user = c.User
+	}
+	password := r.Password
+	if password == "" {
+		password = c.Password
+	}
+	database := r.Database
+	if database == "" {
+		database = c.Database
+	}
+	sslmode := r.SSLMode
+	if sslmode == "" {
+		sslmode = c.SSLMode
+	}
+	timeout := r.QueryTimeout
+	if timeout == 0 {
+		timeout = c.QueryTimeout
+	}
+	if timeout == 0 {
+		timeout = constants.DefaultQueryTimeout * time.Second
+	}
+	return fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=%s statement_timeout=%d",
+		host, port, user, password, database, sslmode, timeout.Milliseconds())
+}
+
+// ReaderPoolConfig returns the resolved pool settings for the reader,
+// falling back to the base config values for any unset fields.
+func (c DatabaseConfig) ReaderPoolConfig() (maxOpen, maxIdle int, maxLifetime time.Duration) {
+	if c.Reader == nil {
+		return c.MaxOpenConns, c.MaxIdleConns, c.ConnMaxLifetime
+	}
+	maxOpen = c.Reader.MaxOpenConns
+	if maxOpen == 0 {
+		maxOpen = c.MaxOpenConns
+	}
+	maxIdle = c.Reader.MaxIdleConns
+	if maxIdle == 0 {
+		maxIdle = c.MaxIdleConns
+	}
+	maxLifetime = c.Reader.ConnMaxLifetime
+	if maxLifetime == 0 {
+		maxLifetime = c.ConnMaxLifetime
+	}
+	return
 }
 
 // AuthConfig holds authentication configuration
@@ -254,6 +333,19 @@ func (c *Config) overrideFromEnv() {
 	}
 	if depKey := os.Getenv("DEP_ENCRYPTION_KEY"); depKey != "" {
 		c.MacOS.DEPEncryptionKey = depKey
+	}
+	// Reader pool overrides (creates reader subsection if any DB_READER_ env var is set)
+	if rHost := os.Getenv("DB_READER_HOST"); rHost != "" {
+		if c.Database.Reader == nil {
+			c.Database.Reader = &ReaderConfig{}
+		}
+		c.Database.Reader.Host = rHost
+	}
+	if rPort := os.Getenv("DB_READER_PORT"); rPort != "" {
+		if c.Database.Reader == nil {
+			c.Database.Reader = &ReaderConfig{}
+		}
+		fmt.Sscanf(rPort, "%d", &c.Database.Reader.Port)
 	}
 }
 
