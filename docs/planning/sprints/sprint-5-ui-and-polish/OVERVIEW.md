@@ -51,14 +51,16 @@ S5-06 should be scoped down to: enhanced health checks (/health/ready with depen
 ```
 S4 complete
     │
-    ├── S5-09 (Device State) ───────┐
-    ├── S5-10 (Service Migration) ──┤
+    ├── S5-12 (SCEP Integration) ───┐──→ S5-05 (E2E Testing)
+    ├── S5-10 (Service Migration) ──┤──→ S5-08 (CLI Tools)
     ├── S5-11 (User/Token Auth) ────┤──→ S5-08 (CLI Tools)
-    ├── S5-02 (Reporting) ──────────┤ (S5-02 depends on S5-09)
+    ├── S5-09 (Device State) ───────┤──→ S5-02 (Reporting)
     ├── S5-03 (API Docs) ───────────┤
     ├── S5-04 (Deployment Guide) ───┤──→ S5-05 (E2E Testing)
     ├── S5-06 (Observability) ──────┤
     └── S5-07 (Performance) ────────┘
+
+Recommended start order: S5-12, S5-10, S5-11 (unblock S5-05 and S5-08 early)
 ```
 
 ## Definition of Done
