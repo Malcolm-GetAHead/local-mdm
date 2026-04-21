@@ -175,7 +175,7 @@ func TestService_CreateDevice(t *testing.T) {
 | android | 61.9% | |
 | macos | 59.0% | Borderline — DEP storage needs real Postgres |
 | api | 56.5% | Below 70% handler target |
-| repository | 49.1% | Integration tests need Docker PostgreSQL |
+| repository | 87.3% | Integration tests need Docker PostgreSQL |
 
 ## Coverage Goals
 

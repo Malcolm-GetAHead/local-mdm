@@ -205,6 +205,7 @@ CREATE INDEX idx_policies_deleted_at ON policies(deleted_at);
 - `policy_type`: Type of policy (wifi, vpn, security, app, restriction)
 - `policy_config`: Policy configuration (JSONB)
 - `is_active`: Whether policy is active
+- `is_template`: Whether this policy is a template (for cloning)
 - `created_at`: Creation timestamp
 - `updated_at`: Last modification timestamp
 - `deleted_at`: Soft delete timestamp

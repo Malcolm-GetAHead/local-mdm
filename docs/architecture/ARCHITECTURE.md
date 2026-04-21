@@ -171,6 +171,12 @@ Local MDM follows a layered architecture with clear separation of concerns:
 #### Logging (`internal/logging`)
 - Structured logging helpers
 
+#### Validation (`internal/validation`)
+- Input validation (JSONB size/depth, pagination parameters, sanitization)
+
+#### Test Utilities (`internal/testutil`)
+- Test helpers (database setup, common fixtures)
+
 ## Data Flow
 
 ### Device Enrollment Flow

@@ -583,6 +583,8 @@ Content-Type: application/json
 }
 ```
 
+**Auth**: admin, operator
+
 **Response**: `201 Created`
 ```json
 {
@@ -619,11 +621,15 @@ Content-Type: application/json
 }
 ```
 
+**Auth**: admin, operator
+
 ### Delete Application
 
 ```http
 DELETE /api/v1/apps/:id
 ```
+
+**Auth**: admin
 
 **Response**: `204 No Content`
 
@@ -640,6 +646,8 @@ Content-Type: application/json
   "install_type": "required"
 }
 ```
+
+**Auth**: admin, operator
 
 **Install Types**:
 - `required`: Force install
@@ -674,6 +682,8 @@ Content-Type: application/json
   }
 }
 ```
+
+**Auth**: admin, operator
 
 **Response**: `201 Created`
 ```json
@@ -725,6 +735,8 @@ Content-Type: application/json
 }
 ```
 
+**Auth**: admin, operator
+
 **Response**: `201 Created`
 ```json
 {
@@ -741,6 +753,8 @@ Content-Type: application/json
 ```http
 DELETE /api/v1/devices/:id/profiles/:profile_id
 ```
+
+**Auth**: admin, operator
 
 **Response**: `204 No Content`
 
@@ -816,6 +830,8 @@ Content-Type: application/json
 }
 ```
 
+**Auth**: admin, operator
+
 **Response**: Binary `.ppkg` file download with `Content-Type: application/octet-stream`.
 
 ### List Provisioning Package Templates
@@ -823,6 +839,8 @@ Content-Type: application/json
 ```http
 GET /api/v1/windows/ppkg/templates
 ```
+
+**Auth**: any authenticated
 
 **Response**:
 ```json
@@ -894,7 +912,7 @@ Returns `.mobileconfig` enrollment profile for download.
 GET|PUT /api/v1/dep/:name/tokenpki
 ```
 
-Generate or retrieve DEP token PKI certificate for Apple portal exchange.
+**Auth**: admin, super_admin. Generate or retrieve DEP token PKI certificate for Apple portal exchange.
 
 #### DEP Assigner Profile
 
@@ -902,7 +920,7 @@ Generate or retrieve DEP token PKI certificate for Apple portal exchange.
 GET|PUT /api/v1/dep/:name/assigner
 ```
 
-Get or set the DEP auto-assign profile UUID.
+**Auth**: admin, super_admin. Get or set the DEP auto-assign profile UUID.
 
 #### DEP Devices
 
@@ -1023,7 +1041,7 @@ Configure webhooks to receive real-time events.
 ```http
 GET /api/v1/policies/{id}/versions?limit=20&offset=0
 ```
-Returns version history for a policy (newest first).
+**Auth**: any authenticated. Returns version history for a policy (newest first).
 
 #### Rollback Policy
 ```http
@@ -1032,13 +1050,13 @@ Content-Type: application/json
 
 {"version": 1}
 ```
-Restores policy to a previous version. Creates a new version entry.
+**Auth**: admin, operator. Restores policy to a previous version. Creates a new version entry.
 
 #### Translate Policy
 ```http
 GET /api/v1/policies/{id}/translate?platform=macos
 ```
-Returns platform-specific translation. Omit `platform` to get all three.
+**Auth**: any authenticated. Returns platform-specific translation. Omit `platform` to get all three.
 
 ### Policy Templates
 
@@ -1046,6 +1064,7 @@ Returns platform-specific translation. Omit `platform` to get all three.
 ```http
 GET /api/v1/policy-templates
 ```
+**Auth**: any authenticated.
 
 #### Clone Template
 ```http
@@ -1054,23 +1073,24 @@ Content-Type: application/json
 
 {"name": "My Security Policy"}
 ```
+**Auth**: admin, operator.
 
 ### Device Groups
 
 #### CRUD
 ```http
-GET    /api/v1/groups
-POST   /api/v1/groups                    {"name": "Engineering", "description": "..."}
-GET    /api/v1/groups/{id}
-PUT    /api/v1/groups/{id}               {"name": "Updated Name"}
-DELETE /api/v1/groups/{id}
+GET    /api/v1/groups                                              # Auth: any authenticated
+POST   /api/v1/groups                    {"name": "Engineering"}   # Auth: admin, operator
+GET    /api/v1/groups/{id}                                         # Auth: any authenticated
+PUT    /api/v1/groups/{id}               {"name": "Updated Name"}  # Auth: admin, operator
+DELETE /api/v1/groups/{id}                                         # Auth: admin
 ```
 
 #### Group Membership
 ```http
-GET    /api/v1/groups/{id}/members
-POST   /api/v1/groups/{id}/members       {"device_id": "uuid"}
-DELETE /api/v1/groups/{id}/members/{device_id}
+GET    /api/v1/groups/{id}/members                                 # Auth: any authenticated
+POST   /api/v1/groups/{id}/members       {"device_id": "uuid"}    # Auth: admin, operator
+DELETE /api/v1/groups/{id}/members/{device_id}                     # Auth: admin, operator
 ```
 
 ### Policy Assignments
@@ -1082,23 +1102,25 @@ Content-Type: application/json
 
 {"target_type": "group", "target_id": "group-uuid", "priority": 10}
 ```
-`target_type`: `device`, `group`, or `enterprise`. Lower priority number = higher precedence.
+**Auth**: admin, operator. `target_type`: `device`, `group`, or `enterprise`. Lower priority number = higher precedence.
 
 #### List Policy Assignments
 ```http
 GET /api/v1/policies/{id}/assignments
 ```
+**Auth**: any authenticated.
 
 #### Remove Assignment
 ```http
 DELETE /api/v1/policy-assignments/{assignment_id}
 ```
+**Auth**: admin, operator.
 
 #### Get Device Effective Policies
 ```http
 GET /api/v1/devices/{id}/effective-policies
 ```
-Returns all policies that apply to a device (via direct, group, and enterprise assignments), ordered by priority.
+**Auth**: any authenticated. Returns all policies that apply to a device (via direct, group, and enterprise assignments), ordered by priority.
 
 ### Compliance
 
@@ -1106,17 +1128,19 @@ Returns all policies that apply to a device (via direct, group, and enterprise a
 ```http
 GET /api/v1/compliance
 ```
-Returns: `{"compliant": 42, "non_compliant": 3, "unknown": 5, "error": 0, "total": 50}`
+**Auth**: any authenticated. Returns: `{"compliant": 42, "non_compliant": 3, "unknown": 5, "error": 0, "total": 50}`
 
 #### Device Compliance
 ```http
 GET /api/v1/devices/{id}/compliance
 ```
+**Auth**: any authenticated.
 
 #### Trigger Compliance Evaluation
 ```http
 POST /api/v1/devices/{id}/compliance/evaluate
 ```
+**Auth**: admin, operator.
 
 ### Idempotency-Key Header
 
