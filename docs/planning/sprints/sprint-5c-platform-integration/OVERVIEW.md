@@ -73,6 +73,7 @@ The expectation is that F-01 will surface protocol-level edge cases (unexpected 
 | S5c-03 | Android: Wire webhook handler + initialize API client | 1 day | Google service account |
 | S5c-04 | SCEP: Fix protocol compliance (PKCS#7 envelopes) | 1 day | S5c-01 (macOS needs SCEP) |
 | S5c-05 | Service layer test coverage (target: 60%+) | 1-2 days | S5c-01 through S5c-04 |
+| S5c-06 | End-to-end integration tests (all platforms, local stack) | 1-2 days | S5c-01 through S5c-04 |
 
 ---
 
@@ -342,15 +343,140 @@ For the request, the simplest approach is to use the `github.com/smallstep/pkcs7
 
 ---
 
+### S5c-06: End-to-End Integration Tests (All Platforms, Local Stack)
+
+**Goal**: Verify the full data flow across all services running locally — not just isolated unit tests, but the actual communication paths between Local MDM, NanoMDM, SCEP, and simulated devices.
+
+**Test infrastructure** (all running in docker-compose):
+- PostgreSQL (shared database)
+- Keycloak (OIDC auth)
+- NanoMDM (Apple MDM protocol handler, added in S5c-01)
+- Local MDM (our server)
+- mdmb (Apple device simulator, run as a test tool)
+
+#### macOS E2E Flow (mdmb → NanoMDM → Local MDM)
+
+Full enrollment-to-management lifecycle using mdmb:
+
+```bash
+# 1. Generate enrollment profile from Local MDM
+curl -H "Authorization: Bearer $TOKEN" \
+  http://localhost:8080/api/v1/macos/enroll/$ENTERPRISE_ID > enroll.mobileconfig
+
+# 2. Create simulated device
+mdmb devices-create
+
+# 3. Enroll device (hits NanoMDM SCEP + check-in endpoints)
+mdmb -uuids all devices-profiles-install -f enroll.mobileconfig
+
+# 4. Verify device appeared in Local MDM (NanoMDM webhook → device record)
+curl -H "Authorization: Bearer $TOKEN" http://localhost:8080/api/v1/devices
+# → should contain the enrolled device
+
+# 5. Send a command via Local MDM → NanoMDM API
+curl -X POST -H "Authorization: Bearer $TOKEN" \
+  http://localhost:8080/api/v1/devices/$DEVICE_ID/lock
+
+# 6. Simulate device checking in (picks up command from NanoMDM)
+mdmb -uuids all devices-connect
+
+# 7. Verify command completed
+curl -H "Authorization: Bearer $TOKEN" \
+  http://localhost:8080/api/v1/devices/$DEVICE_ID/commands
+# → lock command should show status: completed
+```
+
+**Automate as a Go integration test** in `tests/e2e/macos_enrollment_test.go`:
+- Skip if NanoMDM not available (`t.Skipf`)
+- Use `os/exec` to run mdmb commands
+- Assert device appears in API after enrollment
+- Assert command lifecycle (pending → sent → completed)
+
+#### Windows E2E Flow (SOAP → Local MDM)
+
+Simulate the MS-MDE2 enrollment flow with HTTP requests:
+
+```
+1. POST /EnrollmentServer/Discovery.svc → verify discovery response
+2. POST /EnrollmentServer/Policy.svc → verify policy response
+3. POST /EnrollmentServer/Enrollment.svc (with CSR) → verify cert + provisioning XML
+4. GET /api/v1/devices → verify device record was created (S5c-02 fix)
+5. POST /ManagementServer/MDM.svc (SyncML) → verify command delivery
+```
+
+**Automate as a Go integration test** in `tests/e2e/windows_enrollment_test.go`:
+- Build SOAP XML payloads matching MS-MDE2 spec
+- Verify each step returns correct response
+- Assert device appears in database after enrollment
+
+#### Android E2E Flow (webhook → Local MDM)
+
+Simulate Google Management API webhook delivery:
+
+```
+1. POST /api/v1/android/enroll (get enrollment token)
+2. POST /api/v1/android/webhook (ENROLLMENT event with HMAC signature)
+   → verify device record created
+3. POST /api/v1/android/webhook (STATUS_REPORT event)
+   → verify device state updated in platform_data
+4. POST /api/v1/android/webhook (COMPLIANCE_REPORT event)
+   → verify compliance data stored
+5. POST /api/v1/android/webhook (UNENROLLMENT event)
+   → verify device status updated, lifecycle hooks called
+6. GET /api/v1/devices → verify device shows correct status
+```
+
+**Automate as a Go integration test** in `tests/e2e/android_enrollment_test.go`:
+- Build webhook JSON payloads matching Google's format
+- Compute HMAC signatures
+- Assert device lifecycle through all states
+
+#### SCEP E2E Flow (mdmb exercises this as part of macOS enrollment)
+
+mdmb's enrollment includes SCEP certificate enrollment, which tests:
+- `GET /scep?operation=GetCACert` → CA cert in correct format
+- `POST /scep?operation=PKIOperation` → CSR with challenge → signed cert in PKCS#7
+
+If mdmb enrollment succeeds, SCEP is proven to work with a real SCEP client implementation.
+
+#### Cross-Service Communication Test
+
+Verify the webhook path works end-to-end:
+```
+1. Start Local MDM with NanoMDM webhook URL configured
+2. Simulate NanoMDM sending an Authenticate webhook (JSON POST to /api/v1/macos/webhook)
+3. Verify device record created in database
+4. Simulate NanoMDM sending a CheckOut webhook
+5. Verify device status updated to unenrolled
+6. Verify lifecycle hooks fired
+```
+
+This can run without mdmb — just curl/Go HTTP client sending the JSON payloads that NanoMDM would send.
+
+**Acceptance criteria**:
+- [ ] macOS: mdmb device enrolls through NanoMDM, appears in Local MDM device list, receives and responds to a command
+- [ ] Windows: simulated SOAP enrollment creates device record, management sync delivers commands
+- [ ] Android: simulated webhook events create device, update status, trigger lifecycle hooks
+- [ ] SCEP: mdmb enrollment proves PKCS#7 envelope handling works
+- [ ] All tests run with `go test ./tests/e2e/...` when docker-compose stack is up
+- [ ] Tests skip gracefully when NanoMDM/mdmb not available
+
+---
+
 ## Definition of Done
 
 - [ ] macOS enrollment profile points to NanoMDM, not Local MDM
 - [ ] NanoMDM deployed in docker-compose, forwarding webhooks to Local MDM
 - [ ] **mdmb simulated devices complete full enrollment and appear in device list**
+- [ ] **mdmb device receives a command via NanoMDM and responds**
 - [ ] Windows enrollment creates device records in the database
+- [ ] **Windows E2E: SOAP enrollment → device record → management sync (automated test)**
 - [ ] Android webhook events are processed (not silently dropped)
+- [ ] **Android E2E: webhook enrollment → status update → unenrollment (automated test)**
 - [ ] SCEP protocol works with mdmb's SCEP client and openssl
+- [ ] **Cross-service webhook test: NanoMDM JSON → Local MDM → device record (automated test)**
 - [ ] Service layer test coverage ≥ 60%
+- [ ] All E2E tests run with `go test ./tests/e2e/...` and skip gracefully when services unavailable
 - [ ] All existing tests pass
 - [ ] Real device edge cases tracked as F-01 dependency (APNs, DEP, Windows MS-MDE2, Google webhook delivery)
 
