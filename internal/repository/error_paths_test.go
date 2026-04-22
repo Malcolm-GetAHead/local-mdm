@@ -2,9 +2,11 @@ package repository
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/google/uuid"
+	"github.com/malcolm-getahead/local-mdm/internal/apperrors"
 	"github.com/malcolm-getahead/local-mdm/internal/models"
 	"github.com/malcolm-getahead/local-mdm/internal/testutil"
 )
@@ -26,8 +28,8 @@ func TestDeviceRepository_Update_NotFound(t *testing.T) {
 	if err == nil {
 		t.Error("expected error for non-existent device")
 	}
-	if err.Error() != "device not found" {
-		t.Errorf("expected 'device not found', got %v", err)
+	if !errors.Is(err, apperrors.ErrNotFound) {
+		t.Errorf("expected ErrNotFound, got %v", err)
 	}
 }
 
@@ -48,8 +50,8 @@ func TestEnterpriseRepository_Update_NotFound(t *testing.T) {
 	if err == nil {
 		t.Error("expected error for non-existent enterprise")
 	}
-	if err.Error() != "enterprise not found" {
-		t.Errorf("expected 'enterprise not found', got %v", err)
+	if !errors.Is(err, apperrors.ErrNotFound) {
+		t.Errorf("expected ErrNotFound, got %v", err)
 	}
 }
 
@@ -70,8 +72,8 @@ func TestPolicyRepository_Update_NotFound(t *testing.T) {
 	if err == nil {
 		t.Error("expected error for non-existent policy")
 	}
-	if err.Error() != "policy not found" {
-		t.Errorf("expected 'policy not found', got %v", err)
+	if !errors.Is(err, apperrors.ErrNotFound) {
+		t.Errorf("expected ErrNotFound, got %v", err)
 	}
 }
 
@@ -87,8 +89,8 @@ func TestDeviceRepository_Delete_NotFound(t *testing.T) {
 	if err == nil {
 		t.Error("expected error for non-existent device")
 	}
-	if err.Error() != "device not found" {
-		t.Errorf("expected 'device not found', got %v", err)
+	if !errors.Is(err, apperrors.ErrNotFound) {
+		t.Errorf("expected ErrNotFound, got %v", err)
 	}
 }
 
@@ -103,8 +105,8 @@ func TestEnterpriseRepository_Delete_NotFound(t *testing.T) {
 	if err == nil {
 		t.Error("expected error for non-existent enterprise")
 	}
-	if err.Error() != "enterprise not found" {
-		t.Errorf("expected 'enterprise not found', got %v", err)
+	if !errors.Is(err, apperrors.ErrNotFound) {
+		t.Errorf("expected ErrNotFound, got %v", err)
 	}
 }
 
@@ -119,8 +121,8 @@ func TestPolicyRepository_Delete_NotFound(t *testing.T) {
 	if err == nil {
 		t.Error("expected error for non-existent policy")
 	}
-	if err.Error() != "policy not found" {
-		t.Errorf("expected 'policy not found', got %v", err)
+	if !errors.Is(err, apperrors.ErrNotFound) {
+		t.Errorf("expected ErrNotFound, got %v", err)
 	}
 }
 
@@ -183,8 +185,8 @@ func TestDeviceRepository_Delete_SoftDelete(t *testing.T) {
 	if err == nil {
 		t.Error("expected error when deleting already-deleted device")
 	}
-	if err.Error() != "device not found" {
-		t.Errorf("expected 'device not found', got %v", err)
+	if !errors.Is(err, apperrors.ErrNotFound) {
+		t.Errorf("expected ErrNotFound, got %v", err)
 	}
 
 	// Verify device not in list

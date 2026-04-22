@@ -5,6 +5,8 @@ import (
 	"database/sql"
 	"fmt"
 
+	"github.com/malcolm-getahead/local-mdm/internal/apperrors"
+
 	"github.com/google/uuid"
 	"github.com/malcolm-getahead/local-mdm/internal/models"
 	"github.com/malcolm-getahead/local-mdm/internal/validation"
@@ -72,7 +74,7 @@ func (r *enterpriseRepository) GetByID(ctx context.Context, id uuid.UUID) (*mode
 		&enterprise.CreatedAt, &enterprise.UpdatedAt, &enterprise.DeletedAt,
 	)
 	if err == sql.ErrNoRows {
-		return nil, fmt.Errorf("enterprise not found")
+		return nil, fmt.Errorf("enterprise not found: %w", apperrors.ErrNotFound)
 	}
 	return enterprise, err
 }
@@ -89,7 +91,7 @@ func (r *enterpriseRepository) GetBySlug(ctx context.Context, slug string) (*mod
 		&enterprise.CreatedAt, &enterprise.UpdatedAt, &enterprise.DeletedAt,
 	)
 	if err == sql.ErrNoRows {
-		return nil, fmt.Errorf("enterprise not found")
+		return nil, fmt.Errorf("enterprise not found: %w", apperrors.ErrNotFound)
 	}
 	return enterprise, err
 }
@@ -151,7 +153,7 @@ func (r *enterpriseRepository) Update(ctx context.Context, enterprise *models.En
 		return err
 	}
 	if rows == 0 {
-		return fmt.Errorf("enterprise not found")
+		return fmt.Errorf("enterprise not found: %w", apperrors.ErrNotFound)
 	}
 	
 	return nil
@@ -169,7 +171,7 @@ func (r *enterpriseRepository) Delete(ctx context.Context, id uuid.UUID) error {
 		return err
 	}
 	if rows == 0 {
-		return fmt.Errorf("enterprise not found")
+		return fmt.Errorf("enterprise not found: %w", apperrors.ErrNotFound)
 	}
 	
 	return nil

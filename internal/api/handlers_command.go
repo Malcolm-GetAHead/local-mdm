@@ -1,11 +1,12 @@
 package api
 
 import (
+	"errors"
 	"net/http"
-	"strings"
 
 	"github.com/google/uuid"
 	"github.com/gorilla/mux"
+	"github.com/malcolm-getahead/local-mdm/internal/apperrors"
 	"github.com/malcolm-getahead/local-mdm/internal/models"
 )
 
@@ -20,7 +21,7 @@ func (s *Server) handleSendCommand(w http.ResponseWriter, r *http.Request) {
 
 	device, err := s.deviceRepo.GetByID(r.Context(), deviceID)
 	if err != nil {
-		if strings.Contains(err.Error(), "not found") {
+		if errors.Is(err, apperrors.ErrNotFound) {
 			respondError(w, r, http.StatusNotFound, "not_found", "Device not found")
 			return
 		}
@@ -88,7 +89,7 @@ func (s *Server) handleInstallProfile(w http.ResponseWriter, r *http.Request) {
 
 	device, err := s.deviceRepo.GetByID(r.Context(), deviceID)
 	if err != nil {
-		if strings.Contains(err.Error(), "not found") {
+		if errors.Is(err, apperrors.ErrNotFound) {
 			respondError(w, r, http.StatusNotFound, "not_found", "Device not found")
 			return
 		}
@@ -147,7 +148,7 @@ func (s *Server) handleRemoveProfile(w http.ResponseWriter, r *http.Request) {
 
 	device, err := s.deviceRepo.GetByID(r.Context(), deviceID)
 	if err != nil {
-		if strings.Contains(err.Error(), "not found") {
+		if errors.Is(err, apperrors.ErrNotFound) {
 			respondError(w, r, http.StatusNotFound, "not_found", "Device not found")
 			return
 		}

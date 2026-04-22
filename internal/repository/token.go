@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/malcolm-getahead/local-mdm/internal/apperrors"
+
 	"github.com/google/uuid"
 	"github.com/malcolm-getahead/local-mdm/internal/models"
 )
@@ -53,7 +55,7 @@ func (r *tokenRepository) GetByHash(ctx context.Context, tokenHash string) (*mod
 		 AND (expires_at IS NULL OR expires_at > NOW())`, tokenHash,
 	).Scan(&t.ID, &t.UserID, &t.Name, &t.TokenHash, &t.Scopes, &t.LastUsedAt, &t.ExpiresAt, &t.CreatedAt, &t.UpdatedAt, &t.RevokedAt)
 	if err != nil {
-		return nil, fmt.Errorf("token not found")
+		return nil, fmt.Errorf("token not found: %w", apperrors.ErrNotFound)
 	}
 	return t, nil
 }
@@ -85,7 +87,7 @@ func (r *tokenRepository) Revoke(ctx context.Context, id uuid.UUID) error {
 	}
 	n, _ := result.RowsAffected()
 	if n == 0 {
-		return fmt.Errorf("token not found")
+		return fmt.Errorf("token not found: %w", apperrors.ErrNotFound)
 	}
 	return nil
 }

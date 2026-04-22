@@ -1,9 +1,11 @@
 package api
 
 import (
+	"errors"
 	"net/http"
 	"strings"
 
+	"github.com/malcolm-getahead/local-mdm/internal/apperrors"
 	"github.com/malcolm-getahead/local-mdm/internal/models"
 )
 
@@ -75,7 +77,7 @@ func (s *Server) handleGetEnterprise(w http.ResponseWriter, r *http.Request) {
 
 	enterprise, err := s.enterpriseRepo.GetByID(r.Context(), id)
 	if err != nil {
-		if strings.Contains(err.Error(), "not found") {
+		if errors.Is(err, apperrors.ErrNotFound) {
 			respondError(w, r, http.StatusNotFound, "not_found", "Enterprise not found")
 			return
 		}
@@ -96,7 +98,7 @@ func (s *Server) handleUpdateEnterprise(w http.ResponseWriter, r *http.Request) 
 
 	enterprise, err := s.enterpriseRepo.GetByID(r.Context(), id)
 	if err != nil {
-		if strings.Contains(err.Error(), "not found") {
+		if errors.Is(err, apperrors.ErrNotFound) {
 			respondError(w, r, http.StatusNotFound, "not_found", "Enterprise not found")
 			return
 		}
@@ -146,7 +148,7 @@ func (s *Server) handleDeleteEnterprise(w http.ResponseWriter, r *http.Request) 
 	}
 
 	if err := s.enterpriseRepo.Delete(r.Context(), id); err != nil {
-		if strings.Contains(err.Error(), "not found") {
+		if errors.Is(err, apperrors.ErrNotFound) {
 			respondError(w, r, http.StatusNotFound, "not_found", "Enterprise not found")
 			return
 		}

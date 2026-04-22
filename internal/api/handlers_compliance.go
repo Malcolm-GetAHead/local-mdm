@@ -1,9 +1,10 @@
 package api
 
 import (
+	"errors"
 	"net/http"
-	"strings"
 
+	"github.com/malcolm-getahead/local-mdm/internal/apperrors"
 	"github.com/malcolm-getahead/local-mdm/internal/auth"
 )
 
@@ -45,7 +46,7 @@ func (s *Server) handleEvaluateDeviceCompliance(w http.ResponseWriter, r *http.R
 	}
 	device, err := s.deviceRepo.GetByID(r.Context(), deviceID)
 	if err != nil {
-		if strings.Contains(err.Error(), "not found") {
+		if errors.Is(err, apperrors.ErrNotFound) {
 			respondError(w, r, http.StatusNotFound, "not_found", "Device not found")
 			return
 		}

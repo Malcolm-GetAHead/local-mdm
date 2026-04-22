@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/malcolm-getahead/local-mdm/internal/apperrors"
+
 	"github.com/google/uuid"
 	"github.com/malcolm-getahead/local-mdm/internal/models"
 )
@@ -53,7 +55,7 @@ func (r *userRepository) GetByID(ctx context.Context, id uuid.UUID) (*models.Use
 		 FROM users WHERE id = $1 AND deleted_at IS NULL`, id,
 	).Scan(&u.ID, &u.EnterpriseID, &u.Email, &u.PasswordHash, &u.FullName, &u.Role, &u.IsActive, &u.LastLoginAt, &u.CreatedAt, &u.UpdatedAt)
 	if err != nil {
-		return nil, fmt.Errorf("user not found")
+		return nil, fmt.Errorf("user not found: %w", apperrors.ErrNotFound)
 	}
 	return u, nil
 }
@@ -65,7 +67,7 @@ func (r *userRepository) GetByEmail(ctx context.Context, enterpriseID uuid.UUID,
 		 FROM users WHERE enterprise_id = $1 AND email = $2 AND deleted_at IS NULL`, enterpriseID, email,
 	).Scan(&u.ID, &u.EnterpriseID, &u.Email, &u.PasswordHash, &u.FullName, &u.Role, &u.IsActive, &u.LastLoginAt, &u.CreatedAt, &u.UpdatedAt)
 	if err != nil {
-		return nil, fmt.Errorf("user not found")
+		return nil, fmt.Errorf("user not found: %w", apperrors.ErrNotFound)
 	}
 	return u, nil
 }
@@ -108,7 +110,7 @@ func (r *userRepository) Update(ctx context.Context, user *models.User) error {
 	}
 	n, _ := result.RowsAffected()
 	if n == 0 {
-		return fmt.Errorf("user not found")
+		return fmt.Errorf("user not found: %w", apperrors.ErrNotFound)
 	}
 	return nil
 }
@@ -121,7 +123,7 @@ func (r *userRepository) Deactivate(ctx context.Context, id uuid.UUID) error {
 	}
 	n, _ := result.RowsAffected()
 	if n == 0 {
-		return fmt.Errorf("user not found")
+		return fmt.Errorf("user not found: %w", apperrors.ErrNotFound)
 	}
 	return nil
 }

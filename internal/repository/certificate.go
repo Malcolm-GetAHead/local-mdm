@@ -5,6 +5,8 @@ import (
 	"database/sql"
 	"fmt"
 
+	"github.com/malcolm-getahead/local-mdm/internal/apperrors"
+
 	"github.com/google/uuid"
 	"github.com/malcolm-getahead/local-mdm/internal/models"
 )
@@ -49,7 +51,7 @@ func (r *certificateRepository) GetBySerial(ctx context.Context, serialNumber st
 		&cert.CreatedAt, &cert.UpdatedAt,
 	)
 	if err == sql.ErrNoRows {
-		return nil, fmt.Errorf("certificate not found")
+		return nil, fmt.Errorf("certificate not found: %w", apperrors.ErrNotFound)
 	}
 	return cert, err
 }

@@ -1,9 +1,11 @@
 package api
 
 import (
+	"errors"
 	"net/http"
 	"strings"
 
+	"github.com/malcolm-getahead/local-mdm/internal/apperrors"
 	"github.com/malcolm-getahead/local-mdm/internal/auth"
 	"github.com/malcolm-getahead/local-mdm/internal/models"
 )
@@ -38,7 +40,7 @@ func (s *Server) handleGetDevice(w http.ResponseWriter, r *http.Request) {
 
 	device, err := s.deviceService.Get(r.Context(), id)
 	if err != nil {
-		if strings.Contains(err.Error(), "not found") {
+		if errors.Is(err, apperrors.ErrNotFound) {
 			respondError(w, r, http.StatusNotFound, "not_found", "Device not found")
 			return
 		}
@@ -59,7 +61,7 @@ func (s *Server) handleLockDevice(w http.ResponseWriter, r *http.Request) {
 
 	result, err := s.deviceService.Lock(r.Context(), id)
 	if err != nil {
-		if strings.Contains(err.Error(), "not found") {
+		if errors.Is(err, apperrors.ErrNotFound) {
 			respondError(w, r, http.StatusNotFound, "not_found", "Device not found")
 			return
 		}
@@ -88,7 +90,7 @@ func (s *Server) handleWipeDevice(w http.ResponseWriter, r *http.Request) {
 
 	result, err := s.deviceService.Wipe(r.Context(), id)
 	if err != nil {
-		if strings.Contains(err.Error(), "not found") {
+		if errors.Is(err, apperrors.ErrNotFound) {
 			respondError(w, r, http.StatusNotFound, "not_found", "Device not found")
 			return
 		}
@@ -129,7 +131,7 @@ func (s *Server) handleUpdateDevice(w http.ResponseWriter, r *http.Request) {
 
 	device, err := s.deviceService.Update(r.Context(), id, req.Name, req.Model, req.OSVersion, req.Status, req.PlatformData)
 	if err != nil {
-		if strings.Contains(err.Error(), "not found") {
+		if errors.Is(err, apperrors.ErrNotFound) {
 			respondError(w, r, http.StatusNotFound, "not_found", "Device not found")
 			return
 		}
@@ -153,7 +155,7 @@ func (s *Server) handleDeleteDevice(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := s.deviceService.Delete(r.Context(), id); err != nil {
-		if strings.Contains(err.Error(), "not found") {
+		if errors.Is(err, apperrors.ErrNotFound) {
 			respondError(w, r, http.StatusNotFound, "not_found", "Device not found")
 			return
 		}
@@ -175,7 +177,7 @@ func (s *Server) handleRestartDevice(w http.ResponseWriter, r *http.Request) {
 
 	result, err := s.deviceService.Restart(r.Context(), id)
 	if err != nil {
-		if strings.Contains(err.Error(), "not found") {
+		if errors.Is(err, apperrors.ErrNotFound) {
 			respondError(w, r, http.StatusNotFound, "not_found", "Device not found")
 			return
 		}
@@ -207,7 +209,7 @@ func (s *Server) handleGetDeviceEffectivePolicies(w http.ResponseWriter, r *http
 	}
 	device, err := s.deviceRepo.GetByID(r.Context(), deviceID)
 	if err != nil {
-		if strings.Contains(err.Error(), "not found") {
+		if errors.Is(err, apperrors.ErrNotFound) {
 			respondError(w, r, http.StatusNotFound, "not_found", "Device not found")
 			return
 		}

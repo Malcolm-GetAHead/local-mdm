@@ -3,6 +3,8 @@ package repository
 import (
 	"context"
 	"fmt"
+
+	"github.com/malcolm-getahead/local-mdm/internal/apperrors"
 	"time"
 
 	"github.com/google/uuid"
@@ -70,7 +72,7 @@ func (r *commandRepository) GetByID(ctx context.Context, id uuid.UUID) (*models.
 		&cmd.CreatedAt, &cmd.UpdatedAt,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("command not found")
+		return nil, fmt.Errorf("command not found: %w", apperrors.ErrNotFound)
 	}
 	return cmd, nil
 }
@@ -183,7 +185,7 @@ func (r *commandRepository) updateStatus(ctx context.Context, id uuid.UUID, stat
 		return err
 	}
 	if rows == 0 {
-		return fmt.Errorf("command not found")
+		return fmt.Errorf("command not found: %w", apperrors.ErrNotFound)
 	}
 	return nil
 }

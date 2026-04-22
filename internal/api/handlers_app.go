@@ -1,10 +1,12 @@
 package api
 
 import (
+	"errors"
 	"net/http"
 	"strings"
 
 	"github.com/google/uuid"
+	"github.com/malcolm-getahead/local-mdm/internal/apperrors"
 	"github.com/malcolm-getahead/local-mdm/internal/auth"
 	"github.com/malcolm-getahead/local-mdm/internal/models"
 )
@@ -96,7 +98,7 @@ func (s *Server) handleGetApp(w http.ResponseWriter, r *http.Request) {
 
 	app, err := s.appService.Get(r.Context(), id)
 	if err != nil {
-		if strings.Contains(err.Error(), "not found") {
+		if errors.Is(err, apperrors.ErrNotFound) {
 			respondError(w, r, http.StatusNotFound, "not_found", "App not found")
 			return
 		}
@@ -127,7 +129,7 @@ func (s *Server) handleUpdateApp(w http.ResponseWriter, r *http.Request) {
 
 	app, err := s.appService.Update(r.Context(), id, req.Name, req.Version, req.InstallType, req.AppConfig)
 	if err != nil {
-		if strings.Contains(err.Error(), "not found") {
+		if errors.Is(err, apperrors.ErrNotFound) {
 			respondError(w, r, http.StatusNotFound, "not_found", "App not found")
 			return
 		}
@@ -148,7 +150,7 @@ func (s *Server) handleDeleteApp(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := s.appService.Delete(r.Context(), id); err != nil {
-		if strings.Contains(err.Error(), "not found") {
+		if errors.Is(err, apperrors.ErrNotFound) {
 			respondError(w, r, http.StatusNotFound, "not_found", "App not found")
 			return
 		}
@@ -178,7 +180,7 @@ func (s *Server) handleDeployApp(w http.ResponseWriter, r *http.Request) {
 
 	result, err := s.appService.Deploy(r.Context(), appID, req.DeviceIDs)
 	if err != nil {
-		if strings.Contains(err.Error(), "not found") {
+		if errors.Is(err, apperrors.ErrNotFound) {
 			respondError(w, r, http.StatusNotFound, "not_found", "App not found")
 			return
 		}

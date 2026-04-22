@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/malcolm-getahead/local-mdm/internal/apperrors"
 	"github.com/malcolm-getahead/local-mdm/internal/models"
 )
 
@@ -46,7 +47,7 @@ func (s *TokenService) Create(ctx context.Context, userID uuid.UUID, name string
 	}
 	// Verify user exists
 	if _, err := s.userRepo.GetByID(ctx, userID); err != nil {
-		return nil, fmt.Errorf("user not found")
+		return nil, fmt.Errorf("user not found: %w", apperrors.ErrNotFound)
 	}
 
 	// Generate random token
@@ -80,7 +81,7 @@ func (s *TokenService) Validate(ctx context.Context, plaintext string) (*models.
 	}
 	user, err := s.userRepo.GetByID(ctx, token.UserID)
 	if err != nil {
-		return nil, nil, fmt.Errorf("token user not found")
+		return nil, nil, fmt.Errorf("token user not found: %w", apperrors.ErrNotFound)
 	}
 	if !user.IsActive {
 		return nil, nil, fmt.Errorf("user is deactivated")

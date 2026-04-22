@@ -6,14 +6,15 @@ import (
 	"crypto/x509"
 	"encoding/hex"
 	"encoding/pem"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/gorilla/mux"
+	"github.com/malcolm-getahead/local-mdm/internal/apperrors"
 	"github.com/malcolm-getahead/local-mdm/internal/models"
 	"github.com/malcolm-getahead/local-mdm/internal/platform/android"
 	"github.com/malcolm-getahead/local-mdm/internal/platform/macos"
@@ -31,7 +32,7 @@ func (s *Server) handleMacOSEnrollmentProfile(w http.ResponseWriter, r *http.Req
 
 	// Verify enterprise exists
 	if _, err := s.enterpriseRepo.GetByID(r.Context(), enterpriseID); err != nil {
-		if strings.Contains(err.Error(), "not found") {
+		if errors.Is(err, apperrors.ErrNotFound) {
 			respondError(w, r, http.StatusNotFound, "not_found", "Enterprise not found")
 			return
 		}
@@ -290,7 +291,7 @@ func (s *Server) handleAndroidEnrollmentToken(w http.ResponseWriter, r *http.Req
 
 	// Verify enterprise exists
 	if _, err := s.enterpriseRepo.GetByID(r.Context(), enterpriseID); err != nil {
-		if strings.Contains(err.Error(), "not found") {
+		if errors.Is(err, apperrors.ErrNotFound) {
 			respondError(w, r, http.StatusNotFound, "not_found", "Enterprise not found")
 			return
 		}

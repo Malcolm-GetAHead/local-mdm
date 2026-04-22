@@ -13,6 +13,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/gorilla/mux"
+	"github.com/malcolm-getahead/local-mdm/internal/apperrors"
 	"github.com/malcolm-getahead/local-mdm/internal/audit"
 	"github.com/malcolm-getahead/local-mdm/internal/auth"
 	"github.com/malcolm-getahead/local-mdm/internal/config"
@@ -54,7 +55,7 @@ func (m *mockUserRepo) GetByID(_ context.Context, id uuid.UUID) (*models.User, e
 			return u, nil
 		}
 	}
-	return nil, fmt.Errorf("user not found")
+	return nil, fmt.Errorf("user not found: %w", apperrors.ErrNotFound)
 }
 func (m *mockUserRepo) GetByEmail(_ context.Context, _ uuid.UUID, email string) (*models.User, error) {
 	for _, u := range m.users {
@@ -62,7 +63,7 @@ func (m *mockUserRepo) GetByEmail(_ context.Context, _ uuid.UUID, email string) 
 			return u, nil
 		}
 	}
-	return nil, fmt.Errorf("user not found")
+	return nil, fmt.Errorf("user not found: %w", apperrors.ErrNotFound)
 }
 func (m *mockUserRepo) List(_ context.Context, _ uuid.UUID, _, _ int) ([]*models.User, int, error) {
 	return m.users, len(m.users), nil
@@ -90,7 +91,7 @@ func (m *mockTokenRepo) GetByHash(_ context.Context, hash string) (*models.APITo
 			return t, nil
 		}
 	}
-	return nil, fmt.Errorf("token not found")
+	return nil, fmt.Errorf("token not found: %w", apperrors.ErrNotFound)
 }
 func (m *mockTokenRepo) List(_ context.Context, _ uuid.UUID) ([]*models.APIToken, error) {
 	return m.tokens, nil
@@ -129,7 +130,7 @@ func (m *mockEnterpriseRepo) GetByID(_ context.Context, id uuid.UUID) (*models.E
 			return e, nil
 		}
 	}
-	return nil, fmt.Errorf("enterprise not found")
+	return nil, fmt.Errorf("enterprise not found: %w", apperrors.ErrNotFound)
 }
 
 func (m *mockEnterpriseRepo) GetBySlug(_ context.Context, slug string) (*models.Enterprise, error) {
@@ -138,7 +139,7 @@ func (m *mockEnterpriseRepo) GetBySlug(_ context.Context, slug string) (*models.
 			return e, nil
 		}
 	}
-	return nil, fmt.Errorf("enterprise not found")
+	return nil, fmt.Errorf("enterprise not found: %w", apperrors.ErrNotFound)
 }
 
 func (m *mockEnterpriseRepo) List(_ context.Context, limit, offset int) ([]*models.Enterprise, int, error) {
@@ -166,7 +167,7 @@ func (m *mockEnterpriseRepo) Update(_ context.Context, e *models.Enterprise) err
 			return nil
 		}
 	}
-	return fmt.Errorf("enterprise not found")
+	return fmt.Errorf("enterprise not found: %w", apperrors.ErrNotFound)
 }
 func (m *mockEnterpriseRepo) Delete(_ context.Context, id uuid.UUID) error {
 	if m.deleteErr != nil {
@@ -178,7 +179,7 @@ func (m *mockEnterpriseRepo) Delete(_ context.Context, id uuid.UUID) error {
 			return nil
 		}
 	}
-	return fmt.Errorf("enterprise not found")
+	return fmt.Errorf("enterprise not found: %w", apperrors.ErrNotFound)
 }
 
 type mockDeviceRepo struct {
@@ -210,11 +211,11 @@ func (m *mockDeviceRepo) GetByID(_ context.Context, id uuid.UUID) (*models.Devic
 			return d, nil
 		}
 	}
-	return nil, fmt.Errorf("device not found")
+	return nil, fmt.Errorf("device not found: %w", apperrors.ErrNotFound)
 }
 
 func (m *mockDeviceRepo) GetBySerial(_ context.Context, _ uuid.UUID, _ string) (*models.Device, error) {
-	return nil, fmt.Errorf("device not found")
+	return nil, fmt.Errorf("device not found: %w", apperrors.ErrNotFound)
 }
 
 func (m *mockDeviceRepo) GetByPlatformID(_ context.Context, platform, deviceID string) (*models.Device, error) {
@@ -223,7 +224,7 @@ func (m *mockDeviceRepo) GetByPlatformID(_ context.Context, platform, deviceID s
 			return d, nil
 		}
 	}
-	return nil, fmt.Errorf("device not found")
+	return nil, fmt.Errorf("device not found: %w", apperrors.ErrNotFound)
 }
 
 func (m *mockDeviceRepo) List(_ context.Context, _ uuid.UUID, limit, offset int) ([]*models.Device, int, error) {
@@ -251,7 +252,7 @@ func (m *mockDeviceRepo) Update(_ context.Context, d *models.Device) error {
 			return nil
 		}
 	}
-	return fmt.Errorf("device not found")
+	return fmt.Errorf("device not found: %w", apperrors.ErrNotFound)
 }
 
 func (m *mockDeviceRepo) Delete(_ context.Context, id uuid.UUID) error {
@@ -264,7 +265,7 @@ func (m *mockDeviceRepo) Delete(_ context.Context, id uuid.UUID) error {
 			return nil
 		}
 	}
-	return fmt.Errorf("device not found")
+	return fmt.Errorf("device not found: %w", apperrors.ErrNotFound)
 }
 
 type mockPolicyRepo struct {
@@ -300,7 +301,7 @@ func (m *mockPolicyRepo) GetByID(_ context.Context, id uuid.UUID) (*models.Polic
 			return p, nil
 		}
 	}
-	return nil, fmt.Errorf("policy not found")
+	return nil, fmt.Errorf("policy not found: %w", apperrors.ErrNotFound)
 }
 
 func (m *mockPolicyRepo) List(_ context.Context, _ uuid.UUID, limit, offset int) ([]*models.Policy, int, error) {
@@ -328,7 +329,7 @@ func (m *mockPolicyRepo) Update(_ context.Context, p *models.Policy) error {
 			return nil
 		}
 	}
-	return fmt.Errorf("policy not found")
+	return fmt.Errorf("policy not found: %w", apperrors.ErrNotFound)
 }
 func (m *mockPolicyRepo) Delete(_ context.Context, id uuid.UUID) error {
 	if m.deleteErr != nil {
@@ -340,7 +341,7 @@ func (m *mockPolicyRepo) Delete(_ context.Context, id uuid.UUID) error {
 			return nil
 		}
 	}
-	return fmt.Errorf("policy not found")
+	return fmt.Errorf("policy not found: %w", apperrors.ErrNotFound)
 }
 func (m *mockPolicyRepo) AssignToDevice(_ context.Context, deviceID, policyID uuid.UUID) error {
 	if m.assignErr != nil {
@@ -370,7 +371,7 @@ func (m *mockCertRepo) GetBySerial(_ context.Context, serial string) (*models.Ce
 			return c, nil
 		}
 	}
-	return nil, fmt.Errorf("certificate not found")
+	return nil, fmt.Errorf("certificate not found: %w", apperrors.ErrNotFound)
 }
 
 func (m *mockCertRepo) List(_ context.Context, _ *uuid.UUID, limit, offset int) ([]*models.Certificate, int, error) {
@@ -444,7 +445,7 @@ func (m *mockCommandRepo) GetByID(_ context.Context, id uuid.UUID) (*models.Devi
 			return c, nil
 		}
 	}
-	return nil, fmt.Errorf("command not found")
+	return nil, fmt.Errorf("command not found: %w", apperrors.ErrNotFound)
 }
 
 func (m *mockCommandRepo) ListPending(_ context.Context, deviceID uuid.UUID) ([]*models.DeviceCommand, error) {
@@ -485,7 +486,7 @@ func (m *mockCommandRepo) MarkSent(_ context.Context, id uuid.UUID) error {
 			return nil
 		}
 	}
-	return fmt.Errorf("command not found")
+	return fmt.Errorf("command not found: %w", apperrors.ErrNotFound)
 }
 
 func (m *mockCommandRepo) MarkCompleted(_ context.Context, id uuid.UUID) error {
@@ -495,7 +496,7 @@ func (m *mockCommandRepo) MarkCompleted(_ context.Context, id uuid.UUID) error {
 			return nil
 		}
 	}
-	return fmt.Errorf("command not found")
+	return fmt.Errorf("command not found: %w", apperrors.ErrNotFound)
 }
 
 func (m *mockCommandRepo) MarkFailed(_ context.Context, id uuid.UUID, errMsg string) error {
@@ -506,7 +507,7 @@ func (m *mockCommandRepo) MarkFailed(_ context.Context, id uuid.UUID, errMsg str
 			return nil
 		}
 	}
-	return fmt.Errorf("command not found")
+	return fmt.Errorf("command not found: %w", apperrors.ErrNotFound)
 }
 
 type mockAuditLogger struct {
@@ -552,7 +553,7 @@ func (m *mockPolicyVersionRepo) GetByVersion(_ context.Context, policyID uuid.UU
 			return v, nil
 		}
 	}
-	return nil, fmt.Errorf("policy version not found")
+	return nil, fmt.Errorf("policy version not found: %w", apperrors.ErrNotFound)
 }
 func (m *mockPolicyVersionRepo) LatestVersion(_ context.Context, policyID uuid.UUID) (int, error) {
 	max := 0
@@ -595,7 +596,7 @@ func (m *mockAppRepo) GetByID(_ context.Context, id uuid.UUID) (*models.App, err
 			return a, nil
 		}
 	}
-	return nil, fmt.Errorf("app not found")
+	return nil, fmt.Errorf("app not found: %w", apperrors.ErrNotFound)
 }
 
 func (m *mockAppRepo) List(_ context.Context, _ uuid.UUID, limit, offset int) ([]*models.App, int, error) {
@@ -623,7 +624,7 @@ func (m *mockAppRepo) Update(_ context.Context, app *models.App) error {
 			return nil
 		}
 	}
-	return fmt.Errorf("app not found")
+	return fmt.Errorf("app not found: %w", apperrors.ErrNotFound)
 }
 
 func (m *mockAppRepo) Delete(_ context.Context, id uuid.UUID) error {
@@ -636,7 +637,7 @@ func (m *mockAppRepo) Delete(_ context.Context, id uuid.UUID) error {
 			return nil
 		}
 	}
-	return fmt.Errorf("app not found")
+	return fmt.Errorf("app not found: %w", apperrors.ErrNotFound)
 }
 
 // --- Test Helper ---
@@ -902,7 +903,7 @@ func (m *mockGroupRepo) GetByID(_ context.Context, id uuid.UUID) (*models.Device
 			return g, nil
 		}
 	}
-	return nil, fmt.Errorf("group not found")
+	return nil, fmt.Errorf("group not found: %w", apperrors.ErrNotFound)
 }
 func (m *mockGroupRepo) List(_ context.Context, _ uuid.UUID, limit, offset int) ([]*models.DeviceGroup, int, error) {
 	total := len(m.groups)
@@ -922,7 +923,7 @@ func (m *mockGroupRepo) Update(_ context.Context, g *models.DeviceGroup) error {
 			return nil
 		}
 	}
-	return fmt.Errorf("group not found")
+	return fmt.Errorf("group not found: %w", apperrors.ErrNotFound)
 }
 func (m *mockGroupRepo) Delete(_ context.Context, id uuid.UUID) error {
 	for i, g := range m.groups {
@@ -931,7 +932,7 @@ func (m *mockGroupRepo) Delete(_ context.Context, id uuid.UUID) error {
 			return nil
 		}
 	}
-	return fmt.Errorf("group not found")
+	return fmt.Errorf("group not found: %w", apperrors.ErrNotFound)
 }
 func (m *mockGroupRepo) AddMember(_ context.Context, groupID, deviceID uuid.UUID) error {
 	if m.members == nil {
@@ -969,7 +970,7 @@ func (m *mockAssignmentRepo) Delete(_ context.Context, id uuid.UUID) error {
 			return nil
 		}
 	}
-	return fmt.Errorf("assignment not found")
+	return fmt.Errorf("assignment not found: %w", apperrors.ErrNotFound)
 }
 func (m *mockAssignmentRepo) ListByTarget(_ context.Context, _ string, _ uuid.UUID) ([]*models.PolicyAssignment, error) {
 	return m.assignments, nil

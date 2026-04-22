@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/malcolm-getahead/local-mdm/internal/apperrors"
+
 	"github.com/google/uuid"
 	"github.com/malcolm-getahead/local-mdm/internal/models"
 )
@@ -66,7 +68,7 @@ func (r *appRepository) GetByID(ctx context.Context, id uuid.UUID) (*models.App,
 		&app.CreatedAt, &app.UpdatedAt,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("app not found")
+		return nil, fmt.Errorf("app not found: %w", apperrors.ErrNotFound)
 	}
 	return app, nil
 }
@@ -122,7 +124,7 @@ func (r *appRepository) Update(ctx context.Context, app *models.App) error {
 	}
 	rows, _ := result.RowsAffected()
 	if rows == 0 {
-		return fmt.Errorf("app not found")
+		return fmt.Errorf("app not found: %w", apperrors.ErrNotFound)
 	}
 	return nil
 }
@@ -136,7 +138,7 @@ func (r *appRepository) Delete(ctx context.Context, id uuid.UUID) error {
 	}
 	rows, _ := result.RowsAffected()
 	if rows == 0 {
-		return fmt.Errorf("app not found")
+		return fmt.Errorf("app not found: %w", apperrors.ErrNotFound)
 	}
 	return nil
 }

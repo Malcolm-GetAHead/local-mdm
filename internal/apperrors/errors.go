@@ -6,6 +6,11 @@ import (
 	"net/http"
 )
 
+// ErrNotFound is a sentinel error for "not found" conditions.
+// Repositories wrap this with context: fmt.Errorf("device not found: %w", ErrNotFound)
+// Handlers check with: errors.Is(err, ErrNotFound)
+var ErrNotFound = errors.New("not found")
+
 // ErrorCode represents a machine-readable error code
 type ErrorCode string
 

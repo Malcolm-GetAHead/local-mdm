@@ -1,10 +1,12 @@
 package api
 
 import (
+	"errors"
 	"net/http"
 	"strings"
 
 	"github.com/google/uuid"
+	"github.com/malcolm-getahead/local-mdm/internal/apperrors"
 	"github.com/malcolm-getahead/local-mdm/internal/auth"
 	"github.com/malcolm-getahead/local-mdm/internal/models"
 )
@@ -96,7 +98,7 @@ func (s *Server) handleGetPolicy(w http.ResponseWriter, r *http.Request) {
 
 	policy, err := s.policyRepo.GetByID(r.Context(), id)
 	if err != nil {
-		if strings.Contains(err.Error(), "not found") {
+		if errors.Is(err, apperrors.ErrNotFound) {
 			respondError(w, r, http.StatusNotFound, "not_found", "Policy not found")
 			return
 		}
@@ -117,7 +119,7 @@ func (s *Server) handleUpdatePolicy(w http.ResponseWriter, r *http.Request) {
 
 	policy, err := s.policyRepo.GetByID(r.Context(), id)
 	if err != nil {
-		if strings.Contains(err.Error(), "not found") {
+		if errors.Is(err, apperrors.ErrNotFound) {
 			respondError(w, r, http.StatusNotFound, "not_found", "Policy not found")
 			return
 		}
@@ -181,7 +183,7 @@ func (s *Server) handleDeletePolicy(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := s.policyRepo.Delete(r.Context(), id); err != nil {
-		if strings.Contains(err.Error(), "not found") {
+		if errors.Is(err, apperrors.ErrNotFound) {
 			respondError(w, r, http.StatusNotFound, "not_found", "Policy not found")
 			return
 		}
@@ -217,7 +219,7 @@ func (s *Server) handleAssignPolicy(w http.ResponseWriter, r *http.Request) {
 
 	// Verify policy exists
 	if _, err := s.policyRepo.GetByID(r.Context(), policyID); err != nil {
-		if strings.Contains(err.Error(), "not found") {
+		if errors.Is(err, apperrors.ErrNotFound) {
 			respondError(w, r, http.StatusNotFound, "not_found", "Policy not found")
 			return
 		}
@@ -318,7 +320,7 @@ func (s *Server) handleRollbackPolicy(w http.ResponseWriter, r *http.Request) {
 
 	policy, err := s.policyService.Rollback(r.Context(), id, req.Version, userID)
 	if err != nil {
-		if strings.Contains(err.Error(), "not found") {
+		if errors.Is(err, apperrors.ErrNotFound) {
 			respondError(w, r, http.StatusNotFound, "not_found", err.Error())
 			return
 		}
@@ -340,7 +342,7 @@ func (s *Server) handleTranslatePolicy(w http.ResponseWriter, r *http.Request) {
 
 	policy, err := s.policyRepo.GetByID(r.Context(), id)
 	if err != nil {
-		if strings.Contains(err.Error(), "not found") {
+		if errors.Is(err, apperrors.ErrNotFound) {
 			respondError(w, r, http.StatusNotFound, "not_found", "Policy not found")
 			return
 		}
@@ -420,7 +422,7 @@ func (s *Server) handleClonePolicyTemplate(w http.ResponseWriter, r *http.Reques
 
 	policy, err := s.policyService.CloneTemplate(r.Context(), templateID, enterpriseID, req.Name, userID)
 	if err != nil {
-		if strings.Contains(err.Error(), "not found") || strings.Contains(err.Error(), "not a template") {
+		if errors.Is(err, apperrors.ErrNotFound) || strings.Contains(err.Error(), "not a template") {
 			respondError(w, r, http.StatusBadRequest, "invalid_template", err.Error())
 			return
 		}
@@ -471,7 +473,7 @@ func (s *Server) handleUnassignPolicyFromTarget(w http.ResponseWriter, r *http.R
 		return
 	}
 	if err := s.groupService.UnassignPolicy(r.Context(), assignmentID); err != nil {
-		if strings.Contains(err.Error(), "not found") {
+		if errors.Is(err, apperrors.ErrNotFound) {
 			respondError(w, r, http.StatusNotFound, "not_found", "Assignment not found")
 			return
 		}

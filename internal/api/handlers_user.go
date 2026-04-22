@@ -1,10 +1,12 @@
 package api
 
 import (
+	"errors"
 	"net/http"
 	"strings"
 
 	"github.com/google/uuid"
+	"github.com/malcolm-getahead/local-mdm/internal/apperrors"
 	"github.com/malcolm-getahead/local-mdm/internal/auth"
 	"github.com/malcolm-getahead/local-mdm/internal/models"
 )
@@ -69,7 +71,7 @@ func (s *Server) handleGetUser(w http.ResponseWriter, r *http.Request) {
 	}
 	u, err := s.userService.Get(r.Context(), id)
 	if err != nil {
-		if strings.Contains(err.Error(), "not found") {
+		if errors.Is(err, apperrors.ErrNotFound) {
 			respondError(w, r, http.StatusNotFound, "not_found", "User not found")
 			return
 		}
@@ -96,7 +98,7 @@ func (s *Server) handleUpdateUser(w http.ResponseWriter, r *http.Request) {
 	}
 	u, err := s.userService.Update(r.Context(), id, req.FullName, req.Role, req.IsActive)
 	if err != nil {
-		if strings.Contains(err.Error(), "not found") {
+		if errors.Is(err, apperrors.ErrNotFound) {
 			respondError(w, r, http.StatusNotFound, "not_found", "User not found")
 			return
 		}
@@ -118,7 +120,7 @@ func (s *Server) handleDeactivateUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := s.userService.Deactivate(r.Context(), id); err != nil {
-		if strings.Contains(err.Error(), "not found") {
+		if errors.Is(err, apperrors.ErrNotFound) {
 			respondError(w, r, http.StatusNotFound, "not_found", "User not found")
 			return
 		}
@@ -151,7 +153,7 @@ func (s *Server) handleCreateToken(w http.ResponseWriter, r *http.Request) {
 	}
 	result, err := s.tokenService.Create(r.Context(), callerID, req.Name, nil)
 	if err != nil {
-		if strings.Contains(err.Error(), "required") || strings.Contains(err.Error(), "not found") {
+		if strings.Contains(err.Error(), "required") || errors.Is(err, apperrors.ErrNotFound) {
 			respondError(w, r, http.StatusBadRequest, "validation_failed", err.Error())
 			return
 		}
@@ -189,7 +191,7 @@ func (s *Server) handleRevokeToken(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := s.tokenService.Revoke(r.Context(), id); err != nil {
-		if strings.Contains(err.Error(), "not found") {
+		if errors.Is(err, apperrors.ErrNotFound) {
 			respondError(w, r, http.StatusNotFound, "not_found", "Token not found")
 			return
 		}

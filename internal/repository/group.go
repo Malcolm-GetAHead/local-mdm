@@ -5,6 +5,8 @@ import (
 	"database/sql"
 	"fmt"
 
+	"github.com/malcolm-getahead/local-mdm/internal/apperrors"
+
 	"github.com/google/uuid"
 	"github.com/malcolm-getahead/local-mdm/internal/models"
 )
@@ -64,7 +66,7 @@ func (r *groupRepository) GetByID(ctx context.Context, id uuid.UUID) (*models.De
 		`SELECT id, enterprise_id, name, description, created_at, updated_at FROM device_groups WHERE id = $1 AND deleted_at IS NULL`, id,
 	).Scan(&g.ID, &g.EnterpriseID, &g.Name, &g.Description, &g.CreatedAt, &g.UpdatedAt)
 	if err == sql.ErrNoRows {
-		return nil, fmt.Errorf("group not found")
+		return nil, fmt.Errorf("group not found: %w", apperrors.ErrNotFound)
 	}
 	return g, err
 }
@@ -114,7 +116,7 @@ func (r *groupRepository) Update(ctx context.Context, group *models.DeviceGroup)
 	}
 	rows, _ := result.RowsAffected()
 	if rows == 0 {
-		return fmt.Errorf("group not found")
+		return fmt.Errorf("group not found: %w", apperrors.ErrNotFound)
 	}
 	return nil
 }
@@ -128,7 +130,7 @@ func (r *groupRepository) Delete(ctx context.Context, id uuid.UUID) error {
 	}
 	rows, _ := result.RowsAffected()
 	if rows == 0 {
-		return fmt.Errorf("group not found")
+		return fmt.Errorf("group not found: %w", apperrors.ErrNotFound)
 	}
 	return nil
 }
@@ -248,7 +250,7 @@ func (r *policyAssignmentRepository) Delete(ctx context.Context, id uuid.UUID) e
 	}
 	rows, _ := result.RowsAffected()
 	if rows == 0 {
-		return fmt.Errorf("assignment not found")
+		return fmt.Errorf("assignment not found: %w", apperrors.ErrNotFound)
 	}
 	return nil
 }

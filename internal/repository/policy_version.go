@@ -5,6 +5,8 @@ import (
 	"database/sql"
 	"fmt"
 
+	"github.com/malcolm-getahead/local-mdm/internal/apperrors"
+
 	"github.com/google/uuid"
 	"github.com/malcolm-getahead/local-mdm/internal/models"
 )
@@ -97,7 +99,7 @@ func (r *policyVersionRepository) GetByVersion(ctx context.Context, policyID uui
 		policyID, version,
 	).Scan(&v.ID, &v.PolicyID, &v.Version, &v.PolicyConfig, &v.Name, &v.Description, &v.Platform, &v.PolicyType, &v.IsActive, &v.CreatedBy)
 	if err == sql.ErrNoRows {
-		return nil, fmt.Errorf("policy version not found")
+		return nil, fmt.Errorf("policy version not found: %w", apperrors.ErrNotFound)
 	}
 	return v, err
 }

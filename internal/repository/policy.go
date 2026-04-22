@@ -5,6 +5,8 @@ import (
 	"database/sql"
 	"fmt"
 
+	"github.com/malcolm-getahead/local-mdm/internal/apperrors"
+
 	"github.com/google/uuid"
 	"github.com/malcolm-getahead/local-mdm/internal/models"
 	"github.com/malcolm-getahead/local-mdm/internal/validation"
@@ -76,7 +78,7 @@ func (r *policyRepository) GetByID(ctx context.Context, id uuid.UUID) (*models.P
 		&policy.CreatedAt, &policy.UpdatedAt, &policy.DeletedAt,
 	)
 	if err == sql.ErrNoRows {
-		return nil, fmt.Errorf("policy not found")
+		return nil, fmt.Errorf("policy not found: %w", apperrors.ErrNotFound)
 	}
 	return policy, err
 }
@@ -140,7 +142,7 @@ func (r *policyRepository) Update(ctx context.Context, policy *models.Policy) er
 		return err
 	}
 	if rows == 0 {
-		return fmt.Errorf("policy not found")
+		return fmt.Errorf("policy not found: %w", apperrors.ErrNotFound)
 	}
 	
 	return nil
@@ -158,7 +160,7 @@ func (r *policyRepository) Delete(ctx context.Context, id uuid.UUID) error {
 		return err
 	}
 	if rows == 0 {
-		return fmt.Errorf("policy not found")
+		return fmt.Errorf("policy not found: %w", apperrors.ErrNotFound)
 	}
 	
 	return nil

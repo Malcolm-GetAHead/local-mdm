@@ -5,6 +5,8 @@ import (
 	"database/sql"
 	"fmt"
 
+	"github.com/malcolm-getahead/local-mdm/internal/apperrors"
+
 	"github.com/google/uuid"
 	"github.com/malcolm-getahead/local-mdm/internal/models"
 	"github.com/malcolm-getahead/local-mdm/internal/validation"
@@ -80,7 +82,7 @@ func (r *deviceRepository) GetByID(ctx context.Context, id uuid.UUID) (*models.D
 		&device.CreatedAt, &device.UpdatedAt, &device.DeletedAt,
 	)
 	if err == sql.ErrNoRows {
-		return nil, fmt.Errorf("device not found")
+		return nil, fmt.Errorf("device not found: %w", apperrors.ErrNotFound)
 	}
 	return device, err
 }
@@ -101,7 +103,7 @@ func (r *deviceRepository) GetBySerial(ctx context.Context, enterpriseID uuid.UU
 		&device.CreatedAt, &device.UpdatedAt, &device.DeletedAt,
 	)
 	if err == sql.ErrNoRows {
-		return nil, fmt.Errorf("device not found")
+		return nil, fmt.Errorf("device not found: %w", apperrors.ErrNotFound)
 	}
 	return device, err
 }
@@ -121,7 +123,7 @@ func (r *deviceRepository) GetByPlatformID(ctx context.Context, platform, device
 		&device.CreatedAt, &device.UpdatedAt, &device.DeletedAt,
 	)
 	if err == sql.ErrNoRows {
-		return nil, fmt.Errorf("device not found")
+		return nil, fmt.Errorf("device not found: %w", apperrors.ErrNotFound)
 	}
 	return device, err
 }
@@ -188,7 +190,7 @@ func (r *deviceRepository) Update(ctx context.Context, device *models.Device) er
 		return err
 	}
 	if rows == 0 {
-		return fmt.Errorf("device not found")
+		return fmt.Errorf("device not found: %w", apperrors.ErrNotFound)
 	}
 	
 	return nil
@@ -207,7 +209,7 @@ func (r *deviceRepository) Delete(ctx context.Context, id uuid.UUID) error {
 		return err
 	}
 	if rows == 0 {
-		return fmt.Errorf("device not found")
+		return fmt.Errorf("device not found: %w", apperrors.ErrNotFound)
 	}
 	
 	return nil
