@@ -76,6 +76,7 @@ The expectation is that F-01 will surface protocol-level edge cases (unexpected 
 | S5c-06 | End-to-end integration tests (all platforms, local stack) | 1-2 days | S5c-01 through S5c-04 |
 | S5c-07 | Replace string-based error detection with sentinel errors | 0.5-1 day | — |
 | S5c-08 | Make password_hash nullable + enforce Keycloak-only auth | 0.5 day | — |
+| S5c-09 | Split handlers.go into domain-specific files | 0.5 day | — |
 
 ---
 
@@ -511,6 +512,42 @@ Auth enforcement: users with `password_hash IS NULL` can only authenticate via K
 - [ ] Existing `"oidc-managed"` values migrated to `NULL`
 - [ ] Keycloak JWT auth still works for NULL-password users
 - [ ] API token auth still works for NULL-password users
+
+---
+
+### S5c-09: Split handlers.go into Domain-Specific Files
+
+**Problem**: `internal/api/handlers.go` is 1,800+ lines containing every handler for every domain. It's the single largest file in the codebase and will grow further as Sprint 5c adds/modifies handlers. Finding, reading, and reviewing handler code requires scrolling through unrelated domains.
+
+**Fix**: Split into domain-specific files following the existing `platform_handlers.go` convention:
+
+```
+handlers.go              → health, version, parseJSONBody, parsePagination, respondJSON (shared helpers)
+handlers_enterprise.go   → enterprise CRUD
+handlers_device.go       → device CRUD + lock/wipe/restart
+handlers_policy.go       → policy CRUD + versioning + templates + assignments
+handlers_group.go        → group CRUD + members
+handlers_compliance.go   → compliance summary, device compliance, evaluate
+handlers_command.go      → send command, list commands, install/remove profile
+handlers_app.go          → app CRUD + deploy
+handlers_user.go         → user CRUD + token CRUD
+handlers_report.go       → reports + audit logs
+```
+
+**Rules**:
+- No behavior change — purely file reorganization
+- Each file keeps the same `func (s *Server)` receiver pattern
+- Shared helpers (`parseJSONBody`, `parsePagination`, `respondJSON`, `respondError`, `respondPaginated`, `logAudit`, `isValidPlatform`, `isDuplicateError`) stay in `handlers.go`
+- `handlers_test.go` stays as one file (tests reference handlers by name, not file)
+- Run `go test -race -p 4 ./...` after to verify zero behavior change
+
+**Do this early in the sprint** (before S5c-02/S5c-03 modify handlers) to avoid merge conflicts.
+
+**Acceptance criteria**:
+- [ ] `handlers.go` reduced to shared helpers only (~200 lines)
+- [ ] Each domain has its own file
+- [ ] All existing tests pass with zero changes
+- [ ] `go vet ./...` clean
 
 ---
 
