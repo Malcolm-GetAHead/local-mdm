@@ -143,7 +143,7 @@ func (bus *EventBus) listen(ctx context.Context, db *sql.DB) // background gorou
 
 ## Service-Level Dependencies
 
-> **Sprint 5 Note (2026-04-20):** Sprint 4 uses direct service calls for compliance evaluation and policy push triggers. The PostgreSQL LISTEN/NOTIFY event triggers are in place (migration 000007) but the Go-side EventBus listener is deferred to Sprint 5, where outbound webhooks need async event-driven dispatch. Sprint 5 should: (1) implement `internal/service/eventbus.go` with persistent LISTEN connection, reconnection, graceful shutdown; (2) migrate direct compliance calls to EventBus subscribers; (3) add webhook subscriber for outbound notifications.
+> **Sprint 5b Note (updated 2026-04-22):** Sprint 4 uses direct service calls for compliance evaluation. The PostgreSQL LISTEN/NOTIFY event triggers are in place (migration 000007) but the Go-side EventBus listener is deferred to **Sprint 5b**, which owns: (1) `internal/service/eventbus.go` with persistent LISTEN connection; (2) compliance evaluation subscribers for all event types; (3) new triggers for platform_data changes and group membership.
 
 | This Sprint Produces | Consumed By |
 |---|---|

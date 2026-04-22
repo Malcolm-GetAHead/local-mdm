@@ -809,7 +809,7 @@ Unique: (policy_id, version)
 
 ### Event Triggers
 
-PostgreSQL `LISTEN`/`NOTIFY` triggers for event-driven architecture (Go listener in Sprint 5).
+PostgreSQL `LISTEN`/`NOTIFY` triggers for event-driven architecture (Go listener in Sprint 5b).
 
 | Trigger | Table | Event Type | Fires On |
 |---------|-------|------------|----------|

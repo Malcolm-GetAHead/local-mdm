@@ -37,7 +37,7 @@ S5-06 should be scoped down to: enhanced health checks (/health/ready with depen
 
 ## Notes from Sprint 4
 
-- **EventBus LISTEN/NOTIFY listener**: Sprint 4 installed PostgreSQL triggers (migration 000007) that fire `pg_notify` on device, policy, command, assignment, and compliance events. The Go-side listener (`internal/service/eventbus.go`) was deferred to Sprint 5. **S5-09 owns building the EventBus listener** as part of wiring compliance evaluation — it is the first subscriber. Future subscribers: outbound webhooks (F-07), notifications.
+- **EventBus LISTEN/NOTIFY listener**: Sprint 4 installed PostgreSQL triggers (migration 000007) that fire `pg_notify` on device, policy, command, assignment, and compliance events. The Go-side listener was deferred — **Sprint 5b** owns building the EventBus listener and wiring compliance subscribers.
   - **Technical note**: `LISTEN` requires a dedicated, long-lived connection — standard `*sql.DB` pool connections are recycled and would drop the subscription. Use `sql.DB.Conn(ctx)` with keep-alive or a separate `pgx` connection. Must use the **Writer pool's DSN** (primary instance), not the Reader pool, because read replicas do not relay `NOTIFY` events.
 - **Compliance engine placeholder**: `evaluatePolicy()` returns "unknown" — S5-09 adds real evaluation logic.
 - **Policy deployment on assignment**: Policies are recorded but not pushed on assignment. Devices pick up policies on next check-in. EventBus can trigger push notifications in the future.

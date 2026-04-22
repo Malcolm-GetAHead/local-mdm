@@ -74,7 +74,7 @@ Unified Control Plane (Go)
 - Device lifecycle hooks (unenroll/wipe/delete) with extensible hook interface
 - Redis removed — token cache and idempotency keys use PostgreSQL
 - Idempotency-Key header support on all POST/PUT/PATCH endpoints
-- PostgreSQL event triggers for LISTEN/NOTIFY (Go listener in Sprint 5)
+- PostgreSQL event triggers for LISTEN/NOTIFY (Go listener in Sprint 5b)
 - See [Sprint 4 Plan](docs/planning/sprints/sprint-4-policy-and-identity/OVERVIEW.md)
 
 ✅ **Sprint 4b Complete** - 4/4 tasks done (Read/Write Database Pools)
