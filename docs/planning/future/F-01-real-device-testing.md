@@ -112,11 +112,17 @@ Without real device testing:
 - Platform SSO test
 
 ### Task 4: Android Device Tests (1 day)
+- **Configure Google Android Management API client** (prerequisite):
+  - Enable Android Management API in GCP project
+  - Create service account with Android Management API role
+  - Generate JSON key file → `secrets/android-service-account.json`
+  - Set `android.project_id` and `android.service_account_json` in config.yaml
+  - Verify `android.NewClient()` initializes successfully
 - QR code enrollment
 - Policy enforcement tests
 - App installation tests
 - Command execution tests
-- Webhook event validation
+- Webhook event validation (verify Google → Local MDM webhook delivery with real events)
 
 ---
 
