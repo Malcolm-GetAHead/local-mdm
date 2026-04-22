@@ -697,9 +697,11 @@ func (s *Server) setupRoutes() {
 		checkinHandler.ServeHTTP(w, r)
 	})).Methods("POST")
 	
-	// Windows MDM endpoints
+	// Windows MDM endpoints (enterprise_id in URL for multi-tenant)
+	s.router.HandleFunc("/EnrollmentServer/{enterprise_id}/Discovery.svc", s.handleWindowsDiscoveryService).Methods("GET", "POST")
 	s.router.HandleFunc("/EnrollmentServer/Discovery.svc", s.handleWindowsDiscoveryService).Methods("GET", "POST")
 	s.router.HandleFunc("/EnrollmentServer/Policy.svc", s.handleWindowsPolicyService).Methods("POST")
+	s.router.Handle("/EnrollmentServer/{enterprise_id}/Enrollment.svc", enrollLimiter(http.HandlerFunc(s.handleWindowsEnrollmentService))).Methods("POST")
 	s.router.Handle("/EnrollmentServer/Enrollment.svc", enrollLimiter(http.HandlerFunc(s.handleWindowsEnrollmentService))).Methods("POST")
 	s.router.HandleFunc("/ManagementServer/MDM.svc", s.handleWindowsManagementSync).Methods("POST")
 

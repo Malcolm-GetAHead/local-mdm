@@ -120,7 +120,12 @@ func (s *Server) handleWindowsDiscoveryService(w http.ResponseWriter, r *http.Re
 	)
 
 	serverURL := fmt.Sprintf("https://%s", r.Host)
+	// Include enterprise_id in enrollment URL if present in discovery URL
+	enterpriseID := mux.Vars(r)["enterprise_id"]
 	enrollmentURL := serverURL + "/EnrollmentServer/Enrollment.svc"
+	if enterpriseID != "" {
+		enrollmentURL = serverURL + "/EnrollmentServer/" + enterpriseID + "/Enrollment.svc"
+	}
 	policyURL := serverURL + "/EnrollmentServer/Policy.svc"
 
 	resp, err := windows.GenerateDiscoverResponse(enrollmentURL, policyURL)
@@ -209,6 +214,25 @@ func (s *Server) handleWindowsEnrollmentService(w http.ResponseWriter, r *http.R
 		s.logger.Error("failed to generate enrollment response", "error", err)
 		respondError(w, r, http.StatusInternalServerError, "generation_failed", "Failed to generate enrollment response")
 		return
+	}
+
+	// Create device record (enterprise_id from URL path)
+	if eidStr := mux.Vars(r)["enterprise_id"]; eidStr != "" {
+		if enterpriseID, err := uuid.Parse(eidStr); err == nil {
+			device := &models.Device{
+				BaseModel:    models.BaseModel{ID: deviceID},
+				EnterpriseID: enterpriseID,
+				Platform:     models.PlatformWindows,
+				DeviceID:     deviceID.String(),
+				Status:       models.DeviceStatusEnrolled,
+				PlatformData: models.JSONB{},
+			}
+			if err := s.deviceRepo.Create(r.Context(), device); err != nil {
+				s.logger.Error("failed to create windows device record", "error", err, "device_id", deviceID)
+			} else {
+				s.logger.Info("windows device record created", "device_id", deviceID, "enterprise_id", enterpriseID)
+			}
+		}
 	}
 
 	s.logAudit(r, "enrollment.windows.complete", "device", deviceID, map[string]interface{}{
