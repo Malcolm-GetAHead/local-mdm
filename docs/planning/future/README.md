@@ -17,7 +17,7 @@ This directory contains tasks that are **beyond the scope of v1.0** but would en
 | ID | Task | Priority | Effort | Score | Status |
 |----|------|----------|--------|-------|--------|
 | [F-01](F-01-real-device-testing.md) | Real Device Testing | High | 3-4 days | +0.30 | Deferred |
-| [F-02](F-02-production-deployment.md) | Production Deployment & HA | High | 2-3 days | +0.20 | Future (K8s) |
+| [F-02](F-02-production-deployment.md) | Production Deployment & HA | High | 2-3 days | +0.20 | Future (ECS Fargate) |
 | [F-03](F-03-advanced-security.md) | Advanced Security Features | Medium | 2.5-3.5 days | +0.20 | Beyond v1.0 |
 | [F-04](F-04-disaster-recovery.md) | Disaster Recovery & BC | Medium | 1-2 days | +0.15 | Partial |
 | [F-05](F-05-advanced-monitoring.md) | Advanced Monitoring | Low | 2-3 days | +0.08 | Beyond v1.0 |
@@ -68,7 +68,7 @@ This directory contains tasks that are **beyond the scope of v1.0** but would en
 
 ### v1.1 (Q2 2026)
 - F-01: Real device testing
-- F-02: Kubernetes deployment
+- F-02: ECS Fargate deployment
 - F-06: User documentation (basic)
 
 **Effort**: 7-10 days  
@@ -148,7 +148,7 @@ These can be added opportunistically:
 
 ### One-Time Costs
 - **F-01**: $0 (VMs, emulators)
-- **F-02**: $0 (K8s manifests)
+- **F-02**: $0 (ECS task definitions)
 - **F-03**: $0 (mTLS, code changes)
 - **F-04**: $0 (documentation)
 - **F-05**: $0 (open source tools)
@@ -159,7 +159,7 @@ These can be added opportunistically:
 **Total One-Time**: $500-2,000
 
 ### Recurring Costs (Annual)
-- **F-02**: $10,000-40,000 (K8s infrastructure)
+- **F-02**: $300-500/mo (ECS Fargate + RDS)
 - **F-03**: $15,000-35,000 (HSM, security tools)
 - **F-04**: $12,000-48,000 (multi-region)
 - **F-05**: $0-12,000 (APM tools)
