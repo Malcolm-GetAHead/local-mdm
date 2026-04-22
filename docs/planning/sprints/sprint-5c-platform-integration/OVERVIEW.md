@@ -21,24 +21,46 @@ These must be fixed before the dashboard (Sprint 5d) is useful — a dashboard s
 
 ## Testing Strategy — Simulated vs. Real Devices
 
-This sprint frontloads all structural and integration work that can be verified **without real hardware**. The goal is to get the architecture correct and all code paths exercised with simulated payloads, so that the real device testing phase (F-01) is focused on protocol debugging rather than structural rework.
+This sprint frontloads all structural and integration work that can be verified **without real hardware**. The goal is to get the architecture correct and all code paths exercised with simulated payloads, so that the real device testing phase (F-01) is focused on edge cases rather than structural rework.
 
-**What we CAN verify without real devices:**
-- NanoMDM deploys and connects to PostgreSQL (docker-compose)
-- Webhook JSON payloads flow from NanoMDM → Local MDM → device record creation (curl + integration tests)
-- Windows SOAP enrollment creates device records (existing XML test fixtures)
-- Android webhook events are parsed and dispatched (JSON payloads)
-- SCEP challenge → CSR → signed cert flow (openssl + Go test client)
-- All service layer business logic (unit tests with mocks)
+### mdmb — Apple Device Simulator
 
-**What REQUIRES real devices (deferred to F-01):**
-- Apple MDM protocol: does a real macOS device complete enrollment through NanoMDM?
-- Apple SCEP client: does Apple's SCEP implementation accept our PKCS#7 envelopes?
-- Windows MDM: does a real Windows device complete the MS-MDE2 discovery → enrollment → management sync flow?
-- Android Management API: does Google's webhook actually fire with the expected payload format?
-- End-to-end: enroll → policy push → compliance check → lock/wipe on real hardware
+[`mdmb`](https://github.com/jessepeterson/mdmb) is a device simulator built by the same author as NanoMDM, specifically for testing MDM servers. It simulates the full Apple MDM protocol:
 
-The expectation is that F-01 will surface protocol-level issues (wrong plist field names, unexpected envelope formats, timing issues) but NOT architectural issues (wrong service wiring, missing database records, broken data flow).
+- Creates fake devices with UDIDs, serial numbers, simulated keychains
+- Enrolls through the complete flow: SCEP certificate enrollment → MDM check-in (Authenticate, TokenUpdate)
+- Connects to check command queues (simulates APNs push receipt)
+- Responds to MDM commands (DeviceInformation, ProfileList, InstallProfile, etc.)
+- Supports load testing: create N devices, enroll all, connect all with worker pools
+
+**This means we can test the entire macOS → NanoMDM → Local MDM flow end-to-end without a real device**, including SCEP certificate enrollment. Add `mdmb` to the dev toolchain.
+
+Usage:
+```bash
+# Create simulated devices
+./mdmb devices-create -n 10
+
+# Enroll through NanoMDM (uses our enrollment profile, hits our SCEP server)
+./mdmb -uuids all devices-profiles-install -f enroll.mobileconfig
+
+# Simulate devices checking in (triggers NanoMDM → Local MDM webhooks)
+./mdmb -uuids all devices-connect
+```
+
+### What we CAN verify without real devices:
+- **macOS full flow**: mdmb → NanoMDM → SCEP cert → check-in → webhook → device record creation → command dispatch → command response (complete E2E)
+- **SCEP protocol**: mdmb's SCEP client exercises the real PKCS#7 envelope flow
+- **Windows SOAP enrollment**: existing XML test fixtures + curl
+- **Android webhook processing**: JSON payloads via curl + integration tests
+- **All service layer business logic**: unit tests with mocks
+
+### What REQUIRES real devices (deferred to F-01):
+- Windows MS-MDE2 discovery → enrollment → management sync with a real Windows device
+- Android Management API webhook delivery from Google's servers
+- Apple-specific edge cases that mdmb doesn't simulate (APNs delivery, DEP enrollment, user enrollment)
+- End-to-end lock/wipe verification on real hardware
+
+The expectation is that F-01 will surface protocol-level edge cases (unexpected field values, timing issues, platform-specific quirks) but NOT architectural issues (wrong service wiring, missing database records, broken data flow).
 
 ---
 
@@ -137,9 +159,10 @@ macos:
 - [ ] Local MDM creates device record on Authenticate event
 - [ ] Local MDM updates device status on CheckOut event
 - [ ] Commands sent via `NanoMDMService.SendCommand()` reach NanoMDM's API
-- [ ] All flows verified with simulated JSON webhook payloads (curl/tests)
+- [ ] **mdmb simulated device completes full enrollment** (SCEP cert + Authenticate + TokenUpdate)
+- [ ] **mdmb device-connect triggers webhook → device appears in `GET /api/v1/devices`**
 
-> **Real device verification deferred to F-01.** The Apple MDM protocol (plist/CMS binary) is handled by NanoMDM, not our code. Our webhook receiver is JSON-based and fully testable without real hardware. The gap that remains after this sprint is: "does NanoMDM correctly translate Apple protocol → JSON webhooks in this specific deployment?" — that's NanoMDM's responsibility and can only be confirmed with a real macOS device or Apple's MDM testing tools.
+> **mdmb replaces the need for real macOS devices for protocol testing.** It exercises the full Apple MDM protocol stack (SCEP, check-in, command queue) against NanoMDM, which forwards to our webhook handlers. F-01 is still needed for APNs delivery, DEP enrollment, and Apple-specific edge cases that mdmb doesn't simulate.
 
 ---
 
@@ -287,9 +310,10 @@ For the request, the simplest approach is to use the `github.com/smallstep/pkcs7
 - [ ] SCEP PKIOperation accepts PKCS#7-wrapped CSR requests
 - [ ] SCEP PKIOperation returns signed cert in PKCS#7 SignedData envelope
 - [ ] Verified with `openssl` CLI: generate CSR, submit to `/scep`, parse response
+- [ ] **mdmb enrollment completes SCEP certificate exchange successfully** (this is the real test — mdmb uses a proper SCEP client)
 - [ ] Integration test covers the full challenge → CSR → signed cert flow
 
-> **Real device verification deferred to F-01.** The SCEP protocol can be tested end-to-end with `openssl` and Go test clients, which covers the cryptographic correctness. The remaining gap is Apple's specific SCEP client behavior (envelope preferences, retry logic, error handling) — this can only be confirmed during real macOS enrollment in F-01.
+> **mdmb's SCEP client is the definitive test.** It implements the same SCEP protocol flow as Apple devices (PKCS#7 envelopes, challenge passwords, CA cert fetching). If mdmb can enroll through our SCEP server, real Apple devices almost certainly can too. F-01 covers any Apple-specific SCEP quirks.
 
 ---
 
@@ -322,13 +346,13 @@ For the request, the simplest approach is to use the `github.com/smallstep/pkcs7
 
 - [ ] macOS enrollment profile points to NanoMDM, not Local MDM
 - [ ] NanoMDM deployed in docker-compose, forwarding webhooks to Local MDM
+- [ ] **mdmb simulated devices complete full enrollment and appear in device list**
 - [ ] Windows enrollment creates device records in the database
 - [ ] Android webhook events are processed (not silently dropped)
-- [ ] SCEP protocol works with openssl test client
+- [ ] SCEP protocol works with mdmb's SCEP client and openssl
 - [ ] Service layer test coverage ≥ 60%
 - [ ] All existing tests pass
-- [ ] Each platform verified with simulated payloads (curl/openssl/test fixtures)
-- [ ] Real device verification tracked as F-01 dependency, not blocking this sprint
+- [ ] Real device edge cases tracked as F-01 dependency (APNs, DEP, Windows MS-MDE2, Google webhook delivery)
 
 ---
 
