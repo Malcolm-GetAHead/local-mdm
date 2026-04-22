@@ -1,7 +1,14 @@
 # Session Notes — Working Preferences & Project Knowledge
 
-**Last Updated**: 2026-04-21  
+**Last Updated**: 2026-04-22  
 **Purpose**: Guidance for AI agents working on this codebase. Keep this file lean — patterns and conventions that apply to every session. One-shot implementation details belong in sprint docs, not here.
+
+## Current State
+
+- **Sprint 5**: ✅ COMPLETE, on branch `sprint-5/backend-polish` (not yet merged to main)
+- **Retrospective**: ✅ COMPLETE (backward look, forward look, holistic doc/test review, feedback exchange)
+- **Next sprint**: **5c** (platform integration — 9 tasks), then 5b (EventBus), then 5d (dashboard)
+- **Pending**: merge sprint-5/backend-polish to main
 
 ---
 
@@ -14,6 +21,10 @@
 - Architecture discussions before code — present options with tradeoffs, let owner choose, then implement.
 - Owner has strong architectural instincts. Watch for signals like "would it make more sense to..." — these are directional decisions, not questions. Confirm and execute.
 - Owner values honest pushback. Explain why an alternative is better. The owner redirects when they disagree.
+- **Owner's workflow is: analyze sprint → clarify decisions → autonomous implementation → output review → structured retrospective.** Don't slow down implementation with mid-task checkpoints. The retrospective IS the quality gate.
+- **During retrospective, the owner probes deeply.** Casual-sounding questions ("are these items captured anywhere?", "does nanomdm support simulated events?") are deliberate investigation. They consistently lead to significant findings. Investigate fully.
+- **Owner juggles multiple projects.** Keep the "Current State" block at the top of this file updated after each major milestone so anyone can re-orient instantly.
+- **When presenting analysis at sprint start, separate decisions from context.** Put "decisions I need from you" as a numbered list at the top. Put analysis and tradeoffs below. The owner makes decisions quickly when clearly framed.
 
 ## Lessons for Future Agents
 
@@ -23,6 +34,12 @@
 - **Don't default to Kubernetes.** The owner's instinct is toward lighter orchestration (ECS Fargate). If a doc or plan assumes K8s, flag it and propose the simpler alternative.
 - **Integration tests find real bugs that mocks hide.** Every time we wrote integration tests against live PostgreSQL, we found bugs — NULL column scans in command repo, JSONB serialization in DEP storage. When the owner asks "why don't we have tests for this?", the answer should be "let me write them now" not "it's tested through mocks."
 - **The owner asks probing questions that look simple but aren't.** "Don't we have real PostgreSQL?" and "Is this SCEP work detailed anywhere?" both led to significant findings. Take these questions seriously — investigate fully before answering.
+- **Don't trust Sprint 2/3 platform integration claims.** The macOS, Windows, and Android enrollment flows were built against mocks and JSON fixtures. The actual protocol-level integration has never been tested with real protocols. Sprint 5c exists to fix this. Until 5c is complete, treat all platform features as "works in tests, unverified with real protocols."
+- **NULL column scan bugs are a recurring pattern.** Every nullable TEXT/VARCHAR column scanned into a Go `string` will fail. Three bugs found so far: `error_message` in commands, `full_name` in users, `user_agent` in audit logs. When writing new repository code, audit all `Scan()` calls against the schema for nullable columns. Use `COALESCE(col, '')` or `sql.NullString`.
+- **Connection pool exhaustion causes flaky tests.** 18 test packages × N connections can exceed PostgreSQL's 100 limit. Always use `-p 4` when running the full suite. Test pool sizes should be 2 open / 1 idle. If tests fail randomly with different tests each run, check connection counts before debugging individual tests.
+- **`mdmb`** (github.com/jessepeterson/mdmb) is a device simulator by the NanoMDM author. It exercises the full Apple MDM protocol stack (SCEP, check-in, commands). Use it for macOS E2E testing in Sprint 5c.
+- **The `strings.Contains(err.Error(), "not found")` pattern is fragile.** 36 handler checks + 29 repo returns. Sprint 5c task S5c-07 replaces with `apperrors.ErrNotFound` sentinel errors. Until then, don't change error message text in repositories — it silently breaks not-found detection.
+- **The retrospective process finds real issues.** Don't rush it. The backward look, forward look, and holistic doc/test review consistently find bugs, stale docs, and architectural gaps. Budget time for it.
 
 ## Session Closeout Process
 
@@ -60,8 +77,8 @@ After every sprint, the owner expects:
 
 ### Service Layer (Sprint 4+)
 - `internal/service/` — business logic between handlers and repos. Transport-agnostic (no `net/http`).
-- Services: `PolicyService`, `GroupService`, `ComplianceService`, `LifecycleService`.
-- **Two patterns coexist**: Sprint 2/3 handlers call repos directly; Sprint 4+ handlers call services. S5-10 will migrate the rest. Don't extend the old pattern — new business logic goes in services.
+- Services: `PolicyService`, `GroupService`, `ComplianceService`, `LifecycleService`, `DeviceService`, `AppService`, `UserService`, `TokenService`.
+- **Sprint 5 completed the migration**: all device and app handlers now call services. No handlers call repos directly for business logic.
 - Services accept repository interfaces via constructor (dependency injection).
 
 ### Error Handling
@@ -72,7 +89,7 @@ After every sprint, the owner expects:
 - **Handler tests**: mock repos in `handler_test_helpers_test.go`. New endpoints must be registered in `newTestServer()`.
 - **Service tests**: own mocks in `*_test.go` within `internal/service/`.
 - **Integration tests**: need Docker services (`docker compose up -d` then `migrate up`). PostgreSQL is always available — don't use `-short` flag to skip integration tests.
-- **Always run `go test -race ./...`** (no `-short`) — the Docker stack is running.
+- **Always run `go test -race -p 4 ./...`** (no `-short`) — the Docker stack is running. The `-p 4` limits parallel packages to prevent PostgreSQL connection pool exhaustion.
 
 ### Config (Database)
 ```yaml
@@ -125,7 +142,7 @@ database:
 - **Idempotency-Key**: PostgreSQL-backed middleware on all POST/PUT/PATCH. 24h TTL, hourly cleanup.
 - **Prometheus metrics**: separate internal port (127.0.0.1:9090), not the public API port.
 - **EventBus**: PostgreSQL triggers in place (migration 000007). Go-side LISTEN/NOTIFY listener not yet built — **Sprint 5b** owns this. Must use dedicated connection on Writer pool DSN (read replicas don't relay NOTIFY).
-- **Compliance engine**: infrastructure complete but `evaluatePolicy()` returns "unknown" until S5-09.
+- **Compliance engine**: real evaluation logic in Sprint 5 (security: password, encryption, firewall; restrictions: camera). Returns "unknown" when device has no `platform_data`. Auto-evaluation on check-in deferred to Sprint 5b (EventBus).
 - **Policy deployment**: assignments recorded, devices pick up on next check-in. No immediate push (intentional).
 - **Sprint 2 security review docs** contain false claims. Trust the code, not the review narratives.
 - **Dashboard**: Go templates + HTMX + Tailwind CSS (Sprint 5d). Not React.
@@ -145,7 +162,13 @@ database:
 - **Doc debt tracked in `docs/reviews/sprint-4b/DOCUMENTATION_REVIEW.md`** — being resolved on `review/documentation-fixes` branch.
 - **Repo integration test gap tracked in `docs/reviews/sprint-4b/REPOSITORY_TEST_COVERAGE.md`** — resolved on `review/repo-integration-tests` branch. All 5 test files written.
 - **`GET /windows/ppkg/templates`** — auth being added on `review/documentation-fixes` branch.
-- **command.GetByID and ListByDevice bug** — `error_message` column is nullable TEXT but scanned into `string` (not `*string`). Fails for pending/sent commands where error_message is NULL. Documented in `sprint12_gaps_integration_test.go`. Fix needed in Sprint 5.
+- **command.GetByID and ListByDevice bug** — ✅ FIXED in Sprint 5 (COALESCE). Tests updated in `sprint12_gaps_integration_test.go`.
+- **Service layer test coverage at 30.4%** — tracked in S5c-05 (target: 60%).
+- **`strings.Contains` error detection** — 36 handler checks + 29 repo returns. Tracked in S5c-07 (sentinel errors).
+- **NanoMDM not deployed** — not in docker-compose, enrollment profile points to wrong server. Tracked in S5c-01.
+- **Windows enrollment doesn't create device records** — tracked in S5c-02.
+- **Android webhook is a no-op** — tracked in S5c-03.
+- **EventBus Go listener not built** — triggers exist (migration 000007), no listener. Tracked in Sprint 5b.
 
 ## Sprint 4b Learnings
 
