@@ -41,9 +41,7 @@ func (s *UserService) Create(ctx context.Context, user *models.User) error {
 	if !validRoles[user.Role] {
 		return fmt.Errorf("invalid role: %s", user.Role)
 	}
-	if user.PasswordHash == "" {
-		user.PasswordHash = "oidc-managed" // No password — auth via Keycloak or API token
-	}
+	// password_hash is NULL — auth is via Keycloak OIDC or API tokens
 	user.IsActive = true
 	return s.userRepo.Create(ctx, user)
 }

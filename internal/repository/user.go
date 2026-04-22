@@ -42,7 +42,7 @@ func (r *userRepository) Create(ctx context.Context, user *models.User) error {
 	}
 	return getExecutor(ctx, r.writer).QueryRowContext(ctx,
 		`INSERT INTO users (id, enterprise_id, email, password_hash, full_name, role, is_active)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7)
+		 VALUES ($1, $2, $3, NULLIF($4, ''), $5, $6, $7)
 		 RETURNING created_at, updated_at`,
 		user.ID, user.EnterpriseID, user.Email, user.PasswordHash, user.FullName, user.Role, user.IsActive,
 	).Scan(&user.CreatedAt, &user.UpdatedAt)
@@ -51,7 +51,7 @@ func (r *userRepository) Create(ctx context.Context, user *models.User) error {
 func (r *userRepository) GetByID(ctx context.Context, id uuid.UUID) (*models.User, error) {
 	u := &models.User{}
 	err := getReadExecutor(ctx, r.reader).QueryRowContext(ctx,
-		`SELECT id, enterprise_id, email, password_hash, COALESCE(full_name, ''), role, is_active, last_login_at, created_at, updated_at
+		`SELECT id, enterprise_id, email, COALESCE(password_hash, ''), COALESCE(full_name, ''), role, is_active, last_login_at, created_at, updated_at
 		 FROM users WHERE id = $1 AND deleted_at IS NULL`, id,
 	).Scan(&u.ID, &u.EnterpriseID, &u.Email, &u.PasswordHash, &u.FullName, &u.Role, &u.IsActive, &u.LastLoginAt, &u.CreatedAt, &u.UpdatedAt)
 	if err != nil {
@@ -63,7 +63,7 @@ func (r *userRepository) GetByID(ctx context.Context, id uuid.UUID) (*models.Use
 func (r *userRepository) GetByEmail(ctx context.Context, enterpriseID uuid.UUID, email string) (*models.User, error) {
 	u := &models.User{}
 	err := getReadExecutor(ctx, r.reader).QueryRowContext(ctx,
-		`SELECT id, enterprise_id, email, password_hash, COALESCE(full_name, ''), role, is_active, last_login_at, created_at, updated_at
+		`SELECT id, enterprise_id, email, COALESCE(password_hash, ''), COALESCE(full_name, ''), role, is_active, last_login_at, created_at, updated_at
 		 FROM users WHERE enterprise_id = $1 AND email = $2 AND deleted_at IS NULL`, enterpriseID, email,
 	).Scan(&u.ID, &u.EnterpriseID, &u.Email, &u.PasswordHash, &u.FullName, &u.Role, &u.IsActive, &u.LastLoginAt, &u.CreatedAt, &u.UpdatedAt)
 	if err != nil {
@@ -83,7 +83,7 @@ func (r *userRepository) List(ctx context.Context, enterpriseID uuid.UUID, limit
 		return nil, 0, err
 	}
 	rows, err := exec.QueryContext(ctx,
-		`SELECT id, enterprise_id, email, password_hash, COALESCE(full_name, ''), role, is_active, last_login_at, created_at, updated_at
+		`SELECT id, enterprise_id, email, COALESCE(password_hash, ''), COALESCE(full_name, ''), role, is_active, last_login_at, created_at, updated_at
 		 FROM users WHERE enterprise_id = $1 AND deleted_at IS NULL ORDER BY email ASC LIMIT $2 OFFSET $3`,
 		enterpriseID, vLimit, vOffset)
 	if err != nil {
