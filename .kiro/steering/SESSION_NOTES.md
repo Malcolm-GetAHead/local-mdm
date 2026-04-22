@@ -166,7 +166,7 @@ database:
 | 4b | ✅ Complete | Writer/Reader DB pools, repo constructor refactor |
 | 4c | 🔲 Not Started | macOS Platform SSO (Java/Swift) — renamed to Sprint 6 |
 | 5 | ✅ Complete | Backend polish, CLI, observability, performance |
-| 5b | 🔲 Not Started | EventBus listener, compliance wiring, load testing |
 | 5c | 🔲 Not Started | Platform integration fixes (macOS/Windows/Android), SCEP, service tests |
+| 5b | 🔲 Not Started | EventBus listener, compliance wiring, load testing |
 | 5d | 🔲 Not Started | Web dashboard (HTMX) |
 | 6 | 🔲 Not Started | macOS Platform SSO (Java/Swift) — requires Apple Developer account |

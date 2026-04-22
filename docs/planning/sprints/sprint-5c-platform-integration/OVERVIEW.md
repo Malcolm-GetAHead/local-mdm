@@ -3,7 +3,7 @@
 **Status**: 🔲 Not Started  
 **Duration**: 5-7 days  
 **Goal**: Fix the three critical platform integration blockers that prevent real device management, fix SCEP protocol compliance, and increase service layer test coverage  
-**Depends on**: Sprint 5b complete (EventBus provides reactive compliance evaluation)
+**Depends on**: Sprint 5 complete
 
 ---
 
@@ -74,6 +74,8 @@ The expectation is that F-01 will surface protocol-level edge cases (unexpected 
 | S5c-04 | SCEP: Fix protocol compliance (PKCS#7 envelopes) | 1 day | S5c-01 (macOS needs SCEP) |
 | S5c-05 | Service layer test coverage (target: 60%+) | 1-2 days | S5c-01 through S5c-04 |
 | S5c-06 | End-to-end integration tests (all platforms, local stack) | 1-2 days | S5c-01 through S5c-04 |
+| S5c-07 | Replace string-based error detection with sentinel errors | 0.5-1 day | — |
+| S5c-08 | Make password_hash nullable + enforce Keycloak-only auth | 0.5 day | — |
 
 ---
 
@@ -460,6 +462,55 @@ This can run without mdmb — just curl/Go HTTP client sending the JSON payloads
 - [ ] SCEP: mdmb enrollment proves PKCS#7 envelope handling works
 - [ ] All tests run with `go test ./tests/e2e/...` when docker-compose stack is up
 - [ ] Tests skip gracefully when NanoMDM/mdmb not available
+
+---
+
+### S5c-07: Replace String-Based Error Detection with Sentinel Errors
+
+**Problem**: 29 places in the repository layer return `fmt.Errorf("xxx not found")` and 36 places in handlers check `strings.Contains(err.Error(), "not found")`. This is fragile — if an error message changes, detection breaks silently.
+
+**Fix**: The `apperrors` package already exists (100% coverage). Add `ErrNotFound` sentinel:
+
+```go
+// internal/apperrors/errors.go
+var ErrNotFound = errors.New("not found")
+```
+
+Then in repos: `return nil, fmt.Errorf("device not found: %w", apperrors.ErrNotFound)`
+And in handlers: `if errors.Is(err, apperrors.ErrNotFound) { respondError(w, r, 404, ...) }`
+
+**Scope**: ~10 repository files (29 error returns), 2 handler files (36 checks). Mechanical refactor — no behavior change.
+
+**Acceptance criteria**:
+- [ ] `apperrors.ErrNotFound` defined
+- [ ] All repository "not found" errors wrap it with `%w`
+- [ ] All handler not-found checks use `errors.Is()` instead of `strings.Contains()`
+- [ ] All existing tests pass (no behavior change)
+
+---
+
+### S5c-08: Make password_hash Nullable + Enforce Keycloak-Only Auth
+
+**Problem**: The `users` table has `password_hash VARCHAR(255) NOT NULL`. Since auth is via Keycloak OIDC (not local passwords), we store `"oidc-managed"` as a placeholder. This is misleading — it looks like a real hash.
+
+**Fix**:
+
+Migration `000011_nullable_password_hash.up.sql`:
+```sql
+ALTER TABLE users ALTER COLUMN password_hash DROP NOT NULL;
+UPDATE users SET password_hash = NULL WHERE password_hash = 'oidc-managed';
+```
+
+Then in `UserService.Create()`: stop setting the placeholder. Users created without a password get `NULL`.
+
+Auth enforcement: users with `password_hash IS NULL` can only authenticate via Keycloak JWT or API tokens (which are already tied to the user record, not the password). No code change needed in the auth middleware — it already doesn't check passwords. The enforcement is implicit: there's no password-based login endpoint.
+
+**Acceptance criteria**:
+- [ ] Migration makes `password_hash` nullable
+- [ ] New users created with `NULL` password_hash (no placeholder)
+- [ ] Existing `"oidc-managed"` values migrated to `NULL`
+- [ ] Keycloak JWT auth still works for NULL-password users
+- [ ] API token auth still works for NULL-password users
 
 ---
 

@@ -3,7 +3,7 @@
 **Status**: 🔲 Not Started  
 **Duration**: 3-5 days  
 **Goal**: Build the Go-side LISTEN/NOTIFY EventBus listener, wire compliance auto-evaluation into device and policy lifecycle events, fix device state parsing in check-in handlers  
-**Depends on**: Sprint 5 complete (PostgreSQL triggers exist since migration 000007, compliance engine has real evaluation logic)
+**Depends on**: Sprint 5c complete (platform integrations fixed, devices can enroll and report state)
 
 ---
 

@@ -3,7 +3,7 @@
 **Status**: 🔲 Not Started  
 **Duration**: 1-2 weeks  
 **Goal**: Web-based admin dashboard for device management, policy management, and compliance monitoring  
-**Depends on**: Sprint 5c complete (platform integrations fixed, real device data flows working)  
+**Depends on**: Sprint 5b complete (EventBus + compliance wiring provides live data for dashboard)  
 **Stack**: Go HTML templates + HTMX + Tailwind CSS — no separate frontend build pipeline
 
 ---
