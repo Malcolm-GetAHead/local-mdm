@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/malcolm-getahead/local-mdm/internal/certs"
+	"go.mozilla.org/pkcs7"
 )
 
 // Handler serves SCEP protocol requests (GetCACert and PKCSReq).
@@ -55,8 +56,18 @@ func (h *Handler) getCACert(w http.ResponseWriter) {
 		http.Error(w, "CA not available", http.StatusServiceUnavailable)
 		return
 	}
-	w.Header().Set("Content-Type", "application/x-x509-ca-cert")
-	w.Write(cert.Raw)
+	// Return CA cert in PKCS#7 degenerate certificates-only envelope
+	// This is the format real SCEP clients (including Apple's) expect
+	degenerateData, err := pkcs7.DegenerateCertificate(cert.Raw)
+	if err != nil {
+		h.logger.Error("failed to create PKCS#7 degenerate cert", "error", err)
+		// Fall back to raw DER
+		w.Header().Set("Content-Type", "application/x-x509-ca-cert")
+		w.Write(cert.Raw)
+		return
+	}
+	w.Header().Set("Content-Type", "application/x-x509-ca-ra-cert")
+	w.Write(degenerateData)
 }
 
 func (h *Handler) getCACaps(w http.ResponseWriter) {
@@ -71,7 +82,9 @@ func (h *Handler) pkiOperation(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	csr, err := parseCSR(body)
+	// Try to parse as PKCS#7 envelope first (real SCEP clients)
+	// Fall back to raw/base64 CSR (for testing)
+	csr, err := parseCSRFromPKCS7OrRaw(body, h.ca)
 	if err != nil {
 		h.logger.Warn("failed to parse SCEP request", "error", err)
 		http.Error(w, "invalid CSR", http.StatusBadRequest)
@@ -99,8 +112,45 @@ func (h *Handler) pkiOperation(w http.ResponseWriter, r *http.Request) {
 	}
 
 	h.logger.Info("SCEP certificate issued", "device_id", deviceID, "serial", cert.SerialNumber.String())
-	w.Header().Set("Content-Type", "application/x-x509-ca-cert")
-	w.Write(cert.Raw)
+
+	// Wrap signed cert in PKCS#7 degenerate certificates-only envelope
+	caCert := h.ca.GetCACertificate()
+	respData, err := buildCertResponse(cert, caCert)
+	if err != nil {
+		h.logger.Error("failed to build PKCS#7 response", "error", err)
+		// Fall back to raw DER
+		w.Header().Set("Content-Type", "application/x-x509-ca-cert")
+		w.Write(cert.Raw)
+		return
+	}
+	w.Header().Set("Content-Type", "application/x-pki-message")
+	w.Write(respData)
+}
+
+// parseCSRFromPKCS7OrRaw tries PKCS#7 envelope first, then raw/base64 CSR
+func parseCSRFromPKCS7OrRaw(data []byte, ca *certs.CAManager) (*x509.CertificateRequest, error) {
+	// Try PKCS#7 SignedData envelope (real SCEP clients)
+	p7, err := pkcs7.Parse(data)
+	if err == nil && len(p7.Content) > 0 {
+		// The inner content is the CSR (possibly encrypted, but for
+		// challenge-based SCEP the CSR is typically in the signed content)
+		if csr, err := x509.ParseCertificateRequest(p7.Content); err == nil {
+			return csr, nil
+		}
+	}
+	// Fall back to raw DER or base64
+	return parseCSR(data)
+}
+
+// buildCertResponse wraps the signed cert (and CA cert) in a PKCS#7 degenerate envelope
+func buildCertResponse(cert, caCert *x509.Certificate) ([]byte, error) {
+	certs := cert.Raw
+	if caCert != nil {
+		// Include both signed cert and CA cert in the chain
+		certs = append(cert.Raw, caCert.Raw...)
+	}
+	// Use degenerate certificate for the signed cert
+	return pkcs7.DegenerateCertificate(certs)
 }
 
 var challengePasswordOID = asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 9, 7}

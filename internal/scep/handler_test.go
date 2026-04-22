@@ -18,6 +18,7 @@ import (
 	"github.com/malcolm-getahead/local-mdm/internal/certs"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.mozilla.org/pkcs7"
 )
 
 type mockStore struct {
@@ -55,10 +56,11 @@ func TestHandler_GetCACert(t *testing.T) {
 	h.ServeHTTP(w, req)
 
 	assert.Equal(t, http.StatusOK, w.Code)
-	assert.Equal(t, "application/x-x509-ca-cert", w.Header().Get("Content-Type"))
-	cert, err := x509.ParseCertificate(w.Body.Bytes())
+	assert.Equal(t, "application/x-x509-ca-ra-cert", w.Header().Get("Content-Type"))
+	p7, err := pkcs7.Parse(w.Body.Bytes())
 	require.NoError(t, err)
-	assert.Equal(t, "Local MDM Root CA", cert.Subject.CommonName)
+	require.NotEmpty(t, p7.Certificates)
+	assert.Equal(t, "Local MDM Root CA", p7.Certificates[0].Subject.CommonName)
 }
 
 func TestHandler_GetCACaps(t *testing.T) {
@@ -83,7 +85,7 @@ func TestHandler_DefaultGET(t *testing.T) {
 	h.ServeHTTP(w, req)
 
 	assert.Equal(t, http.StatusOK, w.Code)
-	assert.Equal(t, "application/x-x509-ca-cert", w.Header().Get("Content-Type"))
+	assert.Equal(t, "application/x-x509-ca-ra-cert", w.Header().Get("Content-Type"))
 }
 
 func TestHandler_PKIOperation(t *testing.T) {
@@ -98,8 +100,11 @@ func TestHandler_PKIOperation(t *testing.T) {
 		h.ServeHTTP(w, req)
 
 		assert.Equal(t, http.StatusOK, w.Code)
-		cert, err := x509.ParseCertificate(w.Body.Bytes())
+		// Response is PKCS#7 degenerate certificate envelope
+		p7, err := pkcs7.Parse(w.Body.Bytes())
 		require.NoError(t, err)
+		require.NotEmpty(t, p7.Certificates)
+		cert := p7.Certificates[0]
 		assert.False(t, cert.IsCA)
 		assert.Equal(t, "test-device", cert.Subject.CommonName)
 	})
