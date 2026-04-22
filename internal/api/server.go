@@ -691,6 +691,11 @@ func (s *Server) setupRoutes() {
 	commandHandler := macos.NewCommandHandler(s.nanomdmService, s.logger)
 	s.router.Handle("/mdm", commandHandler).Methods("PUT")
 	s.router.Handle("/checkin", checkinHandler).Methods("PUT")
+
+	// NanoMDM webhook — receives forwarded check-in and command events
+	api.Handle("/macos/webhook", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		checkinHandler.ServeHTTP(w, r)
+	})).Methods("POST")
 	
 	// Windows MDM endpoints
 	s.router.HandleFunc("/EnrollmentServer/Discovery.svc", s.handleWindowsDiscoveryService).Methods("GET", "POST")

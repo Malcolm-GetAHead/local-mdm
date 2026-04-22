@@ -8,12 +8,13 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: localmdm
-      POSTGRES_MULTIPLE_DATABASES: localmdm,keycloak
+      POSTGRES_MULTIPLE_DATABASES: localmdm,keycloak,nanomdm
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./docker/postgres/init-multiple-databases.sh:/docker-entrypoint-initdb.d/init-multiple-databases.sh
+      - ./docker/postgres/init-multiple-databases.sh:/docker-entrypoint-initdb.d/01-init-multiple-databases.sh
+      - ./docker/postgres/init-nanomdm-schema.sh:/docker-entrypoint-initdb.d/02-init-nanomdm-schema.sh
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 10s
@@ -55,6 +56,28 @@ services:
       - postgres
     environment:
       ADMINER_DEFAULT_SERVER: postgres
+
+  nanomdm:
+    build:
+      context: ./docker/nanomdm
+      dockerfile: Dockerfile
+    image: localmdm-nanomdm:v0.9.0
+    container_name: localmdm-nanomdm
+    ports:
+      - "9000:9000"
+    environment:
+      NANOMDM_STORAGE: pgsql
+      NANOMDM_STORAGE_DSN: "postgres://postgres:postgres@postgres:5432/nanomdm?sslmode=disable"
+      NANOMDM_API: "localmdm-nanomdm-api-key"
+      NANOMDM_WEBHOOK_URL: "http://host.docker.internal:8080/api/v1/macos/webhook"
+      NANOMDM_CHECKIN: "1"
+      NANOMDM_DEBUG: "1"
+      NANOMDM_CA: "/certs/ca.crt"
+    volumes:
+      - ./internal/api/certs/ca.crt:/certs/ca.crt:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
 
 volumes:
   postgres_data:
