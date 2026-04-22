@@ -1,3 +1,5 @@
+> **⚠️ ARCHIVED** — This document is from 2026-02-08 (post-Sprint 1). Most items have been resolved across Sprints 2-5. Remaining items (audit archival, connection pool monitoring, API versioning) are tracked in the future roadmap (F-05, F-07). Retained for historical reference only.
+
 # Remaining Tasks - Priority Order
 
 **Date**: 2026-02-08  

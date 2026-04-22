@@ -127,7 +127,7 @@ local-mdm/
 | Method | Path | Role | Description |
 |--------|------|------|-------------|
 | GET | `/api/v1/certificates` | any authenticated | List certificates |
-| GET | `/api/v1/audit-logs` | admin, super_admin | List audit logs |
+| GET | `/api/v1/audit-logs` | admin, super_admin | List audit logs (`?action=`, `?start_date=`, `?end_date=`) |
 
 ### macOS
 | Method | Path | Description |
@@ -215,6 +215,40 @@ local-mdm/
 | GET | `/api/v1/devices/{id}/compliance` | any authenticated | Device compliance |
 | POST | `/api/v1/devices/{id}/compliance/evaluate` | admin, operator | Trigger compliance evaluation |
 
+### Users (Sprint 5)
+| Method | Path | Role | Description |
+|--------|------|------|-------------|
+| GET | `/api/v1/users` | admin, super_admin | List users |
+| POST | `/api/v1/users` | admin, super_admin | Create user |
+| GET | `/api/v1/users/{id}` | admin, super_admin | Get user |
+| PUT | `/api/v1/users/{id}` | admin, super_admin | Update user |
+| DELETE | `/api/v1/users/{id}` | super_admin | Delete user |
+
+### API Tokens (Sprint 5)
+| Method | Path | Role | Description |
+|--------|------|------|-------------|
+| GET | `/api/v1/tokens` | any authenticated | List tokens |
+| POST | `/api/v1/tokens` | admin, super_admin | Create token (returns plaintext once) |
+| DELETE | `/api/v1/tokens/{id}` | admin, super_admin | Revoke token |
+
+### Reports (Sprint 5)
+| Method | Path | Role | Description |
+|--------|------|------|-------------|
+| GET | `/api/v1/reports/device-inventory` | any authenticated | Device inventory report |
+| GET | `/api/v1/reports/compliance-summary` | any authenticated | Compliance summary report |
+| GET | `/api/v1/reports/enrollment-trends` | any authenticated | Enrollment trends report |
+
+### SCEP (Sprint 5)
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/scep` | SCEP server (GetCACert, GetCACaps) |
+| POST | `/scep` | SCEP server (PKIOperation) |
+
+### Health (Sprint 5)
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/health/ready` | Readiness probe (per-dependency latency) |
+
 ## Database Tables
 
 | Table | Purpose |
@@ -239,6 +273,7 @@ local-mdm/
 | `policy_versions` | Policy version snapshots |
 | `token_cache` | PostgreSQL-backed token cache |
 | `idempotency_keys` | Idempotency-Key response cache |
+| `scep_challenges` | SCEP one-time-use enrollment challenges |
 
 ## Development Workflow
 
@@ -267,7 +302,7 @@ local-mdm/
 
 ## Current Phase
 
-**Sprint 4b complete** — Read/Write Database Pools. DB struct split into Writer/Reader pools, all repository constructors updated, ReaderConfig with field-level fallback. Ready for Sprint 6 (macOS Platform SSO) or Sprint 5 (Backend Polish).
+**Sprint 5 complete** — Backend Polish, CLI, Observability & Performance. Service layer expansion (DeviceService, AppService, UserService, TokenService, ReportingService), user management API, API token system (`lmdm_` prefix), reporting endpoints with CSV export, SCEP server, readiness probe, audit log search, real compliance evaluation, and performance indexes. Ready for Sprint 5b (EventBus) or Sprint 5c (Platform Integration).
 
 See [Sprint Planning](../planning/sprints/) for roadmap.
 

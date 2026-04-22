@@ -10,7 +10,7 @@
 ## Gap Analysis
 
 ### Current State
-- Web dashboard uses Go HTML templates + HTMX + Tailwind CSS (Sprint 5b)
+- Web dashboard uses Go HTML templates + HTMX + Tailwind CSS (Sprint 5d)
 - Accessibility mentioned but not fully defined
 - English-only interface
 

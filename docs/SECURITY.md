@@ -147,12 +147,14 @@ Every request gets unique UUID:
 - [x] RBAC authorization
 - [x] Panic recovery
 - [x] Request ID tracking
+- [x] API token authentication (lmdm_ prefix, SHA-256 hashed)
+- [x] SCEP challenge-based enrollment
+- [x] Idempotency-Key deduplication (PostgreSQL-backed)
 
 ### Production (TODO)
 - [ ] TLS certificates configured
 - [ ] AWS Secrets Manager integration
-- [ ] AWS WAF rate-based rules on ALB (in-memory rate limiters remain as fallback)
-- [ ] WAF (Web Application Firewall)
+- [ ] AWS WAF rate-based rules on ALB (primary rate limiting; in-memory remains as fallback)
 - [ ] DDoS protection (CloudFlare, AWS Shield)
 - [ ] Security scanning (Snyk, Dependabot)
 - [ ] Penetration testing
@@ -212,6 +214,43 @@ Every request gets unique UUID:
     - Input validation
     - URL sanitization
     - Network segmentation (TODO)
+
+### 11. API Token Authentication ✅
+
+Programmatic API access via long-lived tokens (Sprint 5):
+
+- **Token format**: `lmdm_` prefix followed by 32 random bytes (base64url-encoded)
+- **Storage**: Only the SHA-256 hash is stored in the `api_tokens` table — the plaintext token is returned once at creation and never stored
+- **Authentication**: `Authorization: Bearer lmdm_...` header
+- **Dual auth support**: Endpoints accept either OIDC JWT or API token — middleware tries both and uses the first that succeeds
+- **Token revocation**: `DELETE /api/v1/tokens/{id}` immediately invalidates the token
+- **Scoping**: Tokens are scoped to an enterprise and carry a role (same RBAC as OIDC users)
+
+### 12. SCEP Server Security ✅
+
+Simple Certificate Enrollment Protocol server for device certificate issuance (Sprint 5):
+
+- **Challenge-based enrollment**: Devices must present a valid one-time-use challenge to obtain a certificate
+- **One-time-use challenges**: Each challenge can only be used once — replay attacks are rejected
+- **PostgreSQL-backed**: Challenges stored in `scep_challenges` table, safe across multiple server instances (no in-memory state)
+- **Hourly cleanup**: Expired challenges are purged every hour via background goroutine
+- **Enterprise-scoped**: Challenges are tied to an enterprise, preventing cross-tenant enrollment
+
+### 13. Idempotency ✅
+
+Request deduplication for safe retries on all mutating endpoints (Sprint 4):
+
+- **Idempotency-Key header**: Required on all `POST`, `PUT`, `PATCH` requests
+- **PostgreSQL-backed**: Keys and cached responses stored in `idempotency_keys` table — safe across multiple server instances
+- **24-hour TTL**: Keys expire after 24 hours; hourly cleanup removes expired entries
+- **Replay protection**: Duplicate requests within the TTL window return the original response (status code + body) without re-executing the operation
+
+### 14. Production Rate Limiting ✅
+
+Two-layer rate limiting strategy:
+
+- **Primary — AWS WAF**: Rate-based rules attached to the ALB. Handles volumetric attacks before traffic reaches the application. Configurable per-IP thresholds.
+- **Fallback — In-memory per-instance**: The Go application's built-in rate limiter (100 req/min per IP) remains active as defense-in-depth. In a multi-instance deployment behind a load balancer, each instance tracks rates independently (imprecise but acceptable as a secondary layer).
 
 ## Reporting Security Issues
 

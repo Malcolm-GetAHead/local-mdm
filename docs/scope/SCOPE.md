@@ -1,8 +1,8 @@
 # Project Scope - Local MDM
 
 **Version**: 1.0  
-**Last Updated**: 2026-02-05  
-**Status**: Planning Phase
+**Last Updated**: 2026-04-22  
+**Status**: Sprint 5 Complete
 
 ## Executive Summary
 
@@ -107,6 +107,7 @@ Local MDM is a unified, multi-platform Mobile Device Management solution designe
 - Certificate revocation
 - APNs certificate management (macOS)
 - TLS certificate management
+- SCEP server with challenge-based enrollment (Sprint 5)
 
 #### API & Integration
 - RESTful API for all operations
@@ -118,7 +119,7 @@ Local MDM is a unified, multi-platform Mobile Device Management solution designe
 ### Technical Requirements
 
 #### Backend
-- Language: Go 1.21+
+- Language: Go 1.25+
 - Database: PostgreSQL 15+
 - Migration tool: golang-migrate or similar
 - API framework: gorilla/mux or chi
@@ -151,7 +152,6 @@ Local MDM is a unified, multi-platform Mobile Device Management solution designe
 - ❌ Content management (documents, media)
 - ❌ Mobile threat defense integration
 - ❌ Zero-touch enrollment for Windows (Autopilot alternative)
-- ❌ SCEP server (use external SCEP if needed)
 
 ### Integrations
 - ❌ Active Directory integration (future phase)
@@ -168,39 +168,39 @@ Local MDM is a unified, multi-platform Mobile Device Management solution designe
 ## Success Criteria
 
 ### Phase 1: Foundation (Weeks 1-2)
-- [ ] Project structure established
-- [ ] Database schema designed and migrated
-- [ ] Basic API server running
-- [ ] Authentication system functional
-- [ ] Certificate infrastructure operational
+- [x] Project structure established
+- [x] Database schema designed and migrated
+- [x] Basic API server running
+- [x] Authentication system functional
+- [x] Certificate infrastructure operational
 
 ### Phase 2: Windows Support (Weeks 3-5)
-- [ ] Windows device can discover MDM server
-- [ ] Windows device can enroll successfully
-- [ ] Device information collected and stored
-- [ ] At least one policy (WiFi) can be deployed
-- [ ] Device can be remotely locked
+- [x] Windows device can discover MDM server
+- [x] Windows device can enroll successfully
+- [x] Device information collected and stored
+- [x] At least one policy (WiFi) can be deployed
+- [x] Device can be remotely locked
 
 ### Phase 3: macOS Support (Weeks 6-7)
-- [ ] nanoMDM integrated
-- [ ] macOS device can enroll via profile
-- [ ] Configuration profile can be deployed
-- [ ] App installation command works
-- [ ] Device inventory visible in API
+- [x] nanoMDM integrated
+- [x] macOS device can enroll via profile
+- [x] Configuration profile can be deployed
+- [x] App installation command works
+- [x] Device inventory visible in API
 
 ### Phase 4: Android Support (Weeks 8-9)
-- [ ] Google Management API configured
-- [ ] QR code enrollment functional
-- [ ] Work Profile can be created
-- [ ] App can be deployed from managed Play
-- [ ] Device policy enforced
+- [x] Google Management API configured
+- [x] QR code enrollment functional
+- [x] Work Profile can be created
+- [x] App can be deployed from managed Play
+- [x] Device policy enforced
 
 ### Phase 5: Unified Features (Weeks 10-12)
-- [ ] Single API manages all three platforms
-- [ ] Policy abstraction layer functional
+- [x] Single API manages all three platforms
+- [x] Policy abstraction layer functional
 - [ ] Basic web dashboard operational
-- [ ] API documentation complete
-- [ ] Deployment guide written
+- [x] API documentation complete
+- [x] Deployment guide written
 
 ## Constraints
 
@@ -251,7 +251,7 @@ Local MDM is a unified, multi-platform Mobile Device Management solution designe
 - PostgreSQL - Database
 
 ### Development Tools
-- Go 1.21+
+- Go 1.25+
 - Docker & Docker Compose
 - Make
 - Git

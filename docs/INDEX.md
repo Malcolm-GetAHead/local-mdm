@@ -5,8 +5,8 @@ Complete guide to Local MDM documentation.
 ## Quick Links
 
 - **Getting Started**: [Setup Guide](dev/SETUP.md) | [Quick Reference](dev/QUICK_REFERENCE.md)
-- **Current Status**: [Sprint 3 Complete](planning/sprints/sprint-3-platform-features/OVERVIEW.md) - Commands, Profiles & Apps delivered
-- **Implementation**: [Sprint 3 Plan](planning/sprints/sprint-3-platform-features/OVERVIEW.md)
+- **Current Status**: [Sprint 5 Complete](planning/sprints/sprint-5-ui-and-polish/OVERVIEW.md) - Backend Polish, CLI, Observability & Performance delivered
+- **Implementation**: [Sprint 5 Plan](planning/sprints/sprint-5-ui-and-polish/OVERVIEW.md)
 - **Future Plans**: [Post-v1.0 Roadmap](planning/future/README.md)
 
 ## Documentation Structure
@@ -26,6 +26,7 @@ Complete guide to Local MDM documentation.
 **Location**: `schemas/`
 - `API.md` - REST API reference
 - `DATABASE.md` - Database schema and migrations
+- `openapi.yaml` - OpenAPI specification
 
 ### 🎯 Project Scope
 **Location**: `scope/`
@@ -82,8 +83,12 @@ Complete guide to Local MDM documentation.
 - **sprint-1-foundation/** - Database, auth, API, PKI (✅ Complete)
 - **sprint-2-platform-core/** - Platform enrollment (✅ Complete)
 - **sprint-3-platform-features/** - Platform commands (✅ Complete)
-- **sprint-4-policy-and-identity/** - Policy engine (📋 Planned)
-- **sprint-5-ui-and-polish/** - UI and deployment (📋 Planned)
+- **sprint-4-policy-and-identity/** - Policy engine (✅ Complete)
+- **sprint-4b-db-pools/** - Writer/Reader database pools (✅ Complete)
+- **sprint-5-ui-and-polish/** - Backend polish, CLI, observability (✅ Complete)
+- **sprint-5b-eventbus/** - EventBus listener, compliance wiring, load testing (📋 Planned)
+- **sprint-5c-platform-integration/** - Platform integration fixes, SCEP, service tests (📋 Planned)
+- **sprint-5d-web-dashboard/** - Web dashboard with HTMX (📋 Planned)
 
 #### Future Enhancements (`planning/future/`)
 Post-v1.0 roadmap (F-01 to F-08):
@@ -118,10 +123,14 @@ Post-v1.0 roadmap (F-01 to F-08):
 ### 🔧 Operations
 **Location**: `operations/`
 - `DATA_MIGRATION.md` - Data migration procedures
+- `ALERTING.md` - Alerting configuration
+- `BACKUP.md` - Backup and restore procedures
 
 ### 👥 User Documentation
 **Location**: `user/`
-- (Future user-facing documentation)
+- `DEPLOYMENT.md` - Deployment guide
+- `OPERATIONS.md` - Operations guide
+- `TROUBLESHOOTING.md` - Troubleshooting guide
 
 ## Finding What You Need
 

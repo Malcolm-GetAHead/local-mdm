@@ -119,13 +119,16 @@ func (r *auditLogRepository) Search(ctx context.Context, enterpriseID uuid.UUID,
 	var logs []*models.AuditLog
 	for rows.Next() {
 		log := &models.AuditLog{}
-		var ipAddr sql.NullString
+		var ipAddr, userAgent sql.NullString
 		if err := rows.Scan(&log.ID, &log.EnterpriseID, &log.UserID, &log.Action, &log.ResourceType,
-			&log.ResourceID, &log.Details, &ipAddr, &log.UserAgent, &log.CreatedAt); err != nil {
+			&log.ResourceID, &log.Details, &ipAddr, &userAgent, &log.CreatedAt); err != nil {
 			return nil, 0, err
 		}
 		if ipAddr.Valid {
 			log.IPAddress = ipAddr.String
+		}
+		if userAgent.Valid {
+			log.UserAgent = userAgent.String
 		}
 		logs = append(logs, log)
 	}

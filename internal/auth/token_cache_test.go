@@ -3,7 +3,6 @@ package auth
 import (
 	"context"
 	"database/sql"
-	"os"
 	"testing"
 	"time"
 
@@ -15,17 +14,14 @@ import (
 
 func getTestDB(t *testing.T) *sql.DB {
 	t.Helper()
-	if os.Getenv("INTEGRATION_TESTS") == "" {
-		t.Skip("Skipping integration test. Set INTEGRATION_TESTS=1 to run.")
+	db, err := sql.Open("postgres", "host=localhost port=5432 user=postgres password=postgres dbname=localmdm sslmode=disable")
+	if err != nil {
+		t.Skipf("skipping integration test: %v", err)
 	}
-
-	dsn := "host=localhost port=5432 user=postgres password=postgres dbname=localmdm sslmode=disable"
-	if d := os.Getenv("TEST_DSN"); d != "" {
-		dsn = d
+	if err := db.Ping(); err != nil {
+		t.Skipf("skipping integration test: %v", err)
 	}
-
-	db, err := sql.Open("postgres", dsn)
-	require.NoError(t, err)
+	db.SetMaxOpenConns(2)
 	t.Cleanup(func() { db.Close() })
 	return db
 }

@@ -1,3 +1,5 @@
+> **⚠️ ARCHIVED** — This document is from 2026-02-06 (pre-Sprint 1) and is fully superseded by the sprint plans in `docs/planning/sprints/`. Retained for historical reference only.
+
 # Critical Review: Implementation Plan
 
 **Date**: 2026-02-06  

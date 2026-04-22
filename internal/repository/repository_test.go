@@ -20,8 +20,8 @@ func setupTestDB(t *testing.T) *db.DB {
 		Password:        "postgres",
 		Database:        "localmdm",
 		SSLMode:         "disable",
-		MaxOpenConns:    5,
-		MaxIdleConns:    2,
+		MaxOpenConns:    2,
+		MaxIdleConns:    1,
 		ConnMaxLifetime: 5 * time.Minute,
 	}
 	
