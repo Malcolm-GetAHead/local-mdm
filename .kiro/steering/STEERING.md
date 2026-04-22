@@ -387,7 +387,8 @@ docs/planning/
 │   ├── sprint-4b-db-pools/
 │   ├── sprint-6-platform-sso/
 │   ├── sprint-5-ui-and-polish/
-│   └── sprint-5b-web-dashboard/
+│   └── sprint-5b-eventbus/
+│   └── sprint-5c-web-dashboard/
 └── future/               - Future enhancements (F-01 to F-08)
 ```
 

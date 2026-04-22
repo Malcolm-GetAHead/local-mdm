@@ -124,11 +124,11 @@ database:
 - **Secrets**: `secrets/` directory for dev (gitignored), AWS SSM for production. DEP tokens encrypted with pgcrypto in the database.
 - **Idempotency-Key**: PostgreSQL-backed middleware on all POST/PUT/PATCH. 24h TTL, hourly cleanup.
 - **Prometheus metrics**: separate internal port (127.0.0.1:9090), not the public API port.
-- **EventBus**: PostgreSQL triggers in place (migration 000007). Go-side LISTEN/NOTIFY listener not yet built — S5-09 owns this. Must use dedicated connection on Writer pool DSN (read replicas don't relay NOTIFY).
+- **EventBus**: PostgreSQL triggers in place (migration 000007). Go-side LISTEN/NOTIFY listener not yet built — **Sprint 5b** owns this. Must use dedicated connection on Writer pool DSN (read replicas don't relay NOTIFY).
 - **Compliance engine**: infrastructure complete but `evaluatePolicy()` returns "unknown" until S5-09.
 - **Policy deployment**: assignments recorded, devices pick up on next check-in. No immediate push (intentional).
 - **Sprint 2 security review docs** contain false claims. Trust the code, not the review narratives.
-- **Dashboard**: Go templates + HTMX + Tailwind CSS (Sprint 5b). Not React.
+- **Dashboard**: Go templates + HTMX + Tailwind CSS (Sprint 5c). Not React.
 - **macOS Platform SSO**: Sprint 6 (Java + Swift, separate from Go work).
 
 ## What NOT to Do
@@ -166,5 +166,6 @@ database:
 | 4b | ✅ Complete | Writer/Reader DB pools, repo constructor refactor |
 | 4c | 🔲 Not Started | macOS Platform SSO (Java/Swift) — renamed to Sprint 6 |
 | 5 | ✅ Complete | Backend polish, CLI, observability, performance |
-| 5b | 🔲 Not Started | Web dashboard (HTMX) |
+| 5b | 🔲 Not Started | EventBus listener, compliance wiring, load testing |
+| 5c | 🔲 Not Started | Web dashboard (HTMX) |
 | 6 | 🔲 Not Started | macOS Platform SSO (Java/Swift) — requires Apple Developer account |
