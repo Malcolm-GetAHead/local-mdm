@@ -2,16 +2,40 @@
 
 **Status**: 🔲 Not Started  
 **Duration**: 3-5 days  
-**Goal**: Build the Go-side LISTEN/NOTIFY EventBus listener, wire compliance auto-evaluation into check-in flows, and add load testing infrastructure  
+**Goal**: Build the Go-side LISTEN/NOTIFY EventBus listener, wire compliance auto-evaluation into device and policy lifecycle events, fix device state parsing in check-in handlers  
 **Depends on**: Sprint 5 complete (PostgreSQL triggers exist since migration 000007, compliance engine has real evaluation logic)
 
 ---
 
 ## Why This Sprint
 
-Sprint 4 installed PostgreSQL triggers that fire `pg_notify` on device, policy, command, assignment, and compliance events. Sprint 5 built the compliance evaluation engine with real policy checks. But nothing connects them — compliance only evaluates when explicitly called via the API. The EventBus listener is the missing piece that makes compliance reactive.
+Sprint 4 installed 6 PostgreSQL triggers that fire `pg_notify` on device, policy, command, assignment, and compliance events. Sprint 5 built the compliance evaluation engine with real policy checks. But nothing connects them — compliance only evaluates when explicitly called via the API (`POST /devices/{id}/compliance/evaluate`). The EventBus listener is the missing piece that makes compliance reactive.
 
-The dashboard (Sprint 5c) depends on live compliance data. Without the EventBus, the compliance view shows stale results.
+The dashboard (Sprint 5d) depends on live compliance data. Without the EventBus, the compliance view shows stale results.
+
+---
+
+## Current State of Triggers
+
+All 6 triggers fire on a **single channel `mdm_events`** with JSON payload `{type, id, device_id, table, op}`:
+
+| Trigger | Table | Fires On | Event Type |
+|---------|-------|----------|------------|
+| `device_enrolled_event` | devices | AFTER INSERT | `device.enrolled` |
+| `device_updated_event` | devices | AFTER UPDATE OF **status** only | `device.status_changed` |
+| `policy_updated_event` | policies | AFTER UPDATE | `policy.updated` |
+| `command_created_event` | device_commands | AFTER INSERT | `command.created` |
+| `policy_assigned_event` | policy_assignments | AFTER INSERT | `policy.assigned` |
+| `compliance_evaluated_event` | compliance_results | AFTER INSERT OR UPDATE | `compliance.evaluated` |
+
+### Missing Triggers (need new migration)
+
+| Trigger Needed | Table | Fires On | Why |
+|----------------|-------|----------|-----|
+| `device_info_updated` | devices | AFTER UPDATE OF platform_data | **Most critical** — device reports new state during check-in, compliance must re-evaluate |
+| `policy_unassigned` | policy_assignments | AFTER DELETE | Policy removed from device/group — compliance results should be cleaned up |
+| `group_member_added` | group_memberships | AFTER INSERT | Device added to group — effective policies change, compliance must re-evaluate |
+| `group_member_removed` | group_memberships | AFTER DELETE | Device removed from group — effective policies change |
 
 ---
 
@@ -20,56 +44,155 @@ The dashboard (Sprint 5c) depends on live compliance data. Without the EventBus,
 | ID | Task | Effort | Dependencies |
 |---|---|---|---|
 | S5b-01 | EventBus LISTEN/NOTIFY Go listener | 1-2 days | Migration 000007 triggers |
-| S5b-02 | Wire compliance evaluation into check-in handlers | 1 day | S5-09 compliance engine |
-| S5b-03 | Device state parsing in check-in handlers | 1 day | S5b-02 |
-| S5b-04 | Load testing framework (k6 scenarios) | 0.5-1 day | All API endpoints |
+| S5b-02 | New triggers migration (platform_data, unassign, group membership) | 0.5 day | — |
+| S5b-03 | Wire compliance evaluation into EventBus subscribers | 1 day | S5b-01 |
+| S5b-04 | Device state parsing in check-in handlers | 1 day | S5b-03 |
+| S5b-05 | Register lifecycle hooks + fix Android lifecycle gap | 0.5 day | S5b-01 |
+| S5b-06 | Load testing framework (k6 scenarios) | 0.5 day | All API endpoints |
 
 ### S5b-01: EventBus LISTEN/NOTIFY Listener
 
 Build `internal/service/eventbus.go`:
-- Dedicated long-lived connection using `sql.DB.Conn(ctx)` on **Writer pool DSN** (read replicas don't relay NOTIFY)
-- Keep-alive with periodic ping to prevent connection timeout
-- Subscribe to channels: `device_events`, `policy_events`, `command_events`, `compliance_events`
-- Dispatch to registered subscriber functions
-- Graceful shutdown (context cancellation)
-- Multi-instance safe: all instances receive all events (fan-out)
 
-**Technical note from Sprint 4**: `LISTEN` requires a dedicated connection — standard pool connections are recycled and would drop the subscription. Use `sql.DB.Conn(ctx)` or a separate `pgx` connection.
+```go
+type EventBus struct {
+    dsn         string          // Writer pool DSN (read replicas don't relay NOTIFY)
+    subscribers map[string][]EventHandler
+    logger      *slog.Logger
+}
 
-### S5b-02: Wire Compliance into Check-in
+type MDMEvent struct {
+    Type     string    `json:"type"`      // e.g. "device.enrolled", "policy.updated"
+    ID       uuid.UUID `json:"id"`        // entity ID
+    DeviceID *uuid.UUID `json:"device_id"` // nullable
+    Table    string    `json:"table"`
+    Op       string    `json:"op"`        // INSERT, UPDATE, DELETE
+}
 
-After a device check-in updates `platform_data`:
-- Call `complianceService.EvaluateDevice()` for the device
-- Can be done as a direct service call (simpler) or as an EventBus subscriber on `device_events` (decoupled)
-- Recommendation: direct call first, migrate to EventBus subscriber later
+type EventHandler func(ctx context.Context, event MDMEvent) error
+```
 
-### S5b-03: Device State Parsing
+**Architecture decisions**:
+- **Single channel**: All triggers fire on `mdm_events`. The listener demuxes by `event.Type` to dispatch to the correct subscribers.
+- **Dedicated connection**: Use `sql.DB.Conn(ctx)` to acquire a single long-lived connection from the Writer pool. Call `LISTEN mdm_events` on it. This connection must NOT be returned to the pool.
+- **Keep-alive**: Periodic `SELECT 1` ping every 30 seconds to prevent connection timeout.
+- **Reconnect**: If the connection drops, log an error and reconnect with exponential backoff.
+- **Graceful shutdown**: Context cancellation stops the listener loop.
+- **Multi-instance safe**: All server instances receive all events (PostgreSQL NOTIFY is fan-out). Subscribers must be idempotent.
+- **Error handling**: Subscriber errors are logged but don't stop the listener. Failed events are not retried (fire-and-forget).
 
-Enhance check-in handlers to extract security-relevant fields:
-- **macOS**: Parse SecurityInfo response → `password_present`, `FileVaultEnabled`, `FirewallEnabled`, `SIPEnabled`
-- **Windows**: Parse DevDetail/Policy CSP → `encryption_enabled`, `firewall_enabled`, `password_present`, `bitlocker_status`
-- **Android**: Parse Management API device report → `encryption_enabled`, `password_present`
+**Wire into server**:
+- Create EventBus in `Server.New()` using `cfg.Database.DSN()` (Writer pool DSN)
+- Start listener in `Server.Start()` alongside other background services
+- Stop in `Server.Shutdown()`
 
-Store in `platform_data` with keys that the compliance engine already checks.
+### S5b-02: New Triggers Migration
 
-### S5b-04: Load Testing Framework
+Create `migrations/000010_eventbus_triggers.up.sql`:
+
+```sql
+-- Trigger for platform_data changes (device state updates from check-in)
+CREATE TRIGGER device_info_updated_event
+    AFTER UPDATE OF platform_data ON devices
+    FOR EACH ROW
+    WHEN (OLD.platform_data IS DISTINCT FROM NEW.platform_data)
+    EXECUTE FUNCTION notify_mdm_event('device.info_updated');
+
+-- Trigger for policy unassignment
+CREATE TRIGGER policy_unassigned_event
+    AFTER DELETE ON policy_assignments
+    FOR EACH ROW
+    EXECUTE FUNCTION notify_mdm_event('policy.unassigned');
+
+-- Trigger for group membership changes
+CREATE TRIGGER group_member_added_event
+    AFTER INSERT ON group_memberships
+    FOR EACH ROW
+    EXECUTE FUNCTION notify_mdm_event('group.member_added');
+
+CREATE TRIGGER group_member_removed_event
+    AFTER DELETE ON group_memberships
+    FOR EACH ROW
+    EXECUTE FUNCTION notify_mdm_event('group.member_removed');
+```
+
+**Note**: The `notify_mdm_event()` function uses `NEW.id` and `NEW.device_id` — for DELETE triggers, these will be `OLD.id` and `OLD.device_id`. The function needs a minor update to handle `TG_OP = 'DELETE'` by using `OLD` instead of `NEW`.
+
+### S5b-03: Wire Compliance into EventBus Subscribers
+
+Register these subscribers at startup:
+
+| Event Type | Subscriber Action |
+|------------|-------------------|
+| `device.enrolled` | Evaluate new device against enterprise-wide policies |
+| `device.info_updated` | Re-evaluate device against all assigned policies (device just reported new state) |
+| `policy.updated` | Re-evaluate all devices assigned to this policy |
+| `policy.assigned` | Evaluate the target device (or all devices in target group/enterprise) |
+| `policy.unassigned` | Clean up compliance results for the removed assignment |
+| `group.member_added` | Evaluate the device against the group's assigned policies |
+| `group.member_removed` | Re-evaluate the device (it may have lost policies) |
+
+**Implementation**: Each subscriber calls `complianceService.EvaluateDevice()` for the affected device(s). For policy-level events (`policy.updated`, `policy.assigned`), the subscriber needs to resolve which devices are affected (via `groupService.GetEffectivePolicies` in reverse — find all devices assigned to a policy).
+
+**New method needed**: `ComplianceService.EvaluateAllForPolicy(ctx, policyID)` — finds all devices assigned to this policy and evaluates each one.
+
+### S5b-04: Device State Parsing in Check-in Handlers
+
+Enhance check-in handlers to extract security-relevant fields into `platform_data`:
+
+**macOS** (`internal/platform/macos/responses.go`):
+- Parse SecurityInfo response fields: `HardwareEncryptionCaps`, `FDE_Enabled` → `FileVaultEnabled`
+- Parse `FirewallSettings.FirewallEnabled` → `FirewallEnabled`
+- Parse `IsPasscodePresent` → `password_present`
+- These fields come from the `SecurityInfo` MDM command response, which NanoMDM forwards as part of device info
+
+**Windows** (`internal/platform/windows/management.go`):
+- Add CSP URIs to the `fieldMap`:
+  - `./Vendor/MSFT/BitLocker/Status/DeviceEncryptionStatus` → `bitlocker_status`
+  - `./Vendor/MSFT/Firewall/MdmStore/Global/EnableFirewall` → `firewall_enabled`
+  - `./Vendor/MSFT/DeviceLock/DevicePasswordEnabled` → `password_present`
+
+**Android** (`internal/platform/android/webhook.go`):
+- In `handleStatusReport`: parse `device.SecurityPosture` from the Google API response
+- Map `device.SecurityPosture.DevicePosture` → `encryption_enabled`, `password_present`
+- Actually persist the data: call `h.service.UpdateDevice()` to save to `platform_data`
+
+### S5b-05: Register Lifecycle Hooks + Fix Android Gap
+
+**Problem**: `LifecycleService.RegisterHook()` is never called in production code. The lifecycle service has zero subscribers. Also, Android's `handleUnenrollment` doesn't call lifecycle hooks (only macOS does).
+
+**Fix**:
+1. Create a `ComplianceCleanupHook` that implements `DeviceLifecycleHook`:
+   - `OnUnenroll`: clear compliance results for the device
+   - `OnWipe`: clear compliance results
+   - `OnDelete`: clear compliance results
+2. Register it in `Server.New()`: `s.lifecycleService.RegisterHook(complianceCleanupHook)`
+3. In the Android `WebhookHandler.handleUnenrollment()`: add `h.lifecycle.OnUnenroll(ctx, device)` call (once the webhook handler is wired in Sprint 5c)
+
+### S5b-06: Load Testing Framework
 
 Create `tests/load/` with k6 scenarios:
-- Enrollment burst: 100 devices in 2 minutes
-- Steady state: 1000 devices checking in over 1 hour
-- Admin dashboard: 10 concurrent admin sessions
-- Policy deployment: assign policy to 1000 devices
+- `enrollment_burst.js` — 100 device enrollments in 2 minutes
+- `steady_state.js` — 1000 devices checking in over 1 hour
+- `admin_dashboard.js` — 10 concurrent admin sessions (list devices, policies, compliance)
+- `policy_deploy.js` — assign policy to 1000 devices, verify compliance evaluation
+
+Include a `README.md` with setup instructions and performance targets.
 
 ---
 
 ## Definition of Done
 
 - [ ] EventBus listener receives NOTIFY events from PostgreSQL triggers
-- [ ] Compliance auto-evaluates after device check-in
+- [ ] New triggers fire on platform_data changes, policy unassignment, group membership changes
+- [ ] Compliance auto-evaluates after device check-in (platform_data update)
+- [ ] Compliance re-evaluates when policy is updated or assigned
 - [ ] macOS/Windows/Android check-in handlers populate security state in platform_data
+- [ ] At least one lifecycle hook registered (compliance cleanup)
 - [ ] Load test scenarios exist and run against local environment
 - [ ] All existing tests pass
 
 ---
 
-*Created: 2026-04-22 — Split from Sprint 5 deferred items*
+*Created: 2026-04-22 — Split from Sprint 5 deferred items*  
+*Updated: 2026-04-22 — Added missing triggers, compliance subscribers, lifecycle hooks, Android gap*

@@ -128,7 +128,7 @@ database:
 - **Compliance engine**: infrastructure complete but `evaluatePolicy()` returns "unknown" until S5-09.
 - **Policy deployment**: assignments recorded, devices pick up on next check-in. No immediate push (intentional).
 - **Sprint 2 security review docs** contain false claims. Trust the code, not the review narratives.
-- **Dashboard**: Go templates + HTMX + Tailwind CSS (Sprint 5c). Not React.
+- **Dashboard**: Go templates + HTMX + Tailwind CSS (Sprint 5d). Not React.
 - **macOS Platform SSO**: Sprint 6 (Java + Swift, separate from Go work).
 
 ## What NOT to Do
@@ -167,5 +167,6 @@ database:
 | 4c | 🔲 Not Started | macOS Platform SSO (Java/Swift) — renamed to Sprint 6 |
 | 5 | ✅ Complete | Backend polish, CLI, observability, performance |
 | 5b | 🔲 Not Started | EventBus listener, compliance wiring, load testing |
-| 5c | 🔲 Not Started | Web dashboard (HTMX) |
+| 5c | 🔲 Not Started | Platform integration fixes (macOS/Windows/Android), SCEP, service tests |
+| 5d | 🔲 Not Started | Web dashboard (HTMX) |
 | 6 | 🔲 Not Started | macOS Platform SSO (Java/Swift) — requires Apple Developer account |

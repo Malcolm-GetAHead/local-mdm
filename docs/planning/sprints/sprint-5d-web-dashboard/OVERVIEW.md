@@ -1,9 +1,9 @@
-# Sprint 5c: Web Dashboard
+# Sprint 5d: Web Dashboard
 
 **Status**: 🔲 Not Started  
 **Duration**: 1-2 weeks  
 **Goal**: Web-based admin dashboard for device management, policy management, and compliance monitoring  
-**Depends on**: Sprint 5b complete (EventBus + compliance wiring provides live compliance data)  
+**Depends on**: Sprint 5c complete (platform integrations fixed, real device data flows working)  
 **Stack**: Go HTML templates + HTMX + Tailwind CSS — no separate frontend build pipeline
 
 ---
@@ -48,16 +48,16 @@ Dashboard handlers are separate from API handlers — API returns JSON, dashboar
 
 | ID | Task | Effort |
 |---|---|---|
-| S5c-01 | Project setup (templates, HTMX, Tailwind, auth) | 1 day |
-| S5c-02 | Login & navigation (Keycloak redirect, sidebar, layout) | 1 day |
-| S5c-03 | Device management (list, detail, lock/wipe actions) | 2-3 days |
-| S5c-04 | Policy management (list, create/edit, assign to groups) | 2-3 days |
-| S5c-05 | Compliance & reporting (dashboard, audit log viewer) | 1-2 days |
-| S5c-06 | Seed data for development (mock devices, policies, compliance results) | 0.5 day |
+| S5d-01 | Project setup (templates, HTMX, Tailwind, auth) | 1 day |
+| S5d-02 | Login & navigation (Keycloak redirect, sidebar, layout) | 1 day |
+| S5d-03 | Device management (list, detail, lock/wipe actions) | 2-3 days |
+| S5d-04 | Policy management (list, create/edit, assign to groups) | 2-3 days |
+| S5d-05 | Compliance & reporting (dashboard, audit log viewer) | 1-2 days |
+| S5d-06 | Seed data for development (mock devices, policies, compliance results) | 0.5 day |
 
-> **Dependency**: S5c-05 (Compliance & reporting) depends on Sprint 5b (EventBus & Compliance Wiring) for live compliance data. Without Sprint 5b, compliance views will show stale results from the last manual evaluation. Use seed data (S5c-06) for development if Sprint 5b is not yet complete.
+> **Dependency**: S5d-05 (Compliance & reporting) depends on Sprint 5b (EventBus) and Sprint 5c (platform integration) for live compliance data from real devices. Use seed data (S5d-06) for development if those sprints are not yet complete.
 
-### S5c-01: Project Setup
+### S5d-01: Project Setup
 - Go HTML template layout (base template, partials, components)
 - Vendor HTMX JS into `web/static/`
 - Tailwind CSS via CDN (or vendored for production)
@@ -65,33 +65,33 @@ Dashboard handlers are separate from API handlers — API returns JSON, dashboar
 - Template helper functions (format dates, status badges, pagination)
 - Embed static files in Go binary via `embed.FS`
 
-### S5c-02: Login & Navigation
+### S5d-02: Login & Navigation
 - Keycloak login redirect flow
 - Role-based navigation (admin sees everything, viewer sees read-only)
 - Sidebar: Dashboard, Devices, Policies, Groups, Apps, Audit Logs
 - Header: user info, enterprise name, logout
 - Base layout template with HTMX boost for SPA-like navigation
 
-### S5c-03: Device Management
+### S5d-03: Device Management
 - Device list table with HTMX pagination, filtering (platform, status), search
 - Device detail page: info, enrolled policies, command history
 - Lock/wipe actions with HTMX confirmation dialog
 - Platform-specific info display (Windows OMA-DM data, macOS DEP status, Android compliance)
 - HTMX partial updates: action buttons swap to status indicators after click
 
-### S5c-04: Policy Management
+### S5d-04: Policy Management
 - Policy list with filtering by platform and type
 - Create/edit policy form — settings catalog rendered as checkboxes + value inputs
 - Assign policy to device or group (HTMX-powered select + submit)
 - Policy status per device (pending, applied, failed)
 
-### S5c-05: Compliance & Reporting
+### S5d-05: Compliance & Reporting
 - Compliance dashboard: compliant/non-compliant counts per enterprise
 - Device inventory table with CSV export link
 - Audit log viewer with search by actor, action, date range
 - HTMX infinite scroll or pagination for large result sets
 
-### S5c-06: Seed Data for Development
+### S5d-06: Seed Data for Development
 - SQL script or Go command (`make seed`) that populates the database with realistic mock data
 - Sample enterprise with 20-30 devices across all three platforms (macOS, Windows, Android)
 - Mix of device statuses (enrolled, unenrolled, wiped)
@@ -143,4 +143,4 @@ Dashboard handlers are separate from API handlers — API returns JSON, dashboar
 
 *Created: 2026-04-18 — Split from Sprint 5 (S5-01)*  
 *Updated: 2026-04-20 — Changed from React to HTMX + Go templates*  
-*Updated: 2026-04-22 — Renamed from Sprint 5b to Sprint 5c (EventBus work inserted as Sprint 5b)*
+*Updated: 2026-04-22 — Renamed from Sprint 5b to Sprint 5d (EventBus work inserted as Sprint 5b)*

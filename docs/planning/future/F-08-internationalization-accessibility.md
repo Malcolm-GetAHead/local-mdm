@@ -324,4 +324,4 @@ jobs:
 - [Pa11y Documentation](https://pa11y.org/)
 - [Tailwind CSS RTL](https://tailwindcss.com/blog/tailwindcss-v3-3#rtl-and-ltr-modifiers)
 - [HTMX Accessibility](https://htmx.org/essays/a11y/)
-- [Sprint 5c: Web Dashboard](../sprints/sprint-5c-web-dashboard/OVERVIEW.md)
+- [Sprint 5d: Web Dashboard](../sprints/sprint-5d-web-dashboard/OVERVIEW.md)

@@ -530,5 +530,6 @@ NanoMDM and NanoDEP both support PostgreSQL backends. Their schemas (see [nanomd
 
 **Next Steps**:
 1. Sprint 5b: EventBus listener, compliance wiring, load testing
-2. Sprint 5c: Web dashboard (Go templates + HTMX + Tailwind CSS)
+2. Sprint 5c: Platform integration fixes (macOS NanoMDM, Windows enrollment, Android webhooks)
+3. Sprint 5d: Web dashboard (Go templates + HTMX + Tailwind CSS)
 2. Sprint 6: macOS Platform SSO (Java/Swift)

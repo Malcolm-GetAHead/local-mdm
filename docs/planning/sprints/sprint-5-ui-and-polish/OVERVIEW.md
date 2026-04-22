@@ -6,7 +6,7 @@
 **Depends on**: Sprint 4 complete  
 **Completed**: 2026-04-21
 
-> **Note**: Web Dashboard (S5-01) has been moved to [Sprint 5c](../sprint-5c-web-dashboard/OVERVIEW.md). EventBus and compliance wiring is in [Sprint 5b](../sprint-5b-eventbus/OVERVIEW.md).
+> **Note**: Web Dashboard (S5-01) has been moved to [Sprint 5d](../sprint-5d-web-dashboard/OVERVIEW.md). EventBus and compliance wiring is in [Sprint 5b](../sprint-5b-eventbus/OVERVIEW.md). Platform integration fixes are in [Sprint 5c](../sprint-5c-platform-integration/OVERVIEW.md).
 
 ## Tasks Overview
 
@@ -45,7 +45,7 @@ S5-06 should be scoped down to: enhanced health checks (/health/ready with depen
 ## Notes from Sprint 2a Audit
 
 - **S5-08 (CLI) assumes API token auth exists** but no sprint task explicitly builds the server-side token generation/validation/revocation endpoints. The `api_tokens` table exists in the schema. This should be built as part of S5-08 or as a prerequisite task. See F-07 sections 9-10 for the full spec if it's deferred beyond v1.0.
-- **User management CRUD** (`GET/POST/PUT/DELETE /api/v1/users`) is assumed by both S5-08 and S5c (dashboard) but not explicitly tasked. Same recommendation — build as part of S5-08 or add a dedicated task. See F-07 section 9.
+- **User management CRUD** (`GET/POST/PUT/DELETE /api/v1/users`) is assumed by both S5-08 and S5d (dashboard) but not explicitly tasked. Same recommendation — build as part of S5-08 or add a dedicated task. See F-07 section 9.
 
 ## Dependency Graph
 
@@ -95,14 +95,19 @@ Recommended start order: S5-12, S5-10, S5-11 (unblock S5-05 and S5-08 early)
 - **S5-05** E2E testing — Device lifecycle + cross-platform compliance tests. Gap: no per-platform enrollment E2E, no load tests
 - **S5-07** Performance — 7 indexes, basic benchmarks. Gap: no load testing framework, no cache, no pprof
 
-### Deferred Items (tracked in Sprint 5b/5c or future)
+### Deferred Items (tracked in Sprint 5b/5c/5d or future)
 - EventBus LISTEN/NOTIFY Go listener — **Sprint 5b** (S5b-01)
-- Compliance auto-evaluation on check-in — **Sprint 5b** (S5b-02)
-- Device state parsing in check-in handlers — **Sprint 5b** (S5b-03)
-- Load testing framework (k6) — **Sprint 5b** (S5b-04)
+- Compliance auto-evaluation on check-in — **Sprint 5b** (S5b-02, S5b-03)
+- Device state parsing in check-in handlers — **Sprint 5b** (S5b-04)
+- Load testing framework (k6) — **Sprint 5b** (S5b-06)
+- macOS NanoMDM deployment + enrollment fix — **Sprint 5c** (S5c-01)
+- Windows enrollment device record creation — **Sprint 5c** (S5c-02)
+- Android webhook wiring + API client — **Sprint 5c** (S5c-03)
+- SCEP PKCS#7 protocol compliance — **Sprint 5c** (S5c-04)
+- Service layer test coverage (30% → 60%) — **Sprint 5c** (S5c-05)
+- Enrollment guides per platform — **Sprint 5d** (dashboard)
 - In-memory cache with TTL — F-05
 - pprof profiling endpoints — F-05
-- Enrollment guides per platform — **Sprint 5c** (dashboard) or F-01 (real device testing)
 - Production Docker Compose with TLS — F-02 (deployment)
 
 ### Bug Fixes During Sprint

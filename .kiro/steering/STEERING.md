@@ -388,7 +388,8 @@ docs/planning/
 │   ├── sprint-6-platform-sso/
 │   ├── sprint-5-ui-and-polish/
 │   └── sprint-5b-eventbus/
-│   └── sprint-5c-web-dashboard/
+│   └── sprint-5c-platform-integration/
+│   └── sprint-5d-web-dashboard/
 └── future/               - Future enhancements (F-01 to F-08)
 ```
 
