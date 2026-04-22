@@ -1,7 +1,7 @@
 # Database Schema
 
 **Version**: 2.0  
-**Last Updated**: 2026-04-21
+**Last Updated**: 2026-04-22
 
 ## Overview
 
@@ -518,6 +518,56 @@ CREATE INDEX idx_apps_platform ON apps(platform);
 - `required`: Force install on assigned devices
 - `available`: Available in company portal
 - `uninstall`: Remove from assigned devices
+
+## Sprint 5 Schema (Migration 000008)
+
+### scep_challenges
+
+SCEP challenge passwords for device certificate enrollment. Challenges are single-use and time-limited.
+
+```sql
+CREATE TABLE scep_challenges (
+    password VARCHAR(64) PRIMARY KEY,
+    device_id VARCHAR(255) NOT NULL,
+    expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    used BOOLEAN NOT NULL DEFAULT false,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+```
+
+**Fields**:
+- `password`: SCEP challenge password (primary key, unique per challenge)
+- `device_id`: Device identifier the challenge was issued for
+- `expires_at`: Challenge expiration time
+- `used`: Whether the challenge has been consumed
+- `created_at`: Creation timestamp
+
+## Sprint 5 Performance Indexes (Migration 000009)
+
+Composite indexes for common query patterns identified during Sprint 5 performance work.
+
+```sql
+-- Device queries by enterprise + status/platform
+CREATE INDEX idx_devices_enterprise_status ON devices(enterprise_id, status);
+CREATE INDEX idx_devices_enterprise_platform ON devices(enterprise_id, platform);
+
+-- Active policies per enterprise
+CREATE INDEX idx_policies_enterprise_active ON policies(enterprise_id, is_active);
+
+-- Compliance lookups by device + policy
+CREATE INDEX idx_compliance_device_policy ON compliance_results(device_id, policy_id);
+
+-- Audit log queries by enterprise + time range
+CREATE INDEX idx_audit_logs_enterprise_created ON audit_logs(enterprise_id, created_at);
+
+-- Command queue by device + status
+CREATE INDEX idx_commands_device_status ON device_commands(device_id, status);
+
+-- Group membership lookups by device
+CREATE INDEX idx_group_members_device ON group_memberships(device_id);
+```
+
+These composite indexes optimize the most frequent query patterns: enterprise-scoped device listing, compliance evaluation, audit log search with date filtering, and command queue polling.
 
 ## Migrations
 

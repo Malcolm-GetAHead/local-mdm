@@ -454,6 +454,9 @@ curl http://localhost:8080/metrics | grep rate_limiter
 ## Future Enhancements
 
 ### Redis-Based Rate Limiting (Optional)
+
+> **Note (Sprint 4+):** Redis was removed from the project in Sprint 4. Rate limiting is handled by in-memory rate limiters (per-instance, defense-in-depth) + AWS WAF rate-based rules on ALB in production. This section is retained for historical reference only.
+
 - For very high scale (millions of requests/sec)
 - Shared state across instances without load balancer
 - More complex rate limiting algorithms

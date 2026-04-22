@@ -76,4 +76,39 @@ Recommended start order: S5-12, S5-10, S5-11 (unblock S5-05 and S5-08 early)
 
 ---
 
-*Updated: 2026-04-18 — Dashboard moved to Sprint 5b*
+## Completion Notes (2026-04-22 Backward Look)
+
+### Fully Delivered (3/11)
+- **S5-10** Service layer migration — DeviceService, AppService, all handlers migrated, NULL bug fixed
+- **S5-11** User/token auth — CRUD endpoints, dual OIDC/token middleware, lmdm_ prefix tokens
+- **S5-12** SCEP integration — PostgreSQL challenges, /scep endpoint, CA signing, hourly cleanup
+
+### Delivered with Minor Gaps (5/11)
+- **S5-02** Reporting — 3 report endpoints with CSV/JSON export. Gap: audit log search/filter not enhanced (paginated list only)
+- **S5-03** API docs — OpenAPI 3.0 spec (87 operations), Swagger UI. Gap: CSP blocks CDN resources on /docs
+- **S5-06** Observability — /health/ready, 3 new metrics registered, alerting+backup docs. Gap: metrics not wired to data sources
+- **S5-08** CLI — Cobra binary with device/policy/user/token/health commands. Gap: missing enroll, certs, config commands
+- **S5-09** Compliance — Real evaluatePolicy() with security/restriction checks. Gap: check-in handlers don't auto-populate security state
+
+### Delivered with Significant Gaps (3/11)
+- **S5-04** Deployment docs — Dev setup, operations, troubleshooting. Gap: no prod compose, no enrollment guides, no systemd/reverse proxy
+- **S5-05** E2E testing — Device lifecycle + cross-platform compliance tests. Gap: no per-platform enrollment E2E, no load tests
+- **S5-07** Performance — 7 indexes, basic benchmarks. Gap: no load testing framework, no cache, no pprof
+
+### Deferred Items (tracked for Sprint 5b or future)
+- EventBus LISTEN/NOTIFY Go listener (S5-09 scope, deferred — triggers in DB, listener not built)
+- Compliance auto-evaluation on check-in (needs EventBus or direct service call in check-in handlers)
+- Load testing framework (k6/Locust) — F-01 or Sprint 5b
+- In-memory cache with TTL — F-05
+- pprof profiling endpoints — F-05
+- Enrollment guides per platform — Sprint 5b (dashboard) or F-01 (real device testing)
+- Production Docker Compose with TLS — F-02 (deployment)
+
+### Bug Fixes During Sprint
+- NULL error_message scan failure in command repo (COALESCE fix)
+- Flaky integration tests from PostgreSQL connection pool exhaustion (pool size + parallelism fix)
+- Pre-existing compliance integration test ordering issue (resolved by data setup)
+
+---
+
+*Updated: 2026-04-22 — Backward look audit complete*

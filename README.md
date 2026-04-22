@@ -84,6 +84,18 @@ Unified Control Plane (Go)
 - Transactor uses Writer pool exclusively; reads within transactions see uncommitted writes
 - See [Sprint 4b Plan](docs/planning/sprints/sprint-4b-db-pools/OVERVIEW.md)
 
+✅ **Sprint 5 Complete** - Backend Polish, CLI, Observability & Performance
+- Service layer expansion: DeviceService, AppService, UserService, TokenService, ReportingService
+- User management API (CRUD) with role validation and privilege escalation prevention
+- API token system with `lmdm_` prefix, SHA-256 hashing, create/validate/revoke lifecycle
+- Reporting endpoints: device inventory, compliance summary, enrollment trends (with CSV export)
+- SCEP server with challenge-based certificate enrollment (`scep_challenges` table)
+- Readiness probe (`GET /health/ready`) with per-dependency latency checks
+- Audit log search with `action`, `start_date`, `end_date` query filters
+- ComplianceService `evaluatePolicy()` now performs real policy evaluation (OS version, encryption, password, apps)
+- Performance indexes (migration 000009) for common enterprise-scoped query patterns
+- See [Sprint 5 Plan](docs/planning/sprints/sprint-5-ui-and-polish/OVERVIEW.md)
+
 ## Documentation
 
 ### Getting Started

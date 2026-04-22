@@ -89,24 +89,26 @@ tracing:
 
 ## MEDIUM PRIORITY (8 Remaining)
 
-### M-01: No Query Result Caching
-**Effort**: 0.5 days | **Impact**: Unnecessary database load
+### ~~M-01: No Query Result Caching~~ ✅ Resolved — Redis removed in Sprint 4
+**Status**: Redis was removed in Sprint 4. PostgreSQL handles all caching (token cache, idempotency keys). No separate caching layer needed.
 
-**Problem**: Frequently accessed data (enterprises, policies) queried repeatedly.
+~~**Effort**: 0.5 days | **Impact**: Unnecessary database load~~
 
-**Solution**: Redis caching layer with TTL
-- Cache enterprises (TTL: 1 hour)
-- Cache policies (TTL: 5 minutes)
-- Cache-aside pattern
-- Invalidation on updates
+~~**Problem**: Frequently accessed data (enterprises, policies) queried repeatedly.~~
 
-**Files to Create**:
-- `internal/cache/cache.go` (new)
-- `internal/cache/cache_test.go` (new)
+~~**Solution**: Redis caching layer with TTL~~
+- ~~Cache enterprises (TTL: 1 hour)~~
+- ~~Cache policies (TTL: 5 minutes)~~
+- ~~Cache-aside pattern~~
+- ~~Invalidation on updates~~
 
-**Files to Modify**:
-- `internal/repository/enterprise.go` - Add caching
-- `internal/repository/policy.go` - Add caching
+~~**Files to Create**:~~
+- ~~`internal/cache/cache.go` (new)~~
+- ~~`internal/cache/cache_test.go` (new)~~
+
+~~**Files to Modify**:~~
+- ~~`internal/repository/enterprise.go` - Add caching~~
+- ~~`internal/repository/policy.go` - Add caching~~
 
 ---
 

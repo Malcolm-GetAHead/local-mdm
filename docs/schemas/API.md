@@ -2,7 +2,7 @@
 
 **Version**: 1.0  
 **Base URL**: `https://your-mdm-server.com/api/v1`  
-**Last Updated**: 2026-04-21
+**Last Updated**: 2026-04-22
 
 ## Overview
 
@@ -809,6 +809,313 @@ GET /api/v1/audit-logs
 **Query Parameters**:
 - `limit` (optional): Items per page
 - `offset` (optional): Offset for pagination
+
+---
+
+## User Management
+
+### List Users
+
+```http
+GET /api/v1/users
+```
+
+**Auth**: admin, super_admin
+
+**Query Parameters**:
+- `limit` (optional): Items per page (default: 100)
+- `offset` (optional): Offset for pagination
+
+**Response**:
+```json
+{
+  "data": [
+    {
+      "id": "bb0e8400-e29b-41d4-a716-446655440000",
+      "enterprise_id": "660e8400-e29b-41d4-a716-446655440000",
+      "email": "admin@example.com",
+      "full_name": "Admin User",
+      "role": "admin",
+      "is_active": true,
+      "last_login_at": "2026-04-20T10:00:00Z",
+      "created_at": "2026-02-01T09:00:00Z",
+      "updated_at": "2026-04-20T10:00:00Z"
+    }
+  ]
+}
+```
+
+### Create User
+
+```http
+POST /api/v1/users
+Content-Type: application/json
+
+{
+  "email": "newuser@example.com",
+  "password": "securepassword",
+  "full_name": "New User",
+  "role": "operator"
+}
+```
+
+**Auth**: admin, super_admin
+
+**Response**: `201 Created`
+
+### Get User
+
+```http
+GET /api/v1/users/:id
+```
+
+**Auth**: admin, super_admin
+
+### Update User
+
+```http
+PUT /api/v1/users/:id
+Content-Type: application/json
+
+{
+  "full_name": "Updated Name",
+  "role": "admin",
+  "is_active": true
+}
+```
+
+**Auth**: admin, super_admin. Fields are optional — only provided fields are updated.
+
+### Delete User
+
+```http
+DELETE /api/v1/users/:id
+```
+
+**Auth**: admin, super_admin. Soft-deletes the user.
+
+**Response**: `204 No Content`
+
+---
+
+## API Tokens
+
+### Create API Token
+
+```http
+POST /api/v1/tokens
+Content-Type: application/json
+
+{
+  "name": "CI/CD Token",
+  "scopes": ["devices:read", "policies:read"],
+  "expires_in_days": 90
+}
+```
+
+**Auth**: admin, super_admin
+
+**Response**: `201 Created`
+```json
+{
+  "data": {
+    "id": "cc0e8400-e29b-41d4-a716-446655440000",
+    "name": "CI/CD Token",
+    "token": "lmdm_abc123...",
+    "scopes": ["devices:read", "policies:read"],
+    "expires_at": "2026-07-20T10:00:00Z",
+    "created_at": "2026-04-22T10:00:00Z"
+  }
+}
+```
+
+**Note**: The `token` field (with `lmdm_` prefix) is returned only once at creation. It is stored as a SHA-256 hash and cannot be retrieved again.
+
+### List API Tokens
+
+```http
+GET /api/v1/tokens
+```
+
+**Auth**: admin, super_admin
+
+**Response**:
+```json
+{
+  "data": [
+    {
+      "id": "cc0e8400-e29b-41d4-a716-446655440000",
+      "name": "CI/CD Token",
+      "scopes": ["devices:read", "policies:read"],
+      "last_used_at": "2026-04-21T15:00:00Z",
+      "expires_at": "2026-07-20T10:00:00Z",
+      "created_at": "2026-04-22T10:00:00Z"
+    }
+  ]
+}
+```
+
+### Delete (Revoke) API Token
+
+```http
+DELETE /api/v1/tokens/:id
+```
+
+**Auth**: admin, super_admin
+
+**Response**: `204 No Content`
+
+---
+
+## Reports
+
+### Device Inventory Report
+
+```http
+GET /api/v1/reports/devices
+```
+
+**Auth**: admin, super_admin
+
+**Query Parameters**:
+- `platform` (optional): Filter by platform (windows, macos, android)
+- `format` (optional): Response format — `json` (default) or `csv`
+
+**Response** (JSON):
+```json
+{
+  "data": {
+    "total_devices": 150,
+    "by_platform": {"windows": 80, "macos": 50, "android": 20},
+    "by_status": {"enrolled": 140, "pending": 5, "unenrolled": 5},
+    "devices": [...]
+  }
+}
+```
+
+**Response** (CSV): Returns `Content-Type: text/csv` with device inventory rows.
+
+### Compliance Report
+
+```http
+GET /api/v1/reports/compliance
+```
+
+**Auth**: admin, super_admin
+
+**Query Parameters**:
+- `format` (optional): Response format — `json` (default) or `csv`
+
+**Response** (JSON):
+```json
+{
+  "data": {
+    "compliant": 120,
+    "non_compliant": 15,
+    "unknown": 10,
+    "error": 5,
+    "total": 150,
+    "by_policy": [...]
+  }
+}
+```
+
+### Enrollment Report
+
+```http
+GET /api/v1/reports/enrollments
+```
+
+**Auth**: admin, super_admin
+
+**Query Parameters**:
+- `days` (optional): Number of days to look back (default: 30)
+
+**Response**:
+```json
+{
+  "data": {
+    "period_days": 30,
+    "total_enrollments": 25,
+    "by_platform": {"windows": 12, "macos": 8, "android": 5},
+    "by_day": [
+      {"date": "2026-04-21", "count": 3},
+      {"date": "2026-04-20", "count": 1}
+    ]
+  }
+}
+```
+
+---
+
+## SCEP
+
+Simple Certificate Enrollment Protocol endpoint for device certificate enrollment.
+
+### Get CA Capabilities
+
+```http
+GET /scep?operation=GetCACaps
+```
+
+**Auth**: none (device enrollment)
+
+**Response**: Plain text list of CA capabilities.
+```
+POSTPKIOperation
+SHA-256
+AES
+DES3
+SCEPStandard
+```
+
+### Get CA Certificate
+
+```http
+GET /scep?operation=GetCACert
+```
+
+**Auth**: none (device enrollment)
+
+**Response**: DER-encoded CA certificate (`application/x-x509-ca-cert`).
+
+### PKI Operation
+
+```http
+POST /scep?operation=PKIOperation
+Content-Type: application/x-pki-message
+```
+
+**Auth**: SCEP challenge password (validated against `scep_challenges` table)
+
+**Request Body**: DER-encoded PKCS#7 CSR envelope.
+
+**Response**: DER-encoded PKCS#7 signed certificate response (`application/x-pki-message`).
+
+---
+
+## Health Check (Extended)
+
+### Readiness Probe
+
+```http
+GET /health/ready
+```
+
+**Response**:
+```json
+{
+  "status": "ready",
+  "checks": {
+    "database": {"status": "up", "latency_ms": 2},
+    "database_reader": {"status": "up", "latency_ms": 1},
+    "migrations": {"status": "up"}
+  },
+  "timestamp": "2026-04-22T10:00:00Z"
+}
+```
+
+Returns `200 OK` when all dependencies are healthy, `503 Service Unavailable` otherwise. Each check includes per-dependency latency for diagnostics.
 
 ---
 

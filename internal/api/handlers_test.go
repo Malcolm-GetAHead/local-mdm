@@ -1383,3 +1383,48 @@ func TestHandleWindowsPPKGGenerate(t *testing.T) {
 		assert.Equal(t, http.StatusBadRequest, w.Code)
 	})
 }
+
+// --- Sprint 5: User, Token, Report Handler Tests ---
+
+func TestHandleCreateUser(t *testing.T) {
+	t.Run("creates user with valid data", func(t *testing.T) {
+		ts := newTestServer(t)
+		body := jsonBody(t, map[string]string{"email": "[email]", "role": "admin"})
+		req := httptest.NewRequest("POST", "/api/v1/users", body)
+		w := ts.doWithAuth(req, testUser())
+
+		assert.Equal(t, http.StatusCreated, w.Code)
+		require.Len(t, ts.auditLogger.events, 1)
+		assert.Equal(t, "user.create", ts.auditLogger.events[0].Action)
+	})
+
+	t.Run("rejects invalid role", func(t *testing.T) {
+		ts := newTestServer(t)
+		body := jsonBody(t, map[string]string{"email": "[email]", "role": "hacker"})
+		req := httptest.NewRequest("POST", "/api/v1/users", body)
+		w := ts.doWithAuth(req, testUser())
+
+		assert.Equal(t, http.StatusBadRequest, w.Code)
+	})
+}
+
+func TestHandleListTokens(t *testing.T) {
+	t.Run("returns empty list", func(t *testing.T) {
+		ts := newTestServer(t)
+		req := httptest.NewRequest("GET", "/api/v1/tokens", nil)
+		w := ts.doWithAuth(req, testUser())
+
+		assert.Equal(t, http.StatusOK, w.Code)
+	})
+}
+
+func TestHandleDeviceReport(t *testing.T) {
+	t.Run("requires authentication", func(t *testing.T) {
+		ts := newTestServer(t)
+		req := httptest.NewRequest("GET", "/api/v1/reports/devices", nil)
+		w := ts.do(req) // no auth context
+
+		// Without auth, handler returns 401
+		assert.Equal(t, http.StatusUnauthorized, w.Code)
+	})
+}

@@ -34,6 +34,70 @@ func (m *mockChallengeStore) ValidateChallenge(password string) (string, bool) {
 }
 func (m *mockChallengeStore) CleanupExpired() {}
 
+// Mock user repo for S5-11 handler tests
+type mockUserRepo struct {
+	users []*models.User
+}
+
+func (m *mockUserRepo) Create(_ context.Context, u *models.User) error {
+	if u.ID == uuid.Nil {
+		u.ID = uuid.New()
+	}
+	u.CreatedAt = time.Now()
+	u.UpdatedAt = time.Now()
+	m.users = append(m.users, u)
+	return nil
+}
+func (m *mockUserRepo) GetByID(_ context.Context, id uuid.UUID) (*models.User, error) {
+	for _, u := range m.users {
+		if u.ID == id {
+			return u, nil
+		}
+	}
+	return nil, fmt.Errorf("user not found")
+}
+func (m *mockUserRepo) GetByEmail(_ context.Context, _ uuid.UUID, email string) (*models.User, error) {
+	for _, u := range m.users {
+		if u.Email == email {
+			return u, nil
+		}
+	}
+	return nil, fmt.Errorf("user not found")
+}
+func (m *mockUserRepo) List(_ context.Context, _ uuid.UUID, _, _ int) ([]*models.User, int, error) {
+	return m.users, len(m.users), nil
+}
+func (m *mockUserRepo) Update(_ context.Context, u *models.User) error { return nil }
+func (m *mockUserRepo) Deactivate(_ context.Context, _ uuid.UUID) error { return nil }
+
+// Mock token repo for S5-11 handler tests
+type mockTokenRepo struct {
+	tokens []*models.APIToken
+}
+
+func (m *mockTokenRepo) Create(_ context.Context, t *models.APIToken) error {
+	if t.ID == uuid.Nil {
+		t.ID = uuid.New()
+	}
+	t.CreatedAt = time.Now()
+	t.UpdatedAt = time.Now()
+	m.tokens = append(m.tokens, t)
+	return nil
+}
+func (m *mockTokenRepo) GetByHash(_ context.Context, hash string) (*models.APIToken, error) {
+	for _, t := range m.tokens {
+		if t.TokenHash == hash {
+			return t, nil
+		}
+	}
+	return nil, fmt.Errorf("token not found")
+}
+func (m *mockTokenRepo) List(_ context.Context, _ uuid.UUID) ([]*models.APIToken, error) {
+	return m.tokens, nil
+}
+func (m *mockTokenRepo) Revoke(_ context.Context, _ uuid.UUID) error { return nil }
+func (m *mockTokenRepo) UpdateLastUsed(_ context.Context, _ uuid.UUID) error { return nil }
+
 type mockEnterpriseRepo struct {
 	enterprises []*models.Enterprise
 	createErr   error
@@ -344,6 +408,10 @@ func (m *mockAuditLogRepo) List(_ context.Context, _ uuid.UUID, limit, offset in
 	return m.logs[offset:end], total, nil
 }
 
+func (m *mockAuditLogRepo) Search(_ context.Context, _ uuid.UUID, _, _, _ string, limit, offset int) ([]*models.AuditLog, int, error) {
+	return m.List(context.Background(), uuid.Nil, limit, offset)
+}
+
 type mockCommandRepo struct {
 	commands []*models.DeviceCommand
 	createErr error
@@ -624,6 +692,11 @@ func newTestServer(t *testing.T) *testServer {
 	s.deviceService = service.NewDeviceService(dr, cmdr, s.cmdDispatcher, s.lifecycleService, slog.New(slog.NewTextHandler(bytes.NewBuffer(nil), nil)))
 	s.appService = service.NewAppService(appr, dr, cmdr, s.cmdDispatcher, slog.New(slog.NewTextHandler(bytes.NewBuffer(nil), nil)))
 
+	ur := &mockUserRepo{}
+	tr := &mockTokenRepo{}
+	s.userService = service.NewUserService(ur, slog.New(slog.NewTextHandler(bytes.NewBuffer(nil), nil)))
+	s.tokenService = service.NewTokenService(tr, ur, slog.New(slog.NewTextHandler(bytes.NewBuffer(nil), nil)))
+
 	// Register only the routes we're testing (no auth middleware)
 	api := s.router.PathPrefix("/api/v1").Subrouter()
 	api.HandleFunc("/enterprises", s.handleListEnterprises).Methods("GET")
@@ -696,6 +769,19 @@ func newTestServer(t *testing.T) *testServer {
 	// Sprint 3: Windows PPKG routes
 	api.HandleFunc("/windows/ppkg/generate", s.handleWindowsPPKGGenerate).Methods("POST")
 	api.HandleFunc("/windows/ppkg/templates", s.handleWindowsPPKGTemplates).Methods("GET")
+
+	// Sprint 5: User management, tokens, reports
+	api.HandleFunc("/users", s.handleListUsers).Methods("GET")
+	api.HandleFunc("/users", s.handleCreateUser).Methods("POST")
+	api.HandleFunc("/users/{id}", s.handleGetUser).Methods("GET")
+	api.HandleFunc("/users/{id}", s.handleUpdateUser).Methods("PUT")
+	api.HandleFunc("/users/{id}", s.handleDeactivateUser).Methods("DELETE")
+	api.HandleFunc("/tokens", s.handleCreateToken).Methods("POST")
+	api.HandleFunc("/tokens", s.handleListTokens).Methods("GET")
+	api.HandleFunc("/tokens/{id}", s.handleRevokeToken).Methods("DELETE")
+	api.HandleFunc("/reports/devices", s.handleDeviceReport).Methods("GET")
+	api.HandleFunc("/reports/compliance", s.handleComplianceReport).Methods("GET")
+	api.HandleFunc("/reports/enrollments", s.handleEnrollmentReport).Methods("GET")
 
 	return &testServer{
 		server:         s,

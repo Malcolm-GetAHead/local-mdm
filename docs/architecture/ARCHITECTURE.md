@@ -177,6 +177,37 @@ Local MDM follows a layered architecture with clear separation of concerns:
 #### Test Utilities (`internal/testutil`)
 - Test helpers (database setup, common fixtures)
 
+## Sprint 5: Service Layer Additions
+
+Sprint 5 expanded the service layer (`internal/service/`) with new services and enhanced existing ones. All services follow the same pattern: accept repository interfaces via constructor, transport-agnostic (no `net/http`), reusable from handlers, CLI, and background jobs.
+
+### DeviceService
+
+Full device CRUD with integrated lifecycle hooks. Lock, wipe, and restart actions go through the service layer, which coordinates with the lifecycle hook system (cleanup of policies, group memberships, and compliance results on unenroll/wipe/delete).
+
+### AppService
+
+Application catalog CRUD plus deployment. `Deploy()` translates app installs into platform-specific commands via the command dispatcher — InstallApplication for macOS, App CSP SyncML for Windows, app policy updates for Android.
+
+### UserService
+
+User CRUD with role validation. Enforces valid role values (`super_admin`, `admin`, `operator`, `viewer`) and prevents privilege escalation (operators cannot create admins). Password hashing uses bcrypt.
+
+### TokenService
+
+API token lifecycle: create, validate, and revoke. Tokens use a `lmdm_` prefix for easy identification in logs and config files. The plaintext token is returned once at creation; only the SHA-256 hash is stored in the `api_tokens` table. Validation is a constant-time hash comparison.
+
+### ComplianceService (Enhanced)
+
+`evaluatePolicy()` now contains real evaluation logic (previously returned "unknown"). Evaluates device state against policy rules — checks OS version requirements, encryption status, password policy compliance, and app installation state. Results are written to `compliance_results` with detailed findings in the JSONB `details` column.
+
+### ReportingService
+
+Generates enterprise-scoped reports:
+- **Device inventory**: counts by platform and status, with optional CSV export
+- **Compliance summary**: aggregated compliance state across all devices and policies
+- **Enrollment report**: enrollment trends over a configurable time window (default 30 days), broken down by platform and day
+
 ## Data Flow
 
 ### Device Enrollment Flow
@@ -498,6 +529,5 @@ NanoMDM and NanoDEP both support PostgreSQL backends. Their schemas (see [nanomd
 ---
 
 **Next Steps**:
-1. Sprint 6: macOS Platform SSO (Java/Swift)
-2. Sprint 5: Backend polish, CLI, observability, performance
-3. Sprint 5b: Web dashboard (Go templates + HTMX + Tailwind CSS)
+1. Sprint 5b: Web dashboard (Go templates + HTMX + Tailwind CSS)
+2. Sprint 6: macOS Platform SSO (Java/Swift)

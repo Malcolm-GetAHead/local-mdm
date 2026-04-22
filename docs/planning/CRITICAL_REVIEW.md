@@ -119,7 +119,7 @@ The implementation plan is **well-structured and comprehensive** with clear spri
 **Missing**:
 - ❌ No performance requirements defined (devices per server, API latency)
 - ❌ No database indexing strategy review
-- ❌ No caching layer (Redis for session data, device status)
+- ~~❌ No caching layer (Redis for session data, device status)~~ ✅ **Resolved in Sprint 4**: Redis removed; PostgreSQL handles all caching (token cache, idempotency keys).
 - ❌ No connection pooling tuning
 - ❌ No horizontal scaling plan
 

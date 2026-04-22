@@ -9,7 +9,7 @@ import (
 
 func init() {
 	rootCmd.AddCommand(devicesCmd)
-	devicesCmd.AddCommand(devicesListCmd, devicesGetCmd, devicesLockCmd, devicesWipeCmd)
+	devicesCmd.AddCommand(devicesListCmd, devicesGetCmd, devicesLockCmd, devicesWipeCmd, devicesUnenrollCmd)
 }
 
 var devicesCmd = &cobra.Command{Use: "devices", Short: "Manage devices"}
@@ -81,6 +81,18 @@ var devicesWipeCmd = &cobra.Command{
 		if output == "json" {
 			printJSON(data)
 		}
+		return nil
+	},
+}
+
+var devicesUnenrollCmd = &cobra.Command{
+	Use: "unenroll [id]", Short: "Unenroll (delete) a device", Args: cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		_, _, err := apiRequest("DELETE", "/devices/"+args[0], nil)
+		if err != nil {
+			return err
+		}
+		fmt.Println("Device unenrolled")
 		return nil
 	},
 }

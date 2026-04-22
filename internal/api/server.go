@@ -861,6 +861,9 @@ func (s *Server) startCleanupTicker() {
 	ctx, cancel := context.WithCancel(context.Background())
 	s.cleanupCancel = cancel
 
+	// Refresh metrics once at startup
+	s.refreshGaugeMetrics()
+
 	go func() {
 		ticker := time.NewTicker(1 * time.Hour)
 		defer ticker.Stop()
@@ -875,10 +878,46 @@ func (s *Server) startCleanupTicker() {
 					s.logger.Info("cleaned up expired idempotency keys", "count", n)
 				}
 				s.challengeManager.CleanupExpired()
+				s.refreshGaugeMetrics()
 			}
 		}
 	}()
 	s.logger.Info("Periodic cleanup ticker started", "interval", "1h")
+}
+
+// refreshGaugeMetrics updates devices_total and certificates_expiring_soon from the database.
+func (s *Server) refreshGaugeMetrics() {
+	if s.metrics == nil {
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	// devices_total by platform and status
+	rows, err := s.db.Reader.QueryContext(ctx,
+		`SELECT platform, status, COUNT(*) FROM devices WHERE deleted_at IS NULL GROUP BY platform, status`)
+	if err == nil {
+		s.metrics.DevicesTotal.Reset()
+		defer rows.Close()
+		for rows.Next() {
+			var platform, status string
+			var count int
+			if rows.Scan(&platform, &status, &count) == nil {
+				s.metrics.DevicesTotal.WithLabelValues(platform, status).Set(float64(count))
+			}
+		}
+	}
+
+	// certificates_expiring_soon by days bucket
+	for _, days := range []int{7, 30, 90} {
+		var count int
+		err := s.db.Reader.QueryRowContext(ctx,
+			`SELECT COUNT(*) FROM certificates WHERE revoked_at IS NULL AND expires_at BETWEEN NOW() AND NOW() + $1::interval`,
+			fmt.Sprintf("%d days", days)).Scan(&count)
+		if err == nil {
+			s.metrics.CertsExpiringSoon.WithLabelValues(fmt.Sprintf("%d", days)).Set(float64(count))
+		}
+	}
 }
 
 // Middleware
@@ -1042,7 +1081,11 @@ func securityHeadersMiddleware(next http.Handler) http.Handler {
 		w.Header().Set("X-XSS-Protection", "1; mode=block")
 		
 		// Content Security Policy
-		w.Header().Set("Content-Security-Policy", "default-src 'self'")
+		if strings.HasPrefix(r.URL.Path, "/docs") {
+			w.Header().Set("Content-Security-Policy", "default-src 'self' https://unpkg.com; script-src 'self' 'unsafe-inline' https://unpkg.com; style-src 'self' 'unsafe-inline' https://unpkg.com")
+		} else {
+			w.Header().Set("Content-Security-Policy", "default-src 'self'")
+		}
 		
 		// Referrer policy
 		w.Header().Set("Referrer-Policy", "strict-origin-when-cross-origin")

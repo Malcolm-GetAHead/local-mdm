@@ -119,7 +119,7 @@
 - ✅ **Load Testing**: k6 framework with realistic scenarios
 - ✅ **Database Optimization**: Index review, query optimization
 - ✅ **Connection Pool Tuning**: Benchmarking and configuration
-- ✅ **Caching Strategy**: In-memory cache with TTL, optional Redis
+- ✅ **Caching Strategy**: In-memory cache with TTL ~~, optional Redis~~ (Redis removed in Sprint 4; PostgreSQL handles all caching)
 - ✅ **Performance Profiling**: pprof endpoints for CPU/memory
 
 **Files Created**:

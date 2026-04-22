@@ -22,6 +22,7 @@ import (
 
 // macOS enrollment profile download
 func (s *Server) handleMacOSEnrollmentProfile(w http.ResponseWriter, r *http.Request) {
+	enrollStart := time.Now()
 	enterpriseID, err := parseUUIDParam(r, "enterprise_id")
 	if err != nil {
 		respondError(w, r, http.StatusBadRequest, "invalid_id", "Invalid enterprise ID format")
@@ -76,6 +77,7 @@ func (s *Server) handleMacOSEnrollmentProfile(w http.ResponseWriter, r *http.Req
 	})
 	if s.metrics != nil {
 		s.metrics.EnrollmentsTotal.WithLabelValues(models.PlatformMacOS, "profile_generated").Inc()
+		s.metrics.EnrollmentDuration.WithLabelValues(models.PlatformMacOS).Observe(time.Since(enrollStart).Seconds())
 	}
 
 	w.Header().Set("Content-Type", "application/x-apple-aspen-config")
@@ -128,6 +130,7 @@ func (s *Server) handleWindowsDiscoveryService(w http.ResponseWriter, r *http.Re
 
 // Windows enrollment service — signs CSR and creates device record
 func (s *Server) handleWindowsEnrollmentService(w http.ResponseWriter, r *http.Request) {
+	enrollStart := time.Now()
 	body, err := io.ReadAll(io.LimitReader(r.Body, 1<<20))
 	if err != nil {
 		s.logger.Error("failed to read enrollment request", "error", err)
@@ -207,6 +210,7 @@ func (s *Server) handleWindowsEnrollmentService(w http.ResponseWriter, r *http.R
 	})
 	if s.metrics != nil {
 		s.metrics.EnrollmentsTotal.WithLabelValues(models.PlatformWindows, "complete").Inc()
+		s.metrics.EnrollmentDuration.WithLabelValues(models.PlatformWindows).Observe(time.Since(enrollStart).Seconds())
 	}
 
 	s.logger.Info("windows enrollment complete",
@@ -277,6 +281,7 @@ func (s *Server) handleWindowsPolicyService(w http.ResponseWriter, r *http.Reque
 
 // Android enrollment token generation
 func (s *Server) handleAndroidEnrollmentToken(w http.ResponseWriter, r *http.Request) {
+	enrollStart := time.Now()
 	enterpriseID, err := parseUUIDParam(r, "enterprise_id")
 	if err != nil {
 		respondError(w, r, http.StatusBadRequest, "invalid_id", "Invalid enterprise ID format")
@@ -303,6 +308,7 @@ func (s *Server) handleAndroidEnrollmentToken(w http.ResponseWriter, r *http.Req
 	})
 	if s.metrics != nil {
 		s.metrics.EnrollmentsTotal.WithLabelValues(models.PlatformAndroid, "token_created").Inc()
+		s.metrics.EnrollmentDuration.WithLabelValues(models.PlatformAndroid).Observe(time.Since(enrollStart).Seconds())
 	}
 
 	respondJSON(w, r, http.StatusOK, map[string]interface{}{

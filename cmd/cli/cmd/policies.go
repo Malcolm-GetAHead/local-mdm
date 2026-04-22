@@ -10,7 +10,7 @@ import (
 
 func init() {
 	rootCmd.AddCommand(policiesCmd)
-	policiesCmd.AddCommand(policiesListCmd, policiesGetCmd, policiesCreateCmd, policiesDeleteCmd)
+	policiesCmd.AddCommand(policiesListCmd, policiesGetCmd, policiesCreateCmd, policiesUpdateCmd, policiesDeleteCmd, policiesAssignCmd)
 }
 
 var policiesCmd = &cobra.Command{Use: "policies", Short: "Manage policies"}
@@ -86,6 +86,46 @@ var policiesDeleteCmd = &cobra.Command{
 			return err
 		}
 		fmt.Println("Policy deleted")
+		return nil
+	},
+}
+
+var policiesUpdateCmd = &cobra.Command{
+	Use: "update [id] [json-file]", Short: "Update policy from JSON file", Args: cobra.ExactArgs(2),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		f, err := os.ReadFile(args[1])
+		if err != nil {
+			return fmt.Errorf("failed to read file: %w", err)
+		}
+		var body interface{}
+		if err := json.Unmarshal(f, &body); err != nil {
+			return fmt.Errorf("invalid JSON: %w", err)
+		}
+		data, _, err := apiRequest("PUT", "/policies/"+args[0], body)
+		if err != nil {
+			return err
+		}
+		fmt.Println("Policy updated")
+		printJSON(data)
+		return nil
+	},
+}
+
+var policiesAssignCmd = &cobra.Command{
+	Use: "assign [policy-id] [target-type] [target-id]", Short: "Assign policy to device/group/enterprise",
+	Args: cobra.ExactArgs(3),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		body := map[string]interface{}{
+			"target_type": args[1],
+			"target_id":   args[2],
+			"priority":    1,
+		}
+		data, _, err := apiRequest("POST", "/policies/"+args[0]+"/assignments", body)
+		if err != nil {
+			return err
+		}
+		fmt.Println("Policy assigned")
+		printJSON(data)
 		return nil
 	},
 }
