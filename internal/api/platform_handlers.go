@@ -1,6 +1,7 @@
 package api
 
 import (
+	"bytes"
 	"crypto/hmac"
 	"crypto/sha256"
 	"crypto/x509"
@@ -392,7 +393,15 @@ func (s *Server) handleAndroidWebhook(w http.ResponseWriter, r *http.Request) {
 
 	s.logger.Info("received android webhook", "body_size", len(body))
 
-	// Acknowledge receipt
+	// Dispatch to the Android webhook handler if configured
+	if s.androidWebhookHandler != nil {
+		// Restore body for the handler (HMAC verification consumed it)
+		r.Body = io.NopCloser(bytes.NewReader(body))
+		s.androidWebhookHandler.HandleWebhook(w, r)
+		return
+	}
+
+	s.logger.Warn("android webhook received but handler not configured")
 	w.WriteHeader(http.StatusOK)
 }
 

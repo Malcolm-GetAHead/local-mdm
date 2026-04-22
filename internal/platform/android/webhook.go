@@ -121,7 +121,11 @@ func (h *WebhookHandler) handleStatusReport(ctx context.Context, event *WebhookE
 		return nil
 	}
 
-	// Get device details
+	// Get device details (requires Google API client)
+	if h.client == nil {
+		h.logger.Warn("status report received but Google client not configured", "device", event.DeviceName)
+		return nil
+	}
 	device, err := h.client.GetDevice(ctx, event.DeviceName)
 	if err != nil {
 		return fmt.Errorf("failed to get device details: %w", err)

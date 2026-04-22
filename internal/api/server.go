@@ -60,6 +60,7 @@ type Server struct {
 	windowsMgmtHandler *windows.ManagementHandler
 	ppkgSigner         *windows.PPKGSigner
 	androidService   *android.Service
+	androidWebhookHandler *android.WebhookHandler
 	cmdDispatcher    *commandDispatcher
 	lifecycleService *service.LifecycleService
 	policyService    *service.PolicyService
@@ -244,6 +245,8 @@ func New(cfg *config.Config, database *db.DB, logger *slog.Logger) (*Server, err
 	}
 
 	s.androidService = android.NewService(s.deviceRepo, s.enterpriseRepo, cfg.Android.ProjectID, cfg.Android.ServiceAccountJSON)
+	// Wire webhook handler without Google client (graceful degradation)
+	s.androidWebhookHandler = android.NewWebhookHandler(s.androidService, nil, logger)
 
 	s.cmdDispatcher = newCommandDispatcher(s.cmdRepo, s.nanomdmService, logger)
 
