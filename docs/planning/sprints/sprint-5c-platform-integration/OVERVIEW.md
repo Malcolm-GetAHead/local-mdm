@@ -19,6 +19,29 @@ These must be fixed before the dashboard (Sprint 5d) is useful — a dashboard s
 
 ---
 
+## Testing Strategy — Simulated vs. Real Devices
+
+This sprint frontloads all structural and integration work that can be verified **without real hardware**. The goal is to get the architecture correct and all code paths exercised with simulated payloads, so that the real device testing phase (F-01) is focused on protocol debugging rather than structural rework.
+
+**What we CAN verify without real devices:**
+- NanoMDM deploys and connects to PostgreSQL (docker-compose)
+- Webhook JSON payloads flow from NanoMDM → Local MDM → device record creation (curl + integration tests)
+- Windows SOAP enrollment creates device records (existing XML test fixtures)
+- Android webhook events are parsed and dispatched (JSON payloads)
+- SCEP challenge → CSR → signed cert flow (openssl + Go test client)
+- All service layer business logic (unit tests with mocks)
+
+**What REQUIRES real devices (deferred to F-01):**
+- Apple MDM protocol: does a real macOS device complete enrollment through NanoMDM?
+- Apple SCEP client: does Apple's SCEP implementation accept our PKCS#7 envelopes?
+- Windows MDM: does a real Windows device complete the MS-MDE2 discovery → enrollment → management sync flow?
+- Android Management API: does Google's webhook actually fire with the expected payload format?
+- End-to-end: enroll → policy push → compliance check → lock/wipe on real hardware
+
+The expectation is that F-01 will surface protocol-level issues (wrong plist field names, unexpected envelope formats, timing issues) but NOT architectural issues (wrong service wiring, missing database records, broken data flow).
+
+---
+
 ## Tasks
 
 | ID | Task | Effort | Dependencies |
@@ -114,6 +137,9 @@ macos:
 - [ ] Local MDM creates device record on Authenticate event
 - [ ] Local MDM updates device status on CheckOut event
 - [ ] Commands sent via `NanoMDMService.SendCommand()` reach NanoMDM's API
+- [ ] All flows verified with simulated JSON webhook payloads (curl/tests)
+
+> **Real device verification deferred to F-01.** The Apple MDM protocol (plist/CMS binary) is handled by NanoMDM, not our code. Our webhook receiver is JSON-based and fully testable without real hardware. The gap that remains after this sprint is: "does NanoMDM correctly translate Apple protocol → JSON webhooks in this specific deployment?" — that's NanoMDM's responsibility and can only be confirmed with a real macOS device or Apple's MDM testing tools.
 
 ---
 
@@ -260,7 +286,10 @@ For the request, the simplest approach is to use the `github.com/smallstep/pkcs7
 - [ ] SCEP GetCACert returns CA cert in PKCS#7 degenerate envelope (or raw DER — both are valid per RFC 8894)
 - [ ] SCEP PKIOperation accepts PKCS#7-wrapped CSR requests
 - [ ] SCEP PKIOperation returns signed cert in PKCS#7 SignedData envelope
-- [ ] Apple SCEP client can complete certificate enrollment (verified with `openssl` or test client)
+- [ ] Verified with `openssl` CLI: generate CSR, submit to `/scep`, parse response
+- [ ] Integration test covers the full challenge → CSR → signed cert flow
+
+> **Real device verification deferred to F-01.** The SCEP protocol can be tested end-to-end with `openssl` and Go test clients, which covers the cryptographic correctness. The remaining gap is Apple's specific SCEP client behavior (envelope preferences, retry logic, error handling) — this can only be confirmed during real macOS enrollment in F-01.
 
 ---
 
@@ -295,10 +324,11 @@ For the request, the simplest approach is to use the `github.com/smallstep/pkcs7
 - [ ] NanoMDM deployed in docker-compose, forwarding webhooks to Local MDM
 - [ ] Windows enrollment creates device records in the database
 - [ ] Android webhook events are processed (not silently dropped)
-- [ ] SCEP protocol works with real SCEP clients
+- [ ] SCEP protocol works with openssl test client
 - [ ] Service layer test coverage ≥ 60%
 - [ ] All existing tests pass
-- [ ] At least one platform verified with a simulated device flow (curl/openssl)
+- [ ] Each platform verified with simulated payloads (curl/openssl/test fixtures)
+- [ ] Real device verification tracked as F-01 dependency, not blocking this sprint
 
 ---
 
