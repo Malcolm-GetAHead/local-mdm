@@ -5,7 +5,7 @@ A quick guide to get the Local MDM server running locally and make your first AP
 ## Prerequisites
 
 - **Go 1.25+** — [download](https://go.dev/dl/)
-- **Docker & Docker Compose** — for PostgreSQL, Keycloak, and Adminer
+- **Docker & Docker Compose** — for PostgreSQL, Keycloak, NanoMDM, and Adminer
 - **golang-migrate** — install with `make install-tools`
 
 ## Quick Start
@@ -17,8 +17,9 @@ docker compose up -d
 ```
 
 This starts:
-- **PostgreSQL 15** on port 5432 (databases: `localmdm`, `keycloak`)
+- **PostgreSQL 15** on port 5432 (databases: `localmdm`, `keycloak`, `nanomdm`)
 - **Keycloak 23** on port 8180 (OIDC identity provider)
+- **NanoMDM v0.9.0** on port 9000 (Apple MDM protocol handler, webhooks to Local MDM)
 - **Adminer** on port 8081 (database UI)
 
 Wait for Keycloak to finish starting (~30–45 seconds):

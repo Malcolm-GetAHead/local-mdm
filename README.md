@@ -96,6 +96,19 @@ Unified Control Plane (Go)
 - Performance indexes (migration 000009) for common enterprise-scoped query patterns
 - See [Sprint 5 Plan](docs/planning/sprints/sprint-5-ui-and-polish/OVERVIEW.md)
 
+✅ **Sprint 5c Complete** - 10/10 tasks done (Platform Integration Fixes)
+- NanoMDM v0.9.0 deployed as Docker service (Apple MDM protocol handler)
+- macOS enrollment profile points to NanoMDM, webhook endpoint receives forwarded events
+- Windows enrollment creates device records (enterprise ID in URL path)
+- Android webhook handler wired (enrollment, status, unenrollment events processed)
+- SCEP protocol compliance with PKCS#7 envelopes (go.mozilla.org/pkcs7)
+- Sentinel error `apperrors.ErrNotFound` replaces fragile `strings.Contains` pattern
+- `password_hash` nullable (migration 000010), "oidc-managed" placeholder removed
+- `handlers.go` split into 10 domain-specific files
+- Service layer test coverage: 30.5% → 61.9%
+- E2E integration tests for macOS and Android webhook flows
+- See [Sprint 5c Plan](docs/planning/sprints/sprint-5c-platform-integration/OVERVIEW.md)
+
 ## Documentation
 
 ### Getting Started

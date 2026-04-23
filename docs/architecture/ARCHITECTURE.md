@@ -470,9 +470,25 @@ Local MDM Control Plane
 └── Android Module (Google Management API)
 ```
 
-### Shared Database
+### Database Architecture
 
-NanoMDM and NanoDEP both support PostgreSQL backends. Their schemas (see [nanomdm/schema-pgsql.sql](../dependencies/nanomdm/schema-pgsql.sql) and [nanodep/schema-pgsql.sql](../dependencies/nanodep/schema-pgsql.sql)) will coexist in our PostgreSQL database alongside Local MDM's own tables.
+The PostgreSQL instance hosts three separate databases:
+
+- **`localmdm`** — Local MDM application tables (devices, policies, users, etc.)
+- **`nanomdm`** — NanoMDM's own tables (enrollments, commands, push certs). Separate database to avoid table name conflicts (both have `devices` and `users` tables).
+- **`keycloak`** — Keycloak identity provider tables
+
+NanoDEP uses the `localmdm` database (its tables have a `dep_` prefix, no conflicts).
+
+### NanoMDM Service
+
+NanoMDM runs as a **separate Docker service** (not a Go library embedded in Local MDM). It handles the raw Apple MDM protocol (plist XML, CMS signatures) and forwards events to Local MDM via JSON webhooks.
+
+- **Devices → NanoMDM** (port 9000): `/checkin`, `/mdm` — Apple MDM protocol
+- **NanoMDM → Local MDM** (port 8080): `POST /api/v1/macos/webhook` — JSON webhook
+- **Local MDM → NanoMDM**: HTTP API for sending commands to devices
+
+In production (ECS Fargate), NanoMDM runs as a separate ECS service behind the ALB with path-based routing.
 
 ## Extension Points
 

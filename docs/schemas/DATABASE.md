@@ -74,7 +74,7 @@ CREATE TABLE users (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     enterprise_id UUID NOT NULL REFERENCES enterprises(id) ON DELETE CASCADE,
     email VARCHAR(255) NOT NULL,
-    password_hash VARCHAR(255) NOT NULL,
+    password_hash VARCHAR(255),
     full_name VARCHAR(255),
     role VARCHAR(50) NOT NULL DEFAULT 'admin',
     is_active BOOLEAN DEFAULT true,
@@ -94,7 +94,7 @@ CREATE INDEX idx_users_deleted_at ON users(deleted_at);
 - `id`: Unique identifier
 - `enterprise_id`: Associated enterprise
 - `email`: User email (login)
-- `password_hash`: Bcrypt hashed password
+- `password_hash`: NULL (auth via Keycloak OIDC, not local passwords)
 - `full_name`: User's full name
 - `role`: User role (admin, viewer, etc.)
 - `is_active`: Account status
@@ -568,6 +568,17 @@ CREATE INDEX idx_group_members_device ON group_memberships(device_id);
 ```
 
 These composite indexes optimize the most frequent query patterns: enterprise-scoped device listing, compliance evaluation, audit log search with date filtering, and command queue polling.
+
+## Sprint 5c: Nullable password_hash (Migration 000010)
+
+Auth is via Keycloak OIDC — local passwords are not used. The `password_hash` column was `NOT NULL` with a misleading `"oidc-managed"` placeholder.
+
+```sql
+ALTER TABLE users ALTER COLUMN password_hash DROP NOT NULL;
+UPDATE users SET password_hash = NULL WHERE password_hash = 'oidc-managed';
+```
+
+Users created after this migration have `NULL` password_hash. Repository queries use `COALESCE(password_hash, '')` for scan safety.
 
 ## Migrations
 

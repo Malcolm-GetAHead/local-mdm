@@ -5,10 +5,11 @@
 
 ## Current State
 
-- **Sprint 5**: ✅ COMPLETE, on branch `sprint-5/backend-polish` (not yet merged to main)
-- **Retrospective**: ✅ COMPLETE (backward look, forward look, holistic doc/test review, feedback exchange)
-- **Next sprint**: **5c** (platform integration — 9 tasks), then 5b (EventBus), then 5d (dashboard)
-- **Pending**: merge sprint-5/backend-polish to main
+- **Sprint 5c**: ✅ COMPLETE, on branch `sprint-5c/platform-integration` (not yet merged to main)
+- **Sprint 5**: ✅ COMPLETE, merged to main
+- **Retrospective**: In progress (backward look)
+- **Next sprint**: **5b** (EventBus), then 5d (dashboard)
+- **Pending**: merge sprint-5c/platform-integration to main
 
 ---
 
@@ -38,7 +39,7 @@
 - **NULL column scan bugs are a recurring pattern.** Every nullable TEXT/VARCHAR column scanned into a Go `string` will fail. Three bugs found so far: `error_message` in commands, `full_name` in users, `user_agent` in audit logs. When writing new repository code, audit all `Scan()` calls against the schema for nullable columns. Use `COALESCE(col, '')` or `sql.NullString`.
 - **Connection pool exhaustion causes flaky tests.** 18 test packages × N connections can exceed PostgreSQL's 100 limit. Always use `-p 4` when running the full suite. Test pool sizes should be 2 open / 1 idle. If tests fail randomly with different tests each run, check connection counts before debugging individual tests.
 - **`mdmb`** (github.com/jessepeterson/mdmb) is a device simulator by the NanoMDM author. It exercises the full Apple MDM protocol stack (SCEP, check-in, commands). Use it for macOS E2E testing in Sprint 5c.
-- **The `strings.Contains(err.Error(), "not found")` pattern is fragile.** 36 handler checks + 29 repo returns. Sprint 5c task S5c-07 replaces with `apperrors.ErrNotFound` sentinel errors. Until then, don't change error message text in repositories — it silently breaks not-found detection.
+- **The `strings.Contains(err.Error(), "not found")` pattern is fragile.** ✅ RESOLVED in S5c-07. All 36 handler checks + 29 repo returns now use `apperrors.ErrNotFound` sentinel + `errors.Is()`. 16 integration test assertions still use `assert.Contains` (works, low priority).
 - **The retrospective process finds real issues.** Don't rush it. The backward look, forward look, and holistic doc/test review consistently find bugs, stale docs, and architectural gaps. Budget time for it.
 
 ## Session Closeout Process
@@ -82,7 +83,7 @@ After every sprint, the owner expects:
 - Services accept repository interfaces via constructor (dependency injection).
 
 ### Error Handling
-- Not-found detection: `strings.Contains(err.Error(), "not found")` — repos return `fmt.Errorf`, not sentinel errors.
+- Not-found detection: `errors.Is(err, apperrors.ErrNotFound)` — repos wrap with `fmt.Errorf("xxx not found: %w", apperrors.ErrNotFound)`, handlers check with `errors.Is()`. Replaced `strings.Contains` pattern in S5c-07.
 - Audit logging: `s.logAudit(r, action, resourceType, resourceID, details)` on all mutations.
 
 ### Testing
@@ -113,7 +114,7 @@ database:
 
 ### Services (3 ECS services + RDS)
 - **localmdm** — the Go application (API, policy engine, enrollment). Multiple tasks behind ALB.
-- **nanomdm** — Apple MDM protocol handler (separate ECS service). Receives `/checkin` and `/mdm` via ALB path routing. Shares RDS database. Local MDM sends commands to NanoMDM via HTTP API (`nanomdm_url` config).
+- **nanomdm** — Apple MDM protocol handler (separate ECS service). Receives `/checkin` and `/mdm` via ALB path routing. Uses same RDS instance, separate `nanomdm` database. Local MDM sends commands to NanoMDM via HTTP API (`nanomdm_url` config).
 - **keycloak** — OIDC identity provider (separate ECS service). Admin login, JWT issuance, RBAC. Uses same RDS instance, separate database.
 - **RDS PostgreSQL** — primary (Writer pool) + read replica (Reader pool). NanoMDM and Keycloak use primary only.
 
@@ -163,12 +164,15 @@ database:
 - **Repo integration test gap tracked in `docs/reviews/sprint-4b/REPOSITORY_TEST_COVERAGE.md`** — resolved on `review/repo-integration-tests` branch. All 5 test files written.
 - **`GET /windows/ppkg/templates`** — auth being added on `review/documentation-fixes` branch.
 - **command.GetByID and ListByDevice bug** — ✅ FIXED in Sprint 5 (COALESCE). Tests updated in `sprint12_gaps_integration_test.go`.
-- **Service layer test coverage at 30.4%** — tracked in S5c-05 (target: 60%).
-- **`strings.Contains` error detection** — 36 handler checks + 29 repo returns. Tracked in S5c-07 (sentinel errors).
-- **NanoMDM not deployed** — not in docker-compose, enrollment profile points to wrong server. Tracked in S5c-01.
-- **Windows enrollment doesn't create device records** — tracked in S5c-02.
-- **Android webhook is a no-op** — tracked in S5c-03.
+- **Service layer test coverage at 30.4%** — ✅ FIXED in S5c-05 (now 61.9%).
+- **`strings.Contains` error detection** — ✅ FIXED in S5c-07. `apperrors.ErrNotFound` sentinel + `errors.Is()` in all handlers.
+- **NanoMDM not deployed** — ✅ FIXED in S5c-01. NanoMDM v0.9.0 in docker-compose, separate `nanomdm` database, webhook forwarding.
+- **Windows enrollment doesn't create device records** — ✅ FIXED in S5c-02. Enterprise ID in URL path.
+- **Android webhook is a no-op** — ✅ FIXED in S5c-03. WebhookHandler wired, graceful degradation without Google client.
 - **EventBus Go listener not built** — triggers exist (migration 000007), no listener. Tracked in Sprint 5b.
+- **mdmb device simulator not yet integrated** — NanoMDM is deployed but mdmb not installed in dev toolchain. Tracked in F-01.
+- **Windows SOAP E2E test not written** — device record creation tested, full SOAP flow deferred to F-01.
+- **16 repo integration tests still use `assert.Contains(err.Error(), "not found")`** — works but should use `assert.ErrorIs()` for consistency. Low priority.
 
 ## Sprint 4b Learnings
 
@@ -189,7 +193,7 @@ database:
 | 4b | ✅ Complete | Writer/Reader DB pools, repo constructor refactor |
 | 4c | 🔲 Not Started | macOS Platform SSO (Java/Swift) — renamed to Sprint 6 |
 | 5 | ✅ Complete | Backend polish, CLI, observability, performance |
-| 5c | 🔲 Not Started | Platform integration fixes (macOS/Windows/Android), SCEP, service tests |
+| 5c | ✅ Complete | Platform integration fixes (macOS/Windows/Android), SCEP, service tests |
 | 5b | 🔲 Not Started | EventBus listener, compliance wiring, load testing |
 | 5d | 🔲 Not Started | Web dashboard (HTMX) |
 | 6 | 🔲 Not Started | macOS Platform SSO (Java/Swift) — requires Apple Developer account |

@@ -1175,9 +1175,10 @@ GET /api/v1/windows/ppkg/templates
 
 ```http
 GET|POST /EnrollmentServer/Discovery.svc
+GET|POST /EnrollmentServer/:enterprise_id/Discovery.svc
 ```
 
-MS-MDE2 discovery endpoint used by Windows devices during enrollment.
+MS-MDE2 discovery endpoint used by Windows devices during enrollment. The `enterprise_id` variant propagates the enterprise context to the enrollment URL for multi-tenant support.
 
 #### Policy Service
 
@@ -1191,9 +1192,10 @@ Returns enrollment policy to Windows devices.
 
 ```http
 POST /EnrollmentServer/Enrollment.svc
+POST /EnrollmentServer/:enterprise_id/Enrollment.svc
 ```
 
-Handles Windows device enrollment with certificate signing.
+Handles Windows device enrollment with certificate signing. When `enterprise_id` is present in the URL, a device record is created in the database upon successful enrollment.
 
 #### Management Sync
 
@@ -1237,21 +1239,15 @@ GET /api/v1/dep/:name/devices
 
 List devices synced from Apple DEP.
 
-#### Check-in (NanoMDM webhook)
+#### NanoMDM Webhook
 
 ```http
-PUT /checkin
+POST /api/v1/macos/webhook
 ```
 
-Receives NanoMDM webhook JSON for device check-in events (Authenticate, TokenUpdate, CheckOut).
+Receives NanoMDM webhook JSON for device check-in events (Authenticate, TokenUpdate, CheckOut) and command result events. NanoMDM forwards these automatically when configured with `NANOMDM_WEBHOOK_URL`.
 
-#### Command (NanoMDM webhook)
-
-```http
-PUT /mdm
-```
-
-Receives NanoMDM webhook JSON for command result events.
+Legacy endpoints `PUT /checkin` and `PUT /mdm` are still registered for backward compatibility.
 
 ### Android
 
