@@ -41,6 +41,11 @@
 - **`mdmb`** (github.com/jessepeterson/mdmb) is a device simulator by the NanoMDM author. It exercises the full Apple MDM protocol stack (SCEP, check-in, commands). Use it for macOS E2E testing in Sprint 5c.
 - **The `strings.Contains(err.Error(), "not found")` pattern is fragile.** ✅ RESOLVED in S5c-07. All 36 handler checks + 29 repo returns now use `apperrors.ErrNotFound` sentinel + `errors.Is()`. 16 integration test assertions still use `assert.Contains` (works, low priority).
 - **The retrospective process finds real issues.** Don't rush it. The backward look, forward look, and holistic doc/test review consistently find bugs, stale docs, and architectural gaps. Budget time for it.
+- **Don't defer items that are in the sprint plan without a real blocker.** In Sprint 5c, mdmb integration and SCEP verification were deferred twice before the owner caught it. The "blocker" was just a test configuration issue (wrong port). If the sprint plan says to do it, do it — find a way through the difficulty instead of deferring. The owner will call you on it.
+- **When you hit a test/tooling issue, check if the tool has unreleased fixes.** mdmb v0.1.0 (2021 release) had pkcs7 incompatibilities. The `main` branch (updated weekly) had fixes. Always check the repo's recent commits, not just the latest release tag.
+- **The owner's instinct to move to Docker was correct and should have been proposed by the agent.** When debugging cross-platform issues, the first question should be "are we running on the same platform?" not "what's different about the crypto implementation?" Infrastructure-level solutions beat code-level workarounds.
+- **Push features to completion, not just "working."** The owner asked for enriched enrollment data, concurrent testing, and full protocol verification — none of which were in the original sprint plan. These made the feature production-ready instead of just "tests pass." When implementing a feature, ask: "what would an admin expect to see?" not just "does the test pass?"
+- **Patch upstream bugs locally rather than working around them.** The mdmb Load() bug was a 3-line fix. Patching it in the Dockerfile was faster and more correct than adjusting our test assertions to accept empty fields.
 
 ## Session Closeout Process
 
