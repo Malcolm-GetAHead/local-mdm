@@ -312,3 +312,213 @@ func TestComplianceService_EvaluateDevice_UpsertError(t *testing.T) {
 	require.NoError(t, err)
 	assert.Len(t, results, 0) // result not added because upsert failed
 }
+
+func TestComplianceService_SecurityPolicy_Violations(t *testing.T) {
+	cr := newMockComplianceRepo()
+	pr := newMockPolicyRepo()
+	ar := &mockAssignmentRepo{}
+	gs := NewGroupService(newMockGroupRepo(), ar, testLogger())
+	dr := newMockComplianceDeviceRepo()
+	svc := NewComplianceService(cr, gs, pr, dr, testLogger())
+
+	deviceID := uuid.New()
+	policyID := uuid.New()
+
+	dr.devices[deviceID] = &models.Device{
+		BaseModel: models.BaseModel{ID: deviceID},
+		PlatformData: models.JSONB{
+			"password_present": false,
+			"password_length":  float64(4),
+			"encryption_enabled": false,
+			"firewall_enabled":   false,
+		},
+	}
+	pr.policies[policyID] = &models.Policy{
+		BaseModel:  models.BaseModel{ID: policyID},
+		PolicyType: models.PolicyTypeSecurity,
+		PolicyConfig: models.JSONB{
+			"require_password":     true,
+			"min_password_length":  float64(8),
+			"require_encryption":   true,
+			"require_firewall":     true,
+		},
+		IsActive: true,
+	}
+	gs.AssignPolicy(context.Background(), policyID, models.TargetTypeDevice, deviceID, 1)
+
+	results, err := svc.EvaluateDevice(context.Background(), deviceID, uuid.New())
+	require.NoError(t, err)
+	require.Len(t, results, 1)
+	assert.Equal(t, models.ComplianceStatusNonCompliant, results[0].Status)
+	violations := results[0].Details["violations"].([]string)
+	assert.Len(t, violations, 4) // password not set, password too short, no encryption, no firewall
+}
+
+func TestComplianceService_SecurityPolicy_Compliant(t *testing.T) {
+	cr := newMockComplianceRepo()
+	pr := newMockPolicyRepo()
+	ar := &mockAssignmentRepo{}
+	gs := NewGroupService(newMockGroupRepo(), ar, testLogger())
+	dr := newMockComplianceDeviceRepo()
+	svc := NewComplianceService(cr, gs, pr, dr, testLogger())
+
+	deviceID := uuid.New()
+	policyID := uuid.New()
+
+	dr.devices[deviceID] = &models.Device{
+		BaseModel: models.BaseModel{ID: deviceID},
+		PlatformData: models.JSONB{
+			"password_present":   true,
+			"password_length":    float64(12),
+			"encryption_enabled": true,
+			"firewall_enabled":   true,
+		},
+	}
+	pr.policies[policyID] = &models.Policy{
+		BaseModel:  models.BaseModel{ID: policyID},
+		PolicyType: models.PolicyTypeSecurity,
+		PolicyConfig: models.JSONB{
+			"require_password":    true,
+			"min_password_length": float64(8),
+			"require_encryption":  true,
+			"require_firewall":    true,
+		},
+		IsActive: true,
+	}
+	gs.AssignPolicy(context.Background(), policyID, models.TargetTypeDevice, deviceID, 1)
+
+	results, err := svc.EvaluateDevice(context.Background(), deviceID, uuid.New())
+	require.NoError(t, err)
+	require.Len(t, results, 1)
+	assert.Equal(t, models.ComplianceStatusCompliant, results[0].Status)
+}
+
+func TestComplianceService_SecurityPolicy_MacOSFileVault(t *testing.T) {
+	cr := newMockComplianceRepo()
+	pr := newMockPolicyRepo()
+	ar := &mockAssignmentRepo{}
+	gs := NewGroupService(newMockGroupRepo(), ar, testLogger())
+	dr := newMockComplianceDeviceRepo()
+	svc := NewComplianceService(cr, gs, pr, dr, testLogger())
+
+	deviceID := uuid.New()
+	policyID := uuid.New()
+
+	dr.devices[deviceID] = &models.Device{
+		BaseModel:    models.BaseModel{ID: deviceID},
+		PlatformData: models.JSONB{"FileVaultEnabled": true, "FirewallEnabled": true},
+	}
+	pr.policies[policyID] = &models.Policy{
+		BaseModel:    models.BaseModel{ID: policyID},
+		PolicyType:   models.PolicyTypeSecurity,
+		PolicyConfig: models.JSONB{"require_encryption": true, "require_firewall": true},
+		IsActive:     true,
+	}
+	gs.AssignPolicy(context.Background(), policyID, models.TargetTypeDevice, deviceID, 1)
+
+	results, err := svc.EvaluateDevice(context.Background(), deviceID, uuid.New())
+	require.NoError(t, err)
+	require.Len(t, results, 1)
+	assert.Equal(t, models.ComplianceStatusCompliant, results[0].Status)
+}
+
+func TestComplianceService_SecurityPolicy_WindowsBitLocker(t *testing.T) {
+	cr := newMockComplianceRepo()
+	pr := newMockPolicyRepo()
+	ar := &mockAssignmentRepo{}
+	gs := NewGroupService(newMockGroupRepo(), ar, testLogger())
+	dr := newMockComplianceDeviceRepo()
+	svc := NewComplianceService(cr, gs, pr, dr, testLogger())
+
+	deviceID := uuid.New()
+	policyID := uuid.New()
+
+	dr.devices[deviceID] = &models.Device{
+		BaseModel:    models.BaseModel{ID: deviceID},
+		PlatformData: models.JSONB{"bitlocker_status": "Enabled"},
+	}
+	pr.policies[policyID] = &models.Policy{
+		BaseModel:    models.BaseModel{ID: policyID},
+		PolicyType:   models.PolicyTypeSecurity,
+		PolicyConfig: models.JSONB{"require_encryption": true},
+		IsActive:     true,
+	}
+	gs.AssignPolicy(context.Background(), policyID, models.TargetTypeDevice, deviceID, 1)
+
+	results, err := svc.EvaluateDevice(context.Background(), deviceID, uuid.New())
+	require.NoError(t, err)
+	require.Len(t, results, 1)
+	assert.Equal(t, models.ComplianceStatusCompliant, results[0].Status)
+}
+
+func TestComplianceService_RestrictionPolicy(t *testing.T) {
+	cr := newMockComplianceRepo()
+	pr := newMockPolicyRepo()
+	ar := &mockAssignmentRepo{}
+	gs := NewGroupService(newMockGroupRepo(), ar, testLogger())
+	dr := newMockComplianceDeviceRepo()
+	svc := NewComplianceService(cr, gs, pr, dr, testLogger())
+
+	deviceID := uuid.New()
+	policyID := uuid.New()
+
+	t.Run("camera restricted but enabled", func(t *testing.T) {
+		dr.devices[deviceID] = &models.Device{
+			BaseModel:    models.BaseModel{ID: deviceID},
+			PlatformData: models.JSONB{"camera_enabled": true},
+		}
+		pr.policies[policyID] = &models.Policy{
+			BaseModel:    models.BaseModel{ID: policyID},
+			PolicyType:   "restriction",
+			PolicyConfig: models.JSONB{"allow_camera": false},
+			IsActive:     true,
+		}
+		gs.AssignPolicy(context.Background(), policyID, models.TargetTypeDevice, deviceID, 1)
+
+		results, err := svc.EvaluateDevice(context.Background(), deviceID, uuid.New())
+		require.NoError(t, err)
+		require.Len(t, results, 1)
+		assert.Equal(t, models.ComplianceStatusNonCompliant, results[0].Status)
+	})
+
+	t.Run("camera restricted and disabled", func(t *testing.T) {
+		dr.devices[deviceID] = &models.Device{
+			BaseModel:    models.BaseModel{ID: deviceID},
+			PlatformData: models.JSONB{"camera_enabled": false},
+		}
+		results, err := svc.EvaluateDevice(context.Background(), deviceID, uuid.New())
+		require.NoError(t, err)
+		require.Len(t, results, 1)
+		assert.Equal(t, models.ComplianceStatusCompliant, results[0].Status)
+	})
+}
+
+func TestComplianceService_EmptyPolicyConfig(t *testing.T) {
+	cr := newMockComplianceRepo()
+	pr := newMockPolicyRepo()
+	ar := &mockAssignmentRepo{}
+	gs := NewGroupService(newMockGroupRepo(), ar, testLogger())
+	dr := newMockComplianceDeviceRepo()
+	svc := NewComplianceService(cr, gs, pr, dr, testLogger())
+
+	deviceID := uuid.New()
+	policyID := uuid.New()
+
+	dr.devices[deviceID] = &models.Device{
+		BaseModel:    models.BaseModel{ID: deviceID},
+		PlatformData: models.JSONB{"some_data": true},
+	}
+	pr.policies[policyID] = &models.Policy{
+		BaseModel:    models.BaseModel{ID: policyID},
+		PolicyType:   models.PolicyTypeSecurity,
+		PolicyConfig: nil,
+		IsActive:     true,
+	}
+	gs.AssignPolicy(context.Background(), policyID, models.TargetTypeDevice, deviceID, 1)
+
+	results, err := svc.EvaluateDevice(context.Background(), deviceID, uuid.New())
+	require.NoError(t, err)
+	require.Len(t, results, 1)
+	assert.Equal(t, models.ComplianceStatusCompliant, results[0].Status)
+	assert.Equal(t, "empty policy config", results[0].Details["reason"])
+}

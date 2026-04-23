@@ -3,6 +3,8 @@ package auth
 import (
 	"context"
 	"database/sql"
+	"fmt"
+	"os"
 	"testing"
 	"time"
 
@@ -14,7 +16,16 @@ import (
 
 func getTestDB(t *testing.T) *sql.DB {
 	t.Helper()
-	db, err := sql.Open("postgres", "host=localhost port=5432 user=postgres password=postgres dbname=localmdm sslmode=disable")
+	host := os.Getenv("DB_HOST")
+	if host == "" {
+		host = "localhost"
+	}
+	password := os.Getenv("DB_PASSWORD")
+	if password == "" {
+		password = "postgres"
+	}
+	dsn := fmt.Sprintf("host=%s port=5432 user=postgres password=%s dbname=localmdm sslmode=disable", host, password)
+	db, err := sql.Open("postgres", dsn)
 	if err != nil {
 		t.Skipf("skipping integration test: %v", err)
 	}
