@@ -60,7 +60,10 @@ func TestE2E_Mdmb_FullEnrollment(t *testing.T) {
 	require.NoError(t, entRepo.Create(ctx, enterprise))
 
 	// Use the project's CA (same one mounted in NanoMDM's docker container)
-	ca, err := certs.NewCAManager("internal/api/certs/ca.crt", "internal/api/certs/ca.key")
+	ca, err := certs.NewCAManager(
+		projectPath(t, "internal/api/certs/ca.crt"),
+		projectPath(t, "internal/api/certs/ca.key"),
+	)
 	require.NoError(t, err)
 	dir := t.TempDir()
 	challengeMgr := scep.NewChallengeManager(database.Writer)
@@ -223,8 +226,8 @@ func TestE2E_Mdmb_FullEnrollment(t *testing.T) {
 
 	// Generate enrollment profile
 	// Check-in goes to our test server (which verifies cert + creates device record)
-	// NanoMDM has a pkcs7 library incompatibility with mdmb's Mdm-Signature format
-	// Real Apple devices use Apple's CMS implementation which NanoMDM is designed for
+	// NanoMDM requires cert_auth_associations table for enrollment tracking
+	// Our test server handles check-in directly with cert verification + device creation
 	caCert := ca.GetCACertificate()
 	profile, err := macos.GenerateEnrollmentProfile(
 		enterprise.ID,

@@ -47,7 +47,10 @@ func TestE2E_Mdmb_ConcurrentEnrollment(t *testing.T) {
 	}
 	require.NoError(t, entRepo.Create(ctx, enterprise))
 
-	ca, err := certs.NewCAManager("internal/api/certs/ca.crt", "internal/api/certs/ca.key")
+	ca, err := certs.NewCAManager(
+		projectPath(t, "internal/api/certs/ca.crt"),
+		projectPath(t, "internal/api/certs/ca.key"),
+	)
 	require.NoError(t, err)
 	challengeMgr := scep.NewChallengeManager(database.Writer)
 	scepHandler := scep.NewHandler(ca, challengeMgr, logger)
