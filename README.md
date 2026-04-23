@@ -112,6 +112,16 @@ Unified Control Plane (Go)
 - All development and testing moved to Docker containers (Alpine Linux, environment parity)
 - See [Sprint 5c Plan](docs/planning/sprints/sprint-5c-platform-integration/OVERVIEW.md)
 
+✅ **Sprint 5e Complete** - 4/4 tasks done + bonus coverage work (Cert Verification + Test Hygiene)
+- Root cause: NanoMDM cert verification failure was a CA file path bug, not a pkcs7 library incompatibility
+- Fix: `projectPath()` helper for E2E tests, `.gitignore` for stale CA certs
+- 20 `assert.Contains` → `assert.ErrorIs` migration across 10 files
+- SCEP handler coverage: 49.6% → 75.9%, service coverage: 61.9% → 77.3%
+- Fixed 3 hardcoded `localhost` test files preventing Docker execution
+- Added `NewCAManagerFromPEM` + `CA_CERT_PEM`/`CA_KEY_PEM` env var support for production
+- Overall test coverage: 63.8% → 65.7%
+- See [Sprint 5e Plan](docs/planning/sprints/sprint-5e-cert-verification/OVERVIEW.md)
+
 ## Documentation
 
 ### Getting Started

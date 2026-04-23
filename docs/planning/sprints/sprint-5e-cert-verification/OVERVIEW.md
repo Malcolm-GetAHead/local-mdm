@@ -1,107 +1,79 @@
 # Sprint 5e: NanoMDM Cert Verification + Test Hygiene
 
-**Status**: 🔲 Not Started  
-**Duration**: 1-2 days  
-**Goal**: Resolve the NanoMDM certificate verification failure that prevents mdmb (and potentially real devices) from completing check-in through NanoMDM, and clean up remaining test assertion inconsistencies  
+**Status**: ✅ Complete  
+**Duration**: 1 day (2026-04-23)  
+**Goal**: Resolve the NanoMDM certificate verification failure and clean up test assertion inconsistencies  
 **Depends on**: Sprint 5c complete
 
 ---
 
-## Why This Sprint
+## Root Cause (S5e-01)
 
-Sprint 5c proved the full Apple MDM enrollment flow works — SCEP cert issuance, Mdm-Signature verification, device record creation — but only when our code handles the check-in directly. When mdmb sends the check-in through NanoMDM, NanoMDM rejects it with:
+The "pkcs7 library incompatibility" diagnosis from Sprint 5c was **wrong**. The actual root cause:
 
-```
-x509: certificate signed by unknown authority (possibly because of
-"crypto/rsa: verification error" while trying to verify candidate
-authority certificate "Local MDM Root CA")
-```
+**`go test` sets the working directory to the package directory** (`tests/e2e/`). The test called `certs.NewCAManager("internal/api/certs/ca.crt", ...)` — a relative path. From `tests/e2e/`, that file doesn't exist, so `NewCAManager` silently generated a **new CA** at `tests/e2e/internal/api/certs/ca.crt`. The test signed device certs with this new CA, but NanoMDM had the project root's CA loaded via Docker volume. Two different RSA keys → verification fails.
 
-This happens even with everything running on the same Linux distro in Docker. The cert is valid — our Go code verifies it successfully using the same CA cert. The issue is specific to how NanoMDM's `smallstep/pkcs7 v0.2.1` parses the Mdm-Signature PKCS#7 structure created by mdmb's `go.mozilla.org/pkcs7`.
+Both CAs had the same CN ("Local MDM Root CA") because `NewCAManager` uses the same template, which is why the error said "while trying to verify candidate authority certificate 'Local MDM Root CA'" — Go found the CA by name but the key material didn't match.
 
-**Why this matters for production**: Real Apple devices use Apple's native CMS implementation, not Go's pkcs7 libraries. NanoMDM is designed and tested against Apple's implementation. However, we can't verify this claim until F-01 (real device testing). If NanoMDM's cert verification is broken for any non-Apple CMS implementation, it could also break with certain proxy configurations, certificate formats, or edge cases. We need to understand the root cause, not just work around it.
+**Not a library incompatibility. Not a platform issue. A file path bug.**
 
 ---
 
-## Tasks
+## Tasks — Planned
 
-| ID | Task | Effort | Details |
+| ID | Task | Status | Result |
 |---|---|---|---|
-| S5e-01 | Root cause the pkcs7 cert verification mismatch | 0.5-1 day | See investigation plan below |
-| S5e-02 | Fix or work around the verification failure | 0.5 day | Depends on root cause |
-| S5e-03 | Migrate 16 repo integration test assertions to `assert.ErrorIs` | 0.5 day | Mechanical cleanup |
-| S5e-04 | SCEP handler unit test coverage (49.6% → 70%+) | 0.5 day | Cover PKCS#7 protocol paths |
+| S5e-01 | Root cause the cert verification mismatch | ✅ | Path resolution bug, not pkcs7 incompatibility |
+| S5e-02 | Fix the verification failure | ✅ | `projectPath()` helper, `.gitignore` for stale CAs |
+| S5e-03 | Migrate repo test assertions to `assert.ErrorIs` | ✅ | 20 assertions across 10 files (found 4 more than planned) |
+| S5e-04 | SCEP handler unit test coverage | ✅ | 49.6% → 75.9% (exceeded 70% target) |
+
+## Tasks — Bonus (from review)
+
+| Task | Result |
+|---|---|
+| Fix DB_HOST wiring in 3 integration test files | token_cache, reporting, challenge tests now run in Docker |
+| Compliance service unit tests | checkSecurityPolicy/checkRestrictionPolicy at 100%, service 61.9% → 77.3% |
+| DEP storage sentinel error fix | `fmt.Errorf` → `apperrors.ErrNotFound` wrapping |
+| Project file audit | Removed 4 stale CA certs, 1 mdmb.db, 1 build artifact |
+| CA cert/key env var support | `NewCAManagerFromPEM`, `CA_CERT_PEM`/`CA_KEY_PEM` env vars for production |
+| F-02 production secrets plan update | Added CA key (Secrets Manager) and CA cert (SSM) to secrets table |
+| Sprint 5f created | API hardening + test hygiene before dashboard sprint |
+| Sprint plan updates | S5d-07 moved to S5f-02, F-01 Android test item added |
 
 ---
 
-### S5e-01: Root Cause Investigation
+## Coverage Impact
 
-**What we know:**
-- Cert signed by our CA on Linux, verified by our Go code on Linux: ✅ PASSES
-- Same cert in Mdm-Signature header, verified by NanoMDM on Linux: ❌ FAILS
-- CA cert is identical in both (md5sum verified)
-- openssl-signed certs verify fine in NanoMDM
-- Error is `crypto/rsa: verification error` — RSA signature check fails
-
-**Investigation plan:**
-
-1. **Capture the exact cert bytes** NanoMDM receives from the Mdm-Signature header. Compare byte-for-byte with the cert our code extracts from the same header. If they differ, the pkcs7 parsing is the issue.
-
-2. **Test with NanoMDM's own pkcs7 library**: Write a test that uses `smallstep/pkcs7 v0.2.1` (same version as NanoMDM) to parse the Mdm-Signature and extract the cert. Verify the cert against our CA. This isolates whether the issue is in pkcs7 parsing or in x509 verification.
-
-3. **Test with NanoMDM's certverify package directly**: Import `github.com/micromdm/nanomdm/certverify` and call `NewPoolVerifier` with our CA PEM, then `Verify` with the cert from the Mdm-Signature. This replicates NanoMDM's exact code path.
-
-4. **Check if the issue is in the PKCS#7 SignedData structure**: mdmb creates the Mdm-Signature using `go.mozilla.org/pkcs7.NewSignedData()`. NanoMDM parses it with `smallstep/pkcs7.Parse()`. The cert embedded in the SignedData might be serialized differently by the two libraries.
-
-5. **Compare cert DER bytes**: Extract the cert from the PKCS#7 structure using both libraries and compare the raw DER bytes. If they differ, one library is modifying the cert during parse/serialize.
-
-**Possible root causes:**
-- `smallstep/pkcs7` re-encodes the cert during parsing, producing different DER bytes
-- The PKCS#7 SignedData structure from `go.mozilla.org/pkcs7` uses a format that `smallstep/pkcs7` doesn't handle correctly
-- NanoMDM's `VerifyMdmSignature` function modifies the cert before passing it to the verifier
-- The cert has extensions or encoding that triggers a Go x509 bug in specific contexts
-
-### S5e-02: Fix or Workaround
-
-Depends on root cause. Options:
-- **If pkcs7 library mismatch**: Build NanoMDM with `go.mozilla.org/pkcs7` instead of `smallstep/pkcs7`
-- **If cert encoding issue**: Normalize the cert in our SCEP response
-- **If NanoMDM bug**: Patch NanoMDM's certverify or contribute upstream fix
-- **If fundamental incompatibility**: Document as known limitation, verify with real Apple device in F-01
-
-### S5e-03: Repo Test Assertion Cleanup
-
-16 integration test assertions in `internal/repository/` still use:
-```go
-assert.Contains(t, err.Error(), "not found")
-```
-
-Should be:
-```go
-assert.ErrorIs(t, err, apperrors.ErrNotFound)
-```
-
-Files:
-- `app_integration_test.go` (4)
-- `group_integration_test.go` (4)
-- `new_repos_test.go` (1)
-- `policy_assignment_integration_test.go` (1)
-- `policy_version_integration_test.go` (1)
-- `sprint12_gaps_integration_test.go` (3)
-- `sprint5_integration_test.go` (2)
-
-Mechanical change — no behavior difference, just consistency with the sentinel error pattern from S5c-07.
+| Package | Before | After |
+|---|---|---|
+| scep | 49.6% | 75.9% |
+| service | 61.9% | 77.3% |
+| auth | 66.1% | 73.0% |
+| reporting | 17.0% | 67.9% |
+| **Total** | **63.8%** | **65.7%** |
 
 ---
 
 ## Definition of Done
 
-- [ ] Root cause of NanoMDM cert verification failure identified and documented
-- [ ] Either: fix applied and mdmb check-in works through NanoMDM, OR: root cause documented with clear production impact assessment
-- [ ] All 16 repo integration test assertions use `assert.ErrorIs`
-- [ ] SCEP handler unit test coverage ≥ 70% (cover PKCS#7 ParsePKIMessage/DecryptPKIEnvelope/SignCSR paths)
-- [ ] All tests pass in Docker (`make dev-test`)
+- [x] Root cause of NanoMDM cert verification failure identified and documented
+- [x] Fix applied — `projectPath()` helper ensures correct CA path from any working directory
+- [x] All 20 `assert.Contains(err.Error(), "not found")` migrated to `assert.ErrorIs`
+- [x] SCEP handler unit test coverage ≥ 70% (achieved 75.9%)
+- [x] All tests pass in Docker (`make dev-test` + `make prod-test`)
 
 ---
 
-*Created: 2026-04-23 — Cert verification issue identified during Sprint 5c mdmb integration*
+## Key Lessons
+
+1. **When a bug has a complex explanation, check the simple one first.** "Two pkcs7 libraries produce incompatible CMS structures" was believed for two sprints. The actual cause was "wrong file path." The clue: `go test -c` + run from project root passed, `go test -run` failed. Same binary, different working directory.
+
+2. **`NewCAManager` silently generating CAs is a footgun.** Tracked in Sprint 5f (S5f-01) — make generation explicit via CLI command.
+
+3. **Hardcoded `localhost` in integration tests is a recurring pattern.** Three files had the same bug. Tracked in Sprint 5f (S5f-03) — consolidate into shared `testutil.ConnectDB(t)`.
+
+---
+
+*Created: 2026-04-23*  
+*Completed: 2026-04-23*

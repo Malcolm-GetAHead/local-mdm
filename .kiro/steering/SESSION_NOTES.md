@@ -5,11 +5,10 @@
 
 ## Current State
 
-- **Sprint 5c**: ✅ COMPLETE, on branch `sprint-5c/platform-integration` (not yet merged to main)
-- **Sprint 5**: ✅ COMPLETE, merged to main
-- **Retrospective**: ✅ COMPLETE
-- **Next sprint**: **5e** (NanoMDM cert verification + test cleanup), then 5b (EventBus), then 5d (dashboard)
-- **Pending**: merge sprint-5c/platform-integration to main
+- **Sprint 5e**: ✅ COMPLETE, on branch `sprint-5e/cert-verification` (not yet merged to main)
+- **Sprint 5c**: ✅ COMPLETE, merged to main
+- **Retrospective**: In progress
+- **Next sprint**: **5f** (API hardening + test hygiene), then 5b (EventBus), then 5d (dashboard)
 
 ---
 
@@ -42,17 +41,18 @@
 - **The `strings.Contains(err.Error(), "not found")` pattern is fragile.** ✅ RESOLVED in S5c-07. All 36 handler checks + 29 repo returns now use `apperrors.ErrNotFound` sentinel + `errors.Is()`. 16 integration test assertions still use `assert.Contains` (works, low priority).
 - **The retrospective process finds real issues.** Don't rush it. The backward look, forward look, and holistic doc/test review consistently find bugs, stale docs, and architectural gaps. Budget time for it.
 - **Don't defer items that are in the sprint plan without a real blocker.** In Sprint 5c, mdmb integration and SCEP verification were deferred twice before the owner caught it. The "blocker" was just a test configuration issue (wrong port). If the sprint plan says to do it, do it — find a way through the difficulty instead of deferring. The owner will call you on it.
-- **When you hit a test/tooling issue, check if the tool has unreleased fixes.** mdmb v0.1.0 (2021 release) had pkcs7 incompatibilities. The `main` branch (updated weekly) had fixes. Always check the repo's recent commits, not just the latest release tag.
+- **When you hit a test/tooling issue, check if the tool has unreleased fixes.** mdmb v0.1.0 (2021 release) had build issues. The `main` branch (updated weekly) had fixes. Always check the repo's recent commits, not just the latest release tag.
 - **The owner's instinct to move to Docker was correct and should have been proposed by the agent.** When debugging cross-platform issues, the first question should be "are we running on the same platform?" not "what's different about the crypto implementation?" Infrastructure-level solutions beat code-level workarounds.
 - **Push features to completion, not just "working."** The owner asked for enriched enrollment data, concurrent testing, and full protocol verification — none of which were in the original sprint plan. These made the feature production-ready instead of just "tests pass." When implementing a feature, ask: "what would an admin expect to see?" not just "does the test pass?"
 - **Patch upstream bugs locally rather than working around them.** The mdmb Load() bug was a 3-line fix. Patching it in the Dockerfile was faster and more correct than adjusting our test assertions to accept empty fields.
+- **When a bug has a complex explanation, check the simple one first.** The "pkcs7 library incompatibility" theory was believed for two sprints. The actual cause was a wrong file path — `go test` changes the working directory, `NewCAManager` generated a new CA, NanoMDM had the old CA. The clue: `go test -c` + run from project root passed, `go test -run` failed. Same binary, different working directory. Simple explanation, 10-second fix once found.
+- **Hardcoded connection strings in test files are a recurring pattern.** Three separate test files had `host=localhost` hardcoded, preventing them from running in Docker. Every new integration test file risks the same bug. Consolidate into a shared helper (tracked in S5f-03).
 
 ## Known Issues
 
 - **EventBus Go listener not built** — triggers exist (migration 000007), no listener. Tracked in Sprint 5b.
-- **NanoMDM pkcs7 cert verification** — NanoMDM (`smallstep/pkcs7 v0.2.1`) can't verify Mdm-Signature created by mdmb (`go.mozilla.org/pkcs7`). Same cert verifies fine in our Go code. Not a platform issue (reproduces Linux→Linux). Tracked in Sprint 5e.
 - **Production CheckinHandler only extracts UDID** — The enriched handler (Serial, Name, Model, OS, Build, status=enrolled on TokenUpdate) exists only in `tests/e2e/mdmb_enrollment_test.go`. Must be ported to `internal/platform/macos/webhook.go` CheckinHandler. Tracked in Sprint 5b S5b-04.
-- **16 repo integration tests still use `assert.Contains(err.Error(), "not found")`** — works but should use `assert.ErrorIs()` for consistency. Tracked in Sprint 5e.
+- **NewCAManager silently generates CAs** when file path is wrong — footgun that caused the Sprint 5e cert verification bug. Tracked in Sprint 5f (S5f-01) — make generation explicit via CLI command.
 
 ## Project-Specific Knowledge
 
@@ -80,7 +80,8 @@
 | 4c | 🔲 Not Started | macOS Platform SSO (Java/Swift) — renamed to Sprint 6 |
 | 5 | ✅ Complete | Backend polish, CLI, observability, performance |
 | 5c | ✅ Complete | Platform integration fixes (macOS/Windows/Android), SCEP, service tests |
-| 5e | 🔲 Not Started | NanoMDM cert verification fix, repo test assertion cleanup |
+| 5e | ✅ Complete | NanoMDM cert verification fix (path bug), assert.ErrorIs migration, SCEP tests, coverage improvements |
+| 5f | 🔲 Not Started | API hardening, explicit CA generation, test DB helper consolidation |
 | 5b | 🔲 Not Started | EventBus listener, compliance wiring, load testing |
 | 5d | 🔲 Not Started | Web dashboard (HTMX) |
 | 6 | 🔲 Not Started | macOS Platform SSO (Java/Swift) — requires Apple Developer account |
