@@ -314,6 +314,16 @@ All secrets stored as `SecureString` parameters:
 | `/localmdm/keycloak-secret` | SecureString | Keycloak client secret |
 | `/localmdm/dep-encryption-key` | SecureString | DEP token encryption key |
 | `/localmdm/nanomdm-api-key` | SecureString | NanoMDM API authentication key |
+| `/localmdm/ca-certificate` | String | CA certificate PEM (public — needed by NanoMDM and SCEP clients) |
+
+**AWS Secrets Manager** (for crypto keys — supports rotation, audit trail, larger payloads than SSM):
+
+| Secret | Description |
+|--------|-------------|
+| `localmdm/ca-private-key` | CA private key PEM — signs all device certificates via SCEP. Most sensitive secret in the system. |
+| `localmdm/apns-push-cert` | APNs push certificate (.p12) — required for macOS MDM push notifications. |
+
+**Code change required**: `NewCAManager` currently reads from filesystem paths only. For production, add a `NewCAManagerFromSecrets(certPEM, keyPEM []byte)` constructor that accepts PEM bytes directly. The ECS entrypoint fetches from Secrets Manager/SSM and passes the bytes. NanoMDM's `-ca` flag needs the CA cert written to a tmpfs mount at startup (fetched from SSM by an init script in the container entrypoint).
 
 ECS task execution role needs `ssm:GetParameters` permission on these paths. Secrets are injected as environment variables at task launch — the Go app reads them via `os.Getenv()` (already implemented in `config.go`).
 
