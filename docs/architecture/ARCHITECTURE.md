@@ -49,9 +49,11 @@ Local MDM follows a layered architecture with clear separation of concerns:
 - Response formatting
 
 **Key Files**:
-- `server.go` - Server setup and routing
-- `handlers.go` - HTTP handlers
-- `middleware.go` - Middleware functions (future)
+- `server.go` - Server setup, routing, middleware
+- `handlers.go` - Shared handler helpers (parseJSON, pagination, audit)
+- `handlers_device.go`, `handlers_policy.go`, `handlers_enterprise.go`, `handlers_app.go`, `handlers_user.go`, `handlers_report.go`, `handlers_compliance.go`, `handlers_group.go`, `handlers_command.go`, `handlers_health.go` - Domain-specific HTTP handlers
+- `platform_handlers.go` - Platform enrollment and webhook handlers
+- `ratelimit.go`, `auth_ratelimit.go`, `compression.go`, `idempotency.go` - Middleware
 
 ### Service Layer (`internal/service`)
 
@@ -547,7 +549,7 @@ In production (ECS Fargate), NanoMDM runs as a separate ECS service behind the A
 ---
 
 **Next Steps**:
-1. Sprint 5b: EventBus listener, compliance wiring, load testing
-2. Sprint 5c: Platform integration fixes (macOS NanoMDM, Windows enrollment, Android webhooks)
+1. Sprint 5f: API hardening, explicit CA generation, test DB helper consolidation
+2. Sprint 5b: EventBus listener, compliance wiring, load testing
 3. Sprint 5d: Web dashboard (Go templates + HTMX + Tailwind CSS)
-2. Sprint 6: macOS Platform SSO (Java/Swift)
+4. Sprint 6: macOS Platform SSO (Java/Swift)

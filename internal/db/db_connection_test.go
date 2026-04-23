@@ -313,16 +313,16 @@ func TestNew_RejectsInvalidConfiguration(t *testing.T) {
 }
 
 func TestNew_AcceptsValidConfiguration(t *testing.T) {
-	// Note: This test will fail if PostgreSQL is not running
-	// In CI/CD, ensure PostgreSQL is available or skip this test
-	t.Skip("Requires PostgreSQL - run manually or in integration tests")
+	if testing.Short() {
+		t.Skip("skipping integration test")
+	}
 
 	cfg := config.DatabaseConfig{
 		Host:            testDBHost(),
 		Port:            5432,
 		User:            "postgres",
 		Password:        testDBPassword(),
-		Database:        "localmdm_test",
+		Database:        "localmdm",
 		SSLMode:         "disable",
 		MaxOpenConns:    25,
 		MaxIdleConns:    5,

@@ -809,6 +809,9 @@ GET /api/v1/audit-logs
 **Query Parameters**:
 - `limit` (optional): Items per page
 - `offset` (optional): Offset for pagination
+- `action` (optional): Filter by action type
+- `start_date` (optional): Filter from date (RFC 3339)
+- `end_date` (optional): Filter to date (RFC 3339)
 
 ---
 

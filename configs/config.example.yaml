@@ -75,6 +75,9 @@ keycloak:
 certificates:
   ca_cert_path: "./certs/ca.crt"
   ca_key_path: "./certs/ca.key"
+  # Production: set CA_CERT_PEM and CA_KEY_PEM env vars instead of file paths.
+  # These take priority over ca_cert_path/ca_key_path when set.
+  # Source from AWS Secrets Manager (key) and SSM Parameter Store (cert).
   device_cert_validity: 8760h  # 1 year
   expiration_monitor:
     enabled: true
