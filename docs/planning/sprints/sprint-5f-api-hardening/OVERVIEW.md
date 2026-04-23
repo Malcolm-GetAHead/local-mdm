@@ -1,6 +1,6 @@
 # Sprint 5f: API Hardening & Test Hygiene
 
-**Status**: 🔲 Not Started  
+**Status**: ✅ Complete  
 **Duration**: 1-2 days  
 **Goal**: Harden the API layer and fix design-level issues before the dashboard (5d) builds on top of it  
 **Depends on**: Sprint 5e complete
@@ -67,11 +67,11 @@ All integration tests import this instead of rolling their own.
 
 ## Definition of Done
 
-- [ ] `NewCAManager` returns error when cert/key files don't exist (no silent generation)
-- [ ] `localmdm-cli certs init` generates CA cert/key at configured paths
-- [ ] API handler test coverage ≥ 65%
-- [ ] Single shared `testutil.ConnectDB(t)` used by all integration tests
-- [ ] All tests pass (`make dev-test`)
+- [x] `NewCAManager` returns error when cert/key files don't exist (no silent generation)
+- [x] `localmdm-cli certs init` generates CA cert/key at configured paths
+- [x] API handler test coverage ≥ 65% (achieved: 67.8%)
+- [x] Single shared `testutil.ConnectDB(t)` used by all integration tests
+- [x] All tests pass (`make dev-test`)
 
 ---
 
