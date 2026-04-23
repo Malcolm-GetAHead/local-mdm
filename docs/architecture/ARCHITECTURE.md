@@ -69,6 +69,10 @@ Local MDM follows a layered architecture with clear separation of concerns:
 - `group_service.go` - Device group management and membership
 - `compliance_service.go` - Compliance evaluation and reporting
 - `lifecycle_service.go` - Device lifecycle hooks (unenroll, wipe, delete)
+- `device.go` - Device operations (lock, wipe, restart)
+- `app.go` - App catalog and deployment
+- `user.go` - User management with role validation
+- `token.go` - API token create/validate/revoke
 
 ### Repository Layer (`internal/repository`)
 
@@ -88,6 +92,9 @@ Local MDM follows a layered architecture with clear separation of concerns:
 - `app.go` - App catalog operations
 - `group.go` - Device groups and policy assignments
 - `compliance.go` - Compliance results
+- `policy_version.go` - Policy version snapshots
+- `user.go` - User operations
+- `token.go` - API token operations
 - `policy_version.go` - Policy version snapshots
 
 ### Platform Modules (`internal/platform`)
@@ -166,6 +173,10 @@ Local MDM follows a layered architecture with clear separation of concerns:
 
 #### Application Errors (`internal/apperrors`)
 - Structured application error types
+
+#### Reporting (`internal/reporting`)
+- Device inventory, compliance summary, enrollment trend reports
+- CSV and JSON export
 
 #### Constants (`internal/constants`)
 - Shared constants (timeouts, limits, defaults)
