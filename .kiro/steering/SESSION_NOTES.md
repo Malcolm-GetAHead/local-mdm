@@ -172,6 +172,7 @@ database:
 - **Android webhook is a no-op** — ✅ FIXED in S5c-03. WebhookHandler wired, graceful degradation without Google client.
 - **EventBus Go listener not built** — triggers exist (migration 000007), no listener. Tracked in Sprint 5b.
 - **NanoMDM pkcs7 cert verification** — NanoMDM (`smallstep/pkcs7 v0.2.1`) can't verify Mdm-Signature created by mdmb (`go.mozilla.org/pkcs7`). Same cert verifies fine in our Go code. Not a platform issue (reproduces Linux→Linux). Tracked in Sprint 5e.
+- **Production CheckinHandler only extracts UDID** — The enriched handler (Serial, Name, Model, OS, Build, status=enrolled on TokenUpdate) exists only in `tests/e2e/mdmb_enrollment_test.go`. Must be ported to `internal/platform/macos/webhook.go` CheckinHandler. Tracked in Sprint 5b S5b-04.
 - **16 repo integration tests still use `assert.Contains(err.Error(), "not found")`** — works but should use `assert.ErrorIs()` for consistency. Tracked in Sprint 5e.
 
 ## Sprint 4b Learnings

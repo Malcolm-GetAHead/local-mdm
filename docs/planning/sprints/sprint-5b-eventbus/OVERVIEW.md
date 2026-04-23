@@ -143,6 +143,8 @@ Enhance check-in and webhook handlers to extract security-relevant fields into `
 
 **Architecture note (Sprint 5c change)**: macOS devices check in to NanoMDM, which forwards events to Local MDM via JSON webhook. The `CheckinHandler` in `internal/platform/macos/webhook.go` processes these webhooks. Sprint 5c's E2E test (`mdmb_enrollment_test.go`) already demonstrates enriched parsing of Authenticate/TokenUpdate messages — this logic needs to be moved into the production `CheckinHandler`.
 
+**⚠️ CRITICAL**: The production `CheckinHandler` in `internal/platform/macos/webhook.go` currently only extracts UDID from Authenticate messages. The enriched handler that extracts Serial, DeviceName, Model, OSVersion, BuildVersion, and updates status to "enrolled" on TokenUpdate exists ONLY in `tests/e2e/mdmb_enrollment_test.go`. This must be ported to production code in this task. The test handler is the reference implementation — copy the plist struct and switch/case logic into `CheckinHandler.ServeHTTP()`.
+
 **macOS** (`internal/platform/macos/webhook.go` — CheckinHandler):
 - On Authenticate: extract SerialNumber, DeviceName, ProductName, OSVersion, BuildVersion into device record (pattern from Sprint 5c E2E test)
 - On TokenUpdate: set status to enrolled, store PushMagic and token presence
