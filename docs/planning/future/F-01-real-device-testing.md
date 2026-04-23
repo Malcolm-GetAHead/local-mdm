@@ -133,6 +133,7 @@ Without real device testing:
 - App installation tests
 - Command execution tests
 - Webhook event validation (verify Google → Local MDM webhook delivery with real events)
+- **Android platform unit test coverage** (currently 61.6%): Add HTTP client mocks for `client.go` (CreateEnterprise, CreateEnrollmentToken, CreatePolicy) and `commands.go` (LockDevice, WipeDevice, RebootDevice) — these are 0% because they make real API calls. Use `httptest.NewServer` to mock Google's API responses.
 
 ---
 

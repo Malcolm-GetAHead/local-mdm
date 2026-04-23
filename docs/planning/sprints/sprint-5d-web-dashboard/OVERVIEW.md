@@ -54,6 +54,7 @@ Dashboard handlers are separate from API handlers — API returns JSON, dashboar
 | S5d-04 | Policy management (list, create/edit, assign to groups) | 2-3 days |
 | S5d-05 | Compliance & reporting (dashboard, audit log viewer) | 1-2 days |
 | S5d-06 | Seed data for development (mock devices, policies, compliance results) | 0.5 day |
+| S5d-07 | API handler test coverage for untested endpoints (groups, health, compliance, users, policy versions) | 1 day |
 
 > **Dependency**: S5d-05 (Compliance & reporting) depends on Sprint 5b (EventBus) and Sprint 5c (platform integration) for live compliance data from real devices. Use seed data (S5d-06) for development if those sprints are not yet complete.
 
@@ -138,6 +139,7 @@ Dashboard handlers are separate from API handlers — API returns JSON, dashboar
 - [ ] Audit log searchable by actor and date
 - [ ] All pages work without JavaScript disabled (graceful degradation)
 - [ ] Embedded in Go binary — single deploy artifact
+- [ ] API handler test coverage ≥ 65% (currently 48.8% — untested handlers for groups, health, compliance, users, policy versions/templates/rollback, platform endpoints)
 
 ---
 
