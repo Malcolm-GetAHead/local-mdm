@@ -35,8 +35,12 @@ func TestE2E_Mdmb_FullEnrollment(t *testing.T) {
 	mdmbPath := findMdmb(t)
 
 	// NanoMDM must be running
-	if resp, err := http.Get("http://localhost:9000/version"); err != nil || resp.StatusCode != 200 {
-		t.Skip("NanoMDM not running on localhost:9000")
+	nanomdmURL := os.Getenv("NANOMDM_URL")
+	if nanomdmURL == "" {
+		nanomdmURL = "http://localhost:9000"
+	}
+	if resp, err := http.Get(nanomdmURL + "/version"); err != nil || resp.StatusCode != 200 {
+		t.Skip("NanoMDM not running on " + nanomdmURL)
 	}
 
 	database := setupDB(t)
@@ -65,7 +69,7 @@ func TestE2E_Mdmb_FullEnrollment(t *testing.T) {
 	// Setup webhook handler
 	macosService := macos.NewService(deviceRepo)
 	lifecycleSvc := service.NewLifecycleService(logger)
-	nanomdmSvc := macos.NewNanoMDMService("http://localhost:9000", "localmdm-nanomdm-api-key", cmdRepo, deviceRepo, logger)
+	nanomdmSvc := macos.NewNanoMDMService(nanomdmURL, "localmdm-nanomdm-api-key", cmdRepo, deviceRepo, logger)
 	checkinHandler := macos.NewCheckinHandler(nanomdmSvc, macosService, lifecycleSvc, logger)
 
 	// Start on port 8080 — matches NanoMDM's NANOMDM_WEBHOOK_URL
@@ -156,7 +160,8 @@ func TestE2E_Mdmb_FullEnrollment(t *testing.T) {
 	challenge, err := challengeMgr.GenerateChallenge(enterprise.ID.String(), 5*time.Minute)
 	require.NoError(t, err)
 
-	// Generate enrollment profile: MDM check-in → our proxy (8080), SCEP → our server
+	// Generate enrollment profile: MDM check-in → our test server, SCEP → our test server
+	// Use localhost since mdmb runs in the same container as the test
 	caCert := ca.GetCACertificate()
 	profile, err := macos.GenerateEnrollmentProfile(
 		enterprise.ID,

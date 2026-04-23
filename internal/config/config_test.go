@@ -11,6 +11,10 @@ import (
 
 func TestLoadConfig(t *testing.T) {
 	// Set required environment variables for testing
+	// Clear DB_HOST to test config file value (may be set in Docker)
+	origDBHost := os.Getenv("DB_HOST")
+	os.Unsetenv("DB_HOST")
+	defer os.Setenv("DB_HOST", origDBHost)
 	os.Setenv("DB_PASSWORD", "test-password-at-least-16-chars")
 	os.Setenv("JWT_SECRET", "test-jwt-secret-at-least-32-characters-long")
 	os.Setenv("KEYCLOAK_CLIENT_SECRET", "test-keycloak-secret")

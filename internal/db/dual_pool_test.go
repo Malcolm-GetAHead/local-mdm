@@ -16,7 +16,7 @@ func TestDB_Health_BothPools(t *testing.T) {
 	}
 
 	cfg := config.DatabaseConfig{
-		Host: "localhost", Port: 5432, User: "postgres", Password: "postgres",
+		Host: testDBHost(), Port: 5432, User: "postgres", Password: testDBPassword(),
 		Database: "localmdm", SSLMode: "disable",
 		MaxOpenConns: 5, MaxIdleConns: 2, ConnMaxLifetime: 5 * time.Minute,
 	}
@@ -35,7 +35,7 @@ func TestDB_Health_FailsWhenWriterClosed(t *testing.T) {
 	}
 
 	cfg := config.DatabaseConfig{
-		Host: "localhost", Port: 5432, User: "postgres", Password: "postgres",
+		Host: testDBHost(), Port: 5432, User: "postgres", Password: testDBPassword(),
 		Database: "localmdm", SSLMode: "disable",
 		MaxOpenConns: 5, MaxIdleConns: 2, ConnMaxLifetime: 5 * time.Minute,
 	}
@@ -56,7 +56,7 @@ func TestDB_Health_FailsWhenReaderClosed(t *testing.T) {
 	}
 
 	cfg := config.DatabaseConfig{
-		Host: "localhost", Port: 5432, User: "postgres", Password: "postgres",
+		Host: testDBHost(), Port: 5432, User: "postgres", Password: testDBPassword(),
 		Database: "localmdm", SSLMode: "disable",
 		MaxOpenConns: 5, MaxIdleConns: 2, ConnMaxLifetime: 5 * time.Minute,
 	}
@@ -77,7 +77,7 @@ func TestDB_Close_ClosesBothPools(t *testing.T) {
 	}
 
 	cfg := config.DatabaseConfig{
-		Host: "localhost", Port: 5432, User: "postgres", Password: "postgres",
+		Host: testDBHost(), Port: 5432, User: "postgres", Password: testDBPassword(),
 		Database: "localmdm", SSLMode: "disable",
 		MaxOpenConns: 5, MaxIdleConns: 2, ConnMaxLifetime: 5 * time.Minute,
 	}

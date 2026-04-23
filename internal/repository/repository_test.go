@@ -2,6 +2,7 @@ package repository_test
 
 import (
 	"context"
+	"os"
 	"testing"
 	"time"
 
@@ -13,11 +14,19 @@ import (
 )
 
 func setupTestDB(t *testing.T) *db.DB {
+	host := os.Getenv("DB_HOST")
+	if host == "" {
+		host = "localhost"
+	}
+	password := os.Getenv("DB_PASSWORD")
+	if password == "" {
+		password = "postgres"
+	}
 	cfg := config.DatabaseConfig{
-		Host:            "localhost",
+		Host:            host,
 		Port:            5432,
 		User:            "postgres",
-		Password:        "postgres",
+		Password:        password,
 		Database:        "localmdm",
 		SSLMode:         "disable",
 		MaxOpenConns:    2,

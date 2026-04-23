@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"os"
 	"testing"
 	"time"
 
@@ -14,11 +15,19 @@ import (
 // setupBenchDB creates a test database connection for benchmarks
 func setupBenchDB(b *testing.B) *db.DB {
 	b.Helper()
+	host := os.Getenv("DB_HOST")
+	if host == "" {
+		host = "localhost"
+	}
+	password := os.Getenv("DB_PASSWORD")
+	if password == "" {
+		password = "postgres"
+	}
 	cfg := config.DatabaseConfig{
-		Host:            "localhost",
+		Host:            host,
 		Port:            5432,
 		User:            "postgres",
-		Password:        "postgres",
+		Password:        password,
 		Database:        "localmdm",
 		SSLMode:         "disable",
 		MaxOpenConns:    5,

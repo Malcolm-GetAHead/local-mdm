@@ -2,6 +2,7 @@ package testutil
 
 import (
 	"context"
+	"os"
 	"testing"
 	"time"
 
@@ -9,15 +10,25 @@ import (
 	"github.com/malcolm-getahead/local-mdm/internal/db"
 )
 
-// SetupTestDB creates a test database connection
+// SetupTestDB creates a test database connection.
+// Respects DB_HOST and DB_PASSWORD env vars for Docker-based testing.
 func SetupTestDB(t *testing.T) *db.DB {
 	t.Helper()
-	
+
+	host := os.Getenv("DB_HOST")
+	if host == "" {
+		host = "localhost"
+	}
+	password := os.Getenv("DB_PASSWORD")
+	if password == "" {
+		password = "postgres"
+	}
+
 	cfg := config.DatabaseConfig{
-		Host:            "localhost",
+		Host:            host,
 		Port:            5432,
 		User:            "postgres",
-		Password:        "postgres",
+		Password:        password,
 		Database:        "localmdm",
 		SSLMode:         "disable",
 		MaxOpenConns:    2,

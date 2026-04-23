@@ -1,6 +1,7 @@
 package api
 
 import (
+	"os"
 	"context"
 	"testing"
 	"time"
@@ -16,10 +17,10 @@ func TestServer_CertificateMonitorIntegration(t *testing.T) {
 	// Setup test database
 	cfg := &config.Config{
 		Database: config.DatabaseConfig{
-			Host:            "localhost",
+			Host:            func() string { if h := os.Getenv("DB_HOST"); h != "" { return h }; return "localhost" }(),
 			Port:            5432,
 			User:            "postgres",
-			Password:        "postgres",
+			Password:        func() string { if p := os.Getenv("DB_PASSWORD"); p != "" { return p }; return "postgres" }(),
 			Database:        "localmdm",
 			SSLMode:         "disable",
 			MaxOpenConns:    5,
@@ -27,7 +28,7 @@ func TestServer_CertificateMonitorIntegration(t *testing.T) {
 			ConnMaxLifetime: 5 * time.Minute,
 		},
 		Server: config.ServerConfig{
-			Host:         "localhost",
+			Host:         func() string { if h := os.Getenv("DB_HOST"); h != "" { return h }; return "localhost" }(),
 			Port:         8080,
 			ReadTimeout:  30 * time.Second,
 			WriteTimeout: 30 * time.Second,
@@ -50,7 +51,7 @@ func TestServer_CertificateMonitorIntegration(t *testing.T) {
 			},
 		},
 		Keycloak: config.KeycloakConfig{
-			URL:          "http://localhost:8180",
+			URL:          func() string { if u := os.Getenv("KEYCLOAK_URL"); u != "" { return u }; return "http://localhost:8180" }(),
 			Realm:        "localmdm",
 			ClientID:     "localmdm-api",
 			ClientSecret: "test-secret",
@@ -105,10 +106,10 @@ func TestServer_CertificateMonitorDisabled(t *testing.T) {
 	// Setup test database
 	cfg := &config.Config{
 		Database: config.DatabaseConfig{
-			Host:            "localhost",
+			Host:            func() string { if h := os.Getenv("DB_HOST"); h != "" { return h }; return "localhost" }(),
 			Port:            5432,
 			User:            "postgres",
-			Password:        "postgres",
+			Password:        func() string { if p := os.Getenv("DB_PASSWORD"); p != "" { return p }; return "postgres" }(),
 			Database:        "localmdm",
 			SSLMode:         "disable",
 			MaxOpenConns:    5,
@@ -116,7 +117,7 @@ func TestServer_CertificateMonitorDisabled(t *testing.T) {
 			ConnMaxLifetime: 5 * time.Minute,
 		},
 		Server: config.ServerConfig{
-			Host:         "localhost",
+			Host:         func() string { if h := os.Getenv("DB_HOST"); h != "" { return h }; return "localhost" }(),
 			Port:         8080,
 			ReadTimeout:  30 * time.Second,
 			WriteTimeout: 30 * time.Second,
@@ -139,7 +140,7 @@ func TestServer_CertificateMonitorDisabled(t *testing.T) {
 			},
 		},
 		Keycloak: config.KeycloakConfig{
-			URL:          "http://localhost:8180",
+			URL:          func() string { if u := os.Getenv("KEYCLOAK_URL"); u != "" { return u }; return "http://localhost:8180" }(),
 			Realm:        "localmdm",
 			ClientID:     "localmdm-api",
 			ClientSecret: "test-secret",

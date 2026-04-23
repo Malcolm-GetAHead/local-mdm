@@ -1,12 +1,10 @@
-version: '3.8'
-
 services:
   postgres:
     image: postgres:15-alpine
     container_name: localmdm-postgres
     environment:
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+      POSTGRES_PASSWORD: postgres-dev-password-1234
       POSTGRES_DB: localmdm
       POSTGRES_MULTIPLE_DATABASES: localmdm,keycloak,nanomdm
     ports:
@@ -30,7 +28,7 @@ services:
       KC_DB: postgres
       KC_DB_URL: jdbc:postgresql://postgres:5432/keycloak
       KC_DB_USERNAME: postgres
-      KC_DB_PASSWORD: postgres
+      KC_DB_PASSWORD: postgres-dev-password-1234
       KC_HOSTNAME_STRICT: false
       KC_HTTP_ENABLED: true
     ports:
@@ -42,20 +40,11 @@ services:
         condition: service_healthy
     command: start-dev --import-realm
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:8080/health/ready || exit 1"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-
-  adminer:
-    image: adminer:latest
-    container_name: localmdm-adminer
-    ports:
-      - "8081:8080"
-    depends_on:
-      - postgres
-    environment:
-      ADMINER_DEFAULT_SERVER: postgres
+      test: ["CMD-SHELL", "cat < /dev/null > /dev/tcp/localhost/8080"]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+      start_period: 45s
 
   nanomdm:
     build:
@@ -67,9 +56,9 @@ services:
       - "9000:9000"
     environment:
       NANOMDM_STORAGE: pgsql
-      NANOMDM_STORAGE_DSN: "postgres://postgres:postgres@postgres:5432/nanomdm?sslmode=disable"
+      NANOMDM_STORAGE_DSN: "postgres://postgres:postgres-dev-password-1234@postgres:5432/nanomdm?sslmode=disable"
       NANOMDM_API: "localmdm-nanomdm-api-key"
-      NANOMDM_WEBHOOK_URL: "http://host.docker.internal:8080/api/v1/macos/webhook"
+      NANOMDM_WEBHOOK_URL: "http://localmdm:8080/api/v1/macos/webhook"
       NANOMDM_CHECKIN: "1"
       NANOMDM_DEBUG: "1"
       NANOMDM_CA: "/certs/ca.crt"
@@ -80,5 +69,88 @@ services:
       postgres:
         condition: service_healthy
 
+  # === Local MDM server (production-like build) ===
+  localmdm:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: prod
+    container_name: localmdm-server
+    ports:
+      - "8080:8080"
+      - "9090:9090"
+    environment:
+      CONFIG_PATH: /app/configs/config.docker.yaml
+    depends_on:
+      postgres:
+        condition: service_healthy
+      keycloak:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  # === Dev mode: hot reload with source mounted ===
+  localmdm-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: dev
+    container_name: localmdm-dev
+    ports:
+      - "8080:8080"
+      - "9090:9090"
+    environment:
+      CONFIG_PATH: /src/configs/config.docker.yaml
+    volumes:
+      - .:/src
+      - go_mod_cache:/go/pkg/mod
+      - go_build_cache:/root/.cache/go-build
+    depends_on:
+      postgres:
+        condition: service_healthy
+    profiles:
+      - dev
+
+  # === Test runner: runs go test inside container ===
+  test-runner:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: dev
+    container_name: localmdm-test-runner
+    environment:
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_USER: postgres
+      DB_PASSWORD: postgres-dev-password-1234
+      DB_NAME: localmdm
+      NANOMDM_URL: "http://nanomdm:9000"
+      KEYCLOAK_URL: "http://keycloak:8080"
+    volumes:
+      - .:/src
+      - go_mod_cache:/go/pkg/mod
+      - go_build_cache:/root/.cache/go-build
+    depends_on:
+      postgres:
+        condition: service_healthy
+    profiles:
+      - test
+    command: ["go", "test", "-race", "-p", "4", "-count=1", "./..."]
+
+  adminer:
+    image: adminer:latest
+    container_name: localmdm-adminer
+    ports:
+      - "8081:8080"
+    depends_on:
+      - postgres
+    environment:
+      ADMINER_DEFAULT_SERVER: postgres
+
 volumes:
   postgres_data:
+  go_mod_cache:
+  go_build_cache:

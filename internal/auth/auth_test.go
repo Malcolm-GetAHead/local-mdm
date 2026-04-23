@@ -1,6 +1,7 @@
 package auth_test
 
 import (
+	"os"
 	"context"
 	"net/http"
 	"net/http/httptest"
@@ -15,7 +16,7 @@ import (
 
 func TestKeycloakLogin(t *testing.T) {
 	kc := auth.NewKeycloakClient(
-		"http://localhost:8180/realms/localmdm",
+		keycloakTestURL(),
 		"localmdm-api",
 		"localmdm-api-secret",
 	)
@@ -41,7 +42,7 @@ func TestKeycloakLogin(t *testing.T) {
 func TestOIDCValidator(t *testing.T) {
 	// Get a valid token first
 	kc := auth.NewKeycloakClient(
-		"http://localhost:8180/realms/localmdm",
+		keycloakTestURL(),
 		"localmdm-api",
 		"localmdm-api-secret",
 	)
@@ -52,7 +53,7 @@ func TestOIDCValidator(t *testing.T) {
 	}
 	
 	// Create validator
-	validator, err := auth.NewOIDCValidator("http://localhost:8180/realms/localmdm", "localmdm-api", nil, 5, 30*time.Second, 5*time.Minute, nil)
+	validator, err := auth.NewOIDCValidator(keycloakTestURL(), "localmdm-api", nil, 5, 30*time.Second, 5*time.Minute, nil)
 	if err != nil {
 		t.Fatalf("Failed to create validator: %v", err)
 	}
@@ -75,7 +76,7 @@ func TestOIDCValidator(t *testing.T) {
 func TestAuthMiddleware(t *testing.T) {
 	// Get a valid token
 	kc := auth.NewKeycloakClient(
-		"http://localhost:8180/realms/localmdm",
+		keycloakTestURL(),
 		"localmdm-api",
 		"localmdm-api-secret",
 	)
@@ -86,7 +87,7 @@ func TestAuthMiddleware(t *testing.T) {
 	}
 	
 	// Create validator and middleware
-	validator, _ := auth.NewOIDCValidator("http://localhost:8180/realms/localmdm", "localmdm-api", nil, 5, 30*time.Second, 5*time.Minute, nil)
+	validator, _ := auth.NewOIDCValidator(keycloakTestURL(), "localmdm-api", nil, 5, 30*time.Second, 5*time.Minute, nil)
 	
 	logger := logging.New(config.LoggingConfig{Level: "info", Format: "json"})
 	middleware := auth.NewMiddleware(validator, logger)
@@ -131,7 +132,7 @@ func TestAuthMiddleware(t *testing.T) {
 func TestRequireRole(t *testing.T) {
 	// Get a valid token
 	kc := auth.NewKeycloakClient(
-		"http://localhost:8180/realms/localmdm",
+		keycloakTestURL(),
 		"localmdm-api",
 		"localmdm-api-secret",
 	)
@@ -139,7 +140,7 @@ func TestRequireRole(t *testing.T) {
 	tokenResp, _ := kc.Login("admin", "admin123")
 	
 	// Create validator and middleware
-	validator, _ := auth.NewOIDCValidator("http://localhost:8180/realms/localmdm", "localmdm-api", nil, 5, 30*time.Second, 5*time.Minute, nil)
+	validator, _ := auth.NewOIDCValidator(keycloakTestURL(), "localmdm-api", nil, 5, 30*time.Second, 5*time.Minute, nil)
 	
 	logger := logging.New(config.LoggingConfig{Level: "info", Format: "json"})
 	middleware := auth.NewMiddleware(validator, logger)
@@ -218,14 +219,14 @@ func TestAuthContext(t *testing.T) {
 
 func TestJWKSRefreshRaceCondition(t *testing.T) {
 	// Create validator
-	validator, err := auth.NewOIDCValidator("http://localhost:8180/realms/localmdm", "localmdm-api", nil, 5, 30*time.Second, 5*time.Minute, nil)
+	validator, err := auth.NewOIDCValidator(keycloakTestURL(), "localmdm-api", nil, 5, 30*time.Second, 5*time.Minute, nil)
 	if err != nil {
 		t.Fatalf("Failed to create validator: %v", err)
 	}
 	
 	// Get a valid token
 	kc := auth.NewKeycloakClient(
-		"http://localhost:8180/realms/localmdm",
+		keycloakTestURL(),
 		"localmdm-api",
 		"localmdm-api-secret",
 	)
@@ -262,7 +263,7 @@ func TestJWKSRefreshRaceCondition(t *testing.T) {
 
 func TestRefreshJWKSDoubleCheck(t *testing.T) {
 	// Create validator
-	validator, err := auth.NewOIDCValidator("http://localhost:8180/realms/localmdm", "localmdm-api", nil, 5, 30*time.Second, 5*time.Minute, nil)
+	validator, err := auth.NewOIDCValidator(keycloakTestURL(), "localmdm-api", nil, 5, 30*time.Second, 5*time.Minute, nil)
 	if err != nil {
 		t.Fatalf("Failed to create validator: %v", err)
 	}
@@ -415,7 +416,7 @@ func TestExtractBearerToken(t *testing.T) {
 func TestOptionalAuth(t *testing.T) {
 	// Get a valid token
 	kc := auth.NewKeycloakClient(
-		"http://localhost:8180/realms/localmdm",
+		keycloakTestURL(),
 		"localmdm-api",
 		"localmdm-api-secret",
 	)
@@ -426,7 +427,7 @@ func TestOptionalAuth(t *testing.T) {
 	}
 	
 	// Create validator and middleware
-	validator, _ := auth.NewOIDCValidator("http://localhost:8180/realms/localmdm", "localmdm-api", nil, 5, 30*time.Second, 5*time.Minute, nil)
+	validator, _ := auth.NewOIDCValidator(keycloakTestURL(), "localmdm-api", nil, 5, 30*time.Second, 5*time.Minute, nil)
 	
 	logger := logging.New(config.LoggingConfig{Level: "info", Format: "json"})
 	middleware := auth.NewMiddleware(validator, logger)
@@ -497,4 +498,11 @@ func TestOptionalAuth(t *testing.T) {
 			t.Errorf("Expected anonymous response (invalid token ignored), got %s", body)
 		}
 	})
+}
+
+func keycloakTestURL() string {
+	if u := os.Getenv("KEYCLOAK_URL"); u != "" {
+		return u + "/realms/localmdm"
+	}
+	return "http://localhost:8180/realms/localmdm"
 }

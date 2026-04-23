@@ -1,0 +1,19 @@
+root = "."
+tmp_dir = "/tmp/air"
+
+[build]
+  bin = "/tmp/air/localmdm"
+  cmd = "go build -o /tmp/air/localmdm ./cmd/server/"
+  delay = 1000
+  exclude_dir = ["bin", "docker", "docs", "migrations", "secrets", "tmp"]
+  exclude_regex = ["_test\\.go$"]
+  include_ext = ["go", "yaml"]
+  kill_delay = "2s"
+  send_interrupt = true
+  stop_on_error = true
+
+[log]
+  time = false
+
+[misc]
+  clean_on_exit = true

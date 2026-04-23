@@ -2,6 +2,7 @@ package e2e
 
 import (
 	"context"
+	"os"
 	"testing"
 	"time"
 
@@ -18,8 +19,16 @@ import (
 
 func setupDB(t *testing.T) *db.DB {
 	t.Helper()
+	host := os.Getenv("DB_HOST")
+	if host == "" {
+		host = "localhost"
+	}
+	password := os.Getenv("DB_PASSWORD")
+	if password == "" {
+		password = "postgres"
+	}
 	cfg := config.DatabaseConfig{
-		Host: "localhost", Port: 5432, User: "postgres", Password: "postgres",
+		Host: host, Port: 5432, User: "postgres", Password: password,
 		Database: "localmdm", SSLMode: "disable", MaxOpenConns: 2, MaxIdleConns: 1, ConnMaxLifetime: 5 * time.Minute,
 	}
 	database, err := db.New(cfg)

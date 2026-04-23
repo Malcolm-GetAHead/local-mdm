@@ -243,10 +243,10 @@ func TestNew_RejectsInvalidConfiguration(t *testing.T) {
 		{
 			name: "zero max_open_conns",
 			cfg: config.DatabaseConfig{
-				Host:            "localhost",
+				Host:            testDBHost(),
 				Port:            5432,
 				User:            "postgres",
-				Password:        "postgres",
+				Password:        testDBPassword(),
 				Database:        "test",
 				SSLMode:         "disable",
 				MaxOpenConns:    0,
@@ -258,10 +258,10 @@ func TestNew_RejectsInvalidConfiguration(t *testing.T) {
 		{
 			name: "excessive max_open_conns",
 			cfg: config.DatabaseConfig{
-				Host:            "localhost",
+				Host:            testDBHost(),
 				Port:            5432,
 				User:            "postgres",
-				Password:        "postgres",
+				Password:        testDBPassword(),
 				Database:        "test",
 				SSLMode:         "disable",
 				MaxOpenConns:    200,
@@ -273,10 +273,10 @@ func TestNew_RejectsInvalidConfiguration(t *testing.T) {
 		{
 			name: "idle exceeds open",
 			cfg: config.DatabaseConfig{
-				Host:            "localhost",
+				Host:            testDBHost(),
 				Port:            5432,
 				User:            "postgres",
-				Password:        "postgres",
+				Password:        testDBPassword(),
 				Database:        "test",
 				SSLMode:         "disable",
 				MaxOpenConns:    25,
@@ -288,10 +288,10 @@ func TestNew_RejectsInvalidConfiguration(t *testing.T) {
 		{
 			name: "zero lifetime",
 			cfg: config.DatabaseConfig{
-				Host:            "localhost",
+				Host:            testDBHost(),
 				Port:            5432,
 				User:            "postgres",
-				Password:        "postgres",
+				Password:        testDBPassword(),
 				Database:        "test",
 				SSLMode:         "disable",
 				MaxOpenConns:    25,
@@ -318,10 +318,10 @@ func TestNew_AcceptsValidConfiguration(t *testing.T) {
 	t.Skip("Requires PostgreSQL - run manually or in integration tests")
 
 	cfg := config.DatabaseConfig{
-		Host:            "localhost",
+		Host:            testDBHost(),
 		Port:            5432,
 		User:            "postgres",
-		Password:        "postgres",
+		Password:        testDBPassword(),
 		Database:        "localmdm_test",
 		SSLMode:         "disable",
 		MaxOpenConns:    25,

@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"os"
 	"context"
 	"log/slog"
 	"net/http"
@@ -19,10 +20,10 @@ func setupTestDBForAudit(t *testing.T) *db.DB {
 	t.Helper()
 
 	cfg := config.DatabaseConfig{
-		Host:            "localhost",
+		Host:            func() string { if h := os.Getenv("DB_HOST"); h != "" { return h }; return "localhost" }(),
 		Port:            5432,
 		User:            "postgres",
-		Password:        "postgres",
+		Password:        func() string { if p := os.Getenv("DB_PASSWORD"); p != "" { return p }; return "postgres" }(),
 		Database:        "localmdm",
 		SSLMode:         "disable",
 		MaxOpenConns:    5,

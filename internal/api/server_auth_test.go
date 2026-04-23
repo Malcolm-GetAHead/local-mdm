@@ -60,7 +60,7 @@ func TestServerStartupFailsWithInvalidKeycloak(t *testing.T) {
 			// Create config with invalid Keycloak URL
 			cfg := &config.Config{
 				Server: config.ServerConfig{
-					Host: "localhost",
+					Host: func() string { if h := os.Getenv("DB_HOST"); h != "" { return h }; return "localhost" }(),
 					Port: 8080,
 				},
 				Keycloak: config.KeycloakConfig{
@@ -186,7 +186,7 @@ func TestServerCreationWithValidKeycloak(t *testing.T) {
 
 	cfg := &config.Config{
 		Server: config.ServerConfig{
-			Host: "localhost",
+			Host: func() string { if h := os.Getenv("DB_HOST"); h != "" { return h }; return "localhost" }(),
 			Port: 8080,
 		},
 		Keycloak: config.KeycloakConfig{
@@ -211,10 +211,10 @@ func setupTestDB(t *testing.T) *db.DB {
 	t.Helper()
 
 	cfg := config.DatabaseConfig{
-		Host:            "localhost",
+		Host:            func() string { if h := os.Getenv("DB_HOST"); h != "" { return h }; return "localhost" }(),
 		Port:            5432,
 		User:            "postgres",
-		Password:        "postgres",
+		Password:        func() string { if p := os.Getenv("DB_PASSWORD"); p != "" { return p }; return "postgres" }(),
 		Database:        "localmdm_test",
 		SSLMode:         "disable",
 		MaxOpenConns:    10,
@@ -256,7 +256,7 @@ func setupTestServer(t *testing.T) *Server {
 
 	cfg := &config.Config{
 		Server: config.ServerConfig{
-			Host: "localhost",
+			Host: func() string { if h := os.Getenv("DB_HOST"); h != "" { return h }; return "localhost" }(),
 			Port: 8080,
 		},
 		Keycloak: config.KeycloakConfig{

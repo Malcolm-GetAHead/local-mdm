@@ -1,6 +1,7 @@
 package db
 
 import (
+	"os"
 	"context"
 	"strings"
 	"testing"
@@ -19,11 +20,11 @@ func TestDB_QueryTimeout(t *testing.T) {
 	t.Run("long query is killed by statement timeout", func(t *testing.T) {
 		// Create a new connection with 1 second timeout
 		cfg := config.DatabaseConfig{
-			Host:            "localhost",
+			Host:            testDBHost(),
 			Port:            5432,
 			User:            "postgres",
-			Password:        "postgres",
-			Database:        "localmdm_test",
+			Password:        testDBPassword(),
+			Database:        "localmdm",
 			SSLMode:         "disable",
 			MaxOpenConns:    10,
 			MaxIdleConns:    5,
@@ -46,11 +47,11 @@ func TestDB_QueryTimeout(t *testing.T) {
 
 	t.Run("short query completes successfully", func(t *testing.T) {
 		cfg := config.DatabaseConfig{
-			Host:            "localhost",
+			Host:            testDBHost(),
 			Port:            5432,
 			User:            "postgres",
-			Password:        "postgres",
-			Database:        "localmdm_test",
+			Password:        testDBPassword(),
+			Database:        "localmdm",
 			SSLMode:         "disable",
 			MaxOpenConns:    10,
 			MaxIdleConns:    5,
@@ -72,11 +73,11 @@ func TestDB_QueryTimeout(t *testing.T) {
 
 	t.Run("timeout applies to all connections in pool", func(t *testing.T) {
 		cfg := config.DatabaseConfig{
-			Host:            "localhost",
+			Host:            testDBHost(),
 			Port:            5432,
 			User:            "postgres",
-			Password:        "postgres",
-			Database:        "localmdm_test",
+			Password:        testDBPassword(),
+			Database:        "localmdm",
 			SSLMode:         "disable",
 			MaxOpenConns:    3,
 			MaxIdleConns:    2,
@@ -100,11 +101,11 @@ func TestDB_QueryTimeout(t *testing.T) {
 
 	t.Run("timeout prevents connection pool exhaustion", func(t *testing.T) {
 		cfg := config.DatabaseConfig{
-			Host:            "localhost",
+			Host:            testDBHost(),
 			Port:            5432,
 			User:            "postgres",
-			Password:        "postgres",
-			Database:        "localmdm_test",
+			Password:        testDBPassword(),
+			Database:        "localmdm",
 			SSLMode:         "disable",
 			MaxOpenConns:    10,
 			MaxIdleConns:    5,
@@ -137,4 +138,18 @@ func TestDB_QueryTimeout(t *testing.T) {
 		_, err = db.Writer.ExecContext(ctx, "SELECT 1")
 		require.NoError(t, err, "connection pool should be available after timeouts")
 	})
+}
+
+func testDBHost() string {
+	if h := os.Getenv("DB_HOST"); h != "" {
+		return h
+	}
+	return "localhost"
+}
+
+func testDBPassword() string {
+	if p := os.Getenv("DB_PASSWORD"); p != "" {
+		return p
+	}
+	return "postgres"
 }

@@ -1,0 +1,12 @@
+.git
+bin/
+coverage.out
+coverage.html
+secrets/
+tests/device-testing/
+*.ipsw
+*.dmg
+*.pkg
+docker/
+!docker/nanomdm/
+!docker/postgres/

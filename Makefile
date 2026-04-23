@@ -72,16 +72,62 @@ migrate-force: ## Force migration version (usage: make migrate-force VERSION=1)
 	@echo "Forcing migration version to $(VERSION)"
 	@migrate -path $(MIGRATION_DIR) -database "$(DB_URL)" force $(VERSION)
 
-docker-up: ## Start Docker containers
-	@echo "Starting Docker containers..."
-	@docker-compose up -d
+docker-up: ## Start infrastructure containers (postgres, keycloak, nanomdm, adminer)
+	@echo "Starting infrastructure..."
+	@docker compose up -d postgres keycloak nanomdm adminer
 
-docker-down: ## Stop Docker containers
+docker-down: ## Stop all Docker containers
 	@echo "Stopping Docker containers..."
-	@docker-compose down
+	@docker compose down
 
 docker-logs: ## View Docker logs
-	@docker-compose logs -f
+	@docker compose logs -f
+
+# === Docker-based development ===
+
+dev: ## Start full dev stack (hot reload)
+	@echo "Starting dev stack with hot reload..."
+	@docker compose up -d postgres keycloak nanomdm adminer
+	@docker compose --profile dev up -d localmdm-dev
+	@echo ""
+	@echo "Dev stack running:"
+	@echo "  Local MDM:  http://localhost:8080 (hot reload)"
+	@echo "  NanoMDM:    http://localhost:9000"
+	@echo "  Keycloak:   http://localhost:8180"
+	@echo "  Adminer:    http://localhost:8081"
+	@echo "  Metrics:    http://localhost:9090"
+
+dev-test: ## Run tests in dev container (fast, uses cached modules)
+	@echo "Running tests in Docker..."
+	@docker compose --profile test run --rm test-runner
+
+dev-shell: ## Open a shell in the dev container
+	@docker compose --profile dev exec localmdm-dev sh
+
+# === Production-like verification ===
+
+prod-build: ## Build production container
+	@echo "Building production container..."
+	@docker compose build localmdm
+
+prod-up: ## Start full production-like stack
+	@echo "Starting production-like stack..."
+	@docker compose up -d postgres keycloak nanomdm localmdm adminer
+	@echo ""
+	@echo "Production stack running:"
+	@echo "  Local MDM:  http://localhost:8080"
+	@echo "  NanoMDM:    http://localhost:9000"
+	@echo "  Keycloak:   http://localhost:8180"
+
+prod-test: prod-build ## Build prod container + run full E2E tests
+	@echo "Running full test suite against production build..."
+	@docker compose up -d postgres keycloak nanomdm
+	@sleep 5
+	@docker compose --profile test run --rm test-runner
+	@echo "✓ All tests passed against production build"
+
+prod-down: ## Stop production stack
+	@docker compose down
 
 deps: ## Download dependencies
 	@echo "Downloading dependencies..."
@@ -92,7 +138,5 @@ install-tools: ## Install development tools
 	@echo "Installing development tools..."
 	@go install -tags 'postgres' github.com/golang-migrate/migrate/v4/cmd/migrate@latest
 	@go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
-
-dev: docker-up migrate-up run ## Start development environment
 
 .DEFAULT_GOAL := help
