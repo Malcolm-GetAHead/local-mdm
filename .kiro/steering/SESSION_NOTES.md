@@ -7,8 +7,8 @@
 
 - **Sprint 5c**: ✅ COMPLETE, on branch `sprint-5c/platform-integration` (not yet merged to main)
 - **Sprint 5**: ✅ COMPLETE, merged to main
-- **Retrospective**: In progress (backward look)
-- **Next sprint**: **5b** (EventBus), then 5d (dashboard)
+- **Retrospective**: ✅ COMPLETE
+- **Next sprint**: **5e** (NanoMDM cert verification + test cleanup), then 5b (EventBus), then 5d (dashboard)
 - **Pending**: merge sprint-5c/platform-integration to main
 
 ---
@@ -194,6 +194,7 @@ database:
 | 4c | 🔲 Not Started | macOS Platform SSO (Java/Swift) — renamed to Sprint 6 |
 | 5 | ✅ Complete | Backend polish, CLI, observability, performance |
 | 5c | ✅ Complete | Platform integration fixes (macOS/Windows/Android), SCEP, service tests |
+| 5e | 🔲 Not Started | NanoMDM cert verification fix, repo test assertion cleanup |
 | 5b | 🔲 Not Started | EventBus listener, compliance wiring, load testing |
 | 5d | 🔲 Not Started | Web dashboard (HTMX) |
 | 6 | 🔲 Not Started | macOS Platform SSO (Java/Swift) — requires Apple Developer account |
