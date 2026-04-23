@@ -7,6 +7,8 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"database/sql"
+
+	"github.com/malcolm-getahead/local-mdm/internal/apperrors"
 	"encoding/json"
 	"encoding/pem"
 	"fmt"
@@ -46,7 +48,7 @@ func (s *DEPStorage) RetrieveAuthTokens(ctx context.Context, name string) (*clie
 
 	err := s.db.QueryRowContext(ctx, query, name, s.encryptionKey).Scan(&ck, &cs, &at, &as, &expiry)
 	if err == sql.ErrNoRows {
-		return nil, fmt.Errorf("DEP name not found: %s", name)
+		return nil, fmt.Errorf("DEP name not found: %s: %w", name, apperrors.ErrNotFound)
 	}
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve auth tokens: %w", err)
@@ -90,7 +92,7 @@ func (s *DEPStorage) RetrieveConfig(ctx context.Context, name string) (*client.C
 	var baseURL sql.NullString
 	err := s.db.QueryRowContext(ctx, query, name).Scan(&baseURL)
 	if err == sql.ErrNoRows {
-		return nil, fmt.Errorf("DEP name not found: %s", name)
+		return nil, fmt.Errorf("DEP name not found: %s: %w", name, apperrors.ErrNotFound)
 	}
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve config: %w", err)
