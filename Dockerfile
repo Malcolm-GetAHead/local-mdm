@@ -26,8 +26,7 @@ FROM golang:1.26-alpine AS dev
 RUN apk add --no-cache git curl postgresql-client gcc musl-dev
 RUN go install github.com/air-verse/air@latest
 RUN go install -tags 'postgres' github.com/golang-migrate/migrate/v4/cmd/migrate@latest
-RUN go install github.com/jessepeterson/mdmb/cmd/mdmb@latest || \
-    (cd /tmp && git clone https://github.com/jessepeterson/mdmb.git && cd mdmb && go build -o /go/bin/mdmb ./cmd/mdmb/)
+RUN cd /tmp && git clone --depth 1 https://github.com/jessepeterson/mdmb.git && cd mdmb && go build -o /go/bin/mdmb ./cmd/mdmb/ && rm -rf /tmp/mdmb
 WORKDIR /src
 # Source mounted as volume at /src
 EXPOSE 8080 9090

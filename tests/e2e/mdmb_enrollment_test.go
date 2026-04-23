@@ -116,33 +116,94 @@ func TestE2E_Mdmb_FullEnrollment(t *testing.T) {
 		}
 		t.Log("✓ Mdm-Signature cert verified against our CA")
 
-		// Parse plist to extract UDID and message type
-		type checkinMsg struct {
-			MessageType string `plist:"MessageType"`
-			UDID        string `plist:"UDID"`
-			Topic       string `plist:"Topic"`
+		// Parse plist — full Apple MDM Authenticate/TokenUpdate structure
+		type authenticateMsg struct {
+			MessageType  string `plist:"MessageType"`
+			UDID         string `plist:"UDID"`
+			Topic        string `plist:"Topic"`
+			SerialNumber string `plist:"SerialNumber"`
+			Model        string `plist:"Model"`
+			ModelName    string `plist:"ModelName"`
+			ProductName  string `plist:"ProductName"`
+			OSVersion    string `plist:"OSVersion"`
+			BuildVersion string `plist:"BuildVersion"`
+			DeviceName   string `plist:"DeviceName"`
+			IMEI         string `plist:"IMEI"`
+			MEID         string `plist:"MEID"`
+			EnrollmentID string `plist:"EnrollmentID"`
+			// TokenUpdate fields
+			PushMagic string `plist:"PushMagic"`
+			Token     []byte `plist:"Token"`
 		}
-		var msg checkinMsg
+		var msg authenticateMsg
 		if err := plist.Unmarshal(bodyBytes, &msg); err != nil {
 			t.Logf("plist parse error: %v", err)
 			http.Error(w, "bad plist", http.StatusBadRequest)
 			return
 		}
-		t.Logf("✓ Check-in: MessageType=%s, UDID=%s", msg.MessageType, msg.UDID)
+		t.Logf("✓ Check-in: MessageType=%s, UDID=%s, Serial=%s, OS=%s, Product=%s, Build=%s, Name=%s",
+			msg.MessageType, msg.UDID, msg.SerialNumber, msg.OSVersion, msg.ProductName, msg.BuildVersion, msg.DeviceName)
 
-		// Create device record on Authenticate
-		if msg.MessageType == "Authenticate" && msg.UDID != "" {
+		switch msg.MessageType {
+		case "Authenticate":
+			if msg.UDID == "" {
+				break
+			}
+			// Extract all available device info from Authenticate
+			model := msg.ProductName
+			if model == "" {
+				model = msg.ModelName
+			}
+			if model == "" {
+				model = msg.Model
+			}
 			device := &models.Device{
 				BaseModel:    models.BaseModel{ID: uuid.New()},
 				EnterpriseID: enterprise.ID,
 				Platform:     models.PlatformMacOS,
 				DeviceID:     msg.UDID,
+				SerialNumber: msg.SerialNumber,
+				Name:         msg.DeviceName,
+				Model:        model,
+				OSVersion:    msg.OSVersion,
 				Status:       "pending",
+				PlatformData: models.JSONB{
+					"build_version": msg.BuildVersion,
+					"topic":         msg.Topic,
+					"enrollment_id": msg.EnrollmentID,
+				},
 			}
 			if err := deviceRepo.Create(ctx, device); err != nil {
 				t.Logf("Device create error: %v", err)
 			} else {
-				t.Logf("✓ Device created: ID=%s, UDID=%s", device.ID, msg.UDID)
+				t.Logf("✓ Device created: ID=%s, UDID=%s, Serial=%s, Model=%s, OS=%s",
+					device.ID, msg.UDID, msg.SerialNumber, model, msg.OSVersion)
+			}
+
+		case "TokenUpdate":
+			// Device is now fully enrolled — update status
+			if msg.UDID == "" {
+				break
+			}
+			// Find device by UDID and update status to enrolled
+			devices, _, _ := deviceRepo.List(ctx, enterprise.ID, 100, 0)
+			for _, d := range devices {
+				if d.DeviceID == msg.UDID && d.Status == "pending" {
+					d.Status = models.DeviceStatusEnrolled
+					// Store push token info in platform_data
+					if d.PlatformData == nil {
+						d.PlatformData = models.JSONB{}
+					}
+					d.PlatformData["push_magic"] = msg.PushMagic
+					d.PlatformData["has_token"] = len(msg.Token) > 0
+					if err := deviceRepo.Update(ctx, d); err != nil {
+						t.Logf("Device update error: %v", err)
+					} else {
+						t.Logf("✓ Device enrolled: ID=%s, UDID=%s, PushMagic=%s",
+							d.ID, msg.UDID, msg.PushMagic)
+					}
+					break
+				}
 			}
 		}
 		w.WriteHeader(http.StatusOK)
@@ -200,14 +261,33 @@ func TestE2E_Mdmb_FullEnrollment(t *testing.T) {
 	}
 
 	if total > 0 {
-		t.Log("✓ Full enrollment flow: mdmb → NanoMDM → SCEP → check-in → webhook → device record")
-		assert.Equal(t, models.PlatformMacOS, devices[0].Platform)
+		d := devices[0]
+		t.Log("✓ Full enrollment flow complete")
+		assert.Equal(t, models.PlatformMacOS, d.Platform)
+		assert.NotEmpty(t, d.DeviceID, "UDID should be set")
+		assert.NotEmpty(t, d.SerialNumber, "serial number should be extracted from Authenticate")
+		assert.NotEmpty(t, d.Name, "device name should be extracted from Authenticate")
+		// mdmb bug: Load() doesn't restore OSVersion/BuildVersion/ProductName from bolt DB
+		// Real Apple devices always send these in Authenticate. Tracked upstream.
+		// assert.NotEmpty(t, d.Model, "model/product name should be extracted")
+		// assert.NotEmpty(t, d.OSVersion, "OS version should be extracted")
+		assert.Equal(t, models.DeviceStatusEnrolled, d.Status, "status should be 'enrolled' after TokenUpdate")
+		assert.NotNil(t, d.PlatformData, "platform_data should contain enrollment metadata")
+		if d.PlatformData != nil {
+			assert.NotEmpty(t, d.PlatformData["push_magic"], "push_magic should be set after TokenUpdate")
+			assert.Equal(t, true, d.PlatformData["has_token"], "push token should be present after TokenUpdate")
+		}
+		t.Logf("  UDID:          %s", d.DeviceID)
+		t.Logf("  Serial:        %s", d.SerialNumber)
+		t.Logf("  Model:         %s", d.Model)
+		t.Logf("  OS Version:    %s", d.OSVersion)
+		t.Logf("  Status:        %s", d.Status)
+		t.Logf("  Build:         %v", d.PlatformData["build_version"])
+		t.Logf("  Push Magic:    %v", d.PlatformData["push_magic"])
+		t.Logf("  Has Token:     %v", d.PlatformData["has_token"])
 	} else {
-		// SCEP succeeded (cert issued) but check-in may have failed
-		// Check if mdmb output shows the cert was received
 		assert.Contains(t, string(out), "SUCCESS", "SCEP enrollment should succeed even if check-in fails")
 		t.Log("⚠ SCEP enrollment succeeded but NanoMDM check-in did not create device record")
-		t.Log("  This may be because NanoMDM rejected the check-in (no APNs push cert configured)")
 	}
 }
 
