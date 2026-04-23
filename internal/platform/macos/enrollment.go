@@ -46,16 +46,19 @@ const profileTemplate = `<?xml version="1.0" encoding="UTF-8"?>
 			<string>Configures SCEP</string>
 			<key>PayloadOrganization</key>
 			<string>{{.PayloadOrganization}}</string>
-			<key>URL</key>
-			<string>{{.SCEPURL}}</string>
-			<key>Challenge</key>
-			<string>{{.SCEPChallenge}}</string>
-			<key>Keysize</key>
-			<integer>2048</integer>
-			<key>Key Type</key>
-			<string>RSA</string>
-			<key>Key Usage</key>
-			<integer>5</integer>
+			<key>PayloadContent</key>
+			<dict>
+				<key>URL</key>
+				<string>{{.SCEPURL}}</string>
+				<key>Challenge</key>
+				<string>{{.SCEPChallenge}}</string>
+				<key>Keysize</key>
+				<integer>2048</integer>
+				<key>Key Type</key>
+				<string>RSA</string>
+				<key>Key Usage</key>
+				<integer>5</integer>
+			</dict>
 		</dict>
 		<dict>
 			<key>PayloadType</key>

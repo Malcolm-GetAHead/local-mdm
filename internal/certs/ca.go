@@ -168,6 +168,11 @@ func (m *CAManager) GetCACertificate() *x509.Certificate {
 	return m.caCert
 }
 
+// GetCAPrivateKey returns the CA private key (needed for SCEP envelope decryption).
+func (m *CAManager) GetCAPrivateKey() *rsa.PrivateKey {
+	return m.caKey
+}
+
 func (m *CAManager) GetCACertificatePEM() ([]byte, error) {
 	return pem.EncodeToMemory(&pem.Block{
 		Type:  "CERTIFICATE",

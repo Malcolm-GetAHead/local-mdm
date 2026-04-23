@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/malcolm-getahead/local-mdm/internal/certs"
+	sceplib "github.com/smallstep/scep"
 	"go.mozilla.org/pkcs7"
 )
 
@@ -82,9 +83,60 @@ func (h *Handler) pkiOperation(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Try to parse as PKCS#7 envelope first (real SCEP clients)
-	// Fall back to raw/base64 CSR (for testing)
-	csr, err := parseCSRFromPKCS7OrRaw(body, h.ca)
+	caCert := h.ca.GetCACertificate()
+	caKey := h.ca.GetCAPrivateKey()
+
+	// Try full SCEP protocol (PKCS#7 SignedData + EnvelopedData) first
+	msg, err := sceplib.ParsePKIMessage(body)
+	if err == nil {
+		if err := msg.DecryptPKIEnvelope(caCert, caKey); err != nil {
+			h.logger.Warn("failed to decrypt SCEP envelope", "error", err)
+			http.Error(w, "failed to decrypt envelope", http.StatusBadRequest)
+			return
+		}
+		if msg.CSRReqMessage == nil || msg.CSRReqMessage.CSR == nil {
+			http.Error(w, "no CSR in SCEP message", http.StatusBadRequest)
+			return
+		}
+		csr := msg.CSRReqMessage.CSR
+		pw := msg.CSRReqMessage.ChallengePassword
+		if pw == "" {
+			pw = extractChallengePassword(csr)
+		}
+		if pw == "" {
+			http.Error(w, "missing challenge password", http.StatusForbidden)
+			return
+		}
+		deviceID, valid := h.store.ValidateChallenge(pw)
+		if !valid {
+			h.logger.Warn("SCEP challenge validation failed")
+			certRep, _ := msg.Fail(caCert, caKey, sceplib.BadRequest)
+			w.Header().Set("Content-Type", "application/x-pki-message")
+			w.Write(certRep.Raw)
+			return
+		}
+		cert, err := h.ca.SignCSR(csr, h.certTTL)
+		if err != nil {
+			h.logger.Error("failed to sign CSR", "error", err, "device_id", deviceID)
+			certRep, _ := msg.Fail(caCert, caKey, sceplib.BadRequest)
+			w.Header().Set("Content-Type", "application/x-pki-message")
+			w.Write(certRep.Raw)
+			return
+		}
+		h.logger.Info("SCEP certificate issued", "device_id", deviceID, "serial", cert.SerialNumber.String())
+		certRep, err := msg.Success(caCert, caKey, cert)
+		if err != nil {
+			h.logger.Error("failed to build SCEP success response", "error", err)
+			http.Error(w, "response generation failed", http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "application/x-pki-message")
+		w.Write(certRep.Raw)
+		return
+	}
+
+	// Fall back to raw/base64 CSR (for simple testing without full SCEP envelope)
+	csr, err := parseCSR(body)
 	if err != nil {
 		h.logger.Warn("failed to parse SCEP request", "error", err)
 		http.Error(w, "invalid CSR", http.StatusBadRequest)
@@ -114,32 +166,15 @@ func (h *Handler) pkiOperation(w http.ResponseWriter, r *http.Request) {
 	h.logger.Info("SCEP certificate issued", "device_id", deviceID, "serial", cert.SerialNumber.String())
 
 	// Wrap signed cert in PKCS#7 degenerate certificates-only envelope
-	caCert := h.ca.GetCACertificate()
 	respData, err := buildCertResponse(cert, caCert)
 	if err != nil {
 		h.logger.Error("failed to build PKCS#7 response", "error", err)
-		// Fall back to raw DER
 		w.Header().Set("Content-Type", "application/x-x509-ca-cert")
 		w.Write(cert.Raw)
 		return
 	}
 	w.Header().Set("Content-Type", "application/x-pki-message")
 	w.Write(respData)
-}
-
-// parseCSRFromPKCS7OrRaw tries PKCS#7 envelope first, then raw/base64 CSR
-func parseCSRFromPKCS7OrRaw(data []byte, ca *certs.CAManager) (*x509.CertificateRequest, error) {
-	// Try PKCS#7 SignedData envelope (real SCEP clients)
-	p7, err := pkcs7.Parse(data)
-	if err == nil && len(p7.Content) > 0 {
-		// The inner content is the CSR (possibly encrypted, but for
-		// challenge-based SCEP the CSR is typically in the signed content)
-		if csr, err := x509.ParseCertificateRequest(p7.Content); err == nil {
-			return csr, nil
-		}
-	}
-	// Fall back to raw DER or base64
-	return parseCSR(data)
 }
 
 // buildCertResponse wraps the signed cert (and CA cert) in a PKCS#7 degenerate envelope
