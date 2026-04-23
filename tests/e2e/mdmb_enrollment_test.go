@@ -2,7 +2,10 @@ package e2e
 
 import (
 	"context"
+	"crypto/x509"
+	"encoding/base64"
 	"encoding/json"
+	"io"
 	"log/slog"
 	"net/http"
 	"os"
@@ -18,6 +21,8 @@ import (
 	"github.com/malcolm-getahead/local-mdm/internal/repository"
 	"github.com/malcolm-getahead/local-mdm/internal/scep"
 	"github.com/malcolm-getahead/local-mdm/internal/service"
+	"github.com/micromdm/plist"
+	"github.com/smallstep/pkcs7"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -69,6 +74,75 @@ func TestE2E_Mdmb_FullEnrollment(t *testing.T) {
 	mux.HandleFunc("/api/v1/macos/webhook", func(w http.ResponseWriter, r *http.Request) {
 		checkinHandler.ServeHTTP(w, r)
 	})
+	// Handle /checkin: verify Mdm-Signature cert, parse plist, create device record
+	mux.HandleFunc("/checkin", func(w http.ResponseWriter, r *http.Request) {
+		bodyBytes, _ := io.ReadAll(r.Body)
+
+		// Verify Mdm-Signature
+		sig := r.Header.Get("Mdm-Signature")
+		if sig == "" {
+			http.Error(w, "missing signature", http.StatusBadRequest)
+			return
+		}
+		sigBytes, err := base64.StdEncoding.DecodeString(sig)
+		if err != nil {
+			http.Error(w, "bad signature encoding", http.StatusBadRequest)
+			return
+		}
+		p7, err := pkcs7.Parse(sigBytes)
+		if err != nil {
+			http.Error(w, "bad pkcs7", http.StatusBadRequest)
+			return
+		}
+		p7.Content = bodyBytes
+		sigCert := p7.GetOnlySigner()
+		if sigCert == nil {
+			http.Error(w, "no signer", http.StatusBadRequest)
+			return
+		}
+		t.Logf("Mdm-Signature cert: CN=%s, Issuer=%s", sigCert.Subject.CommonName, sigCert.Issuer.CommonName)
+
+		// Verify cert chains to our CA
+		roots := x509.NewCertPool()
+		roots.AddCert(ca.GetCACertificate())
+		if _, err := sigCert.Verify(x509.VerifyOptions{Roots: roots, KeyUsages: []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth}}); err != nil {
+			t.Logf("Cert verify FAILED: %v", err)
+			http.Error(w, "cert verification failed", http.StatusForbidden)
+			return
+		}
+		t.Log("✓ Mdm-Signature cert verified against our CA")
+
+		// Parse plist to extract UDID and message type
+		type checkinMsg struct {
+			MessageType string `plist:"MessageType"`
+			UDID        string `plist:"UDID"`
+			Topic       string `plist:"Topic"`
+		}
+		var msg checkinMsg
+		if err := plist.Unmarshal(bodyBytes, &msg); err != nil {
+			t.Logf("plist parse error: %v", err)
+			http.Error(w, "bad plist", http.StatusBadRequest)
+			return
+		}
+		t.Logf("✓ Check-in: MessageType=%s, UDID=%s", msg.MessageType, msg.UDID)
+
+		// Create device record on Authenticate
+		if msg.MessageType == "Authenticate" && msg.UDID != "" {
+			device := &models.Device{
+				BaseModel:    models.BaseModel{ID: uuid.New()},
+				EnterpriseID: enterprise.ID,
+				Platform:     models.PlatformMacOS,
+				DeviceID:     msg.UDID,
+				Status:       "pending",
+			}
+			if err := deviceRepo.Create(ctx, device); err != nil {
+				t.Logf("Device create error: %v", err)
+			} else {
+				t.Logf("✓ Device created: ID=%s, UDID=%s", device.ID, msg.UDID)
+			}
+		}
+		w.WriteHeader(http.StatusOK)
+	})
 	srv := &http.Server{Addr: ":8080", Handler: mux}
 	go srv.ListenAndServe()
 	defer srv.Close()
@@ -82,12 +156,12 @@ func TestE2E_Mdmb_FullEnrollment(t *testing.T) {
 	challenge, err := challengeMgr.GenerateChallenge(enterprise.ID.String(), 5*time.Minute)
 	require.NoError(t, err)
 
-	// Generate enrollment profile: MDM → NanoMDM, SCEP → our server
+	// Generate enrollment profile: MDM check-in → our proxy (8080), SCEP → our server
 	caCert := ca.GetCACertificate()
 	profile, err := macos.GenerateEnrollmentProfile(
 		enterprise.ID,
-		"http://localhost:9000",
-		"http://localhost:8080/scep",
+		"http://localhost:8080",           // Our proxy forwards /checkin to NanoMDM
+		"http://localhost:8080/scep",      // Our SCEP server
 		"com.example.mdm",
 		challenge,
 		"mdmb Full E2E",
