@@ -30,6 +30,7 @@ This happens even with everything running on the same Linux distro in Docker. Th
 | S5e-01 | Root cause the pkcs7 cert verification mismatch | 0.5-1 day | See investigation plan below |
 | S5e-02 | Fix or work around the verification failure | 0.5 day | Depends on root cause |
 | S5e-03 | Migrate 16 repo integration test assertions to `assert.ErrorIs` | 0.5 day | Mechanical cleanup |
+| S5e-04 | SCEP handler unit test coverage (49.6% → 70%+) | 0.5 day | Cover PKCS#7 protocol paths |
 
 ---
 
@@ -98,6 +99,7 @@ Mechanical change — no behavior difference, just consistency with the sentinel
 - [ ] Root cause of NanoMDM cert verification failure identified and documented
 - [ ] Either: fix applied and mdmb check-in works through NanoMDM, OR: root cause documented with clear production impact assessment
 - [ ] All 16 repo integration test assertions use `assert.ErrorIs`
+- [ ] SCEP handler unit test coverage ≥ 70% (cover PKCS#7 ParsePKIMessage/DecryptPKIEnvelope/SignCSR paths)
 - [ ] All tests pass in Docker (`make dev-test`)
 
 ---

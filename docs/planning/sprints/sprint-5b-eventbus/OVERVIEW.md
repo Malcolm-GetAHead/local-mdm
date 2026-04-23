@@ -49,6 +49,7 @@ All 6 triggers fire on a **single channel `mdm_events`** with JSON payload `{typ
 | S5b-04 | Device state parsing in check-in handlers | 1 day | S5b-03 |
 | S5b-05 | Register lifecycle hooks + fix Android lifecycle gap | 0.5 day | S5b-01 |
 | S5b-06 | Load testing framework (k6 scenarios) | 0.5 day | All API endpoints |
+| S5b-07 | Reporting integration test coverage (17% → 70%+) | 0.5 day | DeviceInventory, ComplianceReport, EnrollmentReport |
 
 ### S5b-01: EventBus LISTEN/NOTIFY Listener
 
