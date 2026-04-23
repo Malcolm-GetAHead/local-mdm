@@ -115,16 +115,10 @@ func (h *Handler) pkiOperation(w http.ResponseWriter, r *http.Request) {
 			w.Write(certRep.Raw)
 			return
 		}
-		cert, err := h.ca.SignCSR(csr, h.certTTL)
-		if err != nil {
-			h.logger.Error("failed to sign CSR", "error", err, "device_id", deviceID)
-			certRep, _ := msg.Fail(caCert, caKey, sceplib.BadRequest)
-			w.Header().Set("Content-Type", "application/x-pki-message")
-			w.Write(certRep.Raw)
-			return
-		}
-		h.logger.Info("SCEP certificate issued", "device_id", deviceID, "serial", cert.SerialNumber.String())
-		certRep, err := msg.SignCSR(caCert, caKey, cert)
+		// Use a clean template — SignCSR will sign the CSR with our CA
+		tmpl := h.ca.CertTemplate(h.certTTL)
+		h.logger.Info("SCEP certificate issued", "device_id", deviceID)
+		certRep, err := msg.SignCSR(caCert, caKey, tmpl)
 		if err != nil {
 			h.logger.Error("failed to build SCEP response", "error", err)
 			http.Error(w, "response generation failed", http.StatusInternalServerError)

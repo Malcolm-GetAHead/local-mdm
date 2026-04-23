@@ -221,12 +221,14 @@ func TestE2E_Mdmb_FullEnrollment(t *testing.T) {
 	challenge, err := challengeMgr.GenerateChallenge(enterprise.ID.String(), 5*time.Minute)
 	require.NoError(t, err)
 
-	// Generate enrollment profile: MDM check-in → our test server, SCEP → our test server
-	// Use localhost since mdmb runs in the same container as the test
+	// Generate enrollment profile
+	// Check-in goes to our test server (which verifies cert + creates device record)
+	// NanoMDM has a pkcs7 library incompatibility with mdmb's Mdm-Signature format
+	// Real Apple devices use Apple's CMS implementation which NanoMDM is designed for
 	caCert := ca.GetCACertificate()
 	profile, err := macos.GenerateEnrollmentProfile(
 		enterprise.ID,
-		"http://localhost:8080",           // Our proxy forwards /checkin to NanoMDM
+		"http://localhost:8080",           // Our test server handles check-in
 		"http://localhost:8080/scep",      // Our SCEP server
 		"com.example.mdm",
 		challenge,
@@ -267,13 +269,12 @@ func TestE2E_Mdmb_FullEnrollment(t *testing.T) {
 		assert.NotEmpty(t, d.DeviceID, "UDID should be set")
 		assert.NotEmpty(t, d.SerialNumber, "serial number should be extracted from Authenticate")
 		assert.NotEmpty(t, d.Name, "device name should be extracted from Authenticate")
-		// mdmb bug: Load() doesn't restore OSVersion/BuildVersion/ProductName from bolt DB
-		// Real Apple devices always send these in Authenticate. Tracked upstream.
-		// assert.NotEmpty(t, d.Model, "model/product name should be extracted")
-		// assert.NotEmpty(t, d.OSVersion, "OS version should be extracted")
+		assert.NotEmpty(t, d.Model, "model/product name should be extracted from Authenticate")
+		assert.NotEmpty(t, d.OSVersion, "OS version should be extracted from Authenticate")
 		assert.Equal(t, models.DeviceStatusEnrolled, d.Status, "status should be 'enrolled' after TokenUpdate")
 		assert.NotNil(t, d.PlatformData, "platform_data should contain enrollment metadata")
 		if d.PlatformData != nil {
+			assert.NotEmpty(t, d.PlatformData["build_version"], "build_version should be in platform_data")
 			assert.NotEmpty(t, d.PlatformData["push_magic"], "push_magic should be set after TokenUpdate")
 			assert.Equal(t, true, d.PlatformData["has_token"], "push token should be present after TokenUpdate")
 		}
