@@ -460,10 +460,82 @@ When making significant decisions, document them here:
 
 ---
 
+## Owner Background
+
+- **DevOps engineer** — Windows/Linux sysadmin → DevOps. Understands infrastructure, deployment, MDM concepts from the admin side.
+- **Languages**: Python and PostgreSQL at intermediate level. No Go experience — don't assume the owner reads Go code directly.
+- **Strengths**: Architecture patterns, infrastructure decisions, tradeoff analysis, knowing when something smells wrong.
+- **When explaining**: Use plain language for Go-specific patterns. Relate to concepts the owner already knows. Don't over-simplify, just be clear.
+
+## Git Workflow
+
+- **Feature branch per sprint**: `sprint-{id}/{short-description}`. Never commit directly to main.
+- **Commit per sub-task**, referencing task ID (e.g. `S4b-01: ...`). Run tests with `-race` before each commit.
+- **Push after each commit** — work must survive session loss. Per-task commits are recovery checkpoints.
+- Don't squash or amend unless asked. Owner wants to see progression.
+
+## Session Closeout Process
+
+After every sprint, the owner expects:
+
+1. **Retrospective (backward look)**: scope audit, dead code scan, stale docs, test coverage. Check ALL sprint OVERVIEWs (not just current). First action: update current sprint's OVERVIEW (mark complete, check DoD boxes).
+2. **Forward look**: next 2 sprints + future roadmap alignment. Flag broken dependencies, stale assumptions, gaps.
+3. **Doc & test audit**: Owner will prompt with: *"How's our test coverage and documentation? Are they still accurate? Are we skipping any integration tests we shouldn't? Please review documentation holistically for the project to ensure we haven't missed anything outside of the sprint."* — Do a thorough audit. Check API.md matches routes, DATABASE.md matches migrations, ARCHITECTURE.md matches packages. Don't just say "looks good."
+4. **Clean up**: delete merged branches, remove dead code, push to origin.
+5. **Owner asks for feedback**: At session end, the owner asks what they could do differently. Be honest and specific — they act on it. Also offer to update session notes before context is cleared.
+
+## Production Architecture (decided Sprint 4b session)
+
+### Deployment: AWS ECS Fargate (not Kubernetes)
+- Single Go binary per service — no sidecar proxies or service mesh needed.
+- ALB for TLS termination (ACM certificates, auto-renewing) and path-based routing.
+
+### Services (3 ECS services + RDS)
+- **localmdm** — the Go application (API, policy engine, enrollment). Multiple tasks behind ALB.
+- **nanomdm** — Apple MDM protocol handler (separate ECS service). Receives `/checkin` and `/mdm` via ALB path routing. Uses same RDS instance, separate `nanomdm` database. Local MDM sends commands to NanoMDM via HTTP API (`nanomdm_url` config).
+- **keycloak** — OIDC identity provider (separate ECS service). Admin login, JWT issuance, RBAC. Uses same RDS instance, separate database.
+- **RDS PostgreSQL** — primary (Writer pool) + read replica (Reader pool). NanoMDM and Keycloak use primary only.
+
+### Multi-Instance Safety
+- **Stateless by design** — all shared state is in PostgreSQL (token cache, idempotency keys, SCEP challenges).
+- **In-memory rate limiters** are per-instance (imprecise across instances, acceptable as fallback behind WAF).
+- **No sticky sessions required** — any instance can handle any request.
+
+### What NOT to do
+- Don't add Redis or any external cache — PostgreSQL handles all caching.
+- Don't default to Kubernetes — ECS Fargate is the target unless explicitly changed.
+- Don't assume single-instance — all code must work behind a load balancer with multiple instances.
+
+## Implementation Patterns
+
+### Repository Pattern (Writer/Reader Pools)
+- **Constructors take two args**: `NewXxxRepository(writer, reader interface{})`. Both resolve via `resolveExecutor()`.
+- **Write methods** (Create/Update/Delete): `getExecutor(ctx, r.writer)` — transaction-aware via context.
+- **Read methods** (Get/List): `getReadExecutor(ctx, r.reader)` — returns tx if active, otherwise uses reader pool.
+- **Non-repo consumers** (audit, idempotency, certs, metrics, auth, DEP): use Writer pool directly (`*sql.DB`).
+- **Transactor**: uses Writer pool exclusively. `NewTransactor(database.Writer)`.
+
+### Service Layer
+- `internal/service/` — business logic between handlers and repos. Transport-agnostic (no `net/http`).
+- Services accept repository interfaces via constructor (dependency injection).
+- New business logic goes in services. Existing simple handlers (CRUD) stay as-is.
+
+### Error Handling
+- Not-found detection: `errors.Is(err, apperrors.ErrNotFound)` — repos wrap with `fmt.Errorf("xxx not found: %w", apperrors.ErrNotFound)`, handlers check with `errors.Is()`.
+- Audit logging: `s.logAudit(r, action, resourceType, resourceID, details)` on all mutations.
+
+### Testing
+- **Handler tests**: mock repos in `handler_test_helpers_test.go`.
+- **Service tests**: hand-written mock repos in `*_test.go` within `internal/service/`.
+- **Integration tests**: run in Docker. All test DB connections use `DB_HOST`/`DB_PASSWORD` env vars with localhost fallback.
+- **Always run `make dev-test`** — runs all 19 test packages in Docker with race detector.
+- **Pre-commit**: run `make prod-test` — builds a clean production container and runs the full suite.
+
 ## Version History
 
 - **2026-02-07**: Initial steering guide created
 - **2026-04-20**: Updated for Sprint 4b (Writer/Reader pool pattern, repo constructor changes)
+- **2026-04-23**: Consolidated stable sections from SESSION_NOTES (owner background, git workflow, session closeout, production architecture, implementation patterns)
 
 ---
 

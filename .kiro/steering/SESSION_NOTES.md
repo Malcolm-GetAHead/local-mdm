@@ -1,6 +1,6 @@
 # Session Notes — Working Preferences & Project Knowledge
 
-**Last Updated**: 2026-04-22  
+**Last Updated**: 2026-04-23  
 **Purpose**: Guidance for AI agents working on this codebase. Keep this file lean — patterns and conventions that apply to every session. One-shot implementation details belong in sprint docs, not here.
 
 ## Current State
@@ -47,100 +47,12 @@
 - **Push features to completion, not just "working."** The owner asked for enriched enrollment data, concurrent testing, and full protocol verification — none of which were in the original sprint plan. These made the feature production-ready instead of just "tests pass." When implementing a feature, ask: "what would an admin expect to see?" not just "does the test pass?"
 - **Patch upstream bugs locally rather than working around them.** The mdmb Load() bug was a 3-line fix. Patching it in the Dockerfile was faster and more correct than adjusting our test assertions to accept empty fields.
 
-## Session Closeout Process
+## Known Issues
 
-After every sprint, the owner expects:
-
-1. **Retrospective (backward look)**: scope audit, dead code scan, stale docs, test coverage. Check ALL sprint OVERVIEWs (not just current). First action: update current sprint's OVERVIEW (mark complete, check DoD boxes).
-2. **Forward look**: next 2 sprints + future roadmap alignment. Flag broken dependencies, stale assumptions, gaps.
-3. **Doc & test audit**: Owner will prompt with: *"How's our test coverage and documentation? Are they still accurate? Are we skipping any integration tests we shouldn't? Please review documentation holistically for the project to ensure we haven't missed anything outside of the sprint."* — Do a thorough audit. Check API.md matches routes, DATABASE.md matches migrations, ARCHITECTURE.md matches packages. Don't just say "looks good."
-4. **Clean up**: delete merged branches, remove dead code, push to origin.
-5. **Owner asks for feedback**: At session end, the owner asks what they could do differently. Be honest and specific — they act on it. Also offer to update session notes before context is cleared.
-
-## Owner Background
-
-- **DevOps engineer** — Windows/Linux sysadmin → DevOps. Understands infrastructure, deployment, MDM concepts from the admin side.
-- **Languages**: Python and PostgreSQL at intermediate level. No Go experience — don't assume the owner reads Go code directly.
-- **Strengths**: Architecture patterns, infrastructure decisions, tradeoff analysis, knowing when something smells wrong.
-- **When explaining**: Use plain language for Go-specific patterns. Relate to concepts the owner already knows. Don't over-simplify, just be clear.
-
-## Git Workflow
-
-- **Feature branch per sprint**: `sprint-{id}/{short-description}`. Never commit directly to main.
-- **Commit per sub-task**, referencing task ID (e.g. `S4b-01: ...`). Run tests with `-race` before each commit.
-- **Push after each commit** — work must survive session loss. Per-task commits are recovery checkpoints.
-- Don't squash or amend unless asked. Owner wants to see progression.
-
-## Implementation Patterns (Current as of Sprint 4b)
-
-### Repository Pattern (Writer/Reader Pools)
-- **Constructors take two args**: `NewXxxRepository(writer, reader interface{})`. Both resolve via `resolveExecutor()`.
-- **Write methods** (Create/Update/Delete): `getExecutor(ctx, r.writer)` — transaction-aware via context.
-- **Read methods** (Get/List): `getReadExecutor(ctx, r.reader)` — returns tx if active (reads see uncommitted writes in tx), otherwise uses reader pool.
-- **Non-repo consumers** (audit, idempotency, certs, metrics, auth, DEP): use Writer pool directly (`*sql.DB`).
-- **Transactor**: uses Writer pool exclusively. `NewTransactor(database.Writer)`.
-- In dev, both pools point to the same PostgreSQL. In production, Reader points to Aurora read replica.
-
-### Service Layer (Sprint 4+)
-- `internal/service/` — business logic between handlers and repos. Transport-agnostic (no `net/http`).
-- Services: `PolicyService`, `GroupService`, `ComplianceService`, `LifecycleService`, `DeviceService`, `AppService`, `UserService`, `TokenService`.
-- **Sprint 5 completed the migration**: all device and app handlers now call services. No handlers call repos directly for business logic.
-- Services accept repository interfaces via constructor (dependency injection).
-
-### Error Handling
-- Not-found detection: `errors.Is(err, apperrors.ErrNotFound)` — repos wrap with `fmt.Errorf("xxx not found: %w", apperrors.ErrNotFound)`, handlers check with `errors.Is()`. Replaced `strings.Contains` pattern in S5c-07.
-- Audit logging: `s.logAudit(r, action, resourceType, resourceID, details)` on all mutations.
-
-### Testing
-- **Handler tests**: mock repos in `handler_test_helpers_test.go`. New endpoints must be registered in `newTestServer()`.
-- **Service tests**: own mocks in `*_test.go` within `internal/service/`.
-- **Integration tests**: need Docker services (`docker compose up -d` then `migrate up`). PostgreSQL is always available — don't use `-short` flag to skip integration tests.
-- **Always run `make dev-test`** — runs all 19 test packages in Docker with race detector. This is the canonical test command. The old `go test -race -p 4 ./...` still works on host but requires matching DB password.
-- **Pre-commit**: run `make prod-test` — builds a clean production container and runs the full suite against it.
-
-### Config (Database)
-```yaml
-database:
-  host: "localhost"       # Base config = writer pool
-  port: 5432
-  # Optional reader overrides (for read replicas)
-  # Unset fields inherit from base config
-  # reader:
-  #   host: "replica.example.com"
-```
-- `ReaderDSN()` falls back to `DSN()` when no reader config.
-- Env overrides: `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`, `DB_NAME`, `DB_READER_HOST`, `DB_READER_PORT`.
-
-## Production Architecture (decided Sprint 4b session)
-
-### Deployment: AWS ECS Fargate (not Kubernetes)
-- **ECS Fargate** is the primary deployment target. Kubernetes manifests exist as an appendix in F-02 but are not the default.
-- Single Go binary per service — no sidecar proxies or service mesh needed.
-- ALB for TLS termination (ACM certificates, auto-renewing) and path-based routing.
-
-### Services (3 ECS services + RDS)
-- **localmdm** — the Go application (API, policy engine, enrollment). Multiple tasks behind ALB.
-- **nanomdm** — Apple MDM protocol handler (separate ECS service). Receives `/checkin` and `/mdm` via ALB path routing. Uses same RDS instance, separate `nanomdm` database. Local MDM sends commands to NanoMDM via HTTP API (`nanomdm_url` config).
-- **keycloak** — OIDC identity provider (separate ECS service). Admin login, JWT issuance, RBAC. Uses same RDS instance, separate database.
-- **RDS PostgreSQL** — primary (Writer pool) + read replica (Reader pool). NanoMDM and Keycloak use primary only.
-
-### Supporting AWS Services
-- **SSM Parameter Store** — all secrets (DB password, JWT secret, Keycloak secret, DEP encryption key, NanoMDM API key). Injected as env vars at task launch.
-- **CloudWatch Logs** — ECS `awslogs` driver for container stdout/stderr.
-- **CloudWatch Metrics** — CloudWatch Agent sidecar in each localmdm task scrapes Prometheus metrics from localhost:9090 and forwards to CloudWatch. No separate Prometheus server needed.
-- **AWS WAF** — rate-based rules on ALB for production rate limiting. In-memory rate limiters in the Go app remain as defense-in-depth fallback.
-- **ACM** — TLS certificates (free, auto-renewing, attached to ALB).
-
-### Multi-Instance Safety
-- **Stateless by design** — all shared state is in PostgreSQL (token cache, idempotency keys, SCEP challenges after S5-12).
-- **In-memory rate limiters** are per-instance (imprecise across instances, acceptable as fallback behind WAF).
-- **JWKS cache** and **circuit breaker** are per-instance by design (correct behavior — each instance independently caches Keycloak public keys).
-- **No sticky sessions required** — any instance can handle any request.
-
-### What NOT to do
-- Don't add Redis or any external cache — PostgreSQL handles all caching.
-- Don't default to Kubernetes — ECS Fargate is the target unless explicitly changed.
-- Don't assume single-instance — all code must work behind a load balancer with multiple instances.
+- **EventBus Go listener not built** — triggers exist (migration 000007), no listener. Tracked in Sprint 5b.
+- **NanoMDM pkcs7 cert verification** — NanoMDM (`smallstep/pkcs7 v0.2.1`) can't verify Mdm-Signature created by mdmb (`go.mozilla.org/pkcs7`). Same cert verifies fine in our Go code. Not a platform issue (reproduces Linux→Linux). Tracked in Sprint 5e.
+- **Production CheckinHandler only extracts UDID** — The enriched handler (Serial, Name, Model, OS, Build, status=enrolled on TokenUpdate) exists only in `tests/e2e/mdmb_enrollment_test.go`. Must be ported to `internal/platform/macos/webhook.go` CheckinHandler. Tracked in Sprint 5b S5b-04.
+- **16 repo integration tests still use `assert.Contains(err.Error(), "not found")`** — works but should use `assert.ErrorIs()` for consistency. Tracked in Sprint 5e.
 
 ## Project-Specific Knowledge
 
@@ -154,38 +66,6 @@ database:
 - **Sprint 2 security review docs** contain false claims. Trust the code, not the review narratives.
 - **Dashboard**: Go templates + HTMX + Tailwind CSS (Sprint 5d). Not React.
 - **macOS Platform SSO**: Sprint 6 (Java + Swift, separate from Go work).
-
-## What NOT to Do
-
-- Don't add Redis — PostgreSQL handles all caching.
-- Don't change secrets storage approach (file-based for dev is intentional).
-- Don't build things "just in case" — minimal implementation only.
-- Don't trust Sprint 2 review docs at face value.
-- Don't use `-short` flag when running tests — integration tests should run.
-- Don't use the old single-arg repo constructor pattern `NewXxxRepository(db)` — always use `(writer, reader)`.
-
-## Known Issues
-
-- **Doc debt tracked in `docs/reviews/sprint-4b/DOCUMENTATION_REVIEW.md`** — being resolved on `review/documentation-fixes` branch.
-- **Repo integration test gap tracked in `docs/reviews/sprint-4b/REPOSITORY_TEST_COVERAGE.md`** — resolved on `review/repo-integration-tests` branch. All 5 test files written.
-- **`GET /windows/ppkg/templates`** — auth being added on `review/documentation-fixes` branch.
-- **command.GetByID and ListByDevice bug** — ✅ FIXED in Sprint 5 (COALESCE). Tests updated in `sprint12_gaps_integration_test.go`.
-- **Service layer test coverage at 30.4%** — ✅ FIXED in S5c-05 (now 61.9%).
-- **`strings.Contains` error detection** — ✅ FIXED in S5c-07. `apperrors.ErrNotFound` sentinel + `errors.Is()` in all handlers.
-- **NanoMDM not deployed** — ✅ FIXED in S5c-01. NanoMDM v0.9.0 in docker-compose, separate `nanomdm` database, webhook forwarding.
-- **Windows enrollment doesn't create device records** — ✅ FIXED in S5c-02. Enterprise ID in URL path.
-- **Android webhook is a no-op** — ✅ FIXED in S5c-03. WebhookHandler wired, graceful degradation without Google client.
-- **EventBus Go listener not built** — triggers exist (migration 000007), no listener. Tracked in Sprint 5b.
-- **NanoMDM pkcs7 cert verification** — NanoMDM (`smallstep/pkcs7 v0.2.1`) can't verify Mdm-Signature created by mdmb (`go.mozilla.org/pkcs7`). Same cert verifies fine in our Go code. Not a platform issue (reproduces Linux→Linux). Tracked in Sprint 5e.
-- **Production CheckinHandler only extracts UDID** — The enriched handler (Serial, Name, Model, OS, Build, status=enrolled on TokenUpdate) exists only in `tests/e2e/mdmb_enrollment_test.go`. Must be ported to `internal/platform/macos/webhook.go` CheckinHandler. Tracked in Sprint 5b S5b-04.
-- **16 repo integration tests still use `assert.Contains(err.Error(), "not found")`** — works but should use `assert.ErrorIs()` for consistency. Tracked in Sprint 5e.
-
-## Sprint 4b Learnings
-
-- **Writer/Reader pool pattern**: `resolveExecutor()` helper resolves `interface{}` to concrete `executor` at construction time. `getExecutor(ctx, r.writer)` for writes (transaction-aware), `getReadExecutor(ctx, r.reader)` for reads (uses tx if active, otherwise reader pool).
-- **ReaderConfig fallback**: `ReaderDSN()` returns writer DSN when no reader config is set. Zero config change needed for dev — both pools point to the same PostgreSQL.
-- **Non-repo consumers** (audit, idempotency, certs, metrics, auth, DEP) use Writer pool directly as `*sql.DB`. They don't need the Writer/Reader split because they either write or need to see their own writes immediately.
-- **Integration tests found real bugs**: NULL column scan failures in command repo. Integration tests against live PostgreSQL catch issues that mock-based tests miss — column type mismatches, FK constraints, JSONB serialization.
 
 ## Sprint Status
 
