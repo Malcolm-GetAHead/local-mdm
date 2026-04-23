@@ -9,10 +9,10 @@ require (
 	github.com/lib/pq v1.11.1
 	github.com/micromdm/nanodep v0.7.0
 	github.com/micromdm/plist v0.2.2
+	github.com/micromdm/scep v1.0.1-0.20201110133952-f3adbb75202b
 	github.com/prometheus/client_golang v1.22.0
 	github.com/skip2/go-qrcode v0.0.0-20200617195104-da1b6568686e
 	github.com/smallstep/pkcs7 v0.2.1
-	github.com/smallstep/scep v0.0.0-20260331191114-261f960a40d1
 	github.com/spf13/cobra v1.8.1
 	github.com/stretchr/testify v1.11.1
 	go.mozilla.org/pkcs7 v0.9.0
@@ -32,15 +32,20 @@ require (
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
+	github.com/go-kit/kit v0.4.0 // indirect
+	github.com/go-logfmt/logfmt v0.3.0 // indirect
 	github.com/go-logr/logr v1.4.3 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
+	github.com/go-stack/stack v1.6.0 // indirect
 	github.com/gomodule/oauth1 v0.2.0 // indirect
 	github.com/google/s2a-go v0.1.9 // indirect
 	github.com/googleapis/enterprise-certificate-proxy v0.3.11 // indirect
 	github.com/googleapis/gax-go/v2 v2.16.0 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
+	github.com/kr/logfmt v0.0.0-20140226030751-b84e30acd515 // indirect
 	github.com/micromdm/nanolib v0.5.0 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
+	github.com/pkg/errors v0.8.0 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/prometheus/client_model v0.6.1 // indirect
 	github.com/prometheus/common v0.62.0 // indirect

@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/malcolm-getahead/local-mdm/internal/certs"
-	sceplib "github.com/smallstep/scep"
+	sceplib "github.com/micromdm/scep/scep"
 	"go.mozilla.org/pkcs7"
 )
 
@@ -124,7 +124,7 @@ func (h *Handler) pkiOperation(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		h.logger.Info("SCEP certificate issued", "device_id", deviceID, "serial", cert.SerialNumber.String())
-		certRep, err := msg.Success(caCert, caKey, cert)
+		certRep, err := msg.SignCSR(caCert, caKey, cert)
 		if err != nil {
 			h.logger.Error("failed to build SCEP response", "error", err)
 			http.Error(w, "response generation failed", http.StatusInternalServerError)
