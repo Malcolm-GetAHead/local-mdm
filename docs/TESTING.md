@@ -1,30 +1,32 @@
 # Testing Guide
 
-**Last Updated**: 2026-04-21
+**Last Updated**: 2026-04-23
 
 ## Running Tests
 
-### All Tests (with race detector — always use this)
+All development and testing runs inside Docker containers for environment parity.
+
+### Full Test Suite (canonical command)
 ```bash
-go test -race ./...
+make dev-test
 ```
+Runs all 19 test packages in Docker with race detector. This is the command to use for all testing.
+
+### Pre-Commit Verification
+```bash
+make prod-test
+```
+Builds a clean production container and runs the full suite against it.
 
 ### Coverage Summary
 ```bash
-go test -cover ./... | grep -v "no test files"
-```
-
-### Coverage Report (HTML)
-```bash
-go test -coverprofile=coverage.out ./...
-go tool cover -html=coverage.out -o coverage.html
-open coverage.html
+docker compose --profile test run --rm test-runner go test -cover -p 4 ./...
 ```
 
 ### Specific Package
 ```bash
-go test -race -v ./internal/api/...
-go test -race -v ./internal/platform/macos/...
+docker compose --profile test run --rm test-runner go test -race -v ./internal/api/...
+docker compose --profile test run --rm test-runner go test -race -v ./internal/platform/macos/...
 ```
 
 ### Static Analysis
@@ -130,13 +132,12 @@ Mock repos have error fields for testing failure paths:
 - `mockDeviceRepo{updateErr: fmt.Errorf("db error")}`
 - `mockPolicyRepo{assignErr: fmt.Errorf("constraint violation")}`
 
-### Integration Tests (need Docker services)
+### Integration Tests
+
+All integration tests run inside Docker via `make dev-test`. No manual service startup needed — the test-runner container depends on PostgreSQL and connects via Docker networking.
 
 ```bash
-make docker-up    # Start PostgreSQL + Keycloak
-sleep 45          # Wait for services
-make migrate-up   # Run migrations
-go test -race ./...
+make dev-test     # Runs everything, including integration tests
 ```
 
 ### Platform Tests
@@ -190,15 +191,12 @@ func TestService_CreateDevice(t *testing.T) {
 
 ### Local Testing (unit tests only)
 ```bash
-go test -race ./...   # No external services needed for most tests
+make dev-test         # Runs all tests in Docker
 ```
 
 ### Full Integration Testing
 ```bash
-make docker-up        # Start PostgreSQL + Keycloak
-sleep 45              # Wait for services to be ready
-make migrate-up       # Run migrations
-go test -race ./...   # Run all tests
+make dev-test         # All 19 packages, race detector, Docker networking
 ```
 
 ## Tips

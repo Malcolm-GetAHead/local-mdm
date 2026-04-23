@@ -24,17 +24,15 @@ make run            # Start server
 | Command | Description |
 |---------|-------------|
 | `make help` | Show all commands |
-| `make run` | Start server |
-| `make build` | Build binary |
-| `make test` | Run tests |
-| `make docker-up` | Start PostgreSQL + Keycloak |
-| `make docker-down` | Stop services |
-| `make migrate-up` | Run migrations |
-| `make migrate-down` | Rollback migrations |
+| `make dev` | Full stack with hot reload |
+| `make dev-test` | Run all tests in Docker (canonical test command) |
+| `make dev-shell` | Shell into dev container |
+| `make prod-build` | Build production container |
+| `make prod-test` | Build prod + run full E2E suite |
+| `make docker-up` | Start infrastructure services |
+| `make docker-down` | Stop all containers |
 | `make migrate-create NAME=xxx` | Create new migration |
-| `go test -race ./...` | Run tests with race detector |
-| `go test -cover ./...` | Coverage summary |
-| `go vet ./...` | Static analysis |
+| `go vet ./...` | Static analysis (can run on host) |
 
 ## Important URLs
 
@@ -280,24 +278,21 @@ local-mdm/
 1. **Start session**
    ```bash
    cd ~/Documents/GitRepos/Malcolm-GetAHead/local-mdm
-   make docker-up && sleep 45 && make migrate-up
-   make run
+   make dev
    ```
 
-2. **Make changes** — edit code, run tests frequently
+2. **Make changes** — edit code, hot reload rebuilds automatically
 
 3. **Test changes**
    ```bash
-   go test -race ./...
-   go vet ./...
+   make dev-test
    ```
 
 4. **Commit** — one commit per logical unit, reference task IDs
 
 5. **End session**
    ```bash
-   Ctrl+C          # Stop server
-   make docker-down  # Stop services
+   make docker-down  # Stop all containers
    ```
 
 ## Current Phase

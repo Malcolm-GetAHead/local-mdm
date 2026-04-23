@@ -397,11 +397,13 @@ GET /health
 ### Development
 
 ```
-Developer Machine
-├── Docker Compose
-│   ├── PostgreSQL
-│   └── Adminer
-└── Go Application (local)
+Docker Compose (all services on Alpine Linux)
+├── localmdm        — Go API server (port 8080) or localmdm-dev (hot reload)
+├── nanomdm         — Apple MDM protocol handler (port 9000)
+├── postgres        — PostgreSQL 15 (databases: localmdm, keycloak, nanomdm)
+├── keycloak        — OIDC identity provider (port 8180)
+├── adminer         — Database UI (port 8081)
+└── test-runner     — go test with race detector, mdmb installed
 ```
 
 ### Production (Recommended)
