@@ -88,7 +88,7 @@ type EventHandler func(ctx context.Context, event MDMEvent) error
 
 ### S5b-02: New Triggers Migration
 
-Create `migrations/000010_eventbus_triggers.up.sql`:
+Create `migrations/000011_eventbus_triggers.up.sql`:
 
 ```sql
 -- Trigger for platform_data changes (device state updates from check-in)
@@ -138,13 +138,14 @@ Register these subscribers at startup:
 
 ### S5b-04: Device State Parsing in Check-in Handlers
 
-Enhance check-in handlers to extract security-relevant fields into `platform_data`:
+Enhance check-in and webhook handlers to extract security-relevant fields into `platform_data`.
 
-**macOS** (`internal/platform/macos/responses.go`):
-- Parse SecurityInfo response fields: `HardwareEncryptionCaps`, `FDE_Enabled` → `FileVaultEnabled`
-- Parse `FirewallSettings.FirewallEnabled` → `FirewallEnabled`
-- Parse `IsPasscodePresent` → `password_present`
-- These fields come from the `SecurityInfo` MDM command response, which NanoMDM forwards as part of device info
+**Architecture note (Sprint 5c change)**: macOS devices check in to NanoMDM, which forwards events to Local MDM via JSON webhook. The `CheckinHandler` in `internal/platform/macos/webhook.go` processes these webhooks. Sprint 5c's E2E test (`mdmb_enrollment_test.go`) already demonstrates enriched parsing of Authenticate/TokenUpdate messages — this logic needs to be moved into the production `CheckinHandler`.
+
+**macOS** (`internal/platform/macos/webhook.go` — CheckinHandler):
+- On Authenticate: extract SerialNumber, DeviceName, ProductName, OSVersion, BuildVersion into device record (pattern from Sprint 5c E2E test)
+- On TokenUpdate: set status to enrolled, store PushMagic and token presence
+- On SecurityInfo command response (via NanoMDM command webhook): parse `FDE_Enabled` → `FileVaultEnabled`, `FirewallEnabled`, `IsPasscodePresent` → `password_present`
 
 **Windows** (`internal/platform/windows/management.go`):
 - Add CSP URIs to the `fieldMap`:
@@ -153,13 +154,13 @@ Enhance check-in handlers to extract security-relevant fields into `platform_dat
   - `./Vendor/MSFT/DeviceLock/DevicePasswordEnabled` → `password_present`
 
 **Android** (`internal/platform/android/webhook.go`):
-- In `handleStatusReport`: parse `device.SecurityPosture` from the Google API response
-- Map `device.SecurityPosture.DevicePosture` → `encryption_enabled`, `password_present`
+- In `handleStatusReport`: parse `device.SecurityPosture` from the Google API response (requires Google client — deferred until F-01 GCP setup)
+- In `handleComplianceReport`: persist compliance data to `platform_data`
 - Actually persist the data: call `h.service.UpdateDevice()` to save to `platform_data`
 
 ### S5b-05: Register Lifecycle Hooks + Fix Android Gap
 
-**Problem**: `LifecycleService.RegisterHook()` is never called in production code. The lifecycle service has zero subscribers. Also, Android's `handleUnenrollment` doesn't call lifecycle hooks (only macOS does).
+**Problem**: `LifecycleService.RegisterHook()` is never called in production code. The lifecycle service has zero subscribers. Android's `handleUnenrollment` calls `UpdateDeviceStatus` (wired in Sprint 5c) but doesn't call lifecycle hooks.
 
 **Fix**:
 1. Create a `ComplianceCleanupHook` that implements `DeviceLifecycleHook`:
@@ -167,7 +168,7 @@ Enhance check-in handlers to extract security-relevant fields into `platform_dat
    - `OnWipe`: clear compliance results
    - `OnDelete`: clear compliance results
 2. Register it in `Server.New()`: `s.lifecycleService.RegisterHook(complianceCleanupHook)`
-3. In the Android `WebhookHandler.handleUnenrollment()`: add `h.lifecycle.OnUnenroll(ctx, device)` call (once the webhook handler is wired in Sprint 5c)
+3. In the Android `WebhookHandler.handleUnenrollment()`: add `h.lifecycle.OnUnenroll(ctx, device)` call (WebhookHandler was wired in Sprint 5c, needs LifecycleService added to its constructor)
 
 ### S5b-06: Load Testing Framework
 
@@ -178,6 +179,8 @@ Create `tests/load/` with k6 scenarios:
 - `policy_deploy.js` — assign policy to 1000 devices, verify compliance evaluation
 
 Include a `README.md` with setup instructions and performance targets.
+
+**Docker**: Add k6 as a docker-compose service (profile: `load-test`) or install in the dev container. Tests should target `http://localmdm:8080` (Docker networking). All dev/test runs in Docker per Sprint 5c convention.
 
 ---
 

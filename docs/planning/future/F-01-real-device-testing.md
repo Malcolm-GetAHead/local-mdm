@@ -105,11 +105,21 @@ Without real device testing:
 - Validation scripts
 
 ### Task 3: macOS Device Tests (1 day)
-- Enrollment profile generation and installation
-- DEP enrollment simulation (if possible)
-- Profile deployment tests (WiFi, VPN, Certificate)
-- Command execution tests (lock, erase, app install)
+
+**Already completed in Sprint 5c** (mdmb device simulator):
+- ✅ SCEP certificate enrollment (full PKCS#7 PKCSReq/CertRep)
+- ✅ Enrollment profile generation and parsing (PayloadContent, SignMessage)
+- ✅ Authenticate + TokenUpdate check-in with Mdm-Signature verification
+- ✅ Device record creation with Serial, Name, Model, OS, Build
+- ✅ 5 concurrent device enrollments (race-detector clean)
+
+**Remaining for real Apple devices:**
+- DEP/ADE enrollment (requires Apple Business Manager account)
+- APNs push notification delivery (requires Apple Push Certificate)
+- Profile deployment tests (WiFi, VPN, Certificate) on real hardware
+- Command execution tests (lock, erase, app install) on real hardware
 - Platform SSO test
+- Edge cases mdmb doesn't simulate (user enrollment, Shared iPad)
 
 ### Task 4: Android Device Tests (1 day)
 - **Configure Google Android Management API client** (prerequisite):
