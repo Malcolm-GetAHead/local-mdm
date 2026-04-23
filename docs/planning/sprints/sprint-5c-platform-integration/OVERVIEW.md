@@ -555,13 +555,13 @@ handlers_report.go       → reports + audit logs
 
 - [x] macOS enrollment profile points to NanoMDM, not Local MDM
 - [x] NanoMDM deployed in docker-compose, forwarding webhooks to Local MDM
-- [ ] **mdmb simulated devices complete full enrollment and appear in device list** — deferred to F-01 (mdmb not installed in dev toolchain yet)
-- [ ] **mdmb device receives a command via NanoMDM and responds** — deferred to F-01
+- [ ] **mdmb simulated devices complete full enrollment and appear in device list** — SCEP enrollment verified (cert issued + received), NanoMDM check-in blocked by test env webhook port mismatch
+- [ ] **mdmb device receives a command via NanoMDM and responds** — deferred to F-01 (requires full NanoMDM webhook routing in test env)
 - [x] Windows enrollment creates device records in the database
 - [ ] **Windows E2E: SOAP enrollment → device record → management sync (automated test)** — partial: device creation tested via handler, full SOAP E2E deferred to F-01
 - [x] Android webhook events are processed (not silently dropped)
 - [x] **Android E2E: webhook enrollment → status update → unenrollment (automated test)**
-- [x] SCEP protocol uses PKCS#7 envelopes (go.mozilla.org/pkcs7)
+- [x] SCEP protocol uses PKCS#7 envelopes (go.mozilla.org/pkcs7 + smallstep/scep for full protocol)
 - [x] **Cross-service webhook test: NanoMDM JSON → Local MDM → device record (automated test)**
 - [x] Service layer test coverage ≥ 60% (achieved: 61.9%)
 - [x] All E2E tests run with `go test ./tests/e2e/...` and skip gracefully when services unavailable
@@ -569,10 +569,13 @@ handlers_report.go       → reports + audit logs
 - [x] Real device edge cases tracked as F-01 dependency (APNs, DEP, Windows MS-MDE2, Google webhook delivery)
 
 ### Deferred Items (tracked in F-01)
-- mdmb device simulator integration (install, configure, run as part of E2E suite)
+- mdmb full enrollment through NanoMDM check-in (requires webhook routing in test env)
+- mdmb command dispatch + response cycle
 - Full Windows SOAP enrollment E2E test (build SOAP XML payloads, verify each step)
-- SCEP verification with mdmb's SCEP client (proves PKCS#7 works with real client)
 - Google Android Management API client setup (requires GCP service account)
+
+### Bugs Found by mdmb
+- **Enrollment profile SCEP payload missing PayloadContent wrapper** — SCEP config keys (URL, Challenge, Keysize) were at wrong nesting level. Real Apple devices and mdmb couldn't parse the SCEP config. Fixed in S5c-04+.
 
 ---
 
