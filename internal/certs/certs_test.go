@@ -261,3 +261,48 @@ func TestGetCACertificatePEM(t *testing.T) {
 		t.Error("Certificate should be a CA")
 	}
 }
+
+func TestNewCAManagerFromPEM(t *testing.T) {
+	// Generate a CA via file-based path first, then load from PEM
+	dir := t.TempDir()
+	fileCA, err := certs.NewCAManager(dir+"/ca.crt", dir+"/ca.key")
+	if err != nil {
+		t.Fatalf("failed to create file CA: %v", err)
+	}
+
+	certPEM, err := os.ReadFile(dir + "/ca.crt")
+	if err != nil {
+		t.Fatal(err)
+	}
+	keyPEM, err := os.ReadFile(dir + "/ca.key")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	t.Run("valid PEM", func(t *testing.T) {
+		pemCA, err := certs.NewCAManagerFromPEM(certPEM, keyPEM)
+		if err != nil {
+			t.Fatalf("NewCAManagerFromPEM failed: %v", err)
+		}
+		if pemCA.GetCACertificate().Subject.CommonName != fileCA.GetCACertificate().Subject.CommonName {
+			t.Errorf("CN mismatch: got %s, want %s", pemCA.GetCACertificate().Subject.CommonName, fileCA.GetCACertificate().Subject.CommonName)
+		}
+		if pemCA.GetCAPrivateKey() == nil {
+			t.Error("private key is nil")
+		}
+	})
+
+	t.Run("invalid cert PEM", func(t *testing.T) {
+		_, err := certs.NewCAManagerFromPEM([]byte("not a cert"), keyPEM)
+		if err == nil {
+			t.Error("expected error for invalid cert PEM")
+		}
+	})
+
+	t.Run("invalid key PEM", func(t *testing.T) {
+		_, err := certs.NewCAManagerFromPEM(certPEM, []byte("not a key"))
+		if err == nil {
+			t.Error("expected error for invalid key PEM")
+		}
+	})
+}

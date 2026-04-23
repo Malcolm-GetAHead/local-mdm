@@ -42,6 +42,31 @@ func NewCAManager(certPath, keyPath string) (*CAManager, error) {
 	return manager, nil
 }
 
+// NewCAManagerFromPEM creates a CA manager from PEM-encoded certificate and key bytes.
+// Use this in production where secrets come from environment variables (AWS Secrets Manager/SSM)
+// rather than filesystem paths.
+func NewCAManagerFromPEM(certPEM, keyPEM []byte) (*CAManager, error) {
+	block, _ := pem.Decode(certPEM)
+	if block == nil {
+		return nil, fmt.Errorf("failed to decode CA certificate PEM")
+	}
+	cert, err := x509.ParseCertificate(block.Bytes)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse CA certificate: %w", err)
+	}
+
+	keyBlock, _ := pem.Decode(keyPEM)
+	if keyBlock == nil {
+		return nil, fmt.Errorf("failed to decode CA key PEM")
+	}
+	key, err := x509.ParsePKCS1PrivateKey(keyBlock.Bytes)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse CA private key: %w", err)
+	}
+
+	return &CAManager{caCert: cert, caKey: key}, nil
+}
+
 func (m *CAManager) loadCA() error {
 	// Load certificate
 	certPEM, err := os.ReadFile(m.certPath)

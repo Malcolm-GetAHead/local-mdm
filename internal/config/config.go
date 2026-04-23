@@ -223,6 +223,8 @@ func (c KeycloakConfig) IssuerURL() string {
 type CertificatesConfig struct {
 	CACertPath          string                      `yaml:"ca_cert_path"`
 	CAKeyPath           string                      `yaml:"ca_key_path"`
+	CACertPEM           string                      `yaml:"-"` // from CA_CERT_PEM env var (production)
+	CAKeyPEM            string                      `yaml:"-"` // from CA_KEY_PEM env var (production)
 	DeviceCertValidity  time.Duration               `yaml:"device_cert_validity"`
 	SCEPChallengeTTL    time.Duration               `yaml:"scep_challenge_ttl"`
 	ExpirationMonitor   CertExpirationMonitorConfig `yaml:"expiration_monitor"`
@@ -346,6 +348,13 @@ func (c *Config) overrideFromEnv() {
 			c.Database.Reader = &ReaderConfig{}
 		}
 		fmt.Sscanf(rPort, "%d", &c.Database.Reader.Port)
+	}
+	// CA cert/key as PEM from Secrets Manager/SSM (production)
+	if certPEM := os.Getenv("CA_CERT_PEM"); certPEM != "" {
+		c.Certificates.CACertPEM = certPEM
+	}
+	if keyPEM := os.Getenv("CA_KEY_PEM"); keyPEM != "" {
+		c.Certificates.CAKeyPEM = keyPEM
 	}
 }
 

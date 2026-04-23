@@ -153,7 +153,21 @@ func New(cfg *config.Config, database *db.DB, logger *slog.Logger) (*Server, err
 	s.appRepo = appRepo
 
 	// Initialize certificate service
-	caManager, err := certs.NewCAManager(cfg.Certificates.CACertPath, cfg.Certificates.CAKeyPath)
+	var caManager *certs.CAManager
+	if cfg.Certificates.CACertPEM != "" && cfg.Certificates.CAKeyPEM != "" {
+		// Production: CA cert/key from env vars (Secrets Manager/SSM)
+		caManager, err = certs.NewCAManagerFromPEM(
+			[]byte(cfg.Certificates.CACertPEM),
+			[]byte(cfg.Certificates.CAKeyPEM),
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to load CA from PEM env vars: %w", err)
+		}
+		logger.Info("CA loaded from environment variables")
+	} else {
+		// Dev: CA cert/key from filesystem paths
+		caManager, err = certs.NewCAManager(cfg.Certificates.CACertPath, cfg.Certificates.CAKeyPath)
+	}
 	if err != nil {
 		logger.Warn("CA manager not available, certificate operations disabled", "error", err)
 	} else {
