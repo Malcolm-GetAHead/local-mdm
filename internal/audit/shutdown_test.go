@@ -8,6 +8,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/malcolm-getahead/local-mdm/internal/db"
+	"github.com/malcolm-getahead/local-mdm/internal/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -42,8 +43,7 @@ func createTestUser(t testing.TB, database *db.DB, enterpriseID uuid.UUID) uuid.
 
 // TestAsyncLogger_Shutdown_DrainsQueue tests that shutdown waits for queue to drain
 func TestAsyncLogger_Shutdown_DrainsQueue(t *testing.T) {
-	db := setupTestDB(t)
-	defer db.Close()
+	db := testutil.ConnectDB(t)
 
 	logger := NewAsyncLogger(db.Writer, 100, 3, nil)
 
@@ -79,8 +79,7 @@ func TestAsyncLogger_Shutdown_DrainsQueue(t *testing.T) {
 
 // TestAsyncLogger_Shutdown_RespectsTimeout tests that shutdown respects context timeout
 func TestAsyncLogger_Shutdown_RespectsTimeout(t *testing.T) {
-	db := setupTestDB(t)
-	defer db.Close()
+	db := testutil.ConnectDB(t)
 
 	// Create logger with slow worker (simulate stuck worker)
 	logger := &AsyncLogger{
@@ -125,8 +124,7 @@ func TestAsyncLogger_Shutdown_RespectsTimeout(t *testing.T) {
 
 // TestAsyncLogger_Shutdown_Idempotent tests that multiple shutdowns are safe
 func TestAsyncLogger_Shutdown_Idempotent(t *testing.T) {
-	db := setupTestDB(t)
-	defer db.Close()
+	db := testutil.ConnectDB(t)
 
 	logger := NewAsyncLogger(db.Writer, 10, 1, nil)
 
@@ -146,8 +144,7 @@ func TestAsyncLogger_Shutdown_Idempotent(t *testing.T) {
 
 // TestAsyncLogger_Close_CallsShutdown tests that Close() calls Shutdown()
 func TestAsyncLogger_Close_CallsShutdown(t *testing.T) {
-	db := setupTestDB(t)
-	defer db.Close()
+	db := testutil.ConnectDB(t)
 
 	logger := NewAsyncLogger(db.Writer, 10, 1, nil)
 
@@ -178,8 +175,7 @@ func TestAsyncLogger_Close_CallsShutdown(t *testing.T) {
 
 // TestAsyncLogger_Shutdown_EmptyQueue tests shutdown with empty queue
 func TestAsyncLogger_Shutdown_EmptyQueue(t *testing.T) {
-	db := setupTestDB(t)
-	defer db.Close()
+	db := testutil.ConnectDB(t)
 
 	logger := NewAsyncLogger(db.Writer, 10, 3, nil)
 
@@ -193,8 +189,7 @@ func TestAsyncLogger_Shutdown_EmptyQueue(t *testing.T) {
 
 // TestAsyncLogger_Shutdown_LargeQueue tests shutdown with many events
 func TestAsyncLogger_Shutdown_LargeQueue(t *testing.T) {
-	db := setupTestDB(t)
-	defer db.Close()
+	db := testutil.ConnectDB(t)
 
 	logger := NewAsyncLogger(db.Writer, 1000, 5, nil) // More workers for speed
 
@@ -231,8 +226,7 @@ func TestAsyncLogger_Shutdown_LargeQueue(t *testing.T) {
 
 // TestAsyncLogger_Shutdown_RejectsNewEvents tests that events are rejected after shutdown
 func TestAsyncLogger_Shutdown_RejectsNewEvents(t *testing.T) {
-	db := setupTestDB(t)
-	defer db.Close()
+	db := testutil.ConnectDB(t)
 
 	logger := NewAsyncLogger(db.Writer, 10, 1, nil)
 
@@ -260,8 +254,7 @@ func TestAsyncLogger_Shutdown_RejectsNewEvents(t *testing.T) {
 
 // TestAsyncLogger_Shutdown_ConcurrentShutdowns tests concurrent shutdown calls
 func TestAsyncLogger_Shutdown_ConcurrentShutdowns(t *testing.T) {
-	db := setupTestDB(t)
-	defer db.Close()
+	db := testutil.ConnectDB(t)
 
 	logger := NewAsyncLogger(db.Writer, 100, 3, nil)
 
@@ -299,8 +292,7 @@ func TestAsyncLogger_Shutdown_ConcurrentShutdowns(t *testing.T) {
 
 // BenchmarkAsyncLogger_Shutdown benchmarks shutdown performance
 func BenchmarkAsyncLogger_Shutdown(b *testing.B) {
-	db := setupTestDB(b)
-	defer db.Close()
+	db := testutil.ConnectDB(b)
 
 	b.Run("empty_queue", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
@@ -355,8 +347,7 @@ func BenchmarkAsyncLogger_Shutdown(b *testing.B) {
 }
 
 func TestAsyncLogger_Shutdown_NilContext(t *testing.T) {
-	db := setupTestDB(t)
-	defer db.Close()
+	db := testutil.ConnectDB(t)
 
 	logger := NewAsyncLogger(db.Writer, 100, 2, nil)
 

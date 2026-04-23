@@ -12,6 +12,7 @@ import (
 
 	"github.com/malcolm-getahead/local-mdm/internal/config"
 	"github.com/malcolm-getahead/local-mdm/internal/db"
+	"github.com/malcolm-getahead/local-mdm/internal/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -164,8 +165,7 @@ func TestAuthMiddlewareNotNil(t *testing.T) {
 // TestServerCreationWithValidKeycloak verifies that server creation succeeds
 // with a valid Keycloak configuration
 func TestServerCreationWithValidKeycloak(t *testing.T) {
-	testDB := setupTestDB(t)
-	defer testDB.Close()
+	testDB := testutil.ConnectDB(t)
 
 	// Use a mock Keycloak server
 	mockKeycloak := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -206,36 +206,11 @@ func TestServerCreationWithValidKeycloak(t *testing.T) {
 	assert.NotNil(t, server.authMiddleware, "Auth middleware should be initialized")
 }
 
-// setupTestDB creates a test database connection
-func setupTestDB(t *testing.T) *db.DB {
-	t.Helper()
-
-	cfg := config.DatabaseConfig{
-		Host:            func() string { if h := os.Getenv("DB_HOST"); h != "" { return h }; return "localhost" }(),
-		Port:            5432,
-		User:            "postgres",
-		Password:        func() string { if p := os.Getenv("DB_PASSWORD"); p != "" { return p }; return "postgres" }(),
-		Database:        "localmdm",
-		SSLMode:         "disable",
-		MaxOpenConns:    10,
-		MaxIdleConns:    5,
-		ConnMaxLifetime: 300000000000, // 5 minutes in nanoseconds
-	}
-
-	database, err := db.New(cfg)
-	if err != nil {
-		t.Skipf("Skipping test: database not available: %v", err)
-	}
-
-	return database
-}
-
 // setupTestServer creates a test server with mocked Keycloak
 func setupTestServer(t *testing.T) *Server {
 	t.Helper()
 
-	testDB := setupTestDB(t)
-	t.Cleanup(func() { testDB.Close() })
+	testDB := testutil.ConnectDB(t)
 
 	// Mock Keycloak server
 	mockKeycloak := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

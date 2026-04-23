@@ -18,6 +18,7 @@ import (
 
 	"github.com/malcolm-getahead/local-mdm/internal/certs"
 	"github.com/malcolm-getahead/local-mdm/internal/scep"
+	"github.com/malcolm-getahead/local-mdm/internal/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.mozilla.org/pkcs7"
@@ -35,11 +36,10 @@ import (
 // This is the openssl-equivalent verification: every response is parsed
 // as PKCS#7 DER, the same format openssl pkcs7/smime commands expect.
 func TestE2E_SCEP_FullProtocolFlow(t *testing.T) {
-	database := setupDB(t)
-	defer database.Close()
+	database := testutil.ConnectDB(t)
 
 	dir := t.TempDir()
-	ca, err := certs.NewCAManager(dir+"/ca.crt", dir+"/ca.key")
+	ca, err := certs.GenerateCA(dir+"/ca.crt", dir+"/ca.key")
 	require.NoError(t, err)
 
 	challengeMgr := scep.NewChallengeManager(database.Writer)

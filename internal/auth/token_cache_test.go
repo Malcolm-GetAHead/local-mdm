@@ -2,43 +2,18 @@ package auth
 
 import (
 	"context"
-	"database/sql"
-	"fmt"
-	"os"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/malcolm-getahead/local-mdm/internal/testutil"
 	_ "github.com/lib/pq"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func getTestDB(t *testing.T) *sql.DB {
-	t.Helper()
-	host := os.Getenv("DB_HOST")
-	if host == "" {
-		host = "localhost"
-	}
-	password := os.Getenv("DB_PASSWORD")
-	if password == "" {
-		password = "postgres"
-	}
-	dsn := fmt.Sprintf("host=%s port=5432 user=postgres password=%s dbname=localmdm sslmode=disable", host, password)
-	db, err := sql.Open("postgres", dsn)
-	if err != nil {
-		t.Skipf("skipping integration test: %v", err)
-	}
-	if err := db.Ping(); err != nil {
-		t.Skipf("skipping integration test: %v", err)
-	}
-	db.SetMaxOpenConns(2)
-	t.Cleanup(func() { db.Close() })
-	return db
-}
-
 func TestTokenCache(t *testing.T) {
-	db := getTestDB(t)
+	db := testutil.ConnectRawDB(t)
 
 	t.Run("connects to database", func(t *testing.T) {
 		cache, err := NewTokenCache(db, 5*time.Minute)

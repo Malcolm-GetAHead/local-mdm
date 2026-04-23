@@ -45,7 +45,7 @@ func (m *mockStore) CleanupExpired() {}
 func setupTestCA(t *testing.T) *certs.CAManager {
 	t.Helper()
 	dir := t.TempDir()
-	ca, err := certs.NewCAManager(dir+"/ca.crt", dir+"/ca.key")
+	ca, err := certs.GenerateCA(dir+"/ca.crt", dir+"/ca.key")
 	require.NoError(t, err)
 	return ca
 }

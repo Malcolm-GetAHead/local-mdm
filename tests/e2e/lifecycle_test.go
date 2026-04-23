@@ -2,46 +2,21 @@ package e2e
 
 import (
 	"context"
-	"os"
 	"testing"
-	"time"
 
 	"github.com/google/uuid"
 	"github.com/malcolm-getahead/local-mdm/internal/apperrors"
-	"github.com/malcolm-getahead/local-mdm/internal/config"
-	"github.com/malcolm-getahead/local-mdm/internal/db"
 	"github.com/malcolm-getahead/local-mdm/internal/models"
 	"github.com/malcolm-getahead/local-mdm/internal/repository"
 	"github.com/malcolm-getahead/local-mdm/internal/service"
+	"github.com/malcolm-getahead/local-mdm/internal/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"log/slog"
 )
 
-func setupDB(t *testing.T) *db.DB {
-	t.Helper()
-	host := os.Getenv("DB_HOST")
-	if host == "" {
-		host = "localhost"
-	}
-	password := os.Getenv("DB_PASSWORD")
-	if password == "" {
-		password = "postgres"
-	}
-	cfg := config.DatabaseConfig{
-		Host: host, Port: 5432, User: "postgres", Password: password,
-		Database: "localmdm", SSLMode: "disable", MaxOpenConns: 2, MaxIdleConns: 1, ConnMaxLifetime: 5 * time.Minute,
-	}
-	database, err := db.New(cfg)
-	if err != nil {
-		t.Skipf("skipping E2E: %v", err)
-	}
-	return database
-}
-
 func TestE2E_DeviceLifecycle(t *testing.T) {
-	database := setupDB(t)
-	defer database.Close()
+	database := testutil.ConnectDB(t)
 	ctx := context.Background()
 	logger := slog.Default()
 
@@ -156,8 +131,7 @@ func TestE2E_DeviceLifecycle(t *testing.T) {
 }
 
 func TestE2E_CrossPlatformPolicy(t *testing.T) {
-	database := setupDB(t)
-	defer database.Close()
+	database := testutil.ConnectDB(t)
 	ctx := context.Background()
 
 	entRepo, err := repository.NewEnterpriseRepository(database.Writer, database.Reader)

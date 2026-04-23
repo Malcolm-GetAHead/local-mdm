@@ -1,45 +1,18 @@
 package audit
 
 import (
-	"os"
 	"context"
 	"net"
 	"testing"
-	"time"
 
 	"github.com/google/uuid"
-	"github.com/malcolm-getahead/local-mdm/internal/config"
-	"github.com/malcolm-getahead/local-mdm/internal/db"
+	"github.com/malcolm-getahead/local-mdm/internal/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func setupTestDB(t testing.TB) *db.DB {
-	t.Helper()
-
-	cfg := config.DatabaseConfig{
-		Host:            func() string { if h := os.Getenv("DB_HOST"); h != "" { return h }; return "localhost" }(),
-		Port:            5432,
-		User:            "postgres",
-		Password:        func() string { if p := os.Getenv("DB_PASSWORD"); p != "" { return p }; return "postgres" }(),
-		Database:        "localmdm",
-		SSLMode:         "disable",
-		MaxOpenConns:    5,
-		MaxIdleConns:    2,
-		ConnMaxLifetime: 5 * time.Minute,
-	}
-
-	database, err := db.New(cfg)
-	if err != nil {
-		t.Fatalf("Failed to connect to test database: %v", err)
-	}
-
-	return database
-}
-
 func TestLogger_Log_Success(t *testing.T) {
-	database := setupTestDB(t)
-	defer database.Close()
+	database := testutil.ConnectDB(t)
 
 	logger := NewLogger(database.Writer)
 	ctx := context.Background()
@@ -87,8 +60,7 @@ func TestLogger_Log_Success(t *testing.T) {
 }
 
 func TestLogger_Log_MinimalEvent(t *testing.T) {
-	database := setupTestDB(t)
-	defer database.Close()
+	database := testutil.ConnectDB(t)
 
 	logger := NewLogger(database.Writer)
 	ctx := context.Background()
@@ -125,8 +97,7 @@ func TestLogger_Log_MinimalEvent(t *testing.T) {
 }
 
 func TestLogger_Log_InvalidAction(t *testing.T) {
-	database := setupTestDB(t)
-	defer database.Close()
+	database := testutil.ConnectDB(t)
 
 	logger := NewLogger(database.Writer)
 	ctx := context.Background()
@@ -180,8 +151,7 @@ func TestLogger_Log_InvalidAction(t *testing.T) {
 }
 
 func TestLogger_Log_WithNilUUIDs(t *testing.T) {
-	database := setupTestDB(t)
-	defer database.Close()
+	database := testutil.ConnectDB(t)
 
 	logger := NewLogger(database.Writer)
 	ctx := context.Background()
@@ -202,8 +172,7 @@ func TestLogger_Log_WithNilUUIDs(t *testing.T) {
 }
 
 func TestLogger_Log_WithIPv6(t *testing.T) {
-	database := setupTestDB(t)
-	defer database.Close()
+	database := testutil.ConnectDB(t)
 
 	logger := NewLogger(database.Writer)
 	ctx := context.Background()
@@ -231,8 +200,7 @@ func TestLogger_Log_WithIPv6(t *testing.T) {
 }
 
 func TestLogger_Log_WithComplexDetails(t *testing.T) {
-	database := setupTestDB(t)
-	defer database.Close()
+	database := testutil.ConnectDB(t)
 
 	logger := NewLogger(database.Writer)
 	ctx := context.Background()
@@ -272,8 +240,7 @@ func TestLogger_Log_WithComplexDetails(t *testing.T) {
 }
 
 func TestLogger_Log_ConcurrentWrites(t *testing.T) {
-	database := setupTestDB(t)
-	defer database.Close()
+	database := testutil.ConnectDB(t)
 
 	logger := NewLogger(database.Writer)
 	ctx := context.Background()
@@ -310,8 +277,7 @@ func TestLogger_Log_ConcurrentWrites(t *testing.T) {
 }
 
 func TestLogger_Log_ContextCancellation(t *testing.T) {
-	database := setupTestDB(t)
-	defer database.Close()
+	database := testutil.ConnectDB(t)
 
 	logger := NewLogger(database.Writer)
 	ctx, cancel := context.WithCancel(context.Background())
@@ -328,8 +294,7 @@ func TestLogger_Log_ContextCancellation(t *testing.T) {
 }
 
 func TestLogger_Log_EmptyDetails(t *testing.T) {
-	database := setupTestDB(t)
-	defer database.Close()
+	database := testutil.ConnectDB(t)
 
 	logger := NewLogger(database.Writer)
 	ctx := context.Background()
@@ -357,8 +322,7 @@ func TestLogger_Log_EmptyDetails(t *testing.T) {
 }
 
 func TestLogger_Log_NilDetails(t *testing.T) {
-	database := setupTestDB(t)
-	defer database.Close()
+	database := testutil.ConnectDB(t)
 
 	logger := NewLogger(database.Writer)
 	ctx := context.Background()

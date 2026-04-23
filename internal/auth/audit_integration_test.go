@@ -1,7 +1,6 @@
 package auth
 
 import (
-	"os"
 	"context"
 	"log/slog"
 	"net/http"
@@ -10,38 +9,13 @@ import (
 	"time"
 
 	"github.com/malcolm-getahead/local-mdm/internal/audit"
-	"github.com/malcolm-getahead/local-mdm/internal/config"
-	"github.com/malcolm-getahead/local-mdm/internal/db"
+	"github.com/malcolm-getahead/local-mdm/internal/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func setupTestDBForAudit(t *testing.T) *db.DB {
-	t.Helper()
-
-	cfg := config.DatabaseConfig{
-		Host:            func() string { if h := os.Getenv("DB_HOST"); h != "" { return h }; return "localhost" }(),
-		Port:            5432,
-		User:            "postgres",
-		Password:        func() string { if p := os.Getenv("DB_PASSWORD"); p != "" { return p }; return "postgres" }(),
-		Database:        "localmdm",
-		SSLMode:         "disable",
-		MaxOpenConns:    5,
-		MaxIdleConns:    2,
-		ConnMaxLifetime: 5 * time.Minute,
-	}
-
-	database, err := db.New(cfg)
-	if err != nil {
-		t.Fatalf("Failed to connect to test database: %v", err)
-	}
-
-	return database
-}
-
 func TestMiddleware_AuditLogging_AuthFailure(t *testing.T) {
-	database := setupTestDBForAudit(t)
-	defer database.Close()
+	database := testutil.ConnectDB(t)
 
 	// Create middleware with audit logger
 	validator := &OIDCValidator{} // Mock validator
@@ -83,8 +57,7 @@ func TestMiddleware_AuditLogging_AuthFailure(t *testing.T) {
 }
 
 func TestMiddleware_AuditLogging_AccessDenied(t *testing.T) {
-	database := setupTestDBForAudit(t)
-	defer database.Close()
+	database := testutil.ConnectDB(t)
 
 	// Create middleware with audit logger
 	validator := &OIDCValidator{} // Mock validator

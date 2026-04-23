@@ -2,49 +2,16 @@ package repository_test
 
 import (
 	"context"
-	"os"
 	"testing"
-	"time"
 
 	"github.com/google/uuid"
-	"github.com/malcolm-getahead/local-mdm/internal/config"
-	"github.com/malcolm-getahead/local-mdm/internal/db"
 	"github.com/malcolm-getahead/local-mdm/internal/models"
 	"github.com/malcolm-getahead/local-mdm/internal/repository"
+	"github.com/malcolm-getahead/local-mdm/internal/testutil"
 )
 
-func setupTestDB(t *testing.T) *db.DB {
-	host := os.Getenv("DB_HOST")
-	if host == "" {
-		host = "localhost"
-	}
-	password := os.Getenv("DB_PASSWORD")
-	if password == "" {
-		password = "postgres"
-	}
-	cfg := config.DatabaseConfig{
-		Host:            host,
-		Port:            5432,
-		User:            "postgres",
-		Password:        password,
-		Database:        "localmdm",
-		SSLMode:         "disable",
-		MaxOpenConns:    2,
-		MaxIdleConns:    1,
-		ConnMaxLifetime: 5 * time.Minute,
-	}
-	
-	database, err := db.New(cfg)
-	if err != nil {
-		t.Fatalf("Failed to connect to database: %v", err)
-	}
-	
-	return database
-}
-
 func TestEnterpriseRepository(t *testing.T) {
-	database := setupTestDB(t)
-	defer database.Close()
+	database := testutil.ConnectDB(t)
 	
 	repo, err := repository.NewEnterpriseRepository(database.Writer, database.Reader)
 	if err != nil {
@@ -130,8 +97,7 @@ func TestEnterpriseRepository(t *testing.T) {
 }
 
 func TestDeviceRepository(t *testing.T) {
-	database := setupTestDB(t)
-	defer database.Close()
+	database := testutil.ConnectDB(t)
 	
 	// Create enterprise first
 	enterpriseRepo, err := repository.NewEnterpriseRepository(database.Writer, database.Reader)
@@ -220,8 +186,7 @@ func TestDeviceRepository(t *testing.T) {
 }
 
 func TestPolicyRepository(t *testing.T) {
-	database := setupTestDB(t)
-	defer database.Close()
+	database := testutil.ConnectDB(t)
 	
 	// Create enterprise first
 	enterpriseRepo, err := repository.NewEnterpriseRepository(database.Writer, database.Reader)

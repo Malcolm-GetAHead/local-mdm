@@ -8,13 +8,13 @@ import (
 	"github.com/malcolm-getahead/local-mdm/internal/apperrors"
 	"github.com/malcolm-getahead/local-mdm/internal/models"
 	"github.com/malcolm-getahead/local-mdm/internal/repository"
+	"github.com/malcolm-getahead/local-mdm/internal/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func TestPolicyAssignmentRepository(t *testing.T) {
-	database := setupTestDB(t)
-	defer database.Close()
+	database := testutil.ConnectDB(t)
 
 	// Setup: enterprise, device, group, two policies
 	entRepo, err := repository.NewEnterpriseRepository(database.Writer, database.Reader)

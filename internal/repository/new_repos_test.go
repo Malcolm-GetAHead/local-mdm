@@ -8,13 +8,13 @@ import (
 	"github.com/malcolm-getahead/local-mdm/internal/apperrors"
 	"github.com/malcolm-getahead/local-mdm/internal/models"
 	"github.com/malcolm-getahead/local-mdm/internal/repository"
+	"github.com/malcolm-getahead/local-mdm/internal/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func TestCommandRepository(t *testing.T) {
-	database := setupTestDB(t)
-	defer database.Close()
+	database := testutil.ConnectDB(t)
 
 	repo, err := repository.NewCommandRepository(database.Writer, database.Reader)
 	require.NoError(t, err)
@@ -154,8 +154,7 @@ func TestAuditLogRepository_Constructor(t *testing.T) {
 }
 
 func TestCertificateRepository_List(t *testing.T) {
-	database := setupTestDB(t)
-	defer database.Close()
+	database := testutil.ConnectDB(t)
 
 	repo, err := repository.NewCertificateRepository(database.Writer, database.Reader)
 	require.NoError(t, err)
@@ -177,8 +176,7 @@ func TestCertificateRepository_List(t *testing.T) {
 }
 
 func TestAuditLogRepository_List(t *testing.T) {
-	database := setupTestDB(t)
-	defer database.Close()
+	database := testutil.ConnectDB(t)
 
 	repo, err := repository.NewAuditLogRepository(database.Writer, database.Reader)
 	require.NoError(t, err)

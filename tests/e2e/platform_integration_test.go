@@ -16,6 +16,7 @@ import (
 	"github.com/malcolm-getahead/local-mdm/internal/platform/macos"
 	"github.com/malcolm-getahead/local-mdm/internal/repository"
 	"github.com/malcolm-getahead/local-mdm/internal/service"
+	"github.com/malcolm-getahead/local-mdm/internal/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -23,8 +24,7 @@ import (
 // TestE2E_MacOSWebhook simulates NanoMDM forwarding an Authenticate webhook
 // and verifies a device record is created in the database.
 func TestE2E_MacOSWebhook(t *testing.T) {
-	database := setupDB(t)
-	defer database.Close()
+	database := testutil.ConnectDB(t)
 	ctx := context.Background()
 	logger := slog.Default()
 
@@ -90,8 +90,7 @@ func TestE2E_MacOSWebhook(t *testing.T) {
 // TestE2E_MacOSCheckOut simulates a CheckOut webhook and verifies
 // the device status is updated to unenrolled.
 func TestE2E_MacOSCheckOut(t *testing.T) {
-	database := setupDB(t)
-	defer database.Close()
+	database := testutil.ConnectDB(t)
 	ctx := context.Background()
 	logger := slog.Default()
 
@@ -151,8 +150,7 @@ func TestE2E_MacOSCheckOut(t *testing.T) {
 // TestE2E_AndroidWebhookEnrollment simulates an Android enrollment webhook
 // and verifies a device record is created.
 func TestE2E_AndroidWebhookEnrollment(t *testing.T) {
-	database := setupDB(t)
-	defer database.Close()
+	database := testutil.ConnectDB(t)
 	ctx := context.Background()
 	logger := slog.Default()
 
@@ -206,8 +204,7 @@ func TestE2E_AndroidWebhookEnrollment(t *testing.T) {
 // TestE2E_AndroidWebhookUnenrollment simulates an Android unenrollment webhook
 // and verifies the device status is updated.
 func TestE2E_AndroidWebhookUnenrollment(t *testing.T) {
-	database := setupDB(t)
-	defer database.Close()
+	database := testutil.ConnectDB(t)
 	ctx := context.Background()
 	logger := slog.Default()
 

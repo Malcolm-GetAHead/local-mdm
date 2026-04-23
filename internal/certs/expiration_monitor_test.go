@@ -1,7 +1,6 @@
 package certs
 
 import (
-	"os"
 	"bytes"
 	"database/sql"
 	"log/slog"
@@ -9,34 +8,16 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/malcolm-getahead/local-mdm/internal/config"
 	"github.com/malcolm-getahead/local-mdm/internal/db"
+	"github.com/malcolm-getahead/local-mdm/internal/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func setupTestDB(t testing.TB) *db.DB {
+func connectAndCleanDB(t testing.TB) *db.DB {
 	t.Helper()
-
-	cfg := config.DatabaseConfig{
-		Host:            func() string { if h := os.Getenv("DB_HOST"); h != "" { return h }; return "localhost" }(),
-		Port:            5432,
-		User:            "postgres",
-		Password:        func() string { if p := os.Getenv("DB_PASSWORD"); p != "" { return p }; return "postgres" }(),
-		Database:        "localmdm",
-		SSLMode:         "disable",
-		MaxOpenConns:    5,
-		MaxIdleConns:    2,
-		ConnMaxLifetime: 5 * time.Minute,
-	}
-
-	database, err := db.New(cfg)
-	if err != nil {
-		t.Fatalf("Failed to connect to test database: %v", err)
-	}
-
-	// Clean up certificates and devices before test
-	_, err = database.Writer.Exec("DELETE FROM certificates")
+	database := testutil.ConnectDB(t)
+	_, err := database.Writer.Exec("DELETE FROM certificates")
 	if err != nil {
 		t.Fatalf("Failed to clean certificates: %v", err)
 	}
@@ -44,7 +25,6 @@ func setupTestDB(t testing.TB) *db.DB {
 	if err != nil {
 		t.Fatalf("Failed to clean devices: %v", err)
 	}
-
 	return database
 }
 
@@ -113,8 +93,7 @@ func createTestCertificate(t testing.TB, db *sql.DB, deviceID uuid.UUID, expires
 
 // TestExpirationMonitor_Start tests that monitor starts successfully
 func TestExpirationMonitor_Start(t *testing.T) {
-	database := setupTestDB(t)
-	defer database.Close()
+	database := connectAndCleanDB(t)
 
 	monitor := NewExpirationMonitor(database.Writer, nil, 100*time.Millisecond, 30*24*time.Hour)
 	
@@ -131,8 +110,7 @@ func TestExpirationMonitor_Start(t *testing.T) {
 
 // TestExpirationMonitor_Stop tests graceful shutdown
 func TestExpirationMonitor_Stop(t *testing.T) {
-	database := setupTestDB(t)
-	defer database.Close()
+	database := connectAndCleanDB(t)
 
 	monitor := NewExpirationMonitor(database.Writer, nil, 100*time.Millisecond, 30*24*time.Hour)
 	
@@ -151,8 +129,7 @@ func TestExpirationMonitor_Stop(t *testing.T) {
 
 // TestExpirationMonitor_IdempotentStart tests multiple Start calls
 func TestExpirationMonitor_IdempotentStart(t *testing.T) {
-	database := setupTestDB(t)
-	defer database.Close()
+	database := connectAndCleanDB(t)
 
 	monitor := NewExpirationMonitor(database.Writer, nil, 100*time.Millisecond, 30*24*time.Hour)
 	
@@ -172,8 +149,7 @@ func TestExpirationMonitor_IdempotentStart(t *testing.T) {
 
 // TestExpirationMonitor_IdempotentStop tests multiple Stop calls
 func TestExpirationMonitor_IdempotentStop(t *testing.T) {
-	database := setupTestDB(t)
-	defer database.Close()
+	database := connectAndCleanDB(t)
 
 	monitor := NewExpirationMonitor(database.Writer, nil, 100*time.Millisecond, 30*24*time.Hour)
 	
@@ -192,8 +168,7 @@ func TestExpirationMonitor_IdempotentStop(t *testing.T) {
 
 // TestExpirationMonitor_DetectsExpiringCertificates tests warning for expiring certs
 func TestExpirationMonitor_DetectsExpiringCertificates(t *testing.T) {
-	database := setupTestDB(t)
-	defer database.Close()
+	database := connectAndCleanDB(t)
 
 	var logBuf bytes.Buffer
 	logger := slog.New(slog.NewJSONHandler(&logBuf, &slog.HandlerOptions{
@@ -219,8 +194,7 @@ func TestExpirationMonitor_DetectsExpiringCertificates(t *testing.T) {
 
 // TestExpirationMonitor_IgnoresNonExpiringCertificates tests no warning for valid certs
 func TestExpirationMonitor_IgnoresNonExpiringCertificates(t *testing.T) {
-	database := setupTestDB(t)
-	defer database.Close()
+	database := connectAndCleanDB(t)
 
 	var logBuf bytes.Buffer
 	logger := slog.New(slog.NewJSONHandler(&logBuf, &slog.HandlerOptions{
@@ -244,8 +218,7 @@ func TestExpirationMonitor_IgnoresNonExpiringCertificates(t *testing.T) {
 
 // TestExpirationMonitor_IgnoresRevokedCertificates tests revoked certs are ignored
 func TestExpirationMonitor_IgnoresRevokedCertificates(t *testing.T) {
-	database := setupTestDB(t)
-	defer database.Close()
+	database := connectAndCleanDB(t)
 
 	var logBuf bytes.Buffer
 	logger := slog.New(slog.NewJSONHandler(&logBuf, &slog.HandlerOptions{
@@ -269,8 +242,7 @@ func TestExpirationMonitor_IgnoresRevokedCertificates(t *testing.T) {
 
 // TestExpirationMonitor_IgnoresExpiredCertificates tests already expired certs
 func TestExpirationMonitor_IgnoresExpiredCertificates(t *testing.T) {
-	database := setupTestDB(t)
-	defer database.Close()
+	database := connectAndCleanDB(t)
 
 	var logBuf bytes.Buffer
 	logger := slog.New(slog.NewJSONHandler(&logBuf, &slog.HandlerOptions{
@@ -294,8 +266,7 @@ func TestExpirationMonitor_IgnoresExpiredCertificates(t *testing.T) {
 
 // TestExpirationMonitor_MultipleExpiringCertificates tests multiple warnings
 func TestExpirationMonitor_MultipleExpiringCertificates(t *testing.T) {
-	database := setupTestDB(t)
-	defer database.Close()
+	database := connectAndCleanDB(t)
 
 	var logBuf bytes.Buffer
 	logger := slog.New(slog.NewJSONHandler(&logBuf, &slog.HandlerOptions{
@@ -323,8 +294,7 @@ func TestExpirationMonitor_MultipleExpiringCertificates(t *testing.T) {
 
 // TestExpirationMonitor_CustomThreshold tests custom warning threshold
 func TestExpirationMonitor_CustomThreshold(t *testing.T) {
-	database := setupTestDB(t)
-	defer database.Close()
+	database := connectAndCleanDB(t)
 
 	var logBuf bytes.Buffer
 	logger := slog.New(slog.NewJSONHandler(&logBuf, &slog.HandlerOptions{
@@ -349,8 +319,7 @@ func TestExpirationMonitor_CustomThreshold(t *testing.T) {
 
 // TestExpirationMonitor_PeriodicChecks tests multiple periodic checks
 func TestExpirationMonitor_PeriodicChecks(t *testing.T) {
-	database := setupTestDB(t)
-	defer database.Close()
+	database := connectAndCleanDB(t)
 
 	var logBuf bytes.Buffer
 	logger := slog.New(slog.NewJSONHandler(&logBuf, &slog.HandlerOptions{
@@ -376,7 +345,7 @@ func TestExpirationMonitor_PeriodicChecks(t *testing.T) {
 
 // TestExpirationMonitor_DatabaseError tests error handling
 func TestExpirationMonitor_DatabaseError(t *testing.T) {
-	database := setupTestDB(t)
+	database := connectAndCleanDB(t)
 	database.Close() // Close database to cause error
 
 	var logBuf bytes.Buffer
@@ -397,8 +366,7 @@ func TestExpirationMonitor_DatabaseError(t *testing.T) {
 
 // TestExpirationMonitor_DefaultValues tests default configuration
 func TestExpirationMonitor_DefaultValues(t *testing.T) {
-	database := setupTestDB(t)
-	defer database.Close()
+	database := connectAndCleanDB(t)
 
 	// Pass zero values to trigger defaults
 	monitor := NewExpirationMonitor(database.Writer, nil, 0, 0)
@@ -409,8 +377,7 @@ func TestExpirationMonitor_DefaultValues(t *testing.T) {
 
 // TestExpirationMonitor_NilLogger tests operation without logger
 func TestExpirationMonitor_NilLogger(t *testing.T) {
-	database := setupTestDB(t)
-	defer database.Close()
+	database := connectAndCleanDB(t)
 
 	// Create expiring certificate
 	expiresAt := time.Now().Add(15 * 24 * time.Hour)
@@ -428,8 +395,7 @@ func TestExpirationMonitor_NilLogger(t *testing.T) {
 
 // TestExpirationMonitor_ConcurrentStartStop tests concurrent operations
 func TestExpirationMonitor_ConcurrentStartStop(t *testing.T) {
-	database := setupTestDB(t)
-	defer database.Close()
+	database := connectAndCleanDB(t)
 
 	monitor := NewExpirationMonitor(database.Writer, nil, 100*time.Millisecond, 30*24*time.Hour)
 
@@ -467,8 +433,7 @@ func TestExpirationMonitor_ConcurrentStartStop(t *testing.T) {
 
 // BenchmarkExpirationMonitor_Check benchmarks certificate checking
 func BenchmarkExpirationMonitor_Check(b *testing.B) {
-	database := setupTestDB(b)
-	defer database.Close()
+	database := connectAndCleanDB(b)
 
 	// Create 100 expiring certificates
 	for i := 0; i < 100; i++ {

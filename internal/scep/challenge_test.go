@@ -1,46 +1,19 @@
 package scep
 
 import (
-	"database/sql"
-	"fmt"
-	"os"
 	"testing"
 	"time"
 
 	_ "github.com/lib/pq"
+	"github.com/malcolm-getahead/local-mdm/internal/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func setupTestDB(t *testing.T) *sql.DB {
-	t.Helper()
-	host := os.Getenv("DB_HOST")
-	if host == "" {
-		host = "localhost"
-	}
-	password := os.Getenv("DB_PASSWORD")
-	if password == "" {
-		password = "postgres"
-	}
-	dsn := fmt.Sprintf("host=%s port=5432 user=postgres password=%s dbname=localmdm sslmode=disable", host, password)
-	db, err := sql.Open("postgres", dsn)
-	if err != nil {
-		t.Skipf("skipping integration test: %v", err)
-	}
-	if err := db.Ping(); err != nil {
-		t.Skipf("skipping integration test: %v", err)
-	}
-	t.Cleanup(func() {
-		db.Exec("DELETE FROM scep_challenges")
-		db.Close()
-	})
-	// Clean slate
-	db.Exec("DELETE FROM scep_challenges")
-	return db
-}
-
 func TestChallengeManager_GenerateChallenge(t *testing.T) {
-	db := setupTestDB(t)
+	db := testutil.ConnectRawDB(t)
+	t.Cleanup(func() { db.Exec("DELETE FROM scep_challenges") })
+	db.Exec("DELETE FROM scep_challenges")
 	cm := NewChallengeManager(db)
 
 	t.Run("generates unique challenges", func(t *testing.T) {
@@ -61,7 +34,9 @@ func TestChallengeManager_GenerateChallenge(t *testing.T) {
 }
 
 func TestChallengeManager_ValidateChallenge(t *testing.T) {
-	db := setupTestDB(t)
+	db := testutil.ConnectRawDB(t)
+	t.Cleanup(func() { db.Exec("DELETE FROM scep_challenges") })
+	db.Exec("DELETE FROM scep_challenges")
 	cm := NewChallengeManager(db)
 
 	t.Run("validates unused challenge", func(t *testing.T) {
@@ -103,7 +78,9 @@ func TestChallengeManager_ValidateChallenge(t *testing.T) {
 }
 
 func TestChallengeManager_CleanupExpired(t *testing.T) {
-	db := setupTestDB(t)
+	db := testutil.ConnectRawDB(t)
+	t.Cleanup(func() { db.Exec("DELETE FROM scep_challenges") })
+	db.Exec("DELETE FROM scep_challenges")
 	cm := NewChallengeManager(db)
 
 	// Insert expired challenge directly

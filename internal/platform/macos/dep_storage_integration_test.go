@@ -1,44 +1,21 @@
 package macos
 
 import (
-	"os"
 	"context"
 	"testing"
 	"time"
 
 	"github.com/malcolm-getahead/local-mdm/internal/apperrors"
-	"github.com/malcolm-getahead/local-mdm/internal/config"
-	"github.com/malcolm-getahead/local-mdm/internal/db"
+	"github.com/malcolm-getahead/local-mdm/internal/testutil"
 	"github.com/micromdm/nanodep/client"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func setupTestDB(t *testing.T) *db.DB {
-	t.Helper()
-	cfg := config.DatabaseConfig{
-		Host:            func() string { if h := os.Getenv("DB_HOST"); h != "" { return h }; return "localhost" }(),
-		Port:            5432,
-		User:            "postgres",
-		Password:        func() string { if p := os.Getenv("DB_PASSWORD"); p != "" { return p }; return "postgres" }(),
-		Database:        "localmdm",
-		SSLMode:         "disable",
-		MaxOpenConns:    5,
-		MaxIdleConns:    2,
-		ConnMaxLifetime: 5 * time.Minute,
-	}
-	database, err := db.New(cfg)
-	if err != nil {
-		t.Fatalf("Failed to connect to database: %v", err)
-	}
-	t.Cleanup(func() { database.Close() })
-	return database
-}
-
 const testEncKey = "test-encryption-key-for-dep"
 
 func TestDEPStorage_AuthTokens(t *testing.T) {
-	database := setupTestDB(t)
+	database := testutil.ConnectDB(t)
 	storage := NewDEPStorage(database.Writer, testEncKey)
 	ctx := context.Background()
 	name := "auth-test-" + time.Now().Format("150405")
@@ -92,7 +69,7 @@ func TestDEPStorage_AuthTokens(t *testing.T) {
 }
 
 func TestDEPStorage_Config(t *testing.T) {
-	database := setupTestDB(t)
+	database := testutil.ConnectDB(t)
 	storage := NewDEPStorage(database.Writer, testEncKey)
 	ctx := context.Background()
 	name := "config-test-" + time.Now().Format("150405")
@@ -118,7 +95,7 @@ func TestDEPStorage_Config(t *testing.T) {
 }
 
 func TestDEPStorage_Cursor(t *testing.T) {
-	database := setupTestDB(t)
+	database := testutil.ConnectDB(t)
 	storage := NewDEPStorage(database.Writer, testEncKey)
 	ctx := context.Background()
 	name := "cursor-test-" + time.Now().Format("150405")
@@ -146,7 +123,7 @@ func TestDEPStorage_Cursor(t *testing.T) {
 }
 
 func TestDEPStorage_AssignerProfile(t *testing.T) {
-	database := setupTestDB(t)
+	database := testutil.ConnectDB(t)
 	storage := NewDEPStorage(database.Writer, testEncKey)
 	ctx := context.Background()
 	name := "assigner-test-" + time.Now().Format("150405")
@@ -174,7 +151,7 @@ func TestDEPStorage_AssignerProfile(t *testing.T) {
 }
 
 func TestDEPStorage_TokenPKI(t *testing.T) {
-	database := setupTestDB(t)
+	database := testutil.ConnectDB(t)
 	storage := NewDEPStorage(database.Writer, testEncKey)
 	ctx := context.Background()
 	name := "pki-test-" + time.Now().Format("150405")
@@ -208,7 +185,7 @@ func TestDEPStorage_TokenPKI(t *testing.T) {
 }
 
 func TestDEPStorage_SyncedDevices(t *testing.T) {
-	database := setupTestDB(t)
+	database := testutil.ConnectDB(t)
 	storage := NewDEPStorage(database.Writer, testEncKey)
 	ctx := context.Background()
 	name := "devices-test-" + time.Now().Format("150405")

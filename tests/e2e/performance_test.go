@@ -10,12 +10,12 @@ import (
 	"github.com/google/uuid"
 	"github.com/malcolm-getahead/local-mdm/internal/models"
 	"github.com/malcolm-getahead/local-mdm/internal/repository"
+	"github.com/malcolm-getahead/local-mdm/internal/testutil"
 	"github.com/stretchr/testify/require"
 )
 
 func TestPerformance_DeviceListLatency(t *testing.T) {
-	database := setupDB(t)
-	defer database.Close()
+	database := testutil.ConnectDB(t)
 	ctx := context.Background()
 
 	entRepo, _ := repository.NewEnterpriseRepository(database.Writer, database.Reader)
@@ -60,8 +60,7 @@ func TestPerformance_DeviceListLatency(t *testing.T) {
 }
 
 func TestPerformance_ConcurrentEnrollments(t *testing.T) {
-	database := setupDB(t)
-	defer database.Close()
+	database := testutil.ConnectDB(t)
 	ctx := context.Background()
 
 	entRepo, _ := repository.NewEnterpriseRepository(database.Writer, database.Reader)

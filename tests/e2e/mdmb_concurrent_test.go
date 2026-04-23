@@ -21,6 +21,7 @@ import (
 	"github.com/malcolm-getahead/local-mdm/internal/platform/macos"
 	"github.com/malcolm-getahead/local-mdm/internal/repository"
 	"github.com/malcolm-getahead/local-mdm/internal/scep"
+	"github.com/malcolm-getahead/local-mdm/internal/testutil"
 	"github.com/micromdm/plist"
 	"github.com/smallstep/pkcs7"
 	"github.com/stretchr/testify/assert"
@@ -32,8 +33,7 @@ import (
 func TestE2E_Mdmb_ConcurrentEnrollment(t *testing.T) {
 	mdmbPath := findMdmb(t)
 
-	database := setupDB(t)
-	defer database.Close()
+	database := testutil.ConnectDB(t)
 	ctx := context.Background()
 	logger := slog.Default()
 

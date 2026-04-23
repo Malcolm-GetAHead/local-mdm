@@ -27,6 +27,13 @@ import (
 	"github.com/malcolm-getahead/local-mdm/internal/service"
 )
 
+// reportService defines the interface for report generation (allows mocking in tests).
+type reportService interface {
+	DeviceInventory(ctx context.Context, enterpriseID uuid.UUID, platform string) ([]reporting.DeviceRow, error)
+	ComplianceReport(ctx context.Context, enterpriseID uuid.UUID) ([]reporting.ComplianceRow, error)
+	EnrollmentReport(ctx context.Context, enterpriseID uuid.UUID, days int) ([]reporting.EnrollmentRow, error)
+}
+
 // Server represents the HTTP server
 type Server struct {
 	router           *mux.Router
@@ -68,7 +75,7 @@ type Server struct {
 	appService       *service.AppService
 	userService      *service.UserService
 	tokenService     *service.TokenService
-	reportService    *reporting.Service
+	reportService    reportService
 	policyVersionRepo repository.PolicyVersionRepository
 	groupService     *service.GroupService
 	complianceService *service.ComplianceService

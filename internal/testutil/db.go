@@ -1,7 +1,8 @@
 package testutil
 
 import (
-	"context"
+	"database/sql"
+	"fmt"
 	"os"
 	"testing"
 	"time"
@@ -10,63 +11,61 @@ import (
 	"github.com/malcolm-getahead/local-mdm/internal/db"
 )
 
-// SetupTestDB creates a test database connection.
-// Respects DB_HOST and DB_PASSWORD env vars for Docker-based testing.
-func SetupTestDB(t *testing.T) *db.DB {
+// ConnectDB returns a *db.DB for integration tests.
+// Reads DB_HOST/DB_PASSWORD env vars (Docker) with localhost fallback.
+// Skips the test if the database is unavailable.
+// Registers t.Cleanup to close the connection.
+func ConnectDB(t testing.TB) *db.DB {
 	t.Helper()
-
-	host := os.Getenv("DB_HOST")
-	if host == "" {
-		host = "localhost"
-	}
-	password := os.Getenv("DB_PASSWORD")
-	if password == "" {
-		password = "postgres"
-	}
-
 	cfg := config.DatabaseConfig{
-		Host:            host,
+		Host:            envOr("DB_HOST", "localhost"),
 		Port:            5432,
 		User:            "postgres",
-		Password:        password,
+		Password:        envOr("DB_PASSWORD", "postgres"),
 		Database:        "localmdm",
 		SSLMode:         "disable",
 		MaxOpenConns:    2,
 		MaxIdleConns:    1,
 		ConnMaxLifetime: 5 * time.Minute,
 	}
-	
 	database, err := db.New(cfg)
 	if err != nil {
-		t.Fatalf("Failed to connect to test database: %v", err)
+		t.Skipf("skipping: database unavailable: %v", err)
 	}
-	
+	t.Cleanup(func() { database.Close() })
 	return database
 }
 
-// CleanupTestDB closes the database connection
-func CleanupTestDB(t *testing.T, database *db.DB) {
+// ConnectRawDB returns a *sql.DB for tests that need a raw connection
+// (reporting, SCEP challenges, token cache).
+// Skips the test if the database is unavailable.
+// Registers t.Cleanup to close the connection.
+func ConnectRawDB(t testing.TB) *sql.DB {
 	t.Helper()
-	if err := database.Close(); err != nil {
-		t.Errorf("Failed to close database: %v", err)
+	dsn := fmt.Sprintf("host=%s port=5432 user=postgres password=%s dbname=localmdm sslmode=disable",
+		envOr("DB_HOST", "localhost"), envOr("DB_PASSWORD", "postgres"))
+	d, err := sql.Open("postgres", dsn)
+	if err != nil {
+		t.Skipf("skipping: database unavailable: %v", err)
 	}
+	if err := d.Ping(); err != nil {
+		t.Skipf("skipping: database unavailable: %v", err)
+	}
+	d.SetMaxOpenConns(2)
+	d.SetMaxIdleConns(1)
+	t.Cleanup(func() { d.Close() })
+	return d
 }
 
-// WithTransaction runs a test function within a transaction that is rolled back
-func WithTransaction(t *testing.T, database *db.DB, fn func(ctx context.Context)) {
-	t.Helper()
-	
-	tx, err := database.Writer.BeginTx(context.Background(), nil)
-	if err != nil {
-		t.Fatalf("Failed to begin transaction: %v", err)
+func envOr(key, fallback string) string {
+	if v := os.Getenv(key); v != "" {
+		return v
 	}
-	
-	defer func() {
-		if err := tx.Rollback(); err != nil {
-			t.Errorf("Failed to rollback transaction: %v", err)
-		}
-	}()
-	
-	ctx := context.Background()
-	fn(ctx)
+	return fallback
+}
+
+// SetupTestDB is a backward-compatible alias for ConnectDB.
+// Deprecated: Use ConnectDB instead.
+func SetupTestDB(t testing.TB) *db.DB {
+	return ConnectDB(t)
 }

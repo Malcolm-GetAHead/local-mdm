@@ -3,42 +3,17 @@ package reporting
 import (
 	"bytes"
 	"context"
-	"database/sql"
-	"fmt"
-	"os"
 	"testing"
 
 	"github.com/google/uuid"
 	_ "github.com/lib/pq"
+	"github.com/malcolm-getahead/local-mdm/internal/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func setupDB(t *testing.T) *sql.DB {
-	t.Helper()
-	host := os.Getenv("DB_HOST")
-	if host == "" {
-		host = "localhost"
-	}
-	password := os.Getenv("DB_PASSWORD")
-	if password == "" {
-		password = "postgres"
-	}
-	dsn := fmt.Sprintf("host=%s port=5432 user=postgres password=%s dbname=localmdm sslmode=disable", host, password)
-	db, err := sql.Open("postgres", dsn)
-	if err != nil {
-		t.Skipf("skipping: %v", err)
-	}
-	if err := db.Ping(); err != nil {
-		t.Skipf("skipping: %v", err)
-	}
-	db.SetMaxOpenConns(2)
-	return db
-}
-
 func TestDeviceInventory(t *testing.T) {
-	db := setupDB(t)
-	defer db.Close()
+	db := testutil.ConnectRawDB(t)
 	svc := NewService(db)
 
 	// Use a random enterprise ID — should return empty, not error
@@ -48,8 +23,7 @@ func TestDeviceInventory(t *testing.T) {
 }
 
 func TestDeviceInventory_WithPlatformFilter(t *testing.T) {
-	db := setupDB(t)
-	defer db.Close()
+	db := testutil.ConnectRawDB(t)
 	svc := NewService(db)
 
 	rows, err := svc.DeviceInventory(context.Background(), uuid.New(), "windows")
@@ -58,8 +32,7 @@ func TestDeviceInventory_WithPlatformFilter(t *testing.T) {
 }
 
 func TestComplianceReport(t *testing.T) {
-	db := setupDB(t)
-	defer db.Close()
+	db := testutil.ConnectRawDB(t)
 	svc := NewService(db)
 
 	rows, err := svc.ComplianceReport(context.Background(), uuid.New())
@@ -68,8 +41,7 @@ func TestComplianceReport(t *testing.T) {
 }
 
 func TestEnrollmentReport(t *testing.T) {
-	db := setupDB(t)
-	defer db.Close()
+	db := testutil.ConnectRawDB(t)
 	svc := NewService(db)
 
 	rows, err := svc.EnrollmentReport(context.Background(), uuid.New(), 30)
@@ -78,8 +50,7 @@ func TestEnrollmentReport(t *testing.T) {
 }
 
 func TestEnrollmentReport_DefaultDays(t *testing.T) {
-	db := setupDB(t)
-	defer db.Close()
+	db := testutil.ConnectRawDB(t)
 	svc := NewService(db)
 
 	rows, err := svc.EnrollmentReport(context.Background(), uuid.New(), 0)

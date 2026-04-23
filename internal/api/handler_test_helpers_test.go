@@ -19,6 +19,7 @@ import (
 	"github.com/malcolm-getahead/local-mdm/internal/config"
 	"github.com/malcolm-getahead/local-mdm/internal/models"
 	"github.com/malcolm-getahead/local-mdm/internal/platform/macos"
+	"github.com/malcolm-getahead/local-mdm/internal/reporting"
 	"github.com/malcolm-getahead/local-mdm/internal/service"
 	depClient "github.com/micromdm/nanodep/client"
 )
@@ -652,6 +653,7 @@ type testServer struct {
 	auditLogger    *mockAuditLogger
 	commandRepo    *mockCommandRepo
 	appRepo        *mockAppRepo
+	userRepo       *mockUserRepo
 }
 
 func newTestServer(t *testing.T) *testServer {
@@ -697,6 +699,7 @@ func newTestServer(t *testing.T) *testServer {
 	tr := &mockTokenRepo{}
 	s.userService = service.NewUserService(ur, slog.New(slog.NewTextHandler(bytes.NewBuffer(nil), nil)))
 	s.tokenService = service.NewTokenService(tr, ur, slog.New(slog.NewTextHandler(bytes.NewBuffer(nil), nil)))
+	s.reportService = &mockReportService{}
 
 	// Register only the routes we're testing (no auth middleware)
 	api := s.router.PathPrefix("/api/v1").Subrouter()
@@ -784,6 +787,11 @@ func newTestServer(t *testing.T) *testServer {
 	api.HandleFunc("/reports/compliance", s.handleComplianceReport).Methods("GET")
 	api.HandleFunc("/reports/enrollments", s.handleEnrollmentReport).Methods("GET")
 
+	// Health/version/auth routes (registered at root, not under /api/v1)
+	s.router.HandleFunc("/version", s.handleVersion).Methods("GET")
+	s.router.HandleFunc("/api/v1/auth/login", s.handleLogin).Methods("POST")
+	s.router.HandleFunc("/api/v1/auth/refresh", s.handleRefresh).Methods("POST")
+
 	return &testServer{
 		server:         s,
 		enterpriseRepo: er,
@@ -794,6 +802,7 @@ func newTestServer(t *testing.T) *testServer {
 		auditLogger:    al,
 		commandRepo:    cmdr,
 		appRepo:        appr,
+		userRepo:       ur,
 	}
 }
 
@@ -1004,4 +1013,22 @@ func (m *mockComplianceRepo) GetByDevice(_ context.Context, deviceID uuid.UUID) 
 }
 func (m *mockComplianceRepo) GetSummary(_ context.Context, _ uuid.UUID) (*models.ComplianceSummary, error) {
 	return &models.ComplianceSummary{}, nil
+}
+
+// Mock report service for handler tests
+type mockReportService struct {
+	devices    []reporting.DeviceRow
+	compliance []reporting.ComplianceRow
+	enrollment []reporting.EnrollmentRow
+	err        error
+}
+
+func (m *mockReportService) DeviceInventory(_ context.Context, _ uuid.UUID, _ string) ([]reporting.DeviceRow, error) {
+	return m.devices, m.err
+}
+func (m *mockReportService) ComplianceReport(_ context.Context, _ uuid.UUID) ([]reporting.ComplianceRow, error) {
+	return m.compliance, m.err
+}
+func (m *mockReportService) EnrollmentReport(_ context.Context, _ uuid.UUID, _ int) ([]reporting.EnrollmentRow, error) {
+	return m.enrollment, m.err
 }

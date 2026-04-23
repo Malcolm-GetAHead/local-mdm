@@ -21,6 +21,7 @@ import (
 	"github.com/malcolm-getahead/local-mdm/internal/repository"
 	"github.com/malcolm-getahead/local-mdm/internal/scep"
 	"github.com/malcolm-getahead/local-mdm/internal/service"
+	"github.com/malcolm-getahead/local-mdm/internal/testutil"
 	"github.com/micromdm/plist"
 	"github.com/smallstep/pkcs7"
 	"github.com/stretchr/testify/assert"
@@ -43,8 +44,7 @@ func TestE2E_Mdmb_FullEnrollment(t *testing.T) {
 		t.Skip("NanoMDM not running on " + nanomdmURL)
 	}
 
-	database := setupDB(t)
-	defer database.Close()
+	database := testutil.ConnectDB(t)
 	ctx := context.Background()
 	logger := slog.Default()
 

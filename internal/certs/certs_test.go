@@ -13,8 +13,8 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/malcolm-getahead/local-mdm/internal/certs"
-	"github.com/malcolm-getahead/local-mdm/internal/config"
 	"github.com/malcolm-getahead/local-mdm/internal/db"
+	"github.com/malcolm-getahead/local-mdm/internal/testutil"
 )
 
 func setupTestCerts(t *testing.T) (*certs.CAManager, *certs.CertificateService, *db.DB) {
@@ -23,29 +23,13 @@ func setupTestCerts(t *testing.T) (*certs.CAManager, *certs.CertificateService, 
 	certPath := tmpDir + "/ca.crt"
 	keyPath := tmpDir + "/ca.key"
 	
-	// Create CA manager
-	ca, err := certs.NewCAManager(certPath, keyPath)
+	// Generate CA explicitly
+	ca, err := certs.GenerateCA(certPath, keyPath)
 	if err != nil {
-		t.Fatalf("Failed to create CA manager: %v", err)
+		t.Fatalf("Failed to generate CA: %v", err)
 	}
 	
-	// Setup database
-	cfg := config.DatabaseConfig{
-		Host:            func() string { if h := os.Getenv("DB_HOST"); h != "" { return h }; return "localhost" }(),
-		Port:            5432,
-		User:            "postgres",
-		Password:        func() string { if p := os.Getenv("DB_PASSWORD"); p != "" { return p }; return "postgres" }(),
-		Database:        "localmdm",
-		SSLMode:         "disable",
-		MaxOpenConns:    5,
-		MaxIdleConns:    2,
-		ConnMaxLifetime: 5 * time.Minute,
-	}
-	
-	database, err := db.New(cfg)
-	if err != nil {
-		t.Fatalf("Failed to connect to database: %v", err)
-	}
+	database := testutil.ConnectDB(t)
 	
 	// Create certificate service
 	service := certs.NewCertificateService(ca, database.Writer)
@@ -81,10 +65,10 @@ func TestCAGeneration(t *testing.T) {
 	certPath := tmpDir + "/ca.crt"
 	keyPath := tmpDir + "/ca.key"
 	
-	// Create CA
-	ca, err := certs.NewCAManager(certPath, keyPath)
+	// Generate CA explicitly
+	ca, err := certs.GenerateCA(certPath, keyPath)
 	if err != nil {
-		t.Fatalf("Failed to create CA: %v", err)
+		t.Fatalf("Failed to generate CA: %v", err)
 	}
 	
 	// Verify CA certificate
@@ -110,7 +94,7 @@ func TestCAGeneration(t *testing.T) {
 		t.Error("CA key file was not created")
 	}
 	
-	// Test loading existing CA
+	// Test loading existing CA via NewCAManager
 	ca2, err := certs.NewCAManager(certPath, keyPath)
 	if err != nil {
 		t.Fatalf("Failed to load existing CA: %v", err)
@@ -120,11 +104,22 @@ func TestCAGeneration(t *testing.T) {
 	if cert.SerialNumber.Cmp(cert2.SerialNumber) != 0 {
 		t.Error("Loaded CA should have same serial number")
 	}
+
+	// Test NewCAManager fails on missing files
+	_, err = certs.NewCAManager(tmpDir+"/nonexistent.crt", tmpDir+"/nonexistent.key")
+	if err == nil {
+		t.Error("NewCAManager should fail on missing files")
+	}
+
+	// Test GenerateCA refuses to overwrite
+	_, err = certs.GenerateCA(certPath, keyPath)
+	if err == nil {
+		t.Error("GenerateCA should refuse to overwrite existing files")
+	}
 }
 
 func TestCSRSigning(t *testing.T) {
 	ca, service, database := setupTestCerts(t)
-	defer database.Close()
 	
 	// Create test device
 	deviceID := createTestDevice(t, database)
@@ -192,7 +187,6 @@ func TestCSRSigning(t *testing.T) {
 
 func TestCertificateRevocation(t *testing.T) {
 	_, service, database := setupTestCerts(t)
-	defer database.Close()
 	
 	// Create test device
 	deviceID := createTestDevice(t, database)
@@ -238,8 +232,7 @@ func TestCertificateRevocation(t *testing.T) {
 }
 
 func TestGetCACertificatePEM(t *testing.T) {
-	_, service, database := setupTestCerts(t)
-	defer database.Close()
+	_, service, _ := setupTestCerts(t)
 	
 	certPEM, err := service.GetCACertificatePEM()
 	if err != nil {
@@ -263,11 +256,11 @@ func TestGetCACertificatePEM(t *testing.T) {
 }
 
 func TestNewCAManagerFromPEM(t *testing.T) {
-	// Generate a CA via file-based path first, then load from PEM
+	// Generate a CA via explicit generation first, then load from PEM
 	dir := t.TempDir()
-	fileCA, err := certs.NewCAManager(dir+"/ca.crt", dir+"/ca.key")
+	fileCA, err := certs.GenerateCA(dir+"/ca.crt", dir+"/ca.key")
 	if err != nil {
-		t.Fatalf("failed to create file CA: %v", err)
+		t.Fatalf("failed to generate CA: %v", err)
 	}
 
 	certPEM, err := os.ReadFile(dir + "/ca.crt")

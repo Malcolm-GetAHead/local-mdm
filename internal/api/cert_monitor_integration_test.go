@@ -1,32 +1,22 @@
 package api
 
 import (
-	"os"
 	"context"
+	"os"
 	"testing"
 	"time"
 
 	"github.com/malcolm-getahead/local-mdm/internal/config"
-	"github.com/malcolm-getahead/local-mdm/internal/db"
 	"github.com/malcolm-getahead/local-mdm/internal/logging"
+	"github.com/malcolm-getahead/local-mdm/internal/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func TestServer_CertificateMonitorIntegration(t *testing.T) {
-	// Setup test database
+	database := testutil.ConnectDB(t)
+
 	cfg := &config.Config{
-		Database: config.DatabaseConfig{
-			Host:            func() string { if h := os.Getenv("DB_HOST"); h != "" { return h }; return "localhost" }(),
-			Port:            5432,
-			User:            "postgres",
-			Password:        func() string { if p := os.Getenv("DB_PASSWORD"); p != "" { return p }; return "postgres" }(),
-			Database:        "localmdm",
-			SSLMode:         "disable",
-			MaxOpenConns:    5,
-			MaxIdleConns:    2,
-			ConnMaxLifetime: 5 * time.Minute,
-		},
 		Server: config.ServerConfig{
 			Host:         func() string { if h := os.Getenv("DB_HOST"); h != "" { return h }; return "localhost" }(),
 			Port:         8080,
@@ -62,15 +52,11 @@ func TestServer_CertificateMonitorIntegration(t *testing.T) {
 			DeviceCertValidity: 8760 * time.Hour,
 			ExpirationMonitor: config.CertExpirationMonitorConfig{
 				Enabled:          true,
-				CheckInterval:    100 * time.Millisecond, // Fast for testing
+				CheckInterval:    100 * time.Millisecond,
 				WarningThreshold: 30 * 24 * time.Hour,
 			},
 		},
 	}
-
-	database, err := db.New(cfg.Database)
-	require.NoError(t, err)
-	defer database.Close()
 
 	logger := logging.New(config.LoggingConfig{
 		Level:  "info",
@@ -78,23 +64,18 @@ func TestServer_CertificateMonitorIntegration(t *testing.T) {
 		Output: "stdout",
 	})
 
-	// Create server
 	server, err := New(cfg, database, logger)
 	require.NoError(t, err)
 	require.NotNil(t, server.certMonitor, "Certificate monitor should be created")
 
-	// Start server (which starts the monitor)
 	go func() {
 		_ = server.Start()
 	}()
 
-	// Give monitor time to start
 	time.Sleep(200 * time.Millisecond)
 
-	// Verify monitor is running
 	assert.NotNil(t, server.certMonitor)
 
-	// Shutdown server (which stops the monitor)
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
@@ -103,19 +84,9 @@ func TestServer_CertificateMonitorIntegration(t *testing.T) {
 }
 
 func TestServer_CertificateMonitorDisabled(t *testing.T) {
-	// Setup test database
+	database := testutil.ConnectDB(t)
+
 	cfg := &config.Config{
-		Database: config.DatabaseConfig{
-			Host:            func() string { if h := os.Getenv("DB_HOST"); h != "" { return h }; return "localhost" }(),
-			Port:            5432,
-			User:            "postgres",
-			Password:        func() string { if p := os.Getenv("DB_PASSWORD"); p != "" { return p }; return "postgres" }(),
-			Database:        "localmdm",
-			SSLMode:         "disable",
-			MaxOpenConns:    5,
-			MaxIdleConns:    2,
-			ConnMaxLifetime: 5 * time.Minute,
-		},
 		Server: config.ServerConfig{
 			Host:         func() string { if h := os.Getenv("DB_HOST"); h != "" { return h }; return "localhost" }(),
 			Port:         8080,
@@ -150,14 +121,10 @@ func TestServer_CertificateMonitorDisabled(t *testing.T) {
 			CAKeyPath:          "./certs/ca.key",
 			DeviceCertValidity: 8760 * time.Hour,
 			ExpirationMonitor: config.CertExpirationMonitorConfig{
-				Enabled: false, // Disabled
+				Enabled: false,
 			},
 		},
 	}
-
-	database, err := db.New(cfg.Database)
-	require.NoError(t, err)
-	defer database.Close()
 
 	logger := logging.New(config.LoggingConfig{
 		Level:  "info",
@@ -165,7 +132,6 @@ func TestServer_CertificateMonitorDisabled(t *testing.T) {
 		Output: "stdout",
 	})
 
-	// Create server
 	server, err := New(cfg, database, logger)
 	require.NoError(t, err)
 	assert.Nil(t, server.certMonitor, "Certificate monitor should NOT be created when disabled")

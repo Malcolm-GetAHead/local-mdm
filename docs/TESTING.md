@@ -132,13 +132,42 @@ Mock repos have error fields for testing failure paths:
 - `mockDeviceRepo{updateErr: fmt.Errorf("db error")}`
 - `mockPolicyRepo{assignErr: fmt.Errorf("constraint violation")}`
 
-### Integration Tests
+### Integration Tests (need Docker PostgreSQL)
 
-All integration tests run inside Docker via `make dev-test`. No manual service startup needed — the test-runner container depends on PostgreSQL and connects via Docker networking.
+All integration tests use `testutil.ConnectDB(t)` or `testutil.ConnectRawDB(t)` for database connections. These helpers:
+- Read `DB_HOST` / `DB_PASSWORD` env vars (set by Docker Compose) with localhost fallback
+- Set pool limits (2 open / 1 idle) to prevent connection exhaustion
+- Call `t.Cleanup()` for automatic close — no `defer db.Close()` needed
+- Skip the test with `t.Skipf` if the database is unavailable
 
-```bash
-make dev-test     # Runs everything, including integration tests
+```go
+func TestDeviceRepository_Create(t *testing.T) {
+    db := testutil.ConnectDB(t)  // skips if no DB, auto-closes
+    repo := NewDeviceRepository(db.Writer, db.Reader)
+
+    device := &Device{Name: "Test"}
+    err := repo.Create(context.Background(), device)
+    require.NoError(t, err)
+}
 ```
+
+For tests that need a raw `*sql.DB` (reporting, SCEP challenges, token cache):
+```go
+func TestTokenCache(t *testing.T) {
+    db := testutil.ConnectRawDB(t)  // returns *sql.DB, skips if no DB
+    cache := NewTokenCache(db)
+    // ...
+}
+```
+
+**Never create database connections inline in test files.** Always use `testutil.ConnectDB(t)` or `testutil.ConnectRawDB(t)`.
+
+### File Paths in Tests
+
+`go test` changes the working directory to the package directory. Use these patterns:
+- `t.TempDir()` for generated files (CA certs in tests)
+- `projectPath(t, "path/from/root")` for project-root files (defined in `tests/e2e/helpers_test.go`)
+- Never use bare relative paths like `"internal/api/certs/ca.crt"` in tests
 
 ### Platform Tests
 
@@ -156,7 +185,7 @@ func TestService_CreateDevice(t *testing.T) {
 }
 ```
 
-## Current Coverage (Sprint 4b)
+## Current Coverage (Sprint 5f)
 
 | Package | Coverage | Notes |
 |---------|----------|-------|
@@ -169,13 +198,13 @@ func TestService_CreateDevice(t *testing.T) {
 | tracing | 86.7% | |
 | db | 82.4% | With integration tests |
 | certs | 78.4% | |
+| service | 77.3% | |
 | windows | 69.7% | |
 | auth | 68.0% | |
-| service | 67.5% | |
 | metrics | 65.0% | |
 | android | 61.9% | |
-| macos | 79.8% | Above target — DEP storage integration tests added |
-| api | 56.5% | Below 70% handler target |
+| macos | 79.8% | DEP storage integration tests |
+| api | ~65-70% | Unit: 53%, with Docker integration: ~65-70% |
 | repository | 87.3% | Integration tests need Docker PostgreSQL |
 
 ## Coverage Goals

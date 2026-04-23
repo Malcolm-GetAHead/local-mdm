@@ -22,23 +22,33 @@ type CAManager struct {
 	keyPath   string
 }
 
-// NewCAManager creates a new CA manager for signing device certificates.
-// It loads an existing CA from the specified paths or generates a new one if not found.
-// Returns an error if the CA cannot be loaded or generated.
+// NewCAManager loads an existing CA from the specified file paths.
+// Returns an error if the files don't exist or can't be parsed.
+// Use GenerateCA() to create new CA files before calling this.
 func NewCAManager(certPath, keyPath string) (*CAManager, error) {
 	manager := &CAManager{
 		certPath: certPath,
 		keyPath:  keyPath,
 	}
-	
-	// Try to load existing CA
 	if err := manager.loadCA(); err != nil {
-		// Generate new CA if doesn't exist
-		if err := manager.generateCA(); err != nil {
-			return nil, fmt.Errorf("failed to generate CA: %w", err)
-		}
+		return nil, fmt.Errorf("failed to load CA (use 'localmdm-cli certs init' to generate): %w", err)
 	}
-	
+	return manager, nil
+}
+
+// GenerateCA creates a new CA certificate and key at the specified paths.
+// Returns an error if files already exist (won't overwrite).
+func GenerateCA(certPath, keyPath string) (*CAManager, error) {
+	if _, err := os.Stat(certPath); err == nil {
+		return nil, fmt.Errorf("CA certificate already exists at %s", certPath)
+	}
+	if _, err := os.Stat(keyPath); err == nil {
+		return nil, fmt.Errorf("CA key already exists at %s", keyPath)
+	}
+	manager := &CAManager{certPath: certPath, keyPath: keyPath}
+	if err := manager.generateCA(); err != nil {
+		return nil, fmt.Errorf("failed to generate CA: %w", err)
+	}
 	return manager, nil
 }
 

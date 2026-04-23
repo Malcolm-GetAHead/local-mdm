@@ -8,13 +8,13 @@ import (
 	"github.com/malcolm-getahead/local-mdm/internal/apperrors"
 	"github.com/malcolm-getahead/local-mdm/internal/models"
 	"github.com/malcolm-getahead/local-mdm/internal/repository"
+	"github.com/malcolm-getahead/local-mdm/internal/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func TestDeviceRepository_GetByPlatformID(t *testing.T) {
-	database := setupTestDB(t)
-	defer database.Close()
+	database := testutil.ConnectDB(t)
 
 	entRepo, err := repository.NewEnterpriseRepository(database.Writer, database.Reader)
 	require.NoError(t, err)
@@ -63,8 +63,7 @@ func TestDeviceRepository_GetByPlatformID(t *testing.T) {
 }
 
 func TestCommandRepository_GetByID(t *testing.T) {
-	database := setupTestDB(t)
-	defer database.Close()
+	database := testutil.ConnectDB(t)
 
 	entRepo, err := repository.NewEnterpriseRepository(database.Writer, database.Reader)
 	require.NoError(t, err)
@@ -128,8 +127,7 @@ func TestCommandRepository_GetByID(t *testing.T) {
 }
 
 func TestCommandRepository_ListByDevice(t *testing.T) {
-	database := setupTestDB(t)
-	defer database.Close()
+	database := testutil.ConnectDB(t)
 
 	entRepo, err := repository.NewEnterpriseRepository(database.Writer, database.Reader)
 	require.NoError(t, err)
@@ -181,8 +179,7 @@ func TestCommandRepository_ListByDevice(t *testing.T) {
 }
 
 func TestCertificateRepository_GetBySerial(t *testing.T) {
-	database := setupTestDB(t)
-	defer database.Close()
+	database := testutil.ConnectDB(t)
 
 	repo, err := repository.NewCertificateRepository(database.Writer, database.Reader)
 	require.NoError(t, err)
@@ -195,8 +192,7 @@ func TestCertificateRepository_GetBySerial(t *testing.T) {
 }
 
 func TestAuditLogRepository_ListEdgeCases(t *testing.T) {
-	database := setupTestDB(t)
-	defer database.Close()
+	database := testutil.ConnectDB(t)
 
 	repo, err := repository.NewAuditLogRepository(database.Writer, database.Reader)
 	require.NoError(t, err)
