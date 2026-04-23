@@ -9,13 +9,16 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/asn1"
+	"encoding/base64"
 	"log/slog"
+	"math/big"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 	"time"
 
 	"github.com/malcolm-getahead/local-mdm/internal/certs"
+	sceplib "github.com/micromdm/scep/scep"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.mozilla.org/pkcs7"
@@ -237,3 +240,104 @@ func cat(parts ...[]byte) []byte {
 	}
 	return out
 }
+
+func TestHandler_PKIOperation_Base64CSR(t *testing.T) {
+	ca := setupTestCA(t)
+	store := &mockStore{challenges: map[string]string{"b64-pw": "device-b64"}}
+	h := NewHandler(ca, store, slog.Default())
+
+	csrDER := mustBuildCSRWithChallenge(t, "b64-pw")
+	b64 := []byte(base64.StdEncoding.EncodeToString(csrDER))
+
+	req := httptest.NewRequest("POST", "/scep?operation=PKIOperation", bytes.NewReader(b64))
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	p7, err := pkcs7.Parse(w.Body.Bytes())
+	require.NoError(t, err)
+	require.NotEmpty(t, p7.Certificates)
+}
+
+func TestHandler_PKIOperation_SCEPEnvelope(t *testing.T) {
+	ca := setupTestCA(t)
+	caCert := ca.GetCACertificate()
+
+	t.Run("valid challenge via SCEP protocol", func(t *testing.T) {
+		store := &mockStore{challenges: map[string]string{"scep-pw": "device-scep"}}
+		h := NewHandler(ca, store, slog.Default())
+
+		envelope := mustBuildSCEPRequest(t, caCert, "scep-pw")
+		req := httptest.NewRequest("POST", "/scep?operation=PKIOperation", bytes.NewReader(envelope))
+		w := httptest.NewRecorder()
+		h.ServeHTTP(w, req)
+
+		assert.Equal(t, http.StatusOK, w.Code)
+		assert.Equal(t, "application/x-pki-message", w.Header().Get("Content-Type"))
+	})
+
+	t.Run("invalid challenge via SCEP protocol", func(t *testing.T) {
+		store := &mockStore{challenges: map[string]string{}}
+		h := NewHandler(ca, store, slog.Default())
+
+		envelope := mustBuildSCEPRequest(t, caCert, "wrong-pw")
+		req := httptest.NewRequest("POST", "/scep?operation=PKIOperation", bytes.NewReader(envelope))
+		w := httptest.NewRecorder()
+		h.ServeHTTP(w, req)
+
+		// SCEP failure response (still 200 with PKCS#7 failure message)
+		assert.Equal(t, http.StatusOK, w.Code)
+		assert.Equal(t, "application/x-pki-message", w.Header().Get("Content-Type"))
+	})
+
+	t.Run("decrypt error wrong CA", func(t *testing.T) {
+		store := &mockStore{challenges: map[string]string{}}
+		h := NewHandler(ca, store, slog.Default())
+
+		otherCA := setupTestCA(t)
+		envelope := mustBuildSCEPRequest(t, otherCA.GetCACertificate(), "any-pw")
+		req := httptest.NewRequest("POST", "/scep?operation=PKIOperation", bytes.NewReader(envelope))
+		w := httptest.NewRecorder()
+		h.ServeHTTP(w, req)
+
+		assert.Equal(t, http.StatusBadRequest, w.Code)
+	})
+}
+
+// mustBuildSCEPRequest builds a proper SCEP PKCSReq message using the micromdm/scep library.
+func mustBuildSCEPRequest(t *testing.T, recipientCert *x509.Certificate, challengePassword string) []byte {
+	t.Helper()
+
+	// Generate device key and self-signed cert
+	deviceKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	require.NoError(t, err)
+	deviceTmpl := &x509.Certificate{
+		SerialNumber: big.NewInt(1),
+		Subject:      pkix.Name{CommonName: "scep-device"},
+		NotBefore:    time.Now().Add(-time.Hour),
+		NotAfter:     time.Now().Add(24 * time.Hour),
+		KeyUsage:     x509.KeyUsageDigitalSignature | x509.KeyUsageKeyEncipherment,
+	}
+	deviceCertDER, err := x509.CreateCertificate(rand.Reader, deviceTmpl, deviceTmpl, &deviceKey.PublicKey, deviceKey)
+	require.NoError(t, err)
+	deviceCert, err := x509.ParseCertificate(deviceCertDER)
+	require.NoError(t, err)
+
+	// Build CSR with challenge password
+	csrDER := mustBuildCSRWithChallenge(t, challengePassword)
+	csr, err := x509.ParseCertificateRequest(csrDER)
+	require.NoError(t, err)
+
+	// Build SCEP message template
+	tmpl := &sceplib.PKIMessage{
+		MessageType: sceplib.PKCSReq,
+		Recipients:  []*x509.Certificate{recipientCert},
+		SignerCert:  deviceCert,
+		SignerKey:   deviceKey,
+	}
+
+	msg, err := sceplib.NewCSRRequest(csr, tmpl)
+	require.NoError(t, err)
+	return msg.Raw
+}
+
