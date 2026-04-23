@@ -390,6 +390,8 @@ docs/planning/
 │   └── sprint-5b-eventbus/
 │   └── sprint-5c-platform-integration/
 │   └── sprint-5d-web-dashboard/
+│   └── sprint-5e-cert-verification/
+│   └── sprint-5f-api-hardening/
 └── future/               - Future enhancements (F-01 to F-08)
 ```
 

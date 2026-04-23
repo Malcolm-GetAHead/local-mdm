@@ -7,7 +7,7 @@
 
 - **Sprint 5e**: ✅ COMPLETE, on branch `sprint-5e/cert-verification` (not yet merged to main)
 - **Sprint 5c**: ✅ COMPLETE, merged to main
-- **Retrospective**: In progress
+- **Retrospective**: ✅ COMPLETE
 - **Next sprint**: **5f** (API hardening + test hygiene), then 5b (EventBus), then 5d (dashboard)
 
 ---
@@ -47,6 +47,12 @@
 - **Patch upstream bugs locally rather than working around them.** The mdmb Load() bug was a 3-line fix. Patching it in the Dockerfile was faster and more correct than adjusting our test assertions to accept empty fields.
 - **When a bug has a complex explanation, check the simple one first.** The "pkcs7 library incompatibility" theory was believed for two sprints. The actual cause was a wrong file path — `go test` changes the working directory, `NewCAManager` generated a new CA, NanoMDM had the old CA. The clue: `go test -c` + run from project root passed, `go test -run` failed. Same binary, different working directory. Simple explanation, 10-second fix once found.
 - **Hardcoded connection strings in test files are a recurring pattern.** Three separate test files had `host=localhost` hardcoded, preventing them from running in Docker. Every new integration test file risks the same bug. Consolidate into a shared helper (tracked in S5f-03).
+- **Don't trust bug diagnoses from previous sessions without reproducing.** The Sprint 5e plan stated "pkcs7 library incompatibility" as fact. It was a theory that nobody verified. The actual cause was a wrong file path. When a sprint plan gives you a root cause, treat it as a hypothesis until you've confirmed it yourself.
+- **"Is this happening anywhere else?" should be your reflex after every bug fix.** In Sprint 5e, the CA path bug existed in 3 locations, the hardcoded localhost bug in 3 files, and the wrong database name in 2 files. The owner will ask — get ahead of it by searching the full codebase after every fix.
+- **`go test` changes the working directory to the package directory.** Any relative path in a test resolves from the package dir, not the project root. Use `projectPath(t, ...)` (defined in `tests/e2e/helpers_test.go`) for project-root files, or `t.TempDir()` for generated files. Never use bare relative paths like `"internal/api/certs/ca.crt"` in tests.
+- **Tests that skip on DB connection failure can hide wrong database names.** Two tests referenced `localmdm_test` (doesn't exist in Docker) instead of `localmdm`. They silently skipped via `t.Skipf` on connection error. When un-skipping or fixing integration tests, verify the database name matches the Docker setup.
+- **When the owner asks "does that also cover X?" they already suspect it doesn't.** The CA env var support covered Local MDM but not NanoMDM (separate binary, file-based CA loading). The owner caught this immediately. Always think about the full system — all services, not just the Go code.
+- **Independent sprint tasks can run in parallel via subagents.** Mechanical tasks (assert.ErrorIs migration, SCEP test coverage) don't depend on investigation tasks. Use subagents for parallel implementation when tasks touch different files with no shared state.
 
 ## Known Issues
 
