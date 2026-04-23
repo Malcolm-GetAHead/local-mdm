@@ -323,7 +323,7 @@ All secrets stored as `SecureString` parameters:
 | `localmdm/ca-private-key` | CA private key PEM — signs all device certificates via SCEP. Most sensitive secret in the system. |
 | `localmdm/apns-push-cert` | APNs push certificate (.p12) — required for macOS MDM push notifications. |
 
-**Code change required**: `NewCAManager` currently reads from filesystem paths only. For production, add a `NewCAManagerFromSecrets(certPEM, keyPEM []byte)` constructor that accepts PEM bytes directly. The ECS entrypoint fetches from Secrets Manager/SSM and passes the bytes. NanoMDM's `-ca` flag needs the CA cert written to a tmpfs mount at startup (fetched from SSM by an init script in the container entrypoint).
+**Code change required**: `NewCAManagerFromPEM(certPEM, keyPEM []byte)` was added in Sprint 5e. The ECS entrypoint sets `CA_CERT_PEM` and `CA_KEY_PEM` env vars (fetched from Secrets Manager/SSM); the Go app reads them via `config.go` and calls `NewCAManagerFromPEM`. NanoMDM's `-ca` flag needs the CA cert written to a tmpfs mount at startup (fetched from SSM by an init script in the container entrypoint).
 
 ECS task execution role needs `ssm:GetParameters` permission on these paths. Secrets are injected as environment variables at task launch — the Go app reads them via `os.Getenv()` (already implemented in `config.go`).
 
