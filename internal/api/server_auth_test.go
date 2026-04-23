@@ -215,7 +215,7 @@ func setupTestDB(t *testing.T) *db.DB {
 		Port:            5432,
 		User:            "postgres",
 		Password:        func() string { if p := os.Getenv("DB_PASSWORD"); p != "" { return p }; return "postgres" }(),
-		Database:        "localmdm_test",
+		Database:        "localmdm",
 		SSLMode:         "disable",
 		MaxOpenConns:    10,
 		MaxIdleConns:    5,
