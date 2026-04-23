@@ -20,9 +20,11 @@ This starts:
 - **PostgreSQL 15** on port 5432 (databases: `localmdm`, `keycloak`, `nanomdm`)
 - **Keycloak 23** on port 8180 (OIDC identity provider)
 - **NanoMDM v0.9.0** on port 9000 (Apple MDM protocol handler, webhooks to Local MDM)
+- **Local MDM** on port 8080 (API server, built from source)
 - **Adminer** on port 8081 (database UI)
+- **Metrics** on port 9090 (Prometheus)
 
-Wait for Keycloak to finish starting (~30–45 seconds):
+Wait for all services to be healthy (~60 seconds for Keycloak):
 
 ```bash
 docker compose logs -f keycloak
@@ -32,7 +34,8 @@ docker compose logs -f keycloak
 ### 2. Run Migrations
 
 ```bash
-make migrate-up
+docker exec localmdm-server migrate -path /app/migrations \
+  -database "postgres://postgres:postgres-dev-password-1234@postgres:5432/localmdm?sslmode=disable" up
 ```
 
 ### 3. Copy Config
@@ -190,15 +193,21 @@ Override the server URL or token per-command:
 
 ```bash
 make help             # Show all available commands
-make run              # Start the server
-make test             # Run tests with race detector
-make test-coverage    # Generate coverage report
-make docker-up        # Start Docker services
-make docker-down      # Stop Docker services
-make migrate-up       # Run database migrations
-make migrate-down     # Rollback migrations
-make dev              # docker-up + migrate-up + run
+
+# Docker-based development (recommended)
+make dev              # Full stack with hot reload (localmdm-dev container)
+make dev-test         # Run all tests in Docker (race detector, all 19 packages)
+make dev-shell        # Shell into the dev container
+make prod-build       # Build production container
+make prod-test        # Build prod container + run full E2E suite
+
+# Infrastructure
+make docker-up        # Start infrastructure (postgres, keycloak, nanomdm, adminer)
+make docker-down      # Stop all containers
+make docker-logs      # Tail container logs
 ```
+
+All development and testing runs inside Docker containers on Alpine Linux for environment parity with production.
 
 ## Next Steps
 

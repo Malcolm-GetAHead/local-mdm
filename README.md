@@ -107,6 +107,9 @@ Unified Control Plane (Go)
 - `handlers.go` split into 10 domain-specific files
 - Service layer test coverage: 30.5% → 61.9%
 - E2E integration tests for macOS and Android webhook flows
+- Full mdmb device simulator enrollment verified (SCEP + check-in + device record)
+- 5 concurrent device enrollments tested (race-detector clean)
+- All development and testing moved to Docker containers (Alpine Linux, environment parity)
 - See [Sprint 5c Plan](docs/planning/sprints/sprint-5c-platform-integration/OVERVIEW.md)
 
 ## Documentation

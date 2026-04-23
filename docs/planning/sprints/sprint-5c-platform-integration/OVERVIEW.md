@@ -555,29 +555,46 @@ handlers_report.go       → reports + audit logs
 
 - [x] macOS enrollment profile points to NanoMDM, not Local MDM
 - [x] NanoMDM deployed in docker-compose, forwarding webhooks to Local MDM
-- [ ] **mdmb simulated devices complete full enrollment and appear in device list** — SCEP enrollment verified (cert issued + received), NanoMDM check-in blocked by test env webhook port mismatch
-- [ ] **mdmb device receives a command via NanoMDM and responds** — deferred to F-01 (requires full NanoMDM webhook routing in test env)
+- [x] **mdmb simulated devices complete full enrollment and appear in device list** — full flow verified: SCEP cert → Mdm-Signature → Authenticate → TokenUpdate → device record with all fields (Serial, Model, OS, Build, PushMagic)
+- [x] **5 concurrent mdmb enrollments** — all unique, race-detector clean, no clobbering
+- [ ] **mdmb device receives a command via NanoMDM and responds** — blocked by NanoMDM pkcs7 cert verification issue (tracked in Sprint 5e)
 - [x] Windows enrollment creates device records in the database
-- [ ] **Windows E2E: SOAP enrollment → device record → management sync (automated test)** — partial: device creation tested via handler, full SOAP E2E deferred to F-01
+- [ ] **Windows E2E: SOAP enrollment → device record → management sync** — deferred to F-01 (needs real SOAP payloads)
 - [x] Android webhook events are processed (not silently dropped)
 - [x] **Android E2E: webhook enrollment → status update → unenrollment (automated test)**
-- [x] SCEP protocol uses PKCS#7 envelopes (go.mozilla.org/pkcs7 + smallstep/scep for full protocol)
+- [x] SCEP protocol handles full PKCS#7 PKCSReq/CertRep envelopes (micromdm/scep v1)
+- [x] SCEP E2E: GetCACert → PKIOperation → chain verification → replay protection
 - [x] **Cross-service webhook test: NanoMDM JSON → Local MDM → device record (automated test)**
 - [x] Service layer test coverage ≥ 60% (achieved: 61.9%)
-- [x] All E2E tests run with `go test ./tests/e2e/...` and skip gracefully when services unavailable
-- [x] All existing tests pass
-- [x] Real device edge cases tracked as F-01 dependency (APNs, DEP, Windows MS-MDE2, Google webhook delivery)
+- [x] All E2E tests run in Docker with `make dev-test`
+- [x] All 19 test packages pass in Docker, zero failures
+- [x] Real device edge cases tracked as F-01 dependency
 
-### Deferred Items (tracked in F-01)
-- mdmb full enrollment through NanoMDM check-in (requires webhook routing in test env)
-- mdmb command dispatch + response cycle
-- Full Windows SOAP enrollment E2E test (build SOAP XML payloads, verify each step)
+### Beyond Original Scope (delivered)
+- **Docker dev environment**: Full stack in containers (localmdm, nanomdm, postgres, keycloak). Dev mode with hot reload, prod mode for verification. `make dev`, `make dev-test`, `make prod-test`.
+- **Enriched device enrollment**: Authenticate extracts Serial/Name/Model/OS/Build; TokenUpdate sets status=enrolled + push token. All stored in device record + platform_data JSONB.
+- **mdmb patched**: Upstream Load() bug fixed (BuildVersion/OSVersion/ProductName not restored from bolt DB).
+- **Enrollment profile fixes**: PayloadContent wrapper for SCEP payload, SignMessage=true for MDM payload.
+- **SCEP full protocol**: micromdm/scep v1 for PKCSReq envelope decrypt + CertRep envelope encrypt.
+
+### Tracked in Sprint 5e
+- NanoMDM cert verification failure (pkcs7 library incompatibility between mdmb and NanoMDM)
+- 16 repo integration test assertions: `assert.Contains` → `assert.ErrorIs`
+
+### Tracked in F-01
+- mdmb command dispatch through NanoMDM (blocked by 5e cert issue)
+- Full Windows SOAP enrollment E2E test
 - Google Android Management API client setup (requires GCP service account)
+- Real Apple device verification (APNs, DEP enrollment)
 
-### Bugs Found by mdmb
-- **Enrollment profile SCEP payload missing PayloadContent wrapper** — SCEP config keys (URL, Challenge, Keysize) were at wrong nesting level. Real Apple devices and mdmb couldn't parse the SCEP config. Fixed in S5c-04+.
+### Bugs Found and Fixed
+1. **Enrollment profile SCEP payload missing PayloadContent wrapper** — real clients couldn't parse SCEP config
+2. **Enrollment profile missing SignMessage=true** — NanoMDM rejected unsigned check-ins
+3. **SCEP handler couldn't handle real PKCS#7 PKCSReq envelopes** — only accepted raw DER CSRs
+4. **mdmb Load() doesn't restore OSVersion/BuildVersion/ProductName** — upstream bug, patched in Dockerfile
+5. **macOS→Linux RSA signature incompatibility** — resolved by moving all dev/test to Docker
 
 ---
 
 *Created: 2026-04-22 — Critical platform integration blockers identified during Sprint 5 backward look*
-*Completed: 2026-04-22 — All 10 tasks done, 10 commits on sprint-5c/platform-integration*
+*Completed: 2026-04-23 — 21 commits on sprint-5c/platform-integration*

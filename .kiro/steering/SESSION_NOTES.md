@@ -90,7 +90,8 @@ After every sprint, the owner expects:
 - **Handler tests**: mock repos in `handler_test_helpers_test.go`. New endpoints must be registered in `newTestServer()`.
 - **Service tests**: own mocks in `*_test.go` within `internal/service/`.
 - **Integration tests**: need Docker services (`docker compose up -d` then `migrate up`). PostgreSQL is always available — don't use `-short` flag to skip integration tests.
-- **Always run `go test -race -p 4 ./...`** (no `-short`) — the Docker stack is running. The `-p 4` limits parallel packages to prevent PostgreSQL connection pool exhaustion.
+- **Always run `make dev-test`** — runs all 19 test packages in Docker with race detector. This is the canonical test command. The old `go test -race -p 4 ./...` still works on host but requires matching DB password.
+- **Pre-commit**: run `make prod-test` — builds a clean production container and runs the full suite against it.
 
 ### Config (Database)
 ```yaml
@@ -170,9 +171,8 @@ database:
 - **Windows enrollment doesn't create device records** — ✅ FIXED in S5c-02. Enterprise ID in URL path.
 - **Android webhook is a no-op** — ✅ FIXED in S5c-03. WebhookHandler wired, graceful degradation without Google client.
 - **EventBus Go listener not built** — triggers exist (migration 000007), no listener. Tracked in Sprint 5b.
-- **mdmb device simulator not yet integrated** — NanoMDM is deployed but mdmb not installed in dev toolchain. Tracked in F-01.
-- **Windows SOAP E2E test not written** — device record creation tested, full SOAP flow deferred to F-01.
-- **16 repo integration tests still use `assert.Contains(err.Error(), "not found")`** — works but should use `assert.ErrorIs()` for consistency. Low priority.
+- **NanoMDM pkcs7 cert verification** — NanoMDM (`smallstep/pkcs7 v0.2.1`) can't verify Mdm-Signature created by mdmb (`go.mozilla.org/pkcs7`). Same cert verifies fine in our Go code. Not a platform issue (reproduces Linux→Linux). Tracked in Sprint 5e.
+- **16 repo integration tests still use `assert.Contains(err.Error(), "not found")`** — works but should use `assert.ErrorIs()` for consistency. Tracked in Sprint 5e.
 
 ## Sprint 4b Learnings
 

@@ -74,3 +74,4 @@ tests/device-testing/**/*.mp4
 tests/device-testing/**/*.log
 tests/device-testing/results/
 tests/device-testing/.vm_config
+*.srl
