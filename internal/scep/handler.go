@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/malcolm-getahead/local-mdm/internal/certs"
-	sceplib "github.com/smallstep/scep"
+	sceplib "github.com/micromdm/scep/scep"
 	"go.mozilla.org/pkcs7"
 )
 
@@ -115,21 +115,16 @@ func (h *Handler) pkiOperation(w http.ResponseWriter, r *http.Request) {
 			w.Write(certRep.Raw)
 			return
 		}
-		cert, err := h.ca.SignCSR(csr, h.certTTL)
+		// Build certificate template — SignCSR will sign the CSR using this template
+		tmpl := h.ca.CertTemplate(h.certTTL)
+		h.logger.Info("SCEP certificate signing", "device_id", deviceID, "serial", tmpl.SerialNumber.String())
+		certRep, err := msg.SignCSR(caCert, caKey, tmpl)
 		if err != nil {
-			h.logger.Error("failed to sign CSR", "error", err, "device_id", deviceID)
-			certRep, _ := msg.Fail(caCert, caKey, sceplib.BadRequest)
-			w.Header().Set("Content-Type", "application/x-pki-message")
-			w.Write(certRep.Raw)
+			h.logger.Error("failed to sign SCEP CSR", "error", err, "device_id", deviceID)
+			http.Error(w, "signing failed", http.StatusInternalServerError)
 			return
 		}
-		h.logger.Info("SCEP certificate issued", "device_id", deviceID, "serial", cert.SerialNumber.String())
-		certRep, err := msg.Success(caCert, caKey, cert)
-		if err != nil {
-			h.logger.Error("failed to build SCEP success response", "error", err)
-			http.Error(w, "response generation failed", http.StatusInternalServerError)
-			return
-		}
+		h.logger.Info("SCEP certificate issued", "device_id", deviceID)
 		w.Header().Set("Content-Type", "application/x-pki-message")
 		w.Write(certRep.Raw)
 		return

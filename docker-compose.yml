@@ -73,6 +73,7 @@ services:
       NANOMDM_CHECKIN: "1"
       NANOMDM_DEBUG: "1"
       NANOMDM_CA: "/certs/ca.crt"
+      NANOMDM_RETRO: "1"
     volumes:
       - ./internal/api/certs/ca.crt:/certs/ca.crt:ro
     depends_on:

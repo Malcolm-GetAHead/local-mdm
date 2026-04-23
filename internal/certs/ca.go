@@ -173,6 +173,20 @@ func (m *CAManager) GetCAPrivateKey() *rsa.PrivateKey {
 	return m.caKey
 }
 
+// CertTemplate returns a certificate template for SCEP signing (serial, validity, key usage).
+func (m *CAManager) CertTemplate(validity time.Duration) *x509.Certificate {
+	serialNumber, _ := rand.Int(rand.Reader, new(big.Int).Lsh(big.NewInt(1), 128))
+	return &x509.Certificate{
+		SerialNumber:          serialNumber,
+		NotBefore:             time.Now(),
+		NotAfter:              time.Now().Add(validity),
+		KeyUsage:              x509.KeyUsageDigitalSignature | x509.KeyUsageKeyEncipherment,
+		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
+		BasicConstraintsValid: true,
+		IsCA:                  false,
+	}
+}
+
 func (m *CAManager) GetCACertificatePEM() ([]byte, error) {
 	return pem.EncodeToMemory(&pem.Block{
 		Type:  "CERTIFICATE",

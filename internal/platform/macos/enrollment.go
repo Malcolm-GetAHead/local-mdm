@@ -85,6 +85,8 @@ const profileTemplate = `<?xml version="1.0" encoding="UTF-8"?>
 			<string>{{.CheckInURL}}</string>
 			<key>CheckOutWhenRemoved</key>
 			<true/>
+			<key>SignMessage</key>
+			<true/>
 			<key>AccessRights</key>
 			<integer>8191</integer>
 			<key>ServerCapabilities</key>
