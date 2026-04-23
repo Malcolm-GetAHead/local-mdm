@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
+	"github.com/malcolm-getahead/local-mdm/internal/apperrors"
 	"github.com/malcolm-getahead/local-mdm/internal/models"
 	"github.com/malcolm-getahead/local-mdm/internal/repository"
 	"github.com/stretchr/testify/assert"
@@ -80,7 +81,7 @@ func TestUserRepository(t *testing.T) {
 
 		_, err := repo.GetByID(ctx, user.ID)
 		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "not found")
+		assert.ErrorIs(t, err, apperrors.ErrNotFound)
 	})
 
 	t.Run("not found", func(t *testing.T) {

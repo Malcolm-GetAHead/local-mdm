@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
+	"github.com/malcolm-getahead/local-mdm/internal/apperrors"
 	"github.com/malcolm-getahead/local-mdm/internal/models"
 	"github.com/malcolm-getahead/local-mdm/internal/repository"
 	"github.com/stretchr/testify/assert"
@@ -101,7 +102,7 @@ func TestGroupRepository(t *testing.T) {
 
 		_, err = repo.GetByID(ctx, group.ID)
 		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "not found")
+		assert.ErrorIs(t, err, apperrors.ErrNotFound)
 	})
 
 	t.Run("add and list members", func(t *testing.T) {
@@ -171,19 +172,19 @@ func TestGroupRepository(t *testing.T) {
 	t.Run("get nonexistent returns error", func(t *testing.T) {
 		_, err := repo.GetByID(ctx, uuid.New())
 		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "not found")
+		assert.ErrorIs(t, err, apperrors.ErrNotFound)
 	})
 
 	t.Run("update nonexistent returns error", func(t *testing.T) {
 		err := repo.Update(ctx, &models.DeviceGroup{BaseModel: models.BaseModel{ID: uuid.New()}})
 		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "not found")
+		assert.ErrorIs(t, err, apperrors.ErrNotFound)
 	})
 
 	t.Run("delete nonexistent returns error", func(t *testing.T) {
 		err := repo.Delete(ctx, uuid.New())
 		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "not found")
+		assert.ErrorIs(t, err, apperrors.ErrNotFound)
 	})
 }
 

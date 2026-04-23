@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
+	"github.com/malcolm-getahead/local-mdm/internal/apperrors"
 	"github.com/malcolm-getahead/local-mdm/internal/models"
 	"github.com/malcolm-getahead/local-mdm/internal/repository"
 	"github.com/stretchr/testify/assert"
@@ -165,7 +166,7 @@ func TestPolicyAssignmentRepository(t *testing.T) {
 	t.Run("delete nonexistent returns error", func(t *testing.T) {
 		err := repo.Delete(ctx, uuid.New())
 		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "not found")
+		assert.ErrorIs(t, err, apperrors.ErrNotFound)
 	})
 
 	t.Run("duplicate assignment is ignored", func(t *testing.T) {

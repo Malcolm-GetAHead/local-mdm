@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
+	"github.com/malcolm-getahead/local-mdm/internal/apperrors"
 	"github.com/malcolm-getahead/local-mdm/internal/models"
 	"github.com/malcolm-getahead/local-mdm/internal/repository"
 	"github.com/stretchr/testify/assert"
@@ -109,25 +110,25 @@ func TestAppRepository(t *testing.T) {
 
 		_, err = repo.GetByID(ctx, app.ID)
 		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "not found")
+		assert.ErrorIs(t, err, apperrors.ErrNotFound)
 	})
 
 	t.Run("get nonexistent returns error", func(t *testing.T) {
 		_, err := repo.GetByID(ctx, uuid.New())
 		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "not found")
+		assert.ErrorIs(t, err, apperrors.ErrNotFound)
 	})
 
 	t.Run("update nonexistent returns error", func(t *testing.T) {
 		err := repo.Update(ctx, &models.App{BaseModel: models.BaseModel{ID: uuid.New()}})
 		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "not found")
+		assert.ErrorIs(t, err, apperrors.ErrNotFound)
 	})
 
 	t.Run("delete nonexistent returns error", func(t *testing.T) {
 		err := repo.Delete(ctx, uuid.New())
 		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "not found")
+		assert.ErrorIs(t, err, apperrors.ErrNotFound)
 	})
 }
 

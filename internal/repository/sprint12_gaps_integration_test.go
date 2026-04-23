@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
+	"github.com/malcolm-getahead/local-mdm/internal/apperrors"
 	"github.com/malcolm-getahead/local-mdm/internal/models"
 	"github.com/malcolm-getahead/local-mdm/internal/repository"
 	"github.com/stretchr/testify/assert"
@@ -51,13 +52,13 @@ func TestDeviceRepository_GetByPlatformID(t *testing.T) {
 	t.Run("not found returns error", func(t *testing.T) {
 		_, err := repo.GetByPlatformID(ctx, models.PlatformWindows, "nonexistent")
 		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "not found")
+		assert.ErrorIs(t, err, apperrors.ErrNotFound)
 	})
 
 	t.Run("wrong platform returns not found", func(t *testing.T) {
 		_, err := repo.GetByPlatformID(ctx, models.PlatformMacOS, platformDeviceID)
 		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "not found")
+		assert.ErrorIs(t, err, apperrors.ErrNotFound)
 	})
 }
 
@@ -122,7 +123,7 @@ func TestCommandRepository_GetByID(t *testing.T) {
 	t.Run("not found returns error", func(t *testing.T) {
 		_, err := repo.GetByID(ctx, uuid.New())
 		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "not found")
+		assert.ErrorIs(t, err, apperrors.ErrNotFound)
 	})
 }
 
@@ -189,7 +190,7 @@ func TestCertificateRepository_GetBySerial(t *testing.T) {
 	t.Run("not found returns error", func(t *testing.T) {
 		_, err := repo.GetBySerial(context.Background(), "NONEXISTENT-SERIAL")
 		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "not found")
+		assert.ErrorIs(t, err, apperrors.ErrNotFound)
 	})
 }
 

@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
+	"github.com/malcolm-getahead/local-mdm/internal/apperrors"
 	"github.com/malcolm-getahead/local-mdm/internal/models"
 	"github.com/malcolm-getahead/local-mdm/internal/repository"
 	"github.com/stretchr/testify/assert"
@@ -93,7 +94,7 @@ func TestPolicyVersionRepository(t *testing.T) {
 	t.Run("get by version not found", func(t *testing.T) {
 		_, err := repo.GetByVersion(ctx, policy.ID, 999)
 		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "not found")
+		assert.ErrorIs(t, err, apperrors.ErrNotFound)
 	})
 
 	t.Run("latest version", func(t *testing.T) {

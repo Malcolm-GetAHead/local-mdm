@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/malcolm-getahead/local-mdm/internal/apperrors"
 	"github.com/malcolm-getahead/local-mdm/internal/models"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -100,7 +101,7 @@ func TestTokenService_Create_UserNotFound(t *testing.T) {
 	svc := NewTokenService(newMockTokenRepo(), &mockUserRepoForToken{users: map[uuid.UUID]*models.User{}}, testLogger())
 	_, err := svc.Create(context.Background(), uuid.New(), "tok", nil)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "not found")
+	assert.ErrorIs(t, err, apperrors.ErrNotFound)
 }
 
 func TestTokenService_Validate(t *testing.T) {

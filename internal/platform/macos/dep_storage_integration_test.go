@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/malcolm-getahead/local-mdm/internal/apperrors"
 	"github.com/malcolm-getahead/local-mdm/internal/config"
 	"github.com/malcolm-getahead/local-mdm/internal/db"
 	"github.com/micromdm/nanodep/client"
@@ -86,7 +87,7 @@ func TestDEPStorage_AuthTokens(t *testing.T) {
 	t.Run("retrieve nonexistent returns error", func(t *testing.T) {
 		_, err := storage.RetrieveAuthTokens(ctx, "nonexistent")
 		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "not found")
+		assert.ErrorIs(t, err, apperrors.ErrNotFound)
 	})
 }
 
@@ -112,7 +113,7 @@ func TestDEPStorage_Config(t *testing.T) {
 	t.Run("retrieve nonexistent returns error", func(t *testing.T) {
 		_, err := storage.RetrieveConfig(ctx, "nonexistent")
 		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "not found")
+		assert.ErrorIs(t, err, apperrors.ErrNotFound)
 	})
 }
 
