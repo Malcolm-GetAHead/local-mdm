@@ -136,7 +136,7 @@ Dashboard handlers are separate from API handlers — API returns JSON, dashboar
 - [ ] Policy create, edit, and assign from UI
 - [ ] Compliance view shows non-compliant devices with reasons
 - [ ] Audit log searchable by actor and date
-- [ ] All pages work without JavaScript disabled (graceful degradation)
+- [ ] Friendly "JavaScript required" message shown via `<noscript>` tag (Keycloak auth requires JS)
 - [ ] Embedded in Go binary — single deploy artifact
 
 ---
