@@ -63,6 +63,9 @@
                 <button hx-post="/dashboard/devices/{{.Device.ID}}/wipe" hx-target="#device-actions" hx-swap="outerHTML"
                         hx-confirm="WIPE this device? All data will be erased. This cannot be undone."
                         class="btn-danger w-full">Wipe Device</button>
+                <button hx-post="/dashboard/devices/{{.Device.ID}}/unenroll" hx-target="#device-actions" hx-swap="outerHTML"
+                        hx-confirm="Unenroll this device? It will no longer be managed."
+                        class="btn-secondary w-full">Unenroll Device</button>
                 {{end}}
             </div>
             {{else}}

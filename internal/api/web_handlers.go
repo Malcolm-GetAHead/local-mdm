@@ -220,6 +220,8 @@ func (s *Server) handleWebDeviceLock(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		msg = "Failed to send lock command: " + err.Error()
 		success = false
+	} else {
+		s.logAudit(r, "device.lock", "device", id, nil)
 	}
 
 	s.renderFragment(w, s.webTemplates["device_detail"], "action_result", map[string]interface{}{
@@ -243,6 +245,33 @@ func (s *Server) handleWebDeviceWipe(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		msg = "Failed to send wipe command: " + err.Error()
 		success = false
+	} else {
+		s.logAudit(r, "device.wipe", "device", id, nil)
+	}
+
+	s.renderFragment(w, s.webTemplates["device_detail"], "action_result", map[string]interface{}{
+		"Success": success,
+		"Message": msg,
+	})
+}
+
+// handleWebDeviceUnenroll unenrolls a device via HTMX.
+func (s *Server) handleWebDeviceUnenroll(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	id, err := uuid.Parse(mux.Vars(r)["id"])
+	if err != nil {
+		http.Error(w, "Invalid device ID", http.StatusBadRequest)
+		return
+	}
+
+	_, err = s.deviceService.Unenroll(ctx, id)
+	msg := "Device unenrolled successfully"
+	success := true
+	if err != nil {
+		msg = "Failed to unenroll device: " + err.Error()
+		success = false
+	} else {
+		s.logAudit(r, "device.unenroll", "device", id, nil)
 	}
 
 	s.renderFragment(w, s.webTemplates["device_detail"], "action_result", map[string]interface{}{

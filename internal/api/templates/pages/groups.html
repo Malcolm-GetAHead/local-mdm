@@ -1,6 +1,24 @@
 {{define "title"}}Groups — Local MDM{{end}}
 {{define "page_title"}}Groups{{end}}
 {{define "content"}}
+<div class="mb-6 flex justify-end">
+    <button onclick="document.getElementById('create-group-form').classList.toggle('hidden')" class="btn-primary">Create Group</button>
+</div>
+
+<div id="create-group-form" class="card mb-6 hidden">
+    <h2 class="text-lg font-semibold mb-4">Create Group</h2>
+    <form method="POST" action="/dashboard/groups" class="flex gap-4 items-end">
+        <div class="flex-1">
+            <label class="block text-sm font-medium text-gray-700 mb-1">Name</label>
+            <input type="text" name="name" required class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm">
+        </div>
+        <div class="flex-1">
+            <label class="block text-sm font-medium text-gray-700 mb-1">Description</label>
+            <input type="text" name="description" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm">
+        </div>
+        <button type="submit" class="btn-primary">Create</button>
+    </form>
+</div>
 <div class="card overflow-hidden p-0">
     <table class="w-full">
         <thead>

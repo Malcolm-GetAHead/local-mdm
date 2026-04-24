@@ -157,3 +157,19 @@ func (s *DeviceService) Restart(ctx context.Context, id uuid.UUID) (*ActionResul
 	s.dispatcher.Enqueue(device, cmd)
 	return &ActionResult{Device: device, Command: cmd}, nil
 }
+
+// Unenroll marks a device as unenrolled and fires lifecycle hooks.
+func (s *DeviceService) Unenroll(ctx context.Context, id uuid.UUID) (*models.Device, error) {
+	device, err := s.deviceRepo.GetByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	device.Status = "unenrolled"
+	if err := s.deviceRepo.Update(ctx, device); err != nil {
+		return nil, fmt.Errorf("failed to update device status: %w", err)
+	}
+	if s.lifecycle != nil {
+		s.lifecycle.OnUnenroll(ctx, device)
+	}
+	return device, nil
+}

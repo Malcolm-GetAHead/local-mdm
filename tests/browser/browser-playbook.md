@@ -43,12 +43,13 @@
 - [ ] Verify table row appears with text "Surface"
 
 ### Device Detail
-- [ ] Click "View" on first device row
+- [ ] Visit `/dashboard/devices/d0000000-0000-0000-0000-000000000018` — page contains "Exec Surface"
 - [ ] Verify "Serial Number" is visible
 - [ ] Verify "OS Version" is visible
 - [ ] Verify "Actions" is visible
 - [ ] Verify "Lock Device" is visible
 - [ ] Verify "Wipe Device" is visible
+- [ ] Verify "Unenroll Device" is visible
 - [ ] Verify "Groups" is visible
 
 ## Policy Management
@@ -61,6 +62,10 @@
 ### Create Policy
 - [ ] Click "Create Policy"
 - [ ] Verify "Create Policy" is visible
+- [ ] Verify "Security" is visible
+- [ ] Verify "Restrictions" is visible
+- [ ] Verify "WiFi" is visible
+- [ ] Verify "VPN" is visible
 - [ ] Fill: Name=`Test Policy`, Description=`Automated test`
 - [ ] Click "Create Policy"
 - [ ] Verify redirected to `/dashboard/policies` — page contains "Test Policy"
@@ -78,12 +83,14 @@
 - [ ] Verify "Engineering" is visible
 - [ ] Verify "Sales" is visible
 - [ ] Verify "Executives" is visible
+- [ ] Verify "Create Group" is visible
 
 ### Group Detail
 - [ ] Click "View" on "Engineering"
 - [ ] Verify "Engineering" is visible
 - [ ] Verify "Members" is visible
-- [ ] Verify table header row is visible
+- [ ] Verify "In Group" is visible
+- [ ] Verify "Add" is visible
 
 ## Compliance
 

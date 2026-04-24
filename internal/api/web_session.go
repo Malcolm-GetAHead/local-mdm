@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/malcolm-getahead/local-mdm/internal/auth"
 )
 
 const (
@@ -118,6 +119,14 @@ func (s *Server) webAuthMiddleware(next http.Handler) http.Handler {
 			return
 		}
 		ctx := context.WithValue(r.Context(), webSessionCtxKey, sess)
+		// Also inject auth.AuthUser so logAudit and other auth-aware code works
+		authUser := &auth.AuthUser{
+			ID:           sess.UserID.String(),
+			Email:        sess.Email,
+			Roles:        []string{sess.Role},
+			EnterpriseID: sess.EnterpriseID,
+		}
+		ctx = auth.WithUser(ctx, authUser)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }

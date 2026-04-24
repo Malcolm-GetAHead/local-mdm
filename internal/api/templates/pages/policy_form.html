@@ -1,57 +1,121 @@
-{{define "title"}}{{if .Policy.ID}}Edit Policy{{else}}Create Policy{{end}} — Local MDM{{end}}
-{{define "page_title"}}{{if .Policy.ID}}Edit Policy{{else}}Create Policy{{end}}{{end}}
+{{define "title"}}{{if .IsEdit}}Edit Policy{{else}}Create Policy{{end}} — Local MDM{{end}}
+{{define "page_title"}}{{if .IsEdit}}Edit Policy{{else}}Create Policy{{end}}{{end}}
 {{define "content"}}
 <div class="mb-6">
     <a href="/dashboard/policies" class="text-sm text-blue-600 hover:text-blue-800">← Back to Policies</a>
 </div>
 
-<div class="card max-w-2xl">
-    <form method="POST" action="/dashboard/policies{{if .Policy.ID}}/{{.Policy.ID}}{{end}}">
-        <div class="space-y-4">
+<form method="POST" action="/dashboard/policies{{if .IsEdit}}/{{.Policy.ID}}{{end}}" class="space-y-6">
+    <div class="card">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">Name</label>
                 <input type="text" name="name" value="{{.Policy.Name}}" required
                        class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
             </div>
             <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Platform</label>
+                <select name="platform" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                        hx-get="/dashboard/policies/settings-catalog" hx-target="#settings-catalog" hx-include="[name='platform']">
+                    <option value="all" {{if eq .Policy.Platform "all"}}selected{{end}}>Cross-Platform</option>
+                    <option value="macos" {{if eq .Policy.Platform "macos"}}selected{{end}}>macOS</option>
+                    <option value="windows" {{if eq .Policy.Platform "windows"}}selected{{end}}>Windows</option>
+                    <option value="android" {{if eq .Policy.Platform "android"}}selected{{end}}>Android</option>
+                </select>
+            </div>
+            <div class="md:col-span-2">
                 <label class="block text-sm font-medium text-gray-700 mb-1">Description</label>
                 <input type="text" name="description" value="{{.Policy.Description}}"
                        class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-            </div>
-            <div class="grid grid-cols-2 gap-4">
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Platform</label>
-                    <select name="platform" required class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm">
-                        <option value="all" {{if eq .Policy.Platform "all"}}selected{{end}}>Cross-Platform</option>
-                        <option value="macos" {{if eq .Policy.Platform "macos"}}selected{{end}}>macOS</option>
-                        <option value="windows" {{if eq .Policy.Platform "windows"}}selected{{end}}>Windows</option>
-                        <option value="android" {{if eq .Policy.Platform "android"}}selected{{end}}>Android</option>
-                    </select>
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Type</label>
-                    <select name="policy_type" required class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm">
-                        <option value="security" {{if eq .Policy.PolicyType "security"}}selected{{end}}>Security</option>
-                        <option value="restrictions" {{if eq .Policy.PolicyType "restrictions"}}selected{{end}}>Restrictions</option>
-                        <option value="wifi" {{if eq .Policy.PolicyType "wifi"}}selected{{end}}>WiFi</option>
-                        <option value="vpn" {{if eq .Policy.PolicyType "vpn"}}selected{{end}}>VPN</option>
-                    </select>
-                </div>
-            </div>
-            <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Configuration (JSON)</label>
-                <textarea name="policy_config" rows="6" required
-                          class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500">{{jsonPretty .Policy.PolicyConfig}}</textarea>
             </div>
             <div class="flex items-center gap-2">
                 <input type="checkbox" name="is_active" id="is_active" {{if .Policy.IsActive}}checked{{end}} class="rounded">
                 <label for="is_active" class="text-sm">Active</label>
             </div>
         </div>
-        <div class="mt-6 flex gap-3">
-            <button type="submit" class="btn-primary">{{if .Policy.ID}}Save Changes{{else}}Create Policy{{end}}</button>
-            <a href="/dashboard/policies" class="btn-secondary">Cancel</a>
+    </div>
+
+    <div class="card">
+        <div class="flex items-center justify-between mb-4">
+            <h2 class="text-lg font-semibold">Policy Settings</h2>
+            <input type="search" placeholder="Filter settings..." class="rounded-lg border border-gray-300 px-3 py-1.5 text-sm w-64"
+                   oninput="filterSettings(this.value)">
         </div>
-    </form>
+        {{if .Error}}<div class="mb-4 p-3 bg-red-50 text-red-700 rounded-lg text-sm">{{.Error}}</div>{{end}}
+
+        <div id="settings-catalog">
+            {{template "settings_catalog_body" .}}
+        </div>
+    </div>
+
+    <div class="flex gap-3">
+        <button type="submit" class="btn-primary">{{if .IsEdit}}Save Changes{{else}}Create Policy{{end}}</button>
+        <a href="/dashboard/policies" class="btn-secondary">Cancel</a>
+    </div>
+</form>
+
+<script>
+function filterSettings(q) {
+    q = q.toLowerCase();
+    document.querySelectorAll('[data-setting]').forEach(function(el) {
+        var text = el.getAttribute('data-setting').toLowerCase();
+        el.style.display = text.includes(q) ? '' : 'none';
+    });
+    document.querySelectorAll('[data-category]').forEach(function(cat) {
+        var visible = cat.querySelectorAll('[data-setting]:not([style*="display: none"])').length;
+        cat.style.display = visible > 0 ? '' : 'none';
+    });
+}
+</script>
+{{end}}
+
+{{define "settings_catalog_body"}}
+{{range .SettingGroups}}
+<div class="mb-6" data-category="{{.Category}}">
+    <h3 class="text-sm font-semibold text-gray-900 uppercase tracking-wider mb-3 border-b border-gray-200 pb-2">{{.Category}}</h3>
+    <div class="space-y-3">
+        {{range .Settings}}
+        <div class="flex items-start gap-3 py-2" data-setting="{{.Category}} {{.Label}} {{.Key}} {{.Description}}">
+            {{if eq .Type "bool"}}
+            <input type="checkbox" name="setting_{{.Key}}" id="s_{{.Key}}" value="true"
+                   {{if index $.ActiveSettings .Key}}checked{{end}}
+                   class="mt-1 rounded">
+            <label for="s_{{.Key}}" class="flex-1">
+                <div class="text-sm font-medium text-gray-800">{{.Label}}</div>
+                <div class="text-xs text-gray-500">{{.Description}}</div>
+            </label>
+            {{else if eq .Type "int"}}
+            <div class="flex-1">
+                <label for="s_{{.Key}}" class="text-sm font-medium text-gray-800">{{.Label}}</label>
+                <div class="text-xs text-gray-500 mb-1">{{.Description}}</div>
+                <input type="number" name="setting_{{.Key}}" id="s_{{.Key}}" min="0"
+                       value="{{index $.ActiveSettings .Key}}"
+                       class="w-32 rounded-lg border border-gray-300 px-3 py-1.5 text-sm">
+            </div>
+            {{else if eq .Type "string"}}
+            <div class="flex-1">
+                <label for="s_{{.Key}}" class="text-sm font-medium text-gray-800">{{.Label}}</label>
+                <div class="text-xs text-gray-500 mb-1">{{.Description}}</div>
+                <input type="text" name="setting_{{.Key}}" id="s_{{.Key}}"
+                       value="{{index $.ActiveSettings .Key}}"
+                       class="w-full rounded-lg border border-gray-300 px-3 py-1.5 text-sm">
+            </div>
+            {{else if eq .Type "select"}}
+            <div class="flex-1">
+                <label for="s_{{.Key}}" class="text-sm font-medium text-gray-800">{{.Label}}</label>
+                <div class="text-xs text-gray-500 mb-1">{{.Description}}</div>
+                <select name="setting_{{.Key}}" id="s_{{.Key}}" class="rounded-lg border border-gray-300 px-3 py-1.5 text-sm">
+                    <option value="">— Not set —</option>
+                    {{$current := index $.ActiveSettings .Key}}
+                    {{range .Options}}
+                    <option value="{{.}}" {{if eq . $current}}selected{{end}}>{{.}}</option>
+                    {{end}}
+                </select>
+            </div>
+            {{end}}
+        </div>
+        {{end}}
+    </div>
 </div>
+{{end}}
 {{end}}
