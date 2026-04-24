@@ -1,7 +1,7 @@
 # F-07: Advanced MDM Features
 
 **Priority**: Low  
-**Effort**: 5-7 days (increased from 3-5 — user management, API tokens, app updates added from Sprint 2a audit)  
+**Effort**: 5-7 days (increased from 3-5 — user management, API tokens, app updates added from Sprint 2a audit) + 8-12 days for Sprint 5b audit items (lost mode, selective wipe, OS updates, inventory, alerting, self-service, app store integration)  
 **Score Impact**: +0.05 points  
 **Status**: Out of scope for v1.0
 
@@ -27,6 +27,14 @@
 - User management CRUD (Sprint 2a audit — CLI and dashboard assume it exists)
 - API token authentication (Sprint 2a audit — CLI assumes it exists)
 - App update management (Sprint 2a audit — install/remove covered in S3, updates not planned)
+- Lost Mode / Find My Device (Sprint 5b audit — standard MDM feature, not planned)
+- Selective / Corporate Wipe (Sprint 5b audit — only full wipe exists, no BYOD support)
+- OS Update Management (Sprint 5b audit — no ability to enforce or schedule OS updates)
+- Device Hardware Inventory (Sprint 5b audit — no structured inventory view)
+- Zero-Touch Enrollment (Sprint 5b audit — DEP exists for macOS, no Autopilot/Zero-Touch)
+- Admin Alerting / Notifications (Sprint 5b audit — EventBus is internal only, no outbound alerts)
+- Self-Service Portal (Sprint 5b audit — no end-user facing interface)
+- App Store / Package Manager Integration (Sprint 5b audit — no Chocolatey/Brew/Munki/Managed Play)
 
 ### Impact
 Without advanced features:
@@ -665,6 +673,113 @@ DELETE /api/v1/tokens/{id}            → Revoke token
 - Integration marketplace (Slack, Teams, ServiceNow)
 - Mobile app for admins
 - Self-service portal for end users
+
+---
+
+## Features Identified in Sprint 5b Audit (2026-04-24)
+
+### 8. Lost Mode / Find My Device
+
+Standard MDM feature — admin marks a device as lost, device locks and displays a message with contact info, and reports its location.
+
+**Platform support**:
+- **macOS**: `EnableLostMode` MDM command (shows message + phone number on lock screen, reports GPS). `DisableLostMode` to unlock. NanoMDM can send these commands.
+- **Windows**: `./Vendor/MSFT/RemoteFind/Location` CSP — requests device location. Combined with Lock command.
+- **Android**: `LOST_MODE` device state via Management API — locks device, displays message, reports location.
+
+**What exists**: Lock command works on all platforms. No location reporting, no lost mode message.
+
+**What's needed**: Lost mode command builders per platform, location storage (device_locations table), admin UI to trigger/view, privacy controls.
+
+### 9. Selective / Corporate Wipe
+
+Full wipe erases everything. Selective wipe removes only corporate data (MDM profiles, managed apps, corporate email) and leaves personal data intact. Critical for BYOD.
+
+**Platform support**:
+- **macOS**: `RemoveProfile` removes the MDM enrollment profile, which triggers removal of all managed profiles/apps. Device stays functional.
+- **Windows**: `./Vendor/MSFT/DMClient/Provider/{ProviderID}/Unenroll` — removes MDM management. Corporate data removed via `./Vendor/MSFT/Policy/Config/Storage/RemovableDiskDenyWriteAccess` and selective wipe CSPs.
+- **Android**: `WIPE_DATA_FLAGS` with `PRESERVE_RESET_PROTECTION_DATA` — or just unenroll (removes work profile on work-profile devices).
+
+**What exists**: Full wipe only. Unenroll exists but doesn't clean up managed profiles/apps.
+
+**What's needed**: Selective wipe command type, per-platform implementation, tracking of which profiles/apps are MDM-managed.
+
+### 10. OS Update Management
+
+Admins need to enforce OS updates for security patches. Every major MDM offers this.
+
+**Platform support**:
+- **macOS**: `ScheduleOSUpdate` and `AvailableOSUpdates` MDM commands. Can force install, schedule, or defer.
+- **Windows**: `./Vendor/MSFT/Policy/Config/Update` CSPs — configure Windows Update policies (active hours, deferral days, auto-install). `./Vendor/MSFT/WindowsUpdate` for specific update targeting.
+- **Android**: `SystemUpdate` policy in Management API — `WINDOWED` (install during maintenance window), `AUTOMATIC`, `POSTPONE`.
+
+**What exists**: Nothing. No update commands, no update policies, no update status tracking.
+
+**What's needed**: Update policy type, command builders per platform, update status in platform_data, compliance check for minimum OS version (partially exists — compliance engine checks os_version).
+
+### 11. Device Hardware Inventory
+
+Structured view of device hardware: storage, battery, network interfaces, installed apps. Every MDM has a device detail page with this.
+
+**What exists**: Some fields collected via check-in (model, OS version, serial). Windows management handler collects DevDetail CSP fields (RAM, storage, processor). No structured inventory view or API.
+
+**What's needed**: Inventory query commands per platform (macOS `DeviceInformation`, Windows DevDetail CSPs, Android device properties), structured storage, API endpoint (`GET /devices/{id}/inventory`), dashboard tab.
+
+### 12. Zero-Touch Enrollment
+
+Enterprise enrollment without manual device setup. DEP exists for macOS. Windows Autopilot and Android Zero-Touch are the equivalents.
+
+**Platform support**:
+- **macOS DEP**: ✅ Exists (DEP sync, enrollment profiles)
+- **Windows Autopilot**: Requires Azure AD integration. Device hardware hashes registered with Microsoft, device auto-enrolls on first boot. Significant integration effort.
+- **Android Zero-Touch**: Requires Zero-Touch portal access. Devices auto-enroll via DPC (Device Policy Controller). Uses the same Management API we already integrate with.
+
+**What exists**: macOS DEP only.
+
+**What's needed**: Android Zero-Touch is achievable (same API). Windows Autopilot is a larger effort (Azure AD dependency). Prioritize Android Zero-Touch.
+
+### 13. Admin Alerting / Notifications
+
+The EventBus dispatches events internally but admins have no way to be notified. Need outbound notifications for:
+- Device non-compliant
+- Device unenrolled unexpectedly
+- Device not seen in X days
+- Certificate expiring
+- Enrollment failures
+
+**What exists**: EventBus with subscribers, compliance evaluation, cert expiration monitor (logs only).
+
+**What's needed**: Notification channels (email via SES/SMTP, webhook-out, Slack). Alert rules (configurable per enterprise). Alert history table. This builds naturally on the EventBus — add a "notification" subscriber that checks alert rules and dispatches to configured channels.
+
+### 14. Self-Service Portal
+
+End users see their own device status, request app installs, report lost devices, view compliance status. Reduces admin workload.
+
+**What exists**: Nothing user-facing. Dashboard (Sprint 5d) is admin-only.
+
+**What's needed**: Separate auth flow (user vs admin), device ownership model (which user owns which device), limited API endpoints, simple UI. Could be a section of the HTMX dashboard with role-based views.
+
+### 15. App Store / Package Manager Integration
+
+*Added: Sprint 5b — owner input*
+
+Don't build an app store backend. Leverage existing package managers for app delivery. The MDM's job is policy ("this device should have these apps") and status tracking. The package manager handles download, install, and updates.
+
+**Platform approach**:
+- **macOS**: [Munki](https://github.com/munki/munki) for managed installs (mature, widely used in enterprise Mac management). MDM deploys the Munki agent + config profile pointing to a Munki repo. Alternatively, Homebrew with a custom tap for CLI tools.
+- **Windows**: [Chocolatey](https://chocolatey.org/) with a private/internal repo. MDM deploys Chocolatey agent + config via CSP/PPKG. Chocolatey handles package install/update/removal. `choco install` commands sent via OMA-DM exec.
+- **Android**: Managed Google Play — already part of the Android Management API. Apps are approved in the Managed Play console, pushed via `ApplicationPolicy` in the management API. This is the standard approach.
+
+**What exists**: App catalog model (Sprint 3), app deploy commands, app status tracking. No package manager integration — current app deployment sends raw install commands.
+
+**What's needed**:
+1. Package manager config profiles per platform (Munki manifest URL, Chocolatey source URL)
+2. App catalog entries reference package manager IDs (Munki pkginfo name, Chocolatey package ID, Play Store app ID)
+3. Deployment translates to package manager commands instead of raw installs
+4. Status sync — poll package manager for installed state (Munki reports, Chocolatey `choco list --local`, Play install state)
+5. Self-service: user portal shows "available apps" from the catalog, user clicks install, MDM tells the package manager
+
+**This is realistic and avoids reinventing the wheel.** The MDM is the policy layer, the package manager is the delivery layer.
 
 ---
 
