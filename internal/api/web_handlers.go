@@ -4,9 +4,11 @@ import (
 	"html/template"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/gorilla/mux"
+	"github.com/malcolm-getahead/local-mdm/internal/models"
 )
 
 // renderPage renders a named template with the given data.
@@ -106,79 +108,52 @@ func (s *Server) handleWebDeviceList(w http.ResponseWriter, r *http.Request) {
 
 	platform := r.URL.Query().Get("platform")
 	status := r.URL.Query().Get("status")
-	query := r.URL.Query().Get("q")
+	query := strings.ToLower(r.URL.Query().Get("q"))
 	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
 	if page < 1 {
 		page = 1
 	}
 	perPage := 20
-	offset := (page - 1) * perPage
 
-	devices, total, _ := s.deviceRepo.List(ctx, sess.EnterpriseID, perPage, offset)
+	// Fetch all devices then filter (repo doesn't support filter params)
+	allDevices, _, _ := s.deviceRepo.List(ctx, sess.EnterpriseID, 1000, 0)
 
-	// Client-side filter (the repo List doesn't support platform/status/search filters directly)
-	// For a real implementation, add filter params to the repo. For now, fetch all and filter.
-	if platform != "" || status != "" || query != "" {
-		allDevices, allTotal, _ := s.deviceRepo.List(ctx, sess.EnterpriseID, 1000, 0)
-		var filtered []interface{}
-		for _, d := range allDevices {
-			if platform != "" && d.Platform != platform {
-				continue
-			}
-			if status != "" && d.Status != status {
-				continue
-			}
-			if query != "" && !containsCI(d.Name, query) && !containsCI(d.Model, query) && !containsCI(d.SerialNumber, query) {
-				continue
-			}
-			filtered = append(filtered, d)
+	var filtered []*models.Device
+	for _, d := range allDevices {
+		if platform != "" && d.Platform != platform {
+			continue
 		}
-		_ = allTotal
-		total = len(filtered)
-		start := offset
-		end := offset + perPage
-		if start > len(filtered) {
-			start = len(filtered)
+		if status != "" && d.Status != status {
+			continue
 		}
-		if end > len(filtered) {
-			end = len(filtered)
+		if query != "" && !strings.Contains(strings.ToLower(d.Name), query) &&
+			!strings.Contains(strings.ToLower(d.Model), query) &&
+			!strings.Contains(strings.ToLower(d.SerialNumber), query) {
+			continue
 		}
-		devices = nil // clear typed slice
-		// Re-assign from filtered
-		for _, f := range filtered[start:end] {
-			if d, ok := f.(*interface{}); ok {
-				_ = d
-			}
-		}
-		// Simpler: just use allDevices filtered
-		devices = nil
-		for i, d := range allDevices {
-			if platform != "" && d.Platform != platform {
-				continue
-			}
-			if status != "" && d.Status != status {
-				continue
-			}
-			if query != "" && !containsCI(d.Name, query) && !containsCI(d.Model, query) && !containsCI(d.SerialNumber, query) {
-				continue
-			}
-			if i >= offset && len(devices) < perPage {
-				devices = append(devices, d)
-			}
-		}
+		filtered = append(filtered, d)
 	}
 
+	total := len(filtered)
 	totalPages := (total + perPage - 1) / perPage
+	start := (page - 1) * perPage
+	if start > total {
+		start = total
+	}
+	end := start + perPage
+	if end > total {
+		end = total
+	}
 
 	data := map[string]interface{}{
 		"ActiveNav":   "devices",
-		"Devices":     devices,
+		"Devices":     filtered[start:end],
 		"TotalPages":  totalPages,
 		"CurrentPage": page,
 		"Filter": map[string]string{
 			"Platform": platform,
 			"Status":   status,
-			"Query":    query,
+			"Query":    r.URL.Query().Get("q"),
 		},
 	}
 
@@ -276,36 +251,4 @@ func (s *Server) handleWebDeviceWipe(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func containsCI(s, substr string) bool {
-	return len(s) > 0 && len(substr) > 0 &&
-		(s == substr || len(s) >= len(substr) &&
-			(http.CanonicalHeaderKey(s) != "" || true) &&
-			containsLower(s, substr))
-}
-
-func containsLower(s, sub string) bool {
-	s = toLower(s)
-	sub = toLower(sub)
-	return len(s) >= len(sub) && findSubstring(s, sub)
-}
-
-func toLower(s string) string {
-	b := make([]byte, len(s))
-	for i := range s {
-		c := s[i]
-		if c >= 'A' && c <= 'Z' {
-			c += 'a' - 'A'
-		}
-		b[i] = c
-	}
-	return string(b)
-}
-
-func findSubstring(s, sub string) bool {
-	for i := 0; i <= len(s)-len(sub); i++ {
-		if s[i:i+len(sub)] == sub {
-			return true
-		}
-	}
-	return false
-}
+// (end of file)
