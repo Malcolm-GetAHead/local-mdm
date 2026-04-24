@@ -230,3 +230,36 @@ func (s *Server) handleWebAuditLog(w http.ResponseWriter, r *http.Request) {
 	}
 	s.renderPage(w, r, "audit", data)
 }
+
+// handleWebGroups shows the device groups list.
+func (s *Server) handleWebGroups(w http.ResponseWriter, r *http.Request) {
+	sess := getSession(r)
+	ctx := r.Context()
+
+	groups, _, _ := s.groupService.ListGroups(ctx, sess.EnterpriseID, 100, 0)
+
+	type groupRow struct {
+		ID          uuid.UUID
+		Name        string
+		Description string
+		MemberCount int
+	}
+	var rows []groupRow
+	for _, g := range groups {
+		members, _, _ := s.groupService.ListMembers(ctx, g.ID, 1, 0)
+		_ = members
+		// Get count via ListMembers with limit 0 — use total
+		_, total, _ := s.groupService.ListMembers(ctx, g.ID, 1000, 0)
+		rows = append(rows, groupRow{
+			ID:          g.ID,
+			Name:        g.Name,
+			Description: g.Description,
+			MemberCount: total,
+		})
+	}
+
+	s.renderPage(w, r, "groups", map[string]interface{}{
+		"ActiveNav": "groups",
+		"Groups":    rows,
+	})
+}

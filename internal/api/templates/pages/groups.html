@@ -1,0 +1,30 @@
+{{define "title"}}Groups — Local MDM{{end}}
+{{define "page_title"}}Groups{{end}}
+{{define "content"}}
+<div class="card overflow-hidden p-0">
+    <table class="w-full">
+        <thead>
+            <tr class="table-header">
+                <th class="px-6 py-3">Name</th>
+                <th class="px-6 py-3">Description</th>
+                <th class="px-6 py-3">Members</th>
+                <th class="px-6 py-3"></th>
+            </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-200">
+            {{range .Groups}}
+            <tr class="hover:bg-gray-50">
+                <td class="px-6 py-4 text-sm font-medium">{{.Name}}</td>
+                <td class="px-6 py-4 text-sm text-gray-600">{{.Description}}</td>
+                <td class="px-6 py-4"><span class="badge badge-gray">{{.MemberCount}}</span></td>
+                <td class="px-6 py-4 text-sm">
+                    <a href="/dashboard/groups/{{.ID}}" class="text-blue-600 hover:text-blue-800">View</a>
+                </td>
+            </tr>
+            {{else}}
+            <tr><td colspan="4" class="px-6 py-8 text-center text-gray-500">No groups found</td></tr>
+            {{end}}
+        </tbody>
+    </table>
+</div>
+{{end}}

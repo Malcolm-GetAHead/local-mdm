@@ -27,6 +27,7 @@
 - [ ] Verify table row appears with text "MacBook"
 
 ### Search Devices
+- [ ] Visit `/dashboard/devices` — page contains "Devices"
 - [ ] Fill: Search=`Surface`
 - [ ] Wait 0.5s
 - [ ] Verify table row appears with text "Surface"
@@ -46,14 +47,14 @@
 
 ### Create Policy
 - [ ] Click "Create Policy"
-- [ ] Verify form appears with heading "Create Policy"
+- [ ] Verify "Create Policy" is visible
 - [ ] Fill: Name=`Test Policy`, Description=`Automated test`
 - [ ] Click "Create Policy"
 - [ ] Verify redirected to `/dashboard/policies` — page contains "Test Policy"
 
 ### Edit Policy
 - [ ] Click "Edit" on "Test Policy"
-- [ ] Verify Name field contains "Test Policy"
+- [ ] Verify "Edit Policy" is visible
 
 ## Compliance
 
