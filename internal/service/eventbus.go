@@ -2,9 +2,11 @@ package service
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"strings"
 	"sync"
 	"time"
 
@@ -69,7 +71,31 @@ func (eb *EventBus) Subscribe(eventType string, handler EventHandler) {
 
 // Start opens the pq.Listener, subscribes to the channel, and begins dispatching.
 func (eb *EventBus) Start(ctx context.Context) error {
-	eb.listener = pq.NewListener(eb.dsn, MinReconnectInterval, MaxReconnectInterval, func(ev pq.ListenerEventType, err error) {
+	// Verify connectivity before creating the listener.
+	// pq.NewListener starts a background reconnect goroutine that we can't
+	// stop if the initial connection fails, so we pre-flight check here.
+	dsn := eb.dsn
+	if dsn == "" {
+		return fmt.Errorf("eventbus: empty DSN")
+	}
+	// Append connect_timeout if not already present so we don't hang.
+	if !strings.Contains(dsn, "connect_timeout") {
+		dsn += " connect_timeout=5"
+	}
+
+	probe, err := sql.Open("postgres", dsn)
+	if err != nil {
+		return fmt.Errorf("eventbus: invalid DSN: %w", err)
+	}
+	probeCtx, probeCancel := context.WithTimeout(ctx, 5*time.Second)
+	defer probeCancel()
+	if err := probe.PingContext(probeCtx); err != nil {
+		probe.Close()
+		return fmt.Errorf("eventbus: database unreachable: %w", err)
+	}
+	probe.Close()
+
+	eb.listener = pq.NewListener(dsn, MinReconnectInterval, MaxReconnectInterval, func(ev pq.ListenerEventType, err error) {
 		switch ev {
 		case pq.ListenerEventConnected:
 			eb.logger.Info("eventbus: connected to PostgreSQL")
@@ -100,8 +126,8 @@ func (eb *EventBus) Start(ctx context.Context) error {
 func (eb *EventBus) Shutdown() {
 	if eb.cancel != nil {
 		eb.cancel()
+		<-eb.done
 	}
-	<-eb.done
 	if eb.listener != nil {
 		eb.listener.Close()
 	}

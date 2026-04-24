@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/malcolm-getahead/local-mdm/internal/config"
 	"github.com/malcolm-getahead/local-mdm/internal/db"
@@ -189,6 +190,17 @@ func TestServerCreationWithValidKeycloak(t *testing.T) {
 			Host: func() string { if h := os.Getenv("DB_HOST"); h != "" { return h }; return "localhost" }(),
 			Port: 8080,
 		},
+		Database: config.DatabaseConfig{
+			Host:            func() string { if h := os.Getenv("DB_HOST"); h != "" { return h }; return "localhost" }(),
+			Port:            5432,
+			User:            "postgres",
+			Password:        func() string { if p := os.Getenv("DB_PASSWORD"); p != "" { return p }; return "postgres" }(),
+			Database:        "localmdm",
+			SSLMode:         "disable",
+			MaxOpenConns:    2,
+			MaxIdleConns:    1,
+			ConnMaxLifetime: 5 * time.Minute,
+		},
 		Keycloak: config.KeycloakConfig{
 			URL:      mockKeycloak.URL,
 			Realm:    "test",
@@ -233,6 +245,17 @@ func setupTestServer(t *testing.T) *Server {
 		Server: config.ServerConfig{
 			Host: func() string { if h := os.Getenv("DB_HOST"); h != "" { return h }; return "localhost" }(),
 			Port: 8080,
+		},
+		Database: config.DatabaseConfig{
+			Host:            func() string { if h := os.Getenv("DB_HOST"); h != "" { return h }; return "localhost" }(),
+			Port:            5432,
+			User:            "postgres",
+			Password:        func() string { if p := os.Getenv("DB_PASSWORD"); p != "" { return p }; return "postgres" }(),
+			Database:        "localmdm",
+			SSLMode:         "disable",
+			MaxOpenConns:    2,
+			MaxIdleConns:    1,
+			ConnMaxLifetime: 5 * time.Minute,
 		},
 		Keycloak: config.KeycloakConfig{
 			URL:      mockKeycloak.URL,

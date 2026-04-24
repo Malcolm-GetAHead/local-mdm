@@ -299,36 +299,34 @@ func New(cfg *config.Config, database *db.DB, logger *slog.Logger) (*Server, err
 	s.complianceService = service.NewComplianceService(complianceRepo, s.groupService, s.policyRepo, s.deviceRepo, logger)
 
 	// Initialize EventBus (LISTEN/NOTIFY on Writer pool DSN)
-	if cfg.Database.Host != "" {
-		s.eventBus = service.NewEventBus(cfg.Database.DSN(), logger)
+	s.eventBus = service.NewEventBus(cfg.Database.DSN(), logger)
 
-		// Register compliance auto-evaluation subscribers
-		s.eventBus.Subscribe("device.enrolled", func(ctx context.Context, event service.MDMEvent) error {
-			return s.complianceService.EvaluateDeviceByID(ctx, event.ID)
-		})
-		s.eventBus.Subscribe("device.info_updated", func(ctx context.Context, event service.MDMEvent) error {
-			return s.complianceService.EvaluateDeviceByID(ctx, event.ID)
-		})
-		s.eventBus.Subscribe("policy.updated", func(ctx context.Context, event service.MDMEvent) error {
-			return s.complianceService.EvaluateAllForPolicy(ctx, event.ID)
-		})
-		s.eventBus.Subscribe("policy.assigned", func(ctx context.Context, event service.MDMEvent) error {
-			logger.Info("policy assigned, compliance will evaluate on next check-in", "assignment_id", event.ID)
-			return nil
-		})
-		s.eventBus.Subscribe("group.member_added", func(ctx context.Context, event service.MDMEvent) error {
-			if event.DeviceID != nil {
-				return s.complianceService.EvaluateDeviceByID(ctx, *event.DeviceID)
-			}
-			return nil
-		})
-		s.eventBus.Subscribe("group.member_removed", func(ctx context.Context, event service.MDMEvent) error {
-			if event.DeviceID != nil {
-				return s.complianceService.EvaluateDeviceByID(ctx, *event.DeviceID)
-			}
-			return nil
-		})
-	}
+	// Register compliance auto-evaluation subscribers
+	s.eventBus.Subscribe("device.enrolled", func(ctx context.Context, event service.MDMEvent) error {
+		return s.complianceService.EvaluateDeviceByID(ctx, event.ID)
+	})
+	s.eventBus.Subscribe("device.info_updated", func(ctx context.Context, event service.MDMEvent) error {
+		return s.complianceService.EvaluateDeviceByID(ctx, event.ID)
+	})
+	s.eventBus.Subscribe("policy.updated", func(ctx context.Context, event service.MDMEvent) error {
+		return s.complianceService.EvaluateAllForPolicy(ctx, event.ID)
+	})
+	s.eventBus.Subscribe("policy.assigned", func(ctx context.Context, event service.MDMEvent) error {
+		logger.Info("policy assigned, compliance will evaluate on next check-in", "assignment_id", event.ID)
+		return nil
+	})
+	s.eventBus.Subscribe("group.member_added", func(ctx context.Context, event service.MDMEvent) error {
+		if event.DeviceID != nil {
+			return s.complianceService.EvaluateDeviceByID(ctx, *event.DeviceID)
+		}
+		return nil
+	})
+	s.eventBus.Subscribe("group.member_removed", func(ctx context.Context, event service.MDMEvent) error {
+		if event.DeviceID != nil {
+			return s.complianceService.EvaluateDeviceByID(ctx, *event.DeviceID)
+		}
+		return nil
+	})
 
 	// Register lifecycle hooks
 	s.lifecycleService.RegisterHook(service.NewComplianceCleanupHook(complianceRepo, logger))
