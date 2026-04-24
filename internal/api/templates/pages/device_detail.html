@@ -62,25 +62,14 @@
         <button class="tab-btn px-6 py-3 text-sm font-medium border-b-2 border-blue-600 text-blue-600 dark:text-blue-400" data-tab="compliance">Compliance</button>
         <button class="tab-btn px-6 py-3 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400" data-tab="policies">Policies</button>
         <button class="tab-btn px-6 py-3 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400" data-tab="commands">Commands</button>
+        <div class="ml-auto px-4 py-2">
+            <button hx-post="/dashboard/devices/{{.Device.ID}}/evaluate" hx-target="#tab-compliance" hx-swap="innerHTML"
+                    class="btn-secondary text-xs">Re-evaluate</button>
+        </div>
     </div>
 
     <div class="tab-panel" id="tab-compliance">
-        <table class="w-full text-sm">
-            <thead><tr class="table-header"><th class="px-6 py-2">Policy</th><th class="px-6 py-2">Status</th><th class="px-6 py-2">Evaluated</th></tr></thead>
-            <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
-            {{range .Compliance}}
-            <tr>
-                <td class="px-6 py-2">{{.PolicyName}}</td>
-                <td class="px-6 py-2">
-                    {{if eq .Status "compliant"}}<span class="badge badge-green">Compliant</span>
-                    {{else if eq .Status "non_compliant"}}<span class="badge badge-red">Non-Compliant</span>
-                    {{else}}<span class="badge badge-yellow">Unknown</span>{{end}}
-                </td>
-                <td class="px-6 py-2 text-gray-500 dark:text-gray-400">{{timeAgo .EvaluatedAt}}</td>
-            </tr>
-            {{else}}<tr><td colspan="3" class="px-6 py-4 text-center text-gray-500 dark:text-gray-400">No compliance data</td></tr>{{end}}
-            </tbody>
-        </table>
+        {{template "compliance_tab" .}}
     </div>
 
     <div class="tab-panel hidden" id="tab-policies">
@@ -131,4 +120,23 @@
     });
 })();
 </script>
+{{end}}
+
+{{define "compliance_tab"}}
+<table class="w-full text-sm">
+    <thead><tr class="table-header"><th class="px-6 py-2">Policy</th><th class="px-6 py-2">Status</th><th class="px-6 py-2">Evaluated</th></tr></thead>
+    <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+    {{range .Compliance}}
+    <tr>
+        <td class="px-6 py-2">{{.PolicyName}}</td>
+        <td class="px-6 py-2">
+            {{if eq .Status "compliant"}}<span class="badge badge-green">Compliant</span>
+            {{else if eq .Status "non_compliant"}}<span class="badge badge-red">Non-Compliant</span>
+            {{else}}<span class="badge badge-yellow">Unknown</span>{{end}}
+        </td>
+        <td class="px-6 py-2 text-gray-500 dark:text-gray-400">{{timeAgo .EvaluatedAt}}</td>
+    </tr>
+    {{else}}<tr><td colspan="3" class="px-6 py-4 text-center text-gray-500 dark:text-gray-400">No compliance data</td></tr>{{end}}
+    </tbody>
+</table>
 {{end}}

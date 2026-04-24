@@ -342,6 +342,33 @@ func (s *Server) handleWebDeviceUnenroll(w http.ResponseWriter, r *http.Request)
 
 // (end of file)
 
+// handleWebDeviceEvaluate triggers compliance evaluation for a device.
+func (s *Server) handleWebDeviceEvaluate(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	id, _ := uuid.Parse(mux.Vars(r)["id"])
+
+	err := s.complianceService.EvaluateDeviceByID(ctx, id)
+	if err != nil {
+		s.logger.Error("compliance evaluation failed", "error", err, "device_id", id)
+	}
+
+	// Return updated compliance table
+	compResults, _ := s.complianceService.GetDeviceCompliance(ctx, id)
+	var compliance []map[string]interface{}
+	for _, cr := range compResults {
+		policyName := ""
+		if p, err := s.policyRepo.GetByID(ctx, cr.PolicyID); err == nil {
+			policyName = p.Name
+		}
+		compliance = append(compliance, map[string]interface{}{
+			"PolicyName": policyName, "Status": cr.Status, "EvaluatedAt": cr.EvaluatedAt,
+		})
+	}
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	s.webTemplates["device_detail"].ExecuteTemplate(w, "compliance_tab", map[string]interface{}{"Compliance": compliance})
+}
+
 func sortDevices(devices []*models.Device, field, dir string) {
 	sort.Slice(devices, func(i, j int) bool {
 		var less bool

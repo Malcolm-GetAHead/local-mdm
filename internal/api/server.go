@@ -823,6 +823,7 @@ func (s *Server) setupRoutes() {
 	dash.HandleFunc("/devices/{id}/lock", s.handleWebDeviceLock).Methods("POST")
 	dash.HandleFunc("/devices/{id}/wipe", s.handleWebDeviceWipe).Methods("POST")
 	dash.HandleFunc("/devices/{id}/unenroll", s.handleWebDeviceUnenroll).Methods("POST")
+	dash.HandleFunc("/devices/{id}/evaluate", s.handleWebDeviceEvaluate).Methods("POST")
 	dash.HandleFunc("/policies", s.handleWebPolicyList).Methods("GET")
 	dash.HandleFunc("/policies/new", s.handleWebPolicyNew).Methods("GET")
 	dash.HandleFunc("/policies/settings-catalog", s.handleWebSettingsCatalog).Methods("GET")
