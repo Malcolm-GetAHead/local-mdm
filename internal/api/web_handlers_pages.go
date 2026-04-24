@@ -506,12 +506,18 @@ func (s *Server) handleWebGroups(w http.ResponseWriter, r *http.Request) {
 		return less
 	})
 
-	s.renderPage(w, r, "groups", map[string]interface{}{
+	data := map[string]interface{}{
 		"ActiveNav": "groups",
 		"Groups":    rows,
 		"Sort":      "name",
 		"Dir":       sortDir,
-	})
+	}
+
+	if isHTMX(r) {
+		s.renderFragment(w, s.webTemplates["groups"], "groups_table_body", data)
+		return
+	}
+	s.renderPage(w, r, "groups", data)
 }
 
 // handleWebGroupDetail shows a single group with member toggle UI.
