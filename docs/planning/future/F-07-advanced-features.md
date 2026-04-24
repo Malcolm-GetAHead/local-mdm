@@ -35,6 +35,10 @@
 - Admin Alerting / Notifications (Sprint 5b audit — EventBus is internal only, no outbound alerts)
 - Self-Service Portal (Sprint 5b audit — no end-user facing interface)
 - App Store / Package Manager Integration (Sprint 5b audit — no Chocolatey/Brew/Munki/Managed Play)
+- iOS Device Support (Sprint 5b audit — same Apple MDM protocol as macOS, NanoMDM already handles it)
+- Shared Device / Kiosk Mode (Sprint 5b audit — single-app lock for retail/healthcare/warehouse)
+- Conditional Access Compliance Sync (Sprint 5b audit — push compliance to Azure AD/Google for cloud app blocking)
+- SCIM User Provisioning (Sprint 5b audit — auto-sync users from Keycloak/IdP)
 
 ### Impact
 Without advanced features:
@@ -780,6 +784,79 @@ Don't build an app store backend. Leverage existing package managers for app del
 5. Self-service: user portal shows "available apps" from the catalog, user clicks install, MDM tells the package manager
 
 **This is realistic and avoids reinventing the wheel.** The MDM is the policy layer, the package manager is the delivery layer.
+
+### 16. iOS Device Support
+
+*Added: Sprint 5b — owner review*
+
+iOS is conspicuously absent from the platform list (macOS, Windows, Android). In practice, any org managing Macs also has iPhones and iPads. The good news: iOS and macOS share the same Apple MDM protocol. NanoMDM already handles iOS.
+
+**What's already done (for free)**:
+- NanoMDM doesn't distinguish iOS from macOS — same SCEP, check-in, command protocol
+- Enrollment profiles work on iOS
+- Push notifications (APNs) work the same
+- Most MDM commands are shared (Lock, Wipe, InstallProfile, SecurityInfo)
+
+**What's needed**:
+- `platform: "ios"` constant and device detection (User-Agent or ProductName in Authenticate)
+- iOS-specific policy payloads (app install via MDM, supervised restrictions, App Lock)
+- iOS-specific compliance checks (managed apps, supervised status)
+- DEP enrollment works identically — just needs iOS device serials in ABM
+- Documentation and dashboard UI acknowledging iOS
+
+**Effort**: Low — most of the protocol work is shared with macOS. Primarily policy translation and UI.
+
+### 17. Shared Device / Kiosk Mode
+
+Devices locked to a single app or a set of apps. Common in retail (iPad POS), healthcare (patient check-in), warehouses (inventory scanners), lobbies (visitor sign-in).
+
+**Platform support**:
+- **iOS**: `App Lock` MDM command (single-app mode, supervised devices only). Also `allowedApplications` restriction for multi-app kiosk.
+- **Windows**: `AssignedAccess` CSP (`./Vendor/MSFT/AssignedAccess`) — single-app or multi-app kiosk. Shell Launcher for custom kiosk shells.
+- **Android**: Kiosk mode via Management API — `KioskCustomization` policy, lock task mode.
+
+**What exists**: Nothing kiosk-specific. Restriction policies exist but don't implement single-app lock.
+
+**What's needed**: Kiosk policy type, per-platform command builders, kiosk status in device inventory, exit-kiosk admin command.
+
+### 18. Conditional Access — Compliance Sync to Identity Providers
+
+*Added: Sprint 5b — owner review*
+
+The goal: "device is in Iran → block email, Google Drive, OneDrive." This requires two pieces:
+
+1. **Geofence → non-compliance** (fully ours): Device reports location, geofence check fails, compliance engine marks device non-compliant. This works with the existing EventBus + compliance engine.
+
+2. **Non-compliance → block cloud app access** (API integration): Cloud apps (M365, Google Workspace) are controlled by their identity providers, not by the device MDM. To block access, we push compliance status to the provider:
+   - **Microsoft 365**: [Device Compliance Partner API](https://learn.microsoft.com/en-us/mem/intune/protect/device-compliance-partners) — push compliance state to Azure AD, which enforces Conditional Access policies. Requires Azure AD app registration.
+   - **Google Workspace**: [BeyondCorp Alliance / Context-Aware Access](https://cloud.google.com/beyondcorp-enterprise/docs/device-signals) — push device signals, Google enforces access policies.
+
+**What exists**: Compliance engine evaluates device state. EventBus fires on compliance changes. Geofencing is planned (F-07 #1).
+
+**What's needed**:
+1. Compliance sync subscriber on EventBus — when compliance status changes, push to configured providers
+2. Azure AD Graph API integration (app registration, compliance state push)
+3. Google BeyondCorp API integration (device signal push)
+4. Config: provider credentials, sync enabled/disabled per enterprise
+5. Follows credential storage strategy — provider API keys in `secrets/` (dev) / SSM (prod)
+
+**This is achievable without third-party MDM dependencies.** We're calling provider APIs directly, same as any compliance partner. The flow: geofence violation → compliance engine → EventBus → compliance sync subscriber → Azure AD/Google API → provider blocks access.
+
+### 19. SCIM User Provisioning
+
+*Added: Sprint 5b — owner review*
+
+Auto-sync users from the identity provider. When a user is created/disabled in Keycloak (or any SCIM-compatible IdP), the MDM user directory updates automatically. Eliminates manual user management.
+
+**What exists**: User CRUD API, Keycloak OIDC integration for auth. No auto-sync — users are created manually or via API.
+
+**What's needed**:
+1. SCIM 2.0 endpoint (`/scim/v2/Users`) — Keycloak pushes user create/update/delete events
+2. Map SCIM user attributes to our User model (email, name, role, active status)
+3. Handle deprovisioning: SCIM delete/deactivate → disable user, optionally trigger device unenrollment for user's devices
+4. Keycloak SCIM plugin configuration (or use Keycloak's built-in user federation events)
+
+**Effort**: Moderate. SCIM is a well-defined spec. The main work is the endpoint and the Keycloak configuration.
 
 ---
 
