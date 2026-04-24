@@ -125,6 +125,7 @@ Unified Control Plane (Go)
 ✅ **Sprint 5f Complete** - 3/3 tasks done (API Hardening & Test Hygiene)
 - `NewCAManager` no longer silently generates CAs — fails on missing files, explicit `GenerateCA()` + `localmdm-cli certs init`
 - API handler test coverage: 48.8% → 67.8% (80+ new test cases across groups, compliance, users, tokens, policy versioning, reports)
+- Auth package coverage: 73.0% → 90.6% (circuit breaker, SSRF validation, audit logging, cache fallback)
 - Consolidated 10+ duplicate `setupTestDB` functions into shared `testutil.ConnectDB(t)` / `testutil.ConnectRawDB(t)`
 - See [Sprint 5f Plan](docs/planning/sprints/sprint-5f-api-hardening/OVERVIEW.md)
 
