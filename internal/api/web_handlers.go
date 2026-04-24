@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"html/template"
 	"net/http"
 	"sort"
@@ -221,16 +222,7 @@ func (s *Server) handleWebDeviceDetail(w http.ResponseWriter, r *http.Request) {
 
 	// Compliance
 	compResults, _ := s.complianceService.GetDeviceCompliance(ctx, id)
-	var compliance []map[string]interface{}
-	for _, cr := range compResults {
-		policyName := ""
-		if p, err := s.policyRepo.GetByID(ctx, cr.PolicyID); err == nil {
-			policyName = p.Name
-		}
-		compliance = append(compliance, map[string]interface{}{
-			"PolicyName": policyName, "Status": cr.Status, "EvaluatedAt": cr.EvaluatedAt,
-		})
-	}
+	compliance := buildComplianceRows(compResults, s)
 
 	// Groups
 	groups, _ := s.groupService.GetDeviceGroups(ctx, id)
@@ -238,20 +230,14 @@ func (s *Server) handleWebDeviceDetail(w http.ResponseWriter, r *http.Request) {
 	// Commands
 	commands, _, _ := s.cmdRepo.ListByDevice(ctx, id, 20, 0)
 
-	// Assigned policies (via group memberships + direct assignments)
-	var assignedPolicies []*models.Policy
-	if groupList, err := s.groupService.GetDeviceGroups(ctx, id); err == nil {
-		seen := map[uuid.UUID]bool{}
-		for _, g := range groupList {
-			assignments, _ := s.groupService.ListAssignments(ctx, "group", g.ID)
-			for _, a := range assignments {
-				if !seen[a.PolicyID] {
-					if p, err := s.policyRepo.GetByID(ctx, a.PolicyID); err == nil {
-						assignedPolicies = append(assignedPolicies, p)
-						seen[a.PolicyID] = true
-					}
-				}
-			}
+	// Assigned policies — all effective (direct + group + enterprise)
+	effectiveAssignments, _ := s.groupService.GetEffectivePolicies(ctx, id, device.EnterpriseID)
+	var assignedPolicies []map[string]interface{}
+	for _, a := range effectiveAssignments {
+		if p, err := s.policyRepo.GetByID(ctx, a.PolicyID); err == nil {
+			assignedPolicies = append(assignedPolicies, map[string]interface{}{
+				"ID": p.ID, "Name": p.Name, "Platform": p.Platform, "Via": a.TargetType,
+			})
 		}
 	}
 
@@ -354,19 +340,36 @@ func (s *Server) handleWebDeviceEvaluate(w http.ResponseWriter, r *http.Request)
 
 	// Return updated compliance table
 	compResults, _ := s.complianceService.GetDeviceCompliance(ctx, id)
-	var compliance []map[string]interface{}
-	for _, cr := range compResults {
+	compliance := buildComplianceRows(compResults, s)
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	s.webTemplates["device_detail"].ExecuteTemplate(w, "compliance_tab", map[string]interface{}{"Compliance": compliance})
+}
+
+func buildComplianceRows(results []*models.ComplianceResult, s *Server) []map[string]interface{} {
+	ctx := context.Background()
+	var rows []map[string]interface{}
+	for _, cr := range results {
 		policyName := ""
 		if p, err := s.policyRepo.GetByID(ctx, cr.PolicyID); err == nil {
 			policyName = p.Name
 		}
-		compliance = append(compliance, map[string]interface{}{
+		var violations []string
+		if v, ok := cr.Details["violations"]; ok {
+			if arr, ok := v.([]interface{}); ok {
+				for _, item := range arr {
+					if str, ok := item.(string); ok {
+						violations = append(violations, str)
+					}
+				}
+			}
+		}
+		rows = append(rows, map[string]interface{}{
 			"PolicyName": policyName, "Status": cr.Status, "EvaluatedAt": cr.EvaluatedAt,
+			"Violations": violations,
 		})
 	}
-
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	s.webTemplates["device_detail"].ExecuteTemplate(w, "compliance_tab", map[string]interface{}{"Compliance": compliance})
+	return rows
 }
 
 func sortDevices(devices []*models.Device, field, dir string) {
