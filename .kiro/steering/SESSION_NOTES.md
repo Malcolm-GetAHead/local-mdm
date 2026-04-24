@@ -59,6 +59,10 @@
 - **Don't overestimate effort on test coverage.** "Half a day" and "diminishing returns" turned into 5 minutes and +7% coverage. Before claiming something is expensive, actually look at the uncovered lines and count them. The owner will ask you to do it anyway, and you'll look bad when it's trivial.
 - **The owner wants honest, critical feedback — not softened positives reframed as criticism.** When asked "anything I could do differently?", give actual negatives. The owner will push back if you're being too nice. They act on real feedback.
 - **Establish a test baseline before starting work.** Run `make dev-test` before the first change to confirm the branch is green. The steering guide says to do this. If you skip it and something was already broken, you'll waste time debugging pre-existing failures mixed with your changes.
+- **Don't shim around test failures — fix the root cause.** The EventBus `if cfg.Database.Host != ""` guard was a shim to avoid a test hang. The real fix was a pre-flight connection check. When a test fails, write an isolated test that reproduces the failure, fix the underlying issue, then verify. The owner will catch shims.
+- **pq.Listener spawns an uncontrollable reconnect goroutine.** Never create a `pq.Listener` without first verifying the DSN works via `sql.Open` + `Ping`. Add `connect_timeout=5` to the DSN. Make `Shutdown()` safe when `Start()` was never called.
+- **Sprint plan effort estimates are consistently 3-5x too high.** Sprint 5b was estimated at 3-5 days, took <1 day. Before accepting estimates, look at the actual code and count the changes needed. The owner's roadmap depends on accurate estimates.
+- **The owner's casual questions surface major gaps.** "Do we capture BitLocker keys?" → recovery key escrow (not in roadmap). "Does this cover iOS?" → entire platform missing. "Any other MDM features?" → 12 new roadmap items. Take these questions as seriously as explicit requirements.
 
 ## Known Issues
 
