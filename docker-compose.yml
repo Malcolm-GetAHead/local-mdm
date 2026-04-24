@@ -30,6 +30,7 @@ services:
       KC_DB_USERNAME: postgres
       KC_DB_PASSWORD: postgres-dev-password-1234
       KC_HOSTNAME_STRICT: false
+      KC_HOSTNAME_URL: http://keycloak:8080
       KC_HTTP_ENABLED: true
     ports:
       - "8180:8080"

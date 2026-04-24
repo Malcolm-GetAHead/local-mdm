@@ -115,16 +115,9 @@ func (s *Server) handleWebLogin(w http.ResponseWriter, r *http.Request) {
 		MaxAge:   300,
 	})
 
-	// Use browser-accessible Keycloak URL (replace Docker-internal hostname)
-	keycloakURL := s.config.Keycloak.IssuerURL()
-	// In Docker, keycloak:8080 is internal — browser needs localhost:8180
-	if strings.Contains(keycloakURL, "keycloak:8080") {
-		keycloakURL = strings.Replace(keycloakURL, "keycloak:8080", r.Host, 1)
-		// If the dashboard is on 8080, Keycloak is on 8180
-		if strings.Contains(r.Host, ":8080") {
-			keycloakURL = strings.Replace(keycloakURL, ":8080", ":8180", 1)
-		}
-	}
+	// Rewrite Docker-internal Keycloak URL for browser access.
+	// Inside Docker: keycloak:8080. From browser (via /etc/hosts): keycloak:8180.
+	keycloakURL := strings.Replace(s.config.Keycloak.IssuerURL(), "keycloak:8080", "keycloak:8180", 1)
 
 	authURL := fmt.Sprintf("%s/protocol/openid-connect/auth?client_id=%s&response_type=code&redirect_uri=%s&scope=openid+email+profile&state=%s",
 		keycloakURL,
