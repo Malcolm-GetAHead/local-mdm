@@ -57,8 +57,10 @@ func (s *Server) handleDashboardHome(w http.ResponseWriter, r *http.Request) {
 
 	enrolled := 0
 	platformCounts := map[string]int{}
+	statusCounts := map[string]int{}
 	for _, d := range devices {
 		platformCounts[d.Platform]++
+		statusCounts[d.Status]++
 		if d.Status == "enrolled" {
 			enrolled++
 		}
@@ -77,15 +79,37 @@ func (s *Server) handleDashboardHome(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Compliance non-compliant count from report service
-	nonCompliant := 0
+	// Compliance counts
+	compliant, nonCompliant, unknown := 0, 0, 0
 	if compRows, err := s.reportService.ComplianceReport(ctx, sess.EnterpriseID); err == nil {
 		for _, cr := range compRows {
-			if cr.Status == "non_compliant" {
+			switch cr.Status {
+			case "compliant":
+				compliant++
+			case "non_compliant":
 				nonCompliant++
+			default:
+				unknown++
 			}
 		}
 	}
+
+	// Generate SVG charts
+	platformChart := svgPieChart("Platforms", []pieSlice{
+		{"macOS", platformCounts["macos"], "#3b82f6"},
+		{"Windows", platformCounts["windows"], "#8b5cf6"},
+		{"Android", platformCounts["android"], "#10b981"},
+	})
+	statusChart := svgPieChart("Device Status", []pieSlice{
+		{"Enrolled", statusCounts["enrolled"], "#22c55e"},
+		{"Unenrolled", statusCounts["unenrolled"], "#9ca3af"},
+		{"Wiped", statusCounts["wiped"], "#ef4444"},
+	})
+	complianceChart := svgPieChart("Compliance", []pieSlice{
+		{"Compliant", compliant, "#22c55e"},
+		{"Non-Compliant", nonCompliant, "#ef4444"},
+		{"Unknown", unknown, "#eab308"},
+	})
 
 	auditLogs, _, _ := s.auditLogRepo.Search(ctx, sess.EnterpriseID, "", "", "", 5, 0)
 
@@ -97,6 +121,11 @@ func (s *Server) handleDashboardHome(w http.ResponseWriter, r *http.Request) {
 			"NonCompliant":   nonCompliant,
 			"ActivePolicies": activePolicies,
 			"PlatformCounts": platList,
+		},
+		"Charts": map[string]template.HTML{
+			"Platform":   template.HTML(platformChart),
+			"Status":     template.HTML(statusChart),
+			"Compliance": template.HTML(complianceChart),
 		},
 		"RecentAudit": auditLogs,
 	})
@@ -192,7 +221,7 @@ func (s *Server) handleWebDeviceDetail(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Get compliance results for this device
+	// Compliance
 	compResults, _ := s.complianceService.GetDeviceCompliance(ctx, id)
 	var compliance []map[string]interface{}
 	for _, cr := range compResults {
@@ -201,20 +230,40 @@ func (s *Server) handleWebDeviceDetail(w http.ResponseWriter, r *http.Request) {
 			policyName = p.Name
 		}
 		compliance = append(compliance, map[string]interface{}{
-			"PolicyName":  policyName,
-			"Status":      cr.Status,
-			"EvaluatedAt": cr.EvaluatedAt,
+			"PolicyName": policyName, "Status": cr.Status, "EvaluatedAt": cr.EvaluatedAt,
 		})
 	}
 
-	// Get groups this device belongs to
+	// Groups
 	groups, _ := s.groupService.GetDeviceGroups(ctx, id)
 
+	// Commands
+	commands, _, _ := s.cmdRepo.ListByDevice(ctx, id, 20, 0)
+
+	// Assigned policies (via group memberships + direct assignments)
+	var assignedPolicies []*models.Policy
+	if groupList, err := s.groupService.GetDeviceGroups(ctx, id); err == nil {
+		seen := map[uuid.UUID]bool{}
+		for _, g := range groupList {
+			assignments, _ := s.groupService.ListAssignments(ctx, "group", g.ID)
+			for _, a := range assignments {
+				if !seen[a.PolicyID] {
+					if p, err := s.policyRepo.GetByID(ctx, a.PolicyID); err == nil {
+						assignedPolicies = append(assignedPolicies, p)
+						seen[a.PolicyID] = true
+					}
+				}
+			}
+		}
+	}
+
 	s.renderPage(w, r, "device_detail", map[string]interface{}{
-		"ActiveNav":  "devices",
-		"Device":     device,
-		"Compliance": compliance,
-		"Groups":     groups,
+		"ActiveNav":        "devices",
+		"Device":           device,
+		"Compliance":       compliance,
+		"Groups":           groups,
+		"Commands":         commands,
+		"AssignedPolicies": assignedPolicies,
 	})
 }
 

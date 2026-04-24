@@ -1,23 +1,31 @@
 {{define "title"}}Dashboard — Local MDM{{end}}
 {{define "page_title"}}Dashboard{{end}}
 {{define "content"}}
+<style nonce="{{.CSPNonce}}">.chart-title{font-size:9px;font-weight:600;fill:currentColor}.chart-label{font-size:8px;fill:currentColor}</style>
+
 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
     <div class="card">
-        <div class="text-sm text-gray-500">Total Devices</div>
+        <div class="text-sm text-gray-500 dark:text-gray-400">Total Devices</div>
         <div class="text-3xl font-bold mt-1">{{.Stats.TotalDevices}}</div>
     </div>
     <div class="card">
-        <div class="text-sm text-gray-500">Enrolled</div>
-        <div class="text-3xl font-bold mt-1 text-green-600">{{.Stats.Enrolled}}</div>
+        <div class="text-sm text-gray-500 dark:text-gray-400">Enrolled</div>
+        <div class="text-3xl font-bold mt-1 text-green-600 dark:text-green-400">{{.Stats.Enrolled}}</div>
     </div>
     <div class="card">
-        <div class="text-sm text-gray-500">Non-Compliant</div>
-        <div class="text-3xl font-bold mt-1 text-red-600">{{.Stats.NonCompliant}}</div>
+        <div class="text-sm text-gray-500 dark:text-gray-400">Non-Compliant</div>
+        <div class="text-3xl font-bold mt-1 text-red-600 dark:text-red-400">{{.Stats.NonCompliant}}</div>
     </div>
     <div class="card">
-        <div class="text-sm text-gray-500">Active Policies</div>
+        <div class="text-sm text-gray-500 dark:text-gray-400">Active Policies</div>
         <div class="text-3xl font-bold mt-1">{{.Stats.ActivePolicies}}</div>
     </div>
+</div>
+
+<div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+    <div class="card">{{index .Charts "Platform"}}</div>
+    <div class="card">{{index .Charts "Status"}}</div>
+    <div class="card">{{index .Charts "Compliance"}}</div>
 </div>
 
 <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -38,11 +46,11 @@
             {{range .RecentAudit}}
             <div class="flex items-center justify-between text-sm">
                 <span>{{.Action}}</span>
-                <span class="text-gray-500">{{timeAgo .CreatedAt}}</span>
+                <span class="text-gray-500 dark:text-gray-400">{{timeAgo .CreatedAt}}</span>
             </div>
             {{end}}
             {{if not .RecentAudit}}
-            <p class="text-sm text-gray-500">No recent activity</p>
+            <p class="text-sm text-gray-500 dark:text-gray-400">No recent activity</p>
             {{end}}
         </div>
     </div>

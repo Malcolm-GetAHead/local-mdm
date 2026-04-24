@@ -44,8 +44,8 @@
 - [ ] Navigate to "Devices"
 - [ ] Click "Alice MacBook Pro"
 - [ ] Verify "Serial Number" is visible
-- [ ] Verify "Lock Device" is visible
-- [ ] Verify "Unenroll Device" is visible
+- [ ] Verify "Lock" is visible
+- [ ] Verify "Unenroll" is visible
 
 ## Policy Management
 
