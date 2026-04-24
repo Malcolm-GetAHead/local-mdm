@@ -1,14 +1,15 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="{{if .DarkMode}}dark{{end}}">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{block "title" .}}Local MDM{{end}}</title>
+    <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
     <link rel="stylesheet" href="/static/css/output.css">
     <meta name="htmx-config" content='{"inlineStyleNonce":"{{.CSPNonce}}"}'>
     <script src="/static/js/htmx.min.js"></script>
 </head>
-<body class="bg-gray-50 text-gray-900 min-h-screen">
+<body class="bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 min-h-screen">
     <noscript>
         <div style="padding:2rem;text-align:center;background:#fef3c7;color:#92400e;font-family:sans-serif">
             <h2>JavaScript Required</h2>
