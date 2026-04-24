@@ -190,7 +190,13 @@ func (s *Server) handleWebCallback(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleWebLogout(w http.ResponseWriter, r *http.Request) {
 	s.clearWebSession(w)
-	http.Redirect(w, r, "/dashboard/login", http.StatusFound)
+	// Redirect to Keycloak's logout endpoint to end the SSO session
+	logoutURL := fmt.Sprintf("%s/protocol/openid-connect/logout?client_id=%s&post_logout_redirect_uri=%s",
+		s.config.Keycloak.IssuerURL(),
+		s.config.Keycloak.ClientID,
+		fmt.Sprintf("http://%s/dashboard/login", r.Host),
+	)
+	http.Redirect(w, r, logoutURL, http.StatusFound)
 }
 
 func (s *Server) webCallbackURL(r *http.Request) string {
