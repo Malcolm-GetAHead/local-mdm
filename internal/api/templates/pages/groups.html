@@ -20,14 +20,14 @@
     </form>
 </div>
 
-<div class="card overflow-hidden p-0">
+<div id="group-table" class="card overflow-hidden p-0">
     <table class="w-full">
         <thead>
             <tr class="table-header">
-                <th class="px-6 py-3">Name</th>
+                {{template "sort_header" dict "Label" "Name" "Field" "name" "Sort" $.Sort "Dir" $.Dir "URL" "/dashboard/groups?" "Target" "#group-table" "Extra" ""}}
                 <th class="px-6 py-3">Description</th>
                 <th class="px-6 py-3">Members</th>
-                <th class="px-6 py-3"></th>
+                <th class="px-6 py-3">Actions</th>
             </tr>
         </thead>
         <tbody class="divide-y divide-gray-200">

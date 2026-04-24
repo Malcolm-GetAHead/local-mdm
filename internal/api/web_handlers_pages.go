@@ -317,9 +317,14 @@ func (s *Server) handleWebCompliance(w http.ResponseWriter, r *http.Request) {
 		}
 
 		var violations []string
-		// Parse violations from compliance_results details via DB
-		if cr.Status == "non_compliant" {
-			violations = append(violations, cr.Status)
+		if v, ok := cr.Details["violations"]; ok {
+			if arr, ok := v.([]interface{}); ok {
+				for _, item := range arr {
+					if s, ok := item.(string); ok {
+						violations = append(violations, s)
+					}
+				}
+			}
 		}
 
 		allResults = append(allResults, resultRow{
@@ -469,6 +474,11 @@ func (s *Server) handleWebGroups(w http.ResponseWriter, r *http.Request) {
 	sess := getSession(r)
 	ctx := r.Context()
 
+	sortDir := r.URL.Query().Get("dir")
+	if sortDir == "" {
+		sortDir = "asc"
+	}
+
 	groups, _, _ := s.groupService.ListGroups(ctx, sess.EnterpriseID, 100, 0)
 
 	type groupRow struct {
@@ -488,9 +498,19 @@ func (s *Server) handleWebGroups(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
+	sort.Slice(rows, func(i, j int) bool {
+		less := strings.ToLower(rows[i].Name) < strings.ToLower(rows[j].Name)
+		if sortDir == "desc" {
+			return !less
+		}
+		return less
+	})
+
 	s.renderPage(w, r, "groups", map[string]interface{}{
 		"ActiveNav": "groups",
 		"Groups":    rows,
+		"Sort":      "name",
+		"Dir":       sortDir,
 	})
 }
 

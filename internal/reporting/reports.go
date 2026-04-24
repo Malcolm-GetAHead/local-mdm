@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/malcolm-getahead/local-mdm/internal/models"
 )
 
 // Service generates reports from the database.
@@ -63,18 +64,19 @@ func (s *Service) DeviceInventory(ctx context.Context, enterpriseID uuid.UUID, p
 
 // ComplianceRow represents a row in the compliance report.
 type ComplianceRow struct {
-	DeviceID   uuid.UUID `json:"device_id"`
-	DeviceName string    `json:"device_name"`
-	Platform   string    `json:"platform"`
-	PolicyName string    `json:"policy_name"`
-	Status     string    `json:"status"`
-	EvaluatedAt time.Time `json:"evaluated_at"`
+	DeviceID    uuid.UUID      `json:"device_id"`
+	DeviceName  string         `json:"device_name"`
+	Platform    string         `json:"platform"`
+	PolicyName  string         `json:"policy_name"`
+	Status      string         `json:"status"`
+	EvaluatedAt time.Time      `json:"evaluated_at"`
+	Details     models.JSONB   `json:"details"`
 }
 
 // ComplianceReport returns compliance status per device/policy.
 func (s *Service) ComplianceReport(ctx context.Context, enterpriseID uuid.UUID) ([]ComplianceRow, error) {
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT cr.device_id, COALESCE(d.name,''), d.platform, COALESCE(p.name,''), cr.status, cr.evaluated_at
+		`SELECT cr.device_id, COALESCE(d.name,''), d.platform, COALESCE(p.name,''), cr.status, cr.evaluated_at, cr.details
 		 FROM compliance_results cr
 		 JOIN devices d ON cr.device_id = d.id
 		 JOIN policies p ON cr.policy_id = p.id
@@ -87,7 +89,7 @@ func (s *Service) ComplianceReport(ctx context.Context, enterpriseID uuid.UUID) 
 	var result []ComplianceRow
 	for rows.Next() {
 		var c ComplianceRow
-		if err := rows.Scan(&c.DeviceID, &c.DeviceName, &c.Platform, &c.PolicyName, &c.Status, &c.EvaluatedAt); err != nil {
+		if err := rows.Scan(&c.DeviceID, &c.DeviceName, &c.Platform, &c.PolicyName, &c.Status, &c.EvaluatedAt, &c.Details); err != nil {
 			return nil, err
 		}
 		result = append(result, c)

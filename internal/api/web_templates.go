@@ -106,6 +106,9 @@ var templateFuncs = template.FuncMap{
 	"eq": func(a, b interface{}) bool {
 		return fmt.Sprintf("%v", a) == fmt.Sprintf("%v", b)
 	},
+	"ne": func(a, b interface{}) bool {
+		return fmt.Sprintf("%v", a) != fmt.Sprintf("%v", b)
+	},
 	"dict": func(pairs ...interface{}) map[string]interface{} {
 		m := make(map[string]interface{}, len(pairs)/2)
 		for i := 0; i < len(pairs)-1; i += 2 {
