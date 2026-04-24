@@ -15,11 +15,10 @@ type policySetting struct {
 // policySettingsCatalog is the authoritative list of valid policy settings.
 var policySettingsCatalog = []policySetting{
 	// Security
-	{Key: "require_encryption", Label: "Require Encryption", Description: "Require full-disk encryption (FileVault/BitLocker)", Type: "bool", Default: false, Category: "Security", Platforms: []string{"all"}},
+	{Key: "require_encryption", Label: "Require Encryption", Description: "Require full-disk encryption (FileVault on macOS, BitLocker on Windows)", Type: "bool", Default: false, Category: "Security", Platforms: []string{"all"}},
+	{Key: "encryption_method", Label: "Encryption Method", Description: "BitLocker encryption algorithm (Windows only)", Type: "select", Default: "XTS-AES-256", Options: []string{"XTS-AES-128", "XTS-AES-256"}, Category: "Security", Platforms: []string{"windows"}},
 	{Key: "min_password_length", Label: "Minimum Password Length", Description: "Minimum number of characters for device passcode", Type: "int", Default: 0, Category: "Security", Platforms: []string{"all"}},
 	{Key: "require_firewall", Label: "Require Firewall", Description: "Require the system firewall to be enabled", Type: "bool", Default: false, Category: "Security", Platforms: []string{"macos", "windows"}},
-	{Key: "require_bitlocker", Label: "Require BitLocker", Description: "Enforce BitLocker drive encryption", Type: "bool", Default: false, Category: "Security", Platforms: []string{"windows"}},
-	{Key: "encryption_method", Label: "Encryption Method", Description: "BitLocker encryption algorithm", Type: "select", Default: "XTS-AES-256", Options: []string{"XTS-AES-128", "XTS-AES-256"}, Category: "Security", Platforms: []string{"windows"}},
 	{Key: "auto_lock_minutes", Label: "Auto-Lock (minutes)", Description: "Lock screen after inactivity", Type: "int", Default: 0, Category: "Security", Platforms: []string{"all"}},
 
 	// Restrictions

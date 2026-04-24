@@ -28,15 +28,15 @@ INSERT INTO devices (id, enterprise_id, platform, device_id, serial_number, name
   ('d0000000-0000-0000-0000-000000000007', '00000000-0000-0000-0000-000000000001', 'macos', 'mac-007', 'C02XCAFEBABE', 'Lost MacBook', 'MacBook Air M1', '14.1', 'wiped', NOW() - interval '7 days', '{}'),
   ('d0000000-0000-0000-0000-000000000008', '00000000-0000-0000-0000-000000000001', 'macos', 'mac-008', 'C02XFEEDFACE', 'Exec MacBook', 'MacBook Pro 16"', '14.4.1', 'enrolled', NOW() - interval '5 minutes', '{"serial": "C02XFEEDFACE", "mdm_enrolled": true}'),
   -- Windows devices (10)
-  ('d0000000-0000-0000-0000-000000000010', '00000000-0000-0000-0000-000000000001', 'windows', 'win-001', 'PF3K1234', 'Sales Laptop 1', 'Dell Latitude 5540', '10.0.22631', 'enrolled', NOW() - interval '15 minutes', '{"bitlocker_enabled": true}'),
-  ('d0000000-0000-0000-0000-000000000011', '00000000-0000-0000-0000-000000000001', 'windows', 'win-002', 'PF3K5678', 'Sales Laptop 2', 'Dell Latitude 5540', '10.0.22631', 'enrolled', NOW() - interval '1 hour', '{"bitlocker_enabled": true}'),
-  ('d0000000-0000-0000-0000-000000000012', '00000000-0000-0000-0000-000000000001', 'windows', 'win-003', 'PF3K9012', 'Finance Desktop', 'HP EliteDesk 800', '10.0.22631', 'enrolled', NOW() - interval '4 hours', '{"bitlocker_enabled": false}'),
-  ('d0000000-0000-0000-0000-000000000013', '00000000-0000-0000-0000-000000000001', 'windows', 'win-004', 'PF3K3456', 'HR Laptop', 'Lenovo ThinkPad X1', '10.0.19045', 'enrolled', NOW() - interval '2 days', '{"bitlocker_enabled": true}'),
+  ('d0000000-0000-0000-0000-000000000010', '00000000-0000-0000-0000-000000000001', 'windows', 'win-001', 'PF3K1234', 'Sales Laptop 1', 'Dell Latitude 5540', '10.0.22631', 'enrolled', NOW() - interval '15 minutes', '{"encryption": true}'),
+  ('d0000000-0000-0000-0000-000000000011', '00000000-0000-0000-0000-000000000001', 'windows', 'win-002', 'PF3K5678', 'Sales Laptop 2', 'Dell Latitude 5540', '10.0.22631', 'enrolled', NOW() - interval '1 hour', '{"encryption": true}'),
+  ('d0000000-0000-0000-0000-000000000012', '00000000-0000-0000-0000-000000000001', 'windows', 'win-003', 'PF3K9012', 'Finance Desktop', 'HP EliteDesk 800', '10.0.22631', 'enrolled', NOW() - interval '4 hours', '{"encryption": false}'),
+  ('d0000000-0000-0000-0000-000000000013', '00000000-0000-0000-0000-000000000001', 'windows', 'win-004', 'PF3K3456', 'HR Laptop', 'Lenovo ThinkPad X1', '10.0.19045', 'enrolled', NOW() - interval '2 days', '{"encryption": true}'),
   ('d0000000-0000-0000-0000-000000000014', '00000000-0000-0000-0000-000000000001', 'windows', 'win-005', 'PF3K7890', 'Kiosk Terminal', 'Dell OptiPlex 7010', '10.0.22631', 'enrolled', NOW() - interval '6 hours', '{}'),
-  ('d0000000-0000-0000-0000-000000000015', '00000000-0000-0000-0000-000000000001', 'windows', 'win-006', 'PF3KABCD', 'Dev Workstation', 'HP ZBook Fury', '10.0.22631', 'enrolled', NOW() - interval '20 minutes', '{"bitlocker_enabled": true}'),
+  ('d0000000-0000-0000-0000-000000000015', '00000000-0000-0000-0000-000000000001', 'windows', 'win-006', 'PF3KABCD', 'Dev Workstation', 'HP ZBook Fury', '10.0.22631', 'enrolled', NOW() - interval '20 minutes', '{"encryption": true}'),
   ('d0000000-0000-0000-0000-000000000016', '00000000-0000-0000-0000-000000000001', 'windows', 'win-007', 'PF3KEFGH', 'Shared Laptop', 'Dell Latitude 3540', '10.0.19045', 'enrolled', NOW() - interval '5 days', '{}'),
   ('d0000000-0000-0000-0000-000000000017', '00000000-0000-0000-0000-000000000001', 'windows', 'win-008', 'PF3KIJKL', 'Retired PC', 'HP ProDesk 400', '10.0.19044', 'unenrolled', NOW() - interval '60 days', '{}'),
-  ('d0000000-0000-0000-0000-000000000018', '00000000-0000-0000-0000-000000000001', 'windows', 'win-009', 'PF3KMNOP', 'Exec Surface', 'Surface Pro 9', '10.0.22631', 'enrolled', NOW() - interval '45 minutes', '{"bitlocker_enabled": true}'),
+  ('d0000000-0000-0000-0000-000000000018', '00000000-0000-0000-0000-000000000001', 'windows', 'win-009', 'PF3KMNOP', 'Exec Surface', 'Surface Pro 9', '10.0.22631', 'enrolled', NOW() - interval '45 minutes', '{"encryption": true}'),
   ('d0000000-0000-0000-0000-000000000019', '00000000-0000-0000-0000-000000000001', 'windows', 'win-010', 'PF3KQRST', 'Lobby Kiosk', 'Dell OptiPlex 3000', '10.0.22631', 'enrolled', NOW() - interval '12 hours', '{}'),
   -- Android devices (7)
   ('d0000000-0000-0000-0000-000000000020', '00000000-0000-0000-0000-000000000001', 'android', 'and-001', 'R58N1234ABCD', 'Field Phone 1', 'Samsung Galaxy S24', '14', 'enrolled', NOW() - interval '25 minutes', '{"security_patch": "2024-03-01"}'),
@@ -53,7 +53,7 @@ INSERT INTO policies (id, enterprise_id, name, description, platform, policy_typ
   ('e0000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000001', 'Corporate Security Baseline', 'Require encryption and strong passwords on all devices', 'all', 'security', '{"require_encryption": true, "min_password_length": 8, "require_firewall": true}', true, false),
   ('e0000000-0000-0000-0000-000000000002', '00000000-0000-0000-0000-000000000001', 'Corporate WiFi', 'Auto-configure corporate WiFi on enrollment', 'all', 'wifi', '{"ssid": "AcmeCorp", "security": "WPA2-Enterprise", "auto_join": true}', true, false),
   ('e0000000-0000-0000-0000-000000000003', '00000000-0000-0000-0000-000000000001', 'macOS Restrictions', 'Disable camera and AirDrop for macOS fleet', 'macos', 'restrictions', '{"disable_camera": true, "disable_airdrop": true}', true, false),
-  ('e0000000-0000-0000-0000-000000000004', '00000000-0000-0000-0000-000000000001', 'Windows BitLocker', 'Enforce BitLocker encryption on Windows devices', 'windows', 'security', '{"require_bitlocker": true, "encryption_method": "XTS-AES-256"}', true, false),
+  ('e0000000-0000-0000-0000-000000000004', '00000000-0000-0000-0000-000000000001', 'Windows BitLocker', 'Enforce BitLocker encryption on Windows devices', 'windows', 'security', '{"require_encryption": true, "encryption_method": "XTS-AES-256"}', true, false),
   ('e0000000-0000-0000-0000-000000000005', '00000000-0000-0000-0000-000000000001', 'Android Work Profile', 'Configure work profile restrictions', 'android', 'restrictions', '{"disable_camera": false, "disable_screen_capture": true}', true, false),
   ('e0000000-0000-0000-0000-000000000006', '00000000-0000-0000-0000-000000000001', 'VPN Configuration', 'Corporate VPN for remote access', 'all', 'vpn', '{"server": "vpn.acme.test", "protocol": "IKEv2", "on_demand": true}', false, false),
   -- Templates
@@ -114,8 +114,8 @@ INSERT INTO compliance_results (id, device_id, policy_id, status, details, evalu
   ('cc000000-0000-0000-0000-000000000007', 'd0000000-0000-0000-0000-000000000022', 'e0000000-0000-0000-0000-000000000001', 'unknown', '{}', NOW() - interval '8 hours'),
   ('cc000000-0000-0000-0000-000000000008', 'd0000000-0000-0000-0000-000000000004', 'e0000000-0000-0000-0000-000000000001', 'non_compliant', '{"encryption": true, "password_length": 6, "firewall": true, "violations": ["password_too_short"]}', NOW() - interval '3 days'),
   -- BitLocker compliance
-  ('cc000000-0000-0000-0000-000000000010', 'd0000000-0000-0000-0000-000000000010', 'e0000000-0000-0000-0000-000000000004', 'compliant', '{"bitlocker_enabled": true}', NOW() - interval '15 minutes'),
-  ('cc000000-0000-0000-0000-000000000011', 'd0000000-0000-0000-0000-000000000012', 'e0000000-0000-0000-0000-000000000004', 'non_compliant', '{"bitlocker_enabled": false, "violations": ["bitlocker_disabled"]}', NOW() - interval '4 hours'),
+  ('cc000000-0000-0000-0000-000000000010', 'd0000000-0000-0000-0000-000000000010', 'e0000000-0000-0000-0000-000000000004', 'compliant', '{"encryption": true}', NOW() - interval '15 minutes'),
+  ('cc000000-0000-0000-0000-000000000011', 'd0000000-0000-0000-0000-000000000012', 'e0000000-0000-0000-0000-000000000004', 'non_compliant', '{"encryption": false, "violations": ["encryption_disabled"]}', NOW() - interval '4 hours'),
   -- WiFi compliance (all compliant — it's just config push)
   ('cc000000-0000-0000-0000-000000000020', 'd0000000-0000-0000-0000-000000000001', 'e0000000-0000-0000-0000-000000000002', 'compliant', '{}', NOW() - interval '10 minutes'),
   ('cc000000-0000-0000-0000-000000000021', 'd0000000-0000-0000-0000-000000000010', 'e0000000-0000-0000-0000-000000000002', 'compliant', '{}', NOW() - interval '15 minutes')
