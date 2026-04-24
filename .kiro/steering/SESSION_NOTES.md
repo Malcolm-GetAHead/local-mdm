@@ -53,6 +53,11 @@
 - **Tests that skip on DB connection failure can hide wrong database names.** Two tests referenced `localmdm_test` (doesn't exist in Docker) instead of `localmdm`. They silently skipped via `t.Skipf` on connection error. When un-skipping or fixing integration tests, verify the database name matches the Docker setup.
 - **When the owner asks "does that also cover X?" they already suspect it doesn't.** The CA env var support covered Local MDM but not NanoMDM (separate binary, file-based CA loading). The owner caught this immediately. Always think about the full system — all services, not just the Go code.
 - **Independent sprint tasks can run in parallel via subagents.** Mechanical tasks (assert.ErrorIs migration, SCEP test coverage) don't depend on investigation tasks. Use subagents for parallel implementation when tasks touch different files with no shared state.
+- **Don't run the retro autonomously.** "Ready for retro?" is a status check, not a go signal. The owner drives each section with explicit prompts. Wait for them.
+- **When the owner prescribes a technical approach, validate it against the codebase before agreeing.** The owner thinks in infrastructure ("we have real Keycloak, use it") but may not know which test patterns can access it. If a suggestion doesn't fit the code structure, explain why and propose the alternative — don't just silently do something different.
+- **Don't overestimate effort on test coverage.** "Half a day" and "diminishing returns" turned into 5 minutes and +7% coverage. Before claiming something is expensive, actually look at the uncovered lines and count them. The owner will ask you to do it anyway, and you'll look bad when it's trivial.
+- **The owner wants honest, critical feedback — not softened positives reframed as criticism.** When asked "anything I could do differently?", give actual negatives. The owner will push back if you're being too nice. They act on real feedback.
+- **Establish a test baseline before starting work.** Run `make dev-test` before the first change to confirm the branch is green. The steering guide says to do this. If you skip it and something was already broken, you'll waste time debugging pre-existing failures mixed with your changes.
 
 ## Known Issues
 
