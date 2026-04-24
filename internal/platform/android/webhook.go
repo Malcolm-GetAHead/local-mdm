@@ -7,14 +7,21 @@ import (
 	"log/slog"
 	"net/http"
 
+	"github.com/malcolm-getahead/local-mdm/internal/models"
 	"google.golang.org/api/androidmanagement/v1"
 )
 
+// LifecycleNotifier is called on device lifecycle events.
+type LifecycleNotifier interface {
+	OnUnenroll(ctx context.Context, device *models.Device)
+}
+
 // WebhookHandler handles Android Management API webhooks
 type WebhookHandler struct {
-	service *Service
-	client  *Client
-	logger  *slog.Logger
+	service   *Service
+	client    *Client
+	lifecycle LifecycleNotifier
+	logger    *slog.Logger
 }
 
 // NewWebhookHandler creates a new webhook handler
@@ -24,6 +31,11 @@ func NewWebhookHandler(service *Service, client *Client, logger *slog.Logger) *W
 		client:  client,
 		logger:  logger,
 	}
+}
+
+// SetLifecycle sets the lifecycle notifier (optional, avoids constructor change).
+func (h *WebhookHandler) SetLifecycle(lc LifecycleNotifier) {
+	h.lifecycle = lc
 }
 
 // WebhookEvent represents an Android Management API webhook event
@@ -111,9 +123,26 @@ func (h *WebhookHandler) handleComplianceReport(ctx context.Context, event *Webh
 		"device", event.DeviceName,
 		"data", event.Data,
 	)
-	
-	// Update device compliance status
-	return nil
+
+	// Persist compliance data to platform_data
+	if event.DeviceName == "" || event.EnterpriseToken == "" || len(event.Data) == 0 {
+		return nil
+	}
+	enterprise, err := h.service.enterpriseRepo.GetBySlug(ctx, event.EnterpriseToken)
+	if err != nil {
+		return nil
+	}
+	device, err := h.service.deviceRepo.GetBySerial(ctx, enterprise.ID, event.DeviceName)
+	if err != nil {
+		return nil
+	}
+	if device.PlatformData == nil {
+		device.PlatformData = models.JSONB{}
+	}
+	for k, v := range event.Data {
+		device.PlatformData[k] = v
+	}
+	return h.service.deviceRepo.Update(ctx, device)
 }
 
 func (h *WebhookHandler) handleStatusReport(ctx context.Context, event *WebhookEvent) error {
@@ -121,9 +150,29 @@ func (h *WebhookHandler) handleStatusReport(ctx context.Context, event *WebhookE
 		return nil
 	}
 
-	// Get device details (requires Google API client)
+	// Persist status data to platform_data from webhook payload
+	if event.EnterpriseToken != "" && len(event.Data) > 0 {
+		enterprise, err := h.service.enterpriseRepo.GetBySlug(ctx, event.EnterpriseToken)
+		if err == nil {
+			device, err := h.service.deviceRepo.GetBySerial(ctx, enterprise.ID, event.DeviceName)
+			if err == nil {
+				if device.PlatformData == nil {
+					device.PlatformData = models.JSONB{}
+				}
+				for k, v := range event.Data {
+					device.PlatformData[k] = v
+				}
+				if err := h.service.deviceRepo.Update(ctx, device); err != nil {
+					h.logger.Error("failed to persist status data", "error", err, "device", event.DeviceName)
+				}
+			}
+		}
+	}
+
+	// Full device details require Google API client (deferred to F-01 GCP setup)
+	// TODO(F-01): Parse device.SecurityPosture from Google API when client is configured
 	if h.client == nil {
-		h.logger.Warn("status report received but Google client not configured", "device", event.DeviceName)
+		h.logger.Debug("status report: Google client not configured, persisted webhook data only", "device", event.DeviceName)
 		return nil
 	}
 	device, err := h.client.GetDevice(ctx, event.DeviceName)
@@ -137,14 +186,12 @@ func (h *WebhookHandler) handleStatusReport(ctx context.Context, event *WebhookE
 		"applied_state", device.AppliedState,
 	)
 
-	// Update device status in database
 	return nil
 }
 
 func (h *WebhookHandler) handleUnenrollment(ctx context.Context, event *WebhookEvent) error {
 	h.logger.Info("device unenrolled", "device", event.DeviceName)
 
-	// Look up device by device name (Google resource name stored as device_id)
 	if event.DeviceName != "" && event.EnterpriseToken != "" {
 		enterprise, err := h.service.enterpriseRepo.GetBySlug(ctx, event.EnterpriseToken)
 		if err != nil {
@@ -159,6 +206,9 @@ func (h *WebhookHandler) handleUnenrollment(ctx context.Context, event *WebhookE
 		}
 		if err := h.service.UpdateDeviceStatus(ctx, device.ID, "unenrolled"); err != nil {
 			return fmt.Errorf("failed to update device status: %w", err)
+		}
+		if h.lifecycle != nil {
+			h.lifecycle.OnUnenroll(ctx, device)
 		}
 	}
 

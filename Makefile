@@ -129,6 +129,12 @@ prod-test: prod-build ## Build prod container + run full E2E tests
 prod-down: ## Stop production stack
 	@docker compose down
 
+load-test: ## Run k6 load tests against local stack
+	@echo "Running k6 load tests..."
+	@k6 run tests/load/steady_state.js
+	@k6 run tests/load/admin_dashboard.js
+	@k6 run tests/load/enrollment_burst.js
+
 deps: ## Download dependencies
 	@echo "Downloading dependencies..."
 	@go mod download

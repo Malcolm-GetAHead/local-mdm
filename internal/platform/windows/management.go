@@ -163,6 +163,10 @@ func (h *ManagementHandler) updateDeviceInfo(ctx context.Context, deviceID, uri,
 		"./DevInfo/Man":                                     "manufacturer",
 		"./DevInfo/Mod":                                     "model",
 		"./DevInfo/Lang":                                    "language",
+		// Security state CSPs (compliance-relevant)
+		"./Vendor/MSFT/BitLocker/Status/DeviceEncryptionStatus": "bitlocker_status",
+		"./Vendor/MSFT/Firewall/MdmStore/Global/EnableFirewall": "firewall_enabled",
+		"./Vendor/MSFT/DeviceLock/DevicePasswordEnabled":        "password_present",
 	}
 
 	field, ok := fieldMap[uri]

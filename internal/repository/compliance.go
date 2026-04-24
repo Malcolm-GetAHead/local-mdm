@@ -13,6 +13,7 @@ type ComplianceRepository interface {
 	Upsert(ctx context.Context, result *models.ComplianceResult) error
 	GetByDevice(ctx context.Context, deviceID uuid.UUID) ([]*models.ComplianceResult, error)
 	GetSummary(ctx context.Context, enterpriseID uuid.UUID) (*models.ComplianceSummary, error)
+	DeleteByDevice(ctx context.Context, deviceID uuid.UUID) error
 }
 
 type complianceRepository struct {
@@ -105,4 +106,10 @@ func (r *complianceRepository) GetSummary(ctx context.Context, enterpriseID uuid
 		summary.Total += count
 	}
 	return summary, rows.Err()
+}
+
+func (r *complianceRepository) DeleteByDevice(ctx context.Context, deviceID uuid.UUID) error {
+	_, err := getExecutor(ctx, r.writer).ExecContext(ctx,
+		`DELETE FROM compliance_results WHERE device_id = $1`, deviceID)
+	return err
 }

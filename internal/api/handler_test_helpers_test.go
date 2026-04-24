@@ -1014,6 +1014,9 @@ func (m *mockComplianceRepo) GetByDevice(_ context.Context, deviceID uuid.UUID) 
 func (m *mockComplianceRepo) GetSummary(_ context.Context, _ uuid.UUID) (*models.ComplianceSummary, error) {
 	return &models.ComplianceSummary{}, nil
 }
+func (m *mockComplianceRepo) DeleteByDevice(_ context.Context, _ uuid.UUID) error {
+	return nil
+}
 
 // Mock report service for handler tests
 type mockReportService struct {

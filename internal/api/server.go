@@ -79,6 +79,7 @@ type Server struct {
 	policyVersionRepo repository.PolicyVersionRepository
 	groupService     *service.GroupService
 	complianceService *service.ComplianceService
+	eventBus          *service.EventBus
 	cleanupCancel     context.CancelFunc
 }
 
@@ -266,12 +267,13 @@ func New(cfg *config.Config, database *db.DB, logger *slog.Logger) (*Server, err
 	}
 
 	s.androidService = android.NewService(s.deviceRepo, s.enterpriseRepo, cfg.Android.ProjectID, cfg.Android.ServiceAccountJSON)
-	// Wire webhook handler without Google client (graceful degradation)
+	s.lifecycleService = service.NewLifecycleService(logger)
 	s.androidWebhookHandler = android.NewWebhookHandler(s.androidService, nil, logger)
+	s.androidWebhookHandler.SetLifecycle(s.lifecycleService)
 
 	s.cmdDispatcher = newCommandDispatcher(s.cmdRepo, s.nanomdmService, logger)
 
-	s.lifecycleService = service.NewLifecycleService(logger)
+	// lifecycleService already created above
 
 	policyVersionRepo, err := repository.NewPolicyVersionRepository(database.Writer, database.Reader)
 	if err != nil {
@@ -295,6 +297,41 @@ func New(cfg *config.Config, database *db.DB, logger *slog.Logger) (*Server, err
 		return nil, fmt.Errorf("failed to create compliance repository: %w", err)
 	}
 	s.complianceService = service.NewComplianceService(complianceRepo, s.groupService, s.policyRepo, s.deviceRepo, logger)
+
+	// Initialize EventBus (LISTEN/NOTIFY on Writer pool DSN)
+	if cfg.Database.Host != "" {
+		s.eventBus = service.NewEventBus(cfg.Database.DSN(), logger)
+
+		// Register compliance auto-evaluation subscribers
+		s.eventBus.Subscribe("device.enrolled", func(ctx context.Context, event service.MDMEvent) error {
+			return s.complianceService.EvaluateDeviceByID(ctx, event.ID)
+		})
+		s.eventBus.Subscribe("device.info_updated", func(ctx context.Context, event service.MDMEvent) error {
+			return s.complianceService.EvaluateDeviceByID(ctx, event.ID)
+		})
+		s.eventBus.Subscribe("policy.updated", func(ctx context.Context, event service.MDMEvent) error {
+			return s.complianceService.EvaluateAllForPolicy(ctx, event.ID)
+		})
+		s.eventBus.Subscribe("policy.assigned", func(ctx context.Context, event service.MDMEvent) error {
+			logger.Info("policy assigned, compliance will evaluate on next check-in", "assignment_id", event.ID)
+			return nil
+		})
+		s.eventBus.Subscribe("group.member_added", func(ctx context.Context, event service.MDMEvent) error {
+			if event.DeviceID != nil {
+				return s.complianceService.EvaluateDeviceByID(ctx, *event.DeviceID)
+			}
+			return nil
+		})
+		s.eventBus.Subscribe("group.member_removed", func(ctx context.Context, event service.MDMEvent) error {
+			if event.DeviceID != nil {
+				return s.complianceService.EvaluateDeviceByID(ctx, *event.DeviceID)
+			}
+			return nil
+		})
+	}
+
+	// Register lifecycle hooks
+	s.lifecycleService.RegisterHook(service.NewComplianceCleanupHook(complianceRepo, logger))
 
 	s.deviceService = service.NewDeviceService(s.deviceRepo, s.cmdRepo, s.cmdDispatcher, s.lifecycleService, logger)
 	s.appService = service.NewAppService(s.appRepo, s.deviceRepo, s.cmdRepo, s.cmdDispatcher, logger)
@@ -823,6 +860,13 @@ func (s *Server) Start() error {
 		s.cmdDispatcher.Start()
 	}
 
+	// Start EventBus listener
+	if s.eventBus != nil {
+		if err := s.eventBus.Start(context.Background()); err != nil {
+			s.logger.Error("EventBus failed to start", "error", err)
+		}
+	}
+
 	// Start periodic cleanup for expired token cache and idempotency keys
 	s.startCleanupTicker()
 
@@ -877,6 +921,11 @@ func (s *Server) Shutdown(ctx context.Context) error {
 	// Stop command dispatcher (drain queue)
 	if s.cmdDispatcher != nil {
 		s.cmdDispatcher.Stop()
+	}
+
+	// Stop EventBus listener
+	if s.eventBus != nil {
+		s.eventBus.Shutdown()
 	}
 
 	// Stop cleanup ticker

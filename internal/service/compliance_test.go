@@ -81,6 +81,14 @@ func (m *mockComplianceRepo) GetSummary(_ context.Context, _ uuid.UUID) (*models
 	}
 	return s, nil
 }
+func (m *mockComplianceRepo) DeleteByDevice(_ context.Context, deviceID uuid.UUID) error {
+	for key, r := range m.results {
+		if r.DeviceID == deviceID {
+			delete(m.results, key)
+		}
+	}
+	return nil
+}
 
 // --- Tests ---
 
@@ -291,6 +299,9 @@ func (m *mockComplianceRepoErr) GetByDevice(_ context.Context, _ uuid.UUID) ([]*
 }
 func (m *mockComplianceRepoErr) GetSummary(_ context.Context, _ uuid.UUID) (*models.ComplianceSummary, error) {
 	return &models.ComplianceSummary{}, nil
+}
+func (m *mockComplianceRepoErr) DeleteByDevice(_ context.Context, _ uuid.UUID) error {
+	return nil
 }
 
 func TestComplianceService_EvaluateDevice_UpsertError(t *testing.T) {
@@ -521,4 +532,123 @@ func TestComplianceService_EmptyPolicyConfig(t *testing.T) {
 	require.Len(t, results, 1)
 	assert.Equal(t, models.ComplianceStatusCompliant, results[0].Status)
 	assert.Equal(t, "empty policy config", results[0].Details["reason"])
+}
+
+func TestComplianceService_EvaluateDeviceByID(t *testing.T) {
+	cr := newMockComplianceRepo()
+	pr := newMockPolicyRepo()
+	ar := &mockAssignmentRepo{}
+	gs := NewGroupService(newMockGroupRepo(), ar, testLogger())
+	dr := newMockComplianceDeviceRepo()
+	svc := NewComplianceService(cr, gs, pr, dr, testLogger())
+
+	deviceID := uuid.New()
+	entID := uuid.New()
+	dr.devices[deviceID] = &models.Device{
+		BaseModel:    models.BaseModel{ID: deviceID},
+		EnterpriseID: entID,
+		PlatformData: models.JSONB{"password_present": true},
+	}
+
+	policyID := uuid.New()
+	pr.policies[policyID] = &models.Policy{
+		BaseModel:    models.BaseModel{ID: policyID},
+		PolicyType:   models.PolicyTypeSecurity,
+		PolicyConfig: models.JSONB{"require_password": true},
+	}
+	gs.AssignPolicy(context.Background(), policyID, models.TargetTypeDevice, deviceID, 1)
+
+	err := svc.EvaluateDeviceByID(context.Background(), deviceID)
+	require.NoError(t, err)
+
+	results, _ := cr.GetByDevice(context.Background(), deviceID)
+	require.Len(t, results, 1)
+	assert.Equal(t, models.ComplianceStatusCompliant, results[0].Status)
+}
+
+func TestComplianceService_EvaluateDeviceByID_NotFound(t *testing.T) {
+	cr := newMockComplianceRepo()
+	pr := newMockPolicyRepo()
+	ar := &mockAssignmentRepo{}
+	gs := NewGroupService(newMockGroupRepo(), ar, testLogger())
+	dr := newMockComplianceDeviceRepo()
+	svc := NewComplianceService(cr, gs, pr, dr, testLogger())
+
+	err := svc.EvaluateDeviceByID(context.Background(), uuid.New())
+	assert.Error(t, err)
+}
+
+func TestComplianceService_EvaluateAllForPolicy(t *testing.T) {
+	cr := newMockComplianceRepo()
+	pr := newMockPolicyRepo()
+	ar := &mockAssignmentRepo{}
+	gr := newMockGroupRepo()
+	gs := NewGroupService(gr, ar, testLogger())
+	dr := newMockComplianceDeviceRepo()
+	svc := NewComplianceService(cr, gs, pr, dr, testLogger())
+
+	deviceID := uuid.New()
+	entID := uuid.New()
+	dr.devices[deviceID] = &models.Device{
+		BaseModel:    models.BaseModel{ID: deviceID},
+		EnterpriseID: entID,
+		PlatformData: models.JSONB{},
+	}
+
+	policyID := uuid.New()
+	pr.policies[policyID] = &models.Policy{
+		BaseModel:    models.BaseModel{ID: policyID},
+		PolicyType:   models.PolicyTypeSecurity,
+		PolicyConfig: models.JSONB{},
+	}
+	gs.AssignPolicy(context.Background(), policyID, models.TargetTypeDevice, deviceID, 1)
+
+	err := svc.EvaluateAllForPolicy(context.Background(), policyID)
+	require.NoError(t, err)
+
+	results, _ := cr.GetByDevice(context.Background(), deviceID)
+	assert.NotEmpty(t, results)
+}
+
+func TestComplianceCleanupHook(t *testing.T) {
+	cr := newMockComplianceRepo()
+	hook := NewComplianceCleanupHook(cr, testLogger())
+
+	deviceID := uuid.New()
+	policyID := uuid.New()
+	cr.Upsert(context.Background(), &models.ComplianceResult{
+		DeviceID: deviceID,
+		PolicyID: policyID,
+		Status:   models.ComplianceStatusCompliant,
+	})
+
+	device := &models.Device{BaseModel: models.BaseModel{ID: deviceID}}
+
+	// OnUnenroll should clear results
+	err := hook.OnUnenroll(context.Background(), device)
+	require.NoError(t, err)
+	results, _ := cr.GetByDevice(context.Background(), deviceID)
+	assert.Empty(t, results)
+
+	// Re-add and test OnWipe
+	cr.Upsert(context.Background(), &models.ComplianceResult{
+		DeviceID: deviceID,
+		PolicyID: policyID,
+		Status:   models.ComplianceStatusCompliant,
+	})
+	err = hook.OnWipe(context.Background(), device)
+	require.NoError(t, err)
+	results, _ = cr.GetByDevice(context.Background(), deviceID)
+	assert.Empty(t, results)
+
+	// Re-add and test OnDelete
+	cr.Upsert(context.Background(), &models.ComplianceResult{
+		DeviceID: deviceID,
+		PolicyID: policyID,
+		Status:   models.ComplianceStatusCompliant,
+	})
+	err = hook.OnDelete(context.Background(), device)
+	require.NoError(t, err)
+	results, _ = cr.GetByDevice(context.Background(), deviceID)
+	assert.Empty(t, results)
 }

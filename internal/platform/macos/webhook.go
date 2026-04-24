@@ -154,29 +154,105 @@ func (h *CheckinHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		h.logger.Error("nanomdm checkin failed", "error", err, "udid", ce.UDID)
 	}
 
-	// On Authenticate, create a device record if we have enterprise context
-	if ce.MessageType == "Authenticate" && ce.UDID != "" {
-		if enterpriseID, ok := ce.Params["enterprise_id"].(string); ok && enterpriseID != "" {
-			if eid, err := parseUUID(enterpriseID); err == nil {
-				if _, err := h.service.CreateDevice(r.Context(), eid, ce.UDID, ce.UDID); err != nil {
-					h.logger.Error("failed to create device on authenticate", "error", err, "udid", ce.UDID)
-				}
-			}
-		}
-	}
+	ctx := r.Context()
 
-	// On CheckOut, update device status and call lifecycle hooks
-	if ce.MessageType == "CheckOut" && ce.UDID != "" {
-		if device, err := h.service.GetDeviceByUDID(r.Context(), ce.UDID); err == nil {
-			device.Status = models.DeviceStatusUnenrolled
-			if err := h.service.UpdateDevice(r.Context(), device); err != nil {
-				h.logger.Error("failed to update device status on checkout", "error", err, "udid", ce.UDID)
-			}
-			if h.lifecycle != nil {
-				h.lifecycle.OnUnenroll(r.Context(), device)
-			}
-			h.logger.Info("device unenrolled via checkout", "udid", ce.UDID, "device_id", device.ID)
+	switch ce.MessageType {
+	case "Authenticate":
+		if ce.UDID == "" {
+			break
 		}
+		// Extract enterprise_id from params
+		enterpriseID, ok := ce.Params["enterprise_id"].(string)
+		if !ok || enterpriseID == "" {
+			break
+		}
+		eid, err := parseUUID(enterpriseID)
+		if err != nil {
+			break
+		}
+
+		// Extract device info from params (NanoMDM forwards plist fields)
+		serial, _ := ce.Params["serial_number"].(string)
+		name, _ := ce.Params["device_name"].(string)
+		model, _ := ce.Params["product_name"].(string)
+		if model == "" {
+			model, _ = ce.Params["model_name"].(string)
+		}
+		if model == "" {
+			model, _ = ce.Params["model"].(string)
+		}
+		osVersion, _ := ce.Params["os_version"].(string)
+		buildVersion, _ := ce.Params["build_version"].(string)
+		topic, _ := ce.Params["topic"].(string)
+
+		device := &models.Device{
+			BaseModel:    models.BaseModel{ID: uuid.New()},
+			EnterpriseID: eid,
+			Platform:     models.PlatformMacOS,
+			DeviceID:     ce.UDID,
+			SerialNumber: serial,
+			Name:         name,
+			Model:        model,
+			OSVersion:    osVersion,
+			Status:       models.DeviceStatusPending,
+			PlatformData: models.JSONB{
+				"build_version": buildVersion,
+				"topic":         topic,
+			},
+		}
+		if err := h.service.UpdateDevice(ctx, device); err != nil {
+			// Device doesn't exist yet — create it
+			if _, err := h.service.CreateDevice(ctx, eid, ce.UDID, serial); err != nil {
+				h.logger.Error("failed to create device on authenticate", "error", err, "udid", ce.UDID)
+			}
+		}
+		h.logger.Info("device authenticated",
+			"udid", ce.UDID,
+			"serial", serial,
+			"model", model,
+			"os_version", osVersion,
+		)
+
+	case "TokenUpdate":
+		if ce.UDID == "" {
+			break
+		}
+		device, err := h.service.GetDeviceByUDID(ctx, ce.UDID)
+		if err != nil {
+			h.logger.Warn("device not found for token update", "udid", ce.UDID, "error", err)
+			break
+		}
+		device.Status = models.DeviceStatusEnrolled
+		if device.PlatformData == nil {
+			device.PlatformData = models.JSONB{}
+		}
+		if pm, ok := ce.Params["push_magic"].(string); ok {
+			device.PlatformData["push_magic"] = pm
+		}
+		device.PlatformData["has_token"] = true
+		if err := h.service.UpdateDevice(ctx, device); err != nil {
+			h.logger.Error("failed to update device on token update", "error", err, "udid", ce.UDID)
+		} else {
+			h.logger.Info("device enrolled", "udid", ce.UDID, "device_id", device.ID)
+		}
+
+	case "CheckOut":
+		if ce.UDID == "" {
+			break
+		}
+		device, err := h.service.GetDeviceByUDID(ctx, ce.UDID)
+		if err != nil {
+			h.logger.Warn("device not found for checkout", "udid", ce.UDID, "error", err)
+			break
+		}
+		device.Status = models.DeviceStatusUnenrolled
+		if err := h.service.UpdateDevice(ctx, device); err != nil {
+			h.logger.Error("failed to update device status on checkout", "error", err, "udid", ce.UDID)
+		}
+		if h.lifecycle != nil {
+			h.lifecycle.OnUnenroll(ctx, device)
+		}
+		h.logger.Info("device unenrolled via checkout", "udid", ce.UDID, "device_id", device.ID)
 	}
 
 	w.WriteHeader(http.StatusOK)

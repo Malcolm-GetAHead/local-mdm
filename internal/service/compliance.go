@@ -14,6 +14,7 @@ type ComplianceRepository interface {
 	Upsert(ctx context.Context, result *models.ComplianceResult) error
 	GetByDevice(ctx context.Context, deviceID uuid.UUID) ([]*models.ComplianceResult, error)
 	GetSummary(ctx context.Context, enterpriseID uuid.UUID) (*models.ComplianceSummary, error)
+	DeleteByDevice(ctx context.Context, deviceID uuid.UUID) error
 }
 
 type ComplianceService struct {
@@ -213,6 +214,87 @@ func (s *ComplianceService) GetDeviceCompliance(ctx context.Context, deviceID uu
 	return s.complianceRepo.GetByDevice(ctx, deviceID)
 }
 
+// EvaluateDeviceByID evaluates a device by ID, looking up its enterprise from the device record.
+func (s *ComplianceService) EvaluateDeviceByID(ctx context.Context, deviceID uuid.UUID) error {
+	device, err := s.deviceRepo.GetByID(ctx, deviceID)
+	if err != nil {
+		return fmt.Errorf("failed to get device: %w", err)
+	}
+	_, err = s.EvaluateDevice(ctx, device.ID, device.EnterpriseID)
+	return err
+}
+
+// EvaluateAllForPolicy evaluates all devices assigned to a policy.
+func (s *ComplianceService) EvaluateAllForPolicy(ctx context.Context, policyID uuid.UUID) error {
+	assignments, err := s.groupService.ListAssignmentsByPolicy(ctx, policyID)
+	if err != nil {
+		return fmt.Errorf("failed to list assignments for policy: %w", err)
+	}
+
+	for _, a := range assignments {
+		switch a.TargetType {
+		case models.TargetTypeDevice:
+			if err := s.EvaluateDeviceByID(ctx, a.TargetID); err != nil {
+				s.logger.Error("compliance eval failed for device", "error", err, "device_id", a.TargetID)
+			}
+		case models.TargetTypeGroup:
+			devices, _, err := s.groupService.ListMembers(ctx, a.TargetID, 10000, 0)
+			if err != nil {
+				s.logger.Error("failed to list group members", "error", err, "group_id", a.TargetID)
+				continue
+			}
+			for _, d := range devices {
+				if _, err := s.EvaluateDevice(ctx, d.ID, d.EnterpriseID); err != nil {
+					s.logger.Error("compliance eval failed for device", "error", err, "device_id", d.ID)
+				}
+			}
+		case models.TargetTypeEnterprise:
+			devices, _, err := s.deviceRepo.List(ctx, a.TargetID, 10000, 0)
+			if err != nil {
+				s.logger.Error("failed to list enterprise devices", "error", err, "enterprise_id", a.TargetID)
+				continue
+			}
+			for _, d := range devices {
+				if _, err := s.EvaluateDevice(ctx, d.ID, d.EnterpriseID); err != nil {
+					s.logger.Error("compliance eval failed for device", "error", err, "device_id", d.ID)
+				}
+			}
+		}
+	}
+	return nil
+}
+
 func (s *ComplianceService) GetSummary(ctx context.Context, enterpriseID uuid.UUID) (*models.ComplianceSummary, error) {
 	return s.complianceRepo.GetSummary(ctx, enterpriseID)
+}
+
+// ComplianceCleanupHook clears compliance results when a device is unenrolled, wiped, or deleted.
+type ComplianceCleanupHook struct {
+	complianceRepo ComplianceRepository
+	logger         *slog.Logger
+}
+
+// NewComplianceCleanupHook creates a new compliance cleanup hook.
+func NewComplianceCleanupHook(complianceRepo ComplianceRepository, logger *slog.Logger) *ComplianceCleanupHook {
+	return &ComplianceCleanupHook{complianceRepo: complianceRepo, logger: logger}
+}
+
+func (h *ComplianceCleanupHook) OnUnenroll(ctx context.Context, device *models.Device) error {
+	return h.cleanup(ctx, device)
+}
+
+func (h *ComplianceCleanupHook) OnWipe(ctx context.Context, device *models.Device) error {
+	return h.cleanup(ctx, device)
+}
+
+func (h *ComplianceCleanupHook) OnDelete(ctx context.Context, device *models.Device) error {
+	return h.cleanup(ctx, device)
+}
+
+func (h *ComplianceCleanupHook) cleanup(ctx context.Context, device *models.Device) error {
+	if err := h.complianceRepo.DeleteByDevice(ctx, device.ID); err != nil {
+		return fmt.Errorf("failed to clean up compliance results for device %s: %w", device.ID, err)
+	}
+	h.logger.Info("compliance results cleaned up", "device_id", device.ID)
+	return nil
 }
