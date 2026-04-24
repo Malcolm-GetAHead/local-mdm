@@ -177,11 +177,10 @@ func New(cfg *config.Config, database *db.DB, logger *slog.Logger) (*Server, err
 		caManager, err = certs.NewCAManager(cfg.Certificates.CACertPath, cfg.Certificates.CAKeyPath)
 	}
 	if err != nil {
-		logger.Warn("CA manager not available, certificate operations disabled", "error", err)
-	} else {
-		s.caManager = caManager
-		s.certService = certs.NewCertificateService(caManager, database.Writer)
+		return nil, fmt.Errorf("failed to load CA certificate: %w", err)
 	}
+	s.caManager = caManager
+	s.certService = certs.NewCertificateService(caManager, database.Writer)
 	
 	// Create certificate expiration monitor if enabled
 	if cfg.Certificates.ExpirationMonitor.Enabled {
@@ -242,6 +241,9 @@ func New(cfg *config.Config, database *db.DB, logger *slog.Logger) (*Server, err
 	// Initialize platform services
 	s.macosService = macos.NewService(s.deviceRepo)
 
+	if cfg.MacOS.NanoMDMURL == "" {
+		logger.Warn("macos.nanomdm_url not configured — macOS command delivery will fail")
+	}
 	s.nanomdmService = macos.NewNanoMDMService(
 		cfg.MacOS.NanoMDMURL, cfg.MacOS.NanoMDMAPIKey,
 		s.cmdRepo, s.deviceRepo, logger,
@@ -854,9 +856,7 @@ func (s *Server) Start() error {
 	}
 	
 	// Start command dispatcher
-	if s.cmdDispatcher != nil {
-		s.cmdDispatcher.Start()
-	}
+	s.cmdDispatcher.Start()
 
 	// Start EventBus listener
 	if s.eventBus != nil {
@@ -917,9 +917,7 @@ func (s *Server) Shutdown(ctx context.Context) error {
 	}
 
 	// Stop command dispatcher (drain queue)
-	if s.cmdDispatcher != nil {
-		s.cmdDispatcher.Stop()
-	}
+	s.cmdDispatcher.Stop()
 
 	// Stop EventBus listener
 	if s.eventBus != nil {
