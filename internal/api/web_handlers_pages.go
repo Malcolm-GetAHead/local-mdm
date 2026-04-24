@@ -300,14 +300,16 @@ func (s *Server) handleWebAuditLog(w http.ResponseWriter, r *http.Request) {
 
 	// Enrich with user emails
 	var auditLogs []map[string]interface{}
-	userCache := map[uuid.UUID]string{}
 	for _, l := range logs {
 		email := ""
 		if l.UserID != nil {
-			if cached, ok := userCache[*l.UserID]; ok {
-				email = cached
+			if u, err := s.userService.Get(ctx, *l.UserID); err == nil {
+				email = u.Email
+			} else if e, ok := l.Details["user_email"].(string); ok {
+				email = e
+			} else {
+				email = l.UserID.String()[:8] + "…"
 			}
-			// For seed data, we just show the action
 		}
 		auditLogs = append(auditLogs, map[string]interface{}{
 			"CreatedAt":    l.CreatedAt,

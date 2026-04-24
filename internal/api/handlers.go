@@ -72,6 +72,12 @@ func (s *Server) logAudit(r *http.Request, action, resourceType string, resource
 		if uid, err := uuid.Parse(user.ID); err == nil {
 			userID = uid
 		}
+		if details == nil {
+			details = make(map[string]interface{})
+		}
+		if user.Email != "" {
+			details["user_email"] = user.Email
+		}
 	}
 
 	// Propagate request ID into audit details
