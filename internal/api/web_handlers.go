@@ -96,19 +96,19 @@ func (s *Server) handleDashboardHome(w http.ResponseWriter, r *http.Request) {
 
 	// Generate SVG charts
 	platformChart := svgPieChart("Platforms", []pieSlice{
-		{"macOS", platformCounts["macos"], "#3b82f6"},
-		{"Windows", platformCounts["windows"], "#8b5cf6"},
-		{"Android", platformCounts["android"], "#10b981"},
+		{"macOS", platformCounts["macos"], "#2563eb"},
+		{"Windows", platformCounts["windows"], "#7c3aed"},
+		{"Android", platformCounts["android"], "#059669"},
 	})
 	statusChart := svgPieChart("Device Status", []pieSlice{
-		{"Enrolled", statusCounts["enrolled"], "#22c55e"},
-		{"Unenrolled", statusCounts["unenrolled"], "#9ca3af"},
-		{"Wiped", statusCounts["wiped"], "#ef4444"},
+		{"Enrolled", statusCounts["enrolled"], "#16a34a"},
+		{"Unenrolled", statusCounts["unenrolled"], "#6b7280"},
+		{"Wiped", statusCounts["wiped"], "#dc2626"},
 	})
 	complianceChart := svgPieChart("Compliance", []pieSlice{
-		{"Compliant", compliant, "#22c55e"},
-		{"Non-Compliant", nonCompliant, "#ef4444"},
-		{"Unknown", unknown, "#eab308"},
+		{"Compliant", compliant, "#16a34a"},
+		{"Non-Compliant", nonCompliant, "#dc2626"},
+		{"Unknown", unknown, "#ca8a04"},
 	})
 
 	auditLogs, _, _ := s.auditLogRepo.Search(ctx, sess.EnterpriseID, "", "", "", 5, 0)

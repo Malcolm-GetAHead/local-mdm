@@ -12,7 +12,6 @@ type pieSlice struct {
 	Color string
 }
 
-// svgPieChart generates an SVG pie chart as a template-safe HTML string.
 func svgPieChart(title string, slices []pieSlice) string {
 	total := 0
 	for _, s := range slices {
@@ -23,8 +22,8 @@ func svgPieChart(title string, slices []pieSlice) string {
 	}
 
 	var paths, legends strings.Builder
-	cx, cy, r := 60.0, 60.0, 50.0
-	startAngle := -math.Pi / 2 // start at top
+	cx, cy, r := 40.0, 48.0, 32.0
+	startAngle := -math.Pi / 2
 
 	for i, s := range slices {
 		if s.Value == 0 {
@@ -44,7 +43,6 @@ func svgPieChart(title string, slices []pieSlice) string {
 		}
 
 		if fraction >= 0.999 {
-			// Full circle — draw two arcs
 			mx := cx + r*math.Cos(startAngle+math.Pi)
 			my := cy + r*math.Sin(startAngle+math.Pi)
 			paths.WriteString(fmt.Sprintf(`<path d="M%.1f,%.1f A%.1f,%.1f 0 1,1 %.1f,%.1f A%.1f,%.1f 0 1,1 %.1f,%.1f" fill="%s"/>`,
@@ -54,14 +52,13 @@ func svgPieChart(title string, slices []pieSlice) string {
 				cx, cy, x1, y1, r, r, largeArc, x2, y2, s.Color))
 		}
 
-		// Legend
-		ly := 20 + i*18
-		legends.WriteString(fmt.Sprintf(`<rect x="130" y="%d" width="10" height="10" rx="2" fill="%s"/>`, ly, s.Color))
-		legends.WriteString(fmt.Sprintf(`<text x="145" y="%d" class="chart-label">%s (%d)</text>`, ly+9, s.Label, s.Value))
+		ly := 24 + i*16
+		legends.WriteString(fmt.Sprintf(`<circle cx="88" cy="%d" r="4" fill="%s"/>`, ly, s.Color))
+		legends.WriteString(fmt.Sprintf(`<text x="96" y="%d" class="chart-label">%s (%d)</text>`, ly+4, s.Label, s.Value))
 
 		startAngle = endAngle
 	}
 
-	return fmt.Sprintf(`<svg viewBox="0 0 220 120" class="w-full h-auto"><text x="60" y="12" text-anchor="middle" class="chart-title">%s</text>%s%s</svg>`,
+	return fmt.Sprintf(`<svg viewBox="0 0 170 90" class="w-full h-auto max-h-32"><text x="85" y="10" text-anchor="middle" class="chart-title">%s</text>%s%s</svg>`,
 		title, paths.String(), legends.String())
 }
