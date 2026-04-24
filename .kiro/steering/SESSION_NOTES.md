@@ -5,10 +5,11 @@
 
 ## Current State
 
+- **Sprint 5b**: ✅ COMPLETE, on branch `sprint-5b/eventbus` (not yet merged to main)
 - **Sprint 5f**: ✅ COMPLETE, on branch `sprint-5f/api-hardening` (not yet merged to main)
 - **Sprint 5e**: ✅ COMPLETE, merged to main
-- **Retrospective**: ✅ COMPLETE
-- **Next sprint**: **5b** (EventBus listener, compliance wiring), then 5d (dashboard)
+- **Retrospective**: Pending
+- **Next sprint**: **5d** (Web dashboard, HTMX)
 
 ---
 
@@ -61,9 +62,8 @@
 
 ## Known Issues
 
-- **EventBus Go listener not built** — triggers exist (migration 000007), no listener. Tracked in Sprint 5b.
-- **Production CheckinHandler only extracts UDID** — The enriched handler (Serial, Name, Model, OS, Build, status=enrolled on TokenUpdate) exists only in `tests/e2e/mdmb_enrollment_test.go`. Must be ported to `internal/platform/macos/webhook.go` CheckinHandler. Tracked in Sprint 5b S5b-04.
 - **NewCAManager silently generates CAs** when file path is wrong — footgun that caused the Sprint 5e cert verification bug. Tracked in Sprint 5f (S5f-01) — make generation explicit via CLI command.
+- **Android SecurityPosture parsing deferred to F-01** — handleStatusReport persists webhook Data to platform_data but doesn't parse Google SecurityPosture (requires Google API client). TODO comment in code.
 
 ## Project-Specific Knowledge
 
@@ -71,7 +71,7 @@
 - **Secrets**: `secrets/` directory for dev (gitignored), AWS SSM for production. DEP tokens encrypted with pgcrypto in the database.
 - **Idempotency-Key**: PostgreSQL-backed middleware on all POST/PUT/PATCH. 24h TTL, hourly cleanup.
 - **Prometheus metrics**: separate internal port (127.0.0.1:9090), not the public API port.
-- **EventBus**: PostgreSQL triggers in place (migration 000007). Go-side LISTEN/NOTIFY listener not yet built — **Sprint 5b** owns this. Must use dedicated connection on Writer pool DSN (read replicas don't relay NOTIFY).
+- **EventBus**: PostgreSQL triggers in place (migration 000007 + 000011). Go-side pq.Listener built in Sprint 5b. Subscribers: compliance auto-evaluation on device/policy/group events, lifecycle cleanup on unenroll/wipe/delete. Must use Writer pool DSN (read replicas don't relay NOTIFY).
 - **Compliance engine**: real evaluation logic in Sprint 5 (security: password, encryption, firewall; restrictions: camera). Returns "unknown" when device has no `platform_data`. Auto-evaluation on check-in deferred to Sprint 5b (EventBus).
 - **Policy deployment**: assignments recorded, devices pick up on next check-in. No immediate push (intentional).
 - **Sprint 2 security review docs** contain false claims. Trust the code, not the review narratives.
@@ -93,6 +93,6 @@
 | 5c | ✅ Complete | Platform integration fixes (macOS/Windows/Android), SCEP, service tests |
 | 5e | ✅ Complete | NanoMDM cert verification fix (path bug), assert.ErrorIs migration, SCEP tests, coverage improvements |
 | 5f | ✅ Complete | API hardening, explicit CA generation, test DB helper consolidation |
-| 5b | 🔲 Not Started | EventBus listener, compliance wiring, load testing |
+| 5b | ✅ Complete | EventBus listener, compliance wiring, lifecycle hooks, k6 load tests |
 | 5d | 🔲 Not Started | Web dashboard (HTMX) |
 | 6 | 🔲 Not Started | macOS Platform SSO (Java/Swift) — requires Apple Developer account |
