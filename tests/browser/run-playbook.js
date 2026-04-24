@@ -314,6 +314,28 @@ function parsePlaybook(mdPath) {
   page.on("dialog", (d) => d.accept());
   page.setDefaultTimeout(5000);
 
+  // Track browser console errors and failed resource loads
+  const consoleErrors = [];
+  page.on("console", (msg) => {
+    if (msg.type() === "error") {
+      const text = msg.text();
+      if (text.includes("favicon") || text.includes("manifest")) return;
+      // Skip generic "Failed to load resource" — we track those via response events
+      if (text.includes("Failed to load resource")) return;
+      consoleErrors.push(`[${page.url().split("/").slice(3).join("/")}] ${text}`);
+    }
+  });
+  page.on("pageerror", (err) => {
+    consoleErrors.push(`[${page.url().split("/").slice(3).join("/")}] JS Error: ${err.message}`);
+  });
+  page.on("response", (resp) => {
+    if (resp.status() >= 400) {
+      const url = resp.url();
+      if (url.includes("favicon")) return;
+      consoleErrors.push(`HTTP ${resp.status()}: ${url}`);
+    }
+  });
+
   let pass = 0, fail = 0;
   const failures = [];
 
@@ -342,5 +364,10 @@ function parsePlaybook(mdPath) {
   console.log(`\n${"─".repeat(60)}`);
   console.log(`${pass} passed, ${fail} failed`);
   if (failures.length) { console.log("\nFailures:"); failures.forEach((f) => console.log(`  ${f}`)); }
+  if (consoleErrors.length) {
+    console.log(`\nBrowser console errors (${consoleErrors.length}):`);
+    consoleErrors.forEach((e) => console.log(`  ⚠️  ${e}`));
+    fail += consoleErrors.length;
+  }
   process.exit(fail > 0 ? 1 : 0);
 })();
