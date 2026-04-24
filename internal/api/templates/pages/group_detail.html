@@ -13,8 +13,7 @@
 <div class="card overflow-hidden p-0" id="member-list">
     <div class="px-6 py-3 border-b border-gray-200 flex items-center justify-between">
         <h3 class="text-sm font-semibold">Members</h3>
-        <input type="search" placeholder="Filter devices..." class="rounded-lg border border-gray-300 px-3 py-1.5 text-sm w-48"
-               oninput="filterRows(this.value)">
+        <input type="search" id="member-filter" placeholder="Filter devices..." class="rounded-lg border border-gray-300 px-3 py-1.5 text-sm w-48">
     </div>
     <table class="w-full">
         <thead>
@@ -50,12 +49,21 @@
     </table>
 </div>
 
-<script>
-function filterRows(q) {
-    q = q.toLowerCase();
-    document.querySelectorAll('[data-device-name]').forEach(function(row) {
-        row.style.display = row.getAttribute('data-device-name').toLowerCase().includes(q) ? '' : 'none';
+<script nonce="{{.CSPNonce}}">
+(function() {
+    var filter = document.getElementById('member-filter');
+    if (!filter) return;
+    var timer;
+    filter.addEventListener('keydown', function(e) { if (e.key === 'Enter') e.preventDefault(); });
+    filter.addEventListener('input', function() {
+        clearTimeout(timer);
+        timer = setTimeout(function() {
+            var q = filter.value.toLowerCase();
+            document.querySelectorAll('[data-device-name]').forEach(function(row) {
+                row.classList.toggle('hidden', !row.getAttribute('data-device-name').toLowerCase().includes(q));
+            });
+        }, 200);
     });
-}
+})();
 </script>
 {{end}}

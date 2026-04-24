@@ -222,10 +222,7 @@ func (s *Server) handleWebCallback(w http.ResponseWriter, r *http.Request) {
 	}
 
 	userID, _ := uuid.Parse(claims.ID)
-	role := ""
-	if len(claims.Roles) > 0 {
-		role = claims.Roles[0]
-	}
+	role := pickBestRole(claims.Roles)
 
 	s.setWebSession(w, &webSession{
 		UserID:       userID,
@@ -260,4 +257,19 @@ func generateState() string {
 	b := make([]byte, 16)
 	rand.Read(b)
 	return hex.EncodeToString(b)
+}
+
+// pickBestRole returns the most privileged application role from a list.
+func pickBestRole(roles []string) string {
+	priority := map[string]int{"super_admin": 4, "admin": 3, "operator": 2, "viewer": 1}
+	best, bestP := "viewer", 0
+	for _, r := range roles {
+		if p, ok := priority[r]; ok && p > bestP {
+			best, bestP = r, p
+		}
+	}
+	if bestP == 0 {
+		return "viewer"
+	}
+	return best
 }

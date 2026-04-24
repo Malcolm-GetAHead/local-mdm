@@ -1,4 +1,5 @@
 # Local MDM — Browser Test Playbook
+<!-- Run `make seed` before testing to reset data. Tests mutate device statuses. -->
 
 ## Login
 
@@ -43,7 +44,8 @@
 - [ ] Verify table row appears with text "Surface"
 
 ### Device Detail
-- [ ] Visit `/dashboard/devices/d0000000-0000-0000-0000-000000000018` — page contains "Exec Surface"
+- [ ] Navigate to "Devices"
+- [ ] Click "View" on "Alice MacBook Pro"
 - [ ] Verify "Serial Number" is visible
 - [ ] Verify "OS Version" is visible
 - [ ] Verify "Actions" is visible
@@ -67,6 +69,14 @@
 - [ ] Verify "WiFi" is visible
 - [ ] Verify "VPN" is visible
 - [ ] Fill: Name=`Test Policy`, Description=`Automated test`
+
+### Filter Policy Settings
+- [ ] Fill: Search=`firewall`
+- [ ] Wait 0.5s
+- [ ] Verify "Require Firewall" is visible
+- [ ] Verify "Disable Camera" is not visible
+
+### Submit Policy
 - [ ] Click "Create Policy"
 - [ ] Verify redirected to `/dashboard/policies` — page contains "Test Policy"
 

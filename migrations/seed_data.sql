@@ -46,7 +46,7 @@ INSERT INTO devices (id, enterprise_id, platform, device_id, serial_number, name
   ('d0000000-0000-0000-0000-000000000024', '00000000-0000-0000-0000-000000000001', 'android', 'and-005', 'R58NQRST5678', 'Lost Android', 'Samsung Galaxy S23', '13', 'wiped', NOW() - interval '14 days', '{}'),
   ('d0000000-0000-0000-0000-000000000025', '00000000-0000-0000-0000-000000000001', 'android', 'and-006', 'PIXEL5678UVWX', 'Exec Phone', 'Google Pixel 8 Pro', '14', 'enrolled', NOW() - interval '10 minutes', '{"security_patch": "2024-03-05"}'),
   ('d0000000-0000-0000-0000-000000000026', '00000000-0000-0000-0000-000000000001', 'android', 'and-007', 'R58NYZAB9012', 'Shared Tablet', 'Samsung Galaxy Tab A9', '13', 'enrolled', NOW() - interval '2 days', '{}')
-ON CONFLICT (enterprise_id, platform, device_id) DO NOTHING;
+ON CONFLICT (enterprise_id, platform, device_id) DO UPDATE SET status = EXCLUDED.status, name = EXCLUDED.name;
 
 -- Policies (6 enterprise policies + 2 templates)
 INSERT INTO policies (id, enterprise_id, name, description, platform, policy_type, policy_config, is_active, is_template) VALUES

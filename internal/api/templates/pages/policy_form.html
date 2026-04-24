@@ -38,8 +38,7 @@
     <div class="card">
         <div class="flex items-center justify-between mb-4">
             <h2 class="text-lg font-semibold">Policy Settings</h2>
-            <input type="search" placeholder="Filter settings..." class="rounded-lg border border-gray-300 px-3 py-1.5 text-sm w-64"
-                   oninput="filterSettings(this.value)">
+            <input type="search" id="settings-filter" placeholder="Filter settings..." class="rounded-lg border border-gray-300 px-3 py-1.5 text-sm w-64">
         </div>
         {{if .Error}}<div class="mb-4 p-3 bg-red-50 text-red-700 rounded-lg text-sm">{{.Error}}</div>{{end}}
 
@@ -54,16 +53,26 @@
     </div>
 </form>
 
-<script>
+<script nonce="{{.CSPNonce}}">
+(function() {
+    var filter = document.getElementById('settings-filter');
+    if (!filter) return;
+    var timer;
+    filter.addEventListener('keydown', function(e) { if (e.key === 'Enter') e.preventDefault(); });
+    filter.addEventListener('input', function() {
+        clearTimeout(timer);
+        timer = setTimeout(function() { filterSettings(filter.value); }, 200);
+    });
+})();
 function filterSettings(q) {
     q = q.toLowerCase();
     document.querySelectorAll('[data-setting]').forEach(function(el) {
         var text = el.getAttribute('data-setting').toLowerCase();
-        el.style.display = text.includes(q) ? '' : 'none';
+        el.classList.toggle('hidden', !text.includes(q));
     });
     document.querySelectorAll('[data-category]').forEach(function(cat) {
-        var visible = cat.querySelectorAll('[data-setting]:not([style*="display: none"])').length;
-        cat.style.display = visible > 0 ? '' : 'none';
+        var visible = cat.querySelectorAll('[data-setting]:not(.hidden)').length;
+        cat.classList.toggle('hidden', visible === 0);
     });
 }
 </script>
