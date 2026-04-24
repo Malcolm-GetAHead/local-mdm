@@ -16,7 +16,7 @@ COPY --from=builder /localmdm-cli /app/localmdm-cli
 COPY --from=builder /go/bin/migrate /usr/local/bin/migrate
 COPY configs/ /app/configs/
 COPY migrations/ /app/migrations/
-COPY internal/api/certs/ /app/certs/
+RUN /app/localmdm-cli certs init --cert /app/certs/ca.crt --key /app/certs/ca.key
 WORKDIR /app
 EXPOSE 8080 9090
 ENTRYPOINT ["/app/localmdm"]

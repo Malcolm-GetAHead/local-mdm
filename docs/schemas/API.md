@@ -140,6 +140,15 @@ GET /version
 }
 ```
 
+#### API Documentation
+
+```http
+GET /docs
+GET /docs/openapi.yaml
+```
+
+Swagger UI and OpenAPI spec. No authentication required.
+
 ---
 
 ## Enterprises
