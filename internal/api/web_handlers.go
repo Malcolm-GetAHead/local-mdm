@@ -24,6 +24,9 @@ func (s *Server) renderPage(w http.ResponseWriter, r *http.Request, name string,
 	if sess != nil {
 		data["UserRole"] = sess.Role
 	}
+	if nonce, ok := r.Context().Value(cspNonceKey).(string); ok {
+		data["CSPNonce"] = nonce
+	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	if err := tmpl.ExecuteTemplate(w, "base", data); err != nil {
 		s.logger.Error("Template render error", "template", name, "error", err)

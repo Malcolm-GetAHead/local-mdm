@@ -2,6 +2,8 @@ package api
 
 import (
 	"context"
+	crypto_rand "crypto/rand"
+	base64Std "encoding/base64"
 	"encoding/json"
 	"fmt"
 	"html/template"
@@ -1045,6 +1047,13 @@ func (s *Server) refreshGaugeMetrics() {
 type contextKey string
 
 const requestIDKey contextKey = "request_id"
+const cspNonceKey contextKey = "csp_nonce"
+
+func generateCSPNonce() string {
+	b := make([]byte, 16)
+	crypto_rand.Read(b)
+	return base64Std.StdEncoding.EncodeToString(b)
+}
 
 func requestIDMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -1204,7 +1213,10 @@ func securityHeadersMiddleware(next http.Handler) http.Handler {
 		if strings.HasPrefix(r.URL.Path, "/docs") {
 			w.Header().Set("Content-Security-Policy", "default-src 'self' https://unpkg.com; script-src 'self' 'unsafe-inline' https://unpkg.com; style-src 'self' 'unsafe-inline' https://unpkg.com")
 		} else if strings.HasPrefix(r.URL.Path, "/dashboard") || strings.HasPrefix(r.URL.Path, "/static") {
-			w.Header().Set("Content-Security-Policy", "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self'")
+			// Generate nonce for HTMX inline styles
+			nonce := generateCSPNonce()
+			r = r.WithContext(context.WithValue(r.Context(), cspNonceKey, nonce))
+			w.Header().Set("Content-Security-Policy", fmt.Sprintf("default-src 'self'; script-src 'self'; style-src 'self' 'nonce-%s'; connect-src 'self'", nonce))
 		} else {
 			w.Header().Set("Content-Security-Policy", "default-src 'self'")
 		}

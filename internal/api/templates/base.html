@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{block "title" .}}Local MDM{{end}}</title>
     <link rel="stylesheet" href="/static/css/output.css">
+    <meta name="htmx-config" content='{"inlineStyleNonce":"{{.CSPNonce}}"}'>
     <script src="/static/js/htmx.min.js"></script>
 </head>
 <body class="bg-gray-50 text-gray-900 min-h-screen" hx-boost="true">
