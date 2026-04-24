@@ -71,8 +71,17 @@ func settingsByCategory(platform string) []settingGroup {
 }
 
 func settingMatchesPlatform(s policySetting, platform string) bool {
+	if platform == "" || platform == "all" {
+		// Cross-platform: only show settings that apply to all platforms
+		for _, p := range s.Platforms {
+			if p == "all" {
+				return true
+			}
+		}
+		return false
+	}
 	for _, p := range s.Platforms {
-		if p == "all" || p == platform || platform == "" || platform == "all" {
+		if p == "all" || p == platform {
 			return true
 		}
 	}
