@@ -1064,7 +1064,7 @@ const cspNonceKey contextKey = "csp_nonce"
 func generateCSPNonce() string {
 	b := make([]byte, 16)
 	crypto_rand.Read(b)
-	return base64Std.StdEncoding.EncodeToString(b)
+	return base64Std.RawURLEncoding.EncodeToString(b)
 }
 
 func requestIDMiddleware(next http.Handler) http.Handler {
