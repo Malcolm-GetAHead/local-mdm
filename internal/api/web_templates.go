@@ -128,7 +128,13 @@ func (s *Server) loadTemplates() error {
 		partialContent += string(b) + "\n"
 	}
 
-	// Load each page template = base + partials + page
+	// Parse base + partials as the root template
+	baseTmpl, err := template.New("base").Funcs(templateFuncs).Parse(string(base) + "\n" + partialContent)
+	if err != nil {
+		return fmt.Errorf("parse base template: %w", err)
+	}
+
+	// Load each page by cloning base and parsing the page on top
 	pages, err := fs.Glob(templateFS, "templates/pages/*.html")
 	if err != nil {
 		return fmt.Errorf("glob pages: %w", err)
@@ -141,11 +147,15 @@ func (s *Server) loadTemplates() error {
 			return fmt.Errorf("read page %s: %w", page, err)
 		}
 
-		combined := string(base) + "\n" + partialContent + "\n" + string(pageContent)
 		name := strings.TrimPrefix(page, "templates/pages/")
 		name = strings.TrimSuffix(name, ".html")
 
-		tmpl, err := template.New(name).Funcs(templateFuncs).Parse(combined)
+		clone, err := baseTmpl.Clone()
+		if err != nil {
+			return fmt.Errorf("clone base for %s: %w", name, err)
+		}
+
+		tmpl, err := clone.Parse(string(pageContent))
 		if err != nil {
 			return fmt.Errorf("parse template %s: %w", name, err)
 		}

@@ -25,7 +25,7 @@ func (s *Server) renderPage(w http.ResponseWriter, r *http.Request, name string,
 		data["UserRole"] = sess.Role
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	if err := tmpl.Execute(w, data); err != nil {
+	if err := tmpl.ExecuteTemplate(w, "base", data); err != nil {
 		s.logger.Error("Template render error", "template", name, "error", err)
 	}
 }
