@@ -74,3 +74,12 @@
 - [ ] Fill: action=`policy`
 - [ ] Wait 0.5s
 - [ ] Verify "policy.create" is visible
+
+## Groups
+
+### List Groups
+- [ ] Navigate to "Groups"
+- [ ] Verify table header row is visible
+- [ ] Verify "Engineering" is visible
+- [ ] Verify "Sales" is visible
+- [ ] Verify "Executives" is visible
