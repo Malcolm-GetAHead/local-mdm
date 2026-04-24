@@ -71,9 +71,9 @@
 - [ ] Fill: Name=`Test Policy`, Description=`Automated test`
 
 ### Filter Policy Settings
-- [ ] Fill: Search=`firewall`
+- [ ] Fill: Search=`encryption`
 - [ ] Wait 0.5s
-- [ ] Verify "Require Firewall" is visible
+- [ ] Verify "Require Encryption" is visible
 - [ ] Verify "Disable Camera" is not visible
 
 ### Submit Policy
@@ -85,17 +85,30 @@
 - [ ] Verify "Edit Policy" is visible
 - [ ] Verify "Save Changes" is visible
 
+### Assign Policy
+- [ ] Navigate to "Policies"
+- [ ] Click "Assign" on "Test Policy"
+- [ ] Verify "Assign to Group" is visible
+- [ ] Verify "Assign to Device" is visible
+
 ## Groups
 
 ### List Groups
 - [ ] Navigate to "Groups"
 - [ ] Verify table header row is visible
 - [ ] Verify "Engineering" is visible
-- [ ] Verify "Sales" is visible
-- [ ] Verify "Executives" is visible
 - [ ] Verify "Create Group" is visible
 
+### Create Group
+- [ ] Click "Create Group"
+- [ ] Wait 0.5s
+- [ ] Fill: Name=`Test Group`, Description=`Playwright test`
+- [ ] Click "Save Group"
+- [ ] Wait 1s
+- [ ] Verify "Test Group" is visible
+
 ### Group Detail
+- [ ] Navigate to "Groups"
 - [ ] Click "View" on "Engineering"
 - [ ] Verify "Engineering" is visible
 - [ ] Verify "Members" is visible

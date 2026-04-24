@@ -2,7 +2,7 @@
 {{define "page_title"}}Groups{{end}}
 {{define "content"}}
 <div class="mb-6 flex justify-end">
-    <button onclick="document.getElementById('create-group-form').classList.toggle('hidden')" class="btn-primary">Create Group</button>
+    <button id="toggle-create-form" class="btn-primary">Create Group</button>
 </div>
 
 <div id="create-group-form" class="card mb-6 hidden">
@@ -16,9 +16,10 @@
             <label class="block text-sm font-medium text-gray-700 mb-1">Description</label>
             <input type="text" name="description" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm">
         </div>
-        <button type="submit" class="btn-primary">Create</button>
+        <button type="submit" class="btn-primary">Save Group</button>
     </form>
 </div>
+
 <div class="card overflow-hidden p-0">
     <table class="w-full">
         <thead>
@@ -35,8 +36,11 @@
                 <td class="px-6 py-4 text-sm font-medium">{{.Name}}</td>
                 <td class="px-6 py-4 text-sm text-gray-600">{{.Description}}</td>
                 <td class="px-6 py-4"><span class="badge badge-gray">{{.MemberCount}}</span></td>
-                <td class="px-6 py-4 text-sm">
+                <td class="px-6 py-4 text-sm flex gap-2">
                     <a href="/dashboard/groups/{{.ID}}" class="text-blue-600 hover:text-blue-800">View</a>
+                    <button hx-post="/dashboard/groups/{{.ID}}/delete" hx-confirm="Delete group '{{.Name}}'? Members will be removed from the group."
+                            hx-target="closest tr" hx-swap="outerHTML"
+                            class="text-red-600 hover:text-red-800">Delete</button>
                 </td>
             </tr>
             {{else}}
@@ -45,4 +49,10 @@
         </tbody>
     </table>
 </div>
+
+<script nonce="{{.CSPNonce}}">
+document.getElementById('toggle-create-form').addEventListener('click', function() {
+    document.getElementById('create-group-form').classList.toggle('hidden');
+});
+</script>
 {{end}}

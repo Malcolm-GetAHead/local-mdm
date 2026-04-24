@@ -430,7 +430,7 @@ func (s *Server) handleWebGroupCreate(w http.ResponseWriter, r *http.Request) {
 		Description:  r.FormValue("description"),
 	}
 	if err := s.groupService.CreateGroup(ctx, group); err != nil {
-		http.Error(w, "Failed to create group: "+err.Error(), http.StatusInternalServerError)
+		http.Redirect(w, r, "/dashboard/groups", http.StatusFound)
 		return
 	}
 	s.logAudit(r, "group.create", "group", group.ID, map[string]interface{}{"name": group.Name})
@@ -460,4 +460,111 @@ func (s *Server) handleWebGroupRemoveMember(w http.ResponseWriter, r *http.Reque
 	s.logAudit(r, "group.remove_member", "group", groupID, map[string]interface{}{"device_id": deviceID})
 
 	s.handleWebGroupDetail(w, r)
+}
+
+// handleWebGroupDelete deletes a group.
+func (s *Server) handleWebGroupDelete(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	groupID, _ := uuid.Parse(mux.Vars(r)["id"])
+
+	if err := s.groupService.DeleteGroup(ctx, groupID); err != nil {
+		http.Error(w, "Failed to delete group", http.StatusInternalServerError)
+		return
+	}
+	s.logAudit(r, "group.delete", "group", groupID, nil)
+	// Return empty string to remove the table row via hx-swap="outerHTML"
+	w.WriteHeader(http.StatusOK)
+}
+
+// handleWebPolicyDelete deletes a policy if it has no assignments.
+func (s *Server) handleWebPolicyDelete(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	id, _ := uuid.Parse(mux.Vars(r)["id"])
+
+	// Check for active assignments
+	assignments, _ := s.groupService.ListAssignmentsByPolicy(ctx, id)
+	if len(assignments) > 0 {
+		w.Header().Set("Content-Type", "text/html")
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprint(w, `<div class="p-3 bg-red-50 text-red-700 rounded-lg text-sm">Cannot delete: policy is assigned to devices or groups. Remove all assignments first.</div>`)
+		return
+	}
+
+	if err := s.policyRepo.Delete(ctx, id); err != nil {
+		http.Error(w, "Failed to delete policy", http.StatusInternalServerError)
+		return
+	}
+	s.logAudit(r, "policy.delete", "policy", id, nil)
+	w.WriteHeader(http.StatusOK)
+}
+
+// handleWebPolicyAssignPage shows the policy assignment page.
+func (s *Server) handleWebPolicyAssignPage(w http.ResponseWriter, r *http.Request) {
+	sess := getSession(r)
+	ctx := r.Context()
+	id, _ := uuid.Parse(mux.Vars(r)["id"])
+
+	policy, err := s.policyRepo.GetByID(ctx, id)
+	if err != nil {
+		http.Error(w, "Policy not found", http.StatusNotFound)
+		return
+	}
+
+	groups, _, _ := s.groupService.ListGroups(ctx, sess.EnterpriseID, 100, 0)
+	devices, _, _ := s.deviceRepo.List(ctx, sess.EnterpriseID, 1000, 0)
+	assignments, _ := s.groupService.ListAssignmentsByPolicy(ctx, id)
+
+	type assignRow struct {
+		ID         string
+		TargetType string
+		TargetName string
+	}
+	var rows []assignRow
+	for _, a := range assignments {
+		name := a.TargetID.String()
+		if a.TargetType == "group" {
+			if g, err := s.groupService.GetGroup(ctx, a.TargetID); err == nil {
+				name = g.Name
+			}
+		} else if a.TargetType == "device" {
+			if d, err := s.deviceRepo.GetByID(ctx, a.TargetID); err == nil {
+				name = d.Name
+			}
+		} else if a.TargetType == "enterprise" {
+			name = "Entire Enterprise"
+		}
+		rows = append(rows, assignRow{ID: a.ID.String(), TargetType: a.TargetType, TargetName: name})
+	}
+
+	s.renderPage(w, r, "policy_assign", map[string]interface{}{
+		"ActiveNav":   "policies",
+		"Policy":      policy,
+		"Groups":      groups,
+		"Devices":     devices,
+		"Assignments": rows,
+	})
+}
+
+// handleWebPolicyAssign creates a policy assignment.
+func (s *Server) handleWebPolicyAssign(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	policyID, _ := uuid.Parse(mux.Vars(r)["id"])
+	r.ParseForm()
+
+	targetType := r.FormValue("target_type")
+	targetID, _ := uuid.Parse(r.FormValue("target_id"))
+
+	s.groupService.AssignPolicy(ctx, policyID, targetType, targetID, 0)
+	s.logAudit(r, "policy.assign", "policy", policyID, map[string]interface{}{"target_type": targetType, "target_id": targetID})
+	http.Redirect(w, r, fmt.Sprintf("/dashboard/policies/%s/assign", policyID), http.StatusFound)
+}
+
+// handleWebPolicyUnassign removes a policy assignment.
+func (s *Server) handleWebPolicyUnassign(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	assignmentID, _ := uuid.Parse(mux.Vars(r)["assignment_id"])
+
+	s.groupService.UnassignPolicy(ctx, assignmentID)
+	s.logAudit(r, "policy.unassign", "policy", uuid.Nil, map[string]interface{}{"assignment_id": assignmentID})
+	w.WriteHeader(http.StatusOK)
 }

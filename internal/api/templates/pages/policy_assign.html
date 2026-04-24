@@ -1,0 +1,64 @@
+{{define "title"}}Assign Policy — Local MDM{{end}}
+{{define "page_title"}}Assign Policy{{end}}
+{{define "content"}}
+<div class="mb-6">
+    <a href="/dashboard/policies" class="text-sm text-blue-600 hover:text-blue-800">← Back to Policies</a>
+</div>
+
+<div class="card mb-6">
+    <h2 class="text-lg font-semibold">{{.Policy.Name}}</h2>
+    <p class="text-sm text-gray-600">{{.Policy.Description}}</p>
+</div>
+
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <div class="card">
+        <h3 class="text-sm font-semibold mb-4">Assign to Group</h3>
+        <form method="POST" action="/dashboard/policies/{{.Policy.ID}}/assign" class="space-y-3">
+            <input type="hidden" name="target_type" value="group">
+            <select name="target_id" required class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm">
+                <option value="">Select a group...</option>
+                {{range .Groups}}
+                <option value="{{.ID}}">{{.Name}}</option>
+                {{end}}
+            </select>
+            <button type="submit" class="btn-primary">Assign to Group</button>
+        </form>
+    </div>
+
+    <div class="card">
+        <h3 class="text-sm font-semibold mb-4">Assign to Device</h3>
+        <form method="POST" action="/dashboard/policies/{{.Policy.ID}}/assign" class="space-y-3">
+            <input type="hidden" name="target_type" value="device">
+            <select name="target_id" required class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm">
+                <option value="">Select a device...</option>
+                {{range .Devices}}
+                <option value="{{.ID}}">{{.Name}} ({{.Platform}})</option>
+                {{end}}
+            </select>
+            <button type="submit" class="btn-primary">Assign to Device</button>
+        </form>
+    </div>
+</div>
+
+{{if .Assignments}}
+<div class="card mt-6 overflow-hidden p-0">
+    <h3 class="px-6 py-3 text-sm font-semibold border-b border-gray-200">Current Assignments</h3>
+    <table class="w-full">
+        <thead><tr class="table-header"><th class="px-6 py-3">Target</th><th class="px-6 py-3">Type</th><th class="px-6 py-3"></th></tr></thead>
+        <tbody class="divide-y divide-gray-200">
+            {{range .Assignments}}
+            <tr>
+                <td class="px-6 py-3 text-sm">{{.TargetName}}</td>
+                <td class="px-6 py-3"><span class="badge badge-gray capitalize">{{.TargetType}}</span></td>
+                <td class="px-6 py-3 text-sm">
+                    <button hx-post="/dashboard/policies/{{$.Policy.ID}}/unassign/{{.ID}}" hx-confirm="Remove this assignment?"
+                            hx-target="closest tr" hx-swap="outerHTML"
+                            class="text-red-600 hover:text-red-800">Remove</button>
+                </td>
+            </tr>
+            {{end}}
+        </tbody>
+    </table>
+</div>
+{{end}}
+{{end}}
