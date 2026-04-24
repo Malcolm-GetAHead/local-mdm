@@ -8,7 +8,7 @@
 - **Sprint 5b**: ✅ COMPLETE, on branch `sprint-5b/eventbus` (not yet merged to main)
 - **Sprint 5f**: ✅ COMPLETE, on branch `sprint-5f/api-hardening` (not yet merged to main)
 - **Sprint 5e**: ✅ COMPLETE, merged to main
-- **Retrospective**: Pending
+- **Retrospective**: Pending (Sprint 5b)
 - **Next sprint**: **5d** (Web dashboard, HTMX)
 
 ---
@@ -62,8 +62,11 @@
 
 ## Known Issues
 
-- **NewCAManager silently generates CAs** when file path is wrong — footgun that caused the Sprint 5e cert verification bug. Tracked in Sprint 5f (S5f-01) — make generation explicit via CLI command.
 - **Android SecurityPosture parsing deferred to F-01** — handleStatusReport persists webhook Data to platform_data but doesn't parse Google SecurityPosture (requires Google API client). TODO comment in code.
+- **CA manager failure is now fatal** (Sprint 5b) — server won't start if CA cert/key can't be loaded. All test configs must include valid Certificates config.
+- **pq.Listener spawns uncontrollable reconnect goroutine** — EventBus.Start() does a pre-flight sql.Open+Ping before creating the listener to avoid hangs. If you see EventBus connection issues, check the DSN has `connect_timeout`.
+- **F-07 expanded significantly in Sprint 5b** — 12 new features added (iOS, kiosk, lost mode, selective wipe, OS updates, inventory, zero-touch, alerting, self-service, app store, conditional access sync, SCIM). Review before planning next sprints.
+- **Recovery key escrow tracked in F-03** — gap analysis with 7 specific items (migration, repo, profile payloads, response parsing, API endpoint). Depends on F-01.
 
 ## Project-Specific Knowledge
 
