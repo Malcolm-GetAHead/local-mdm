@@ -341,6 +341,15 @@ function parsePlaybook(mdPath) {
 
   for (const section of sections) {
     if (SECTION_FILTER && !section.name.toLowerCase().includes(SECTION_FILTER.toLowerCase())) continue;
+
+    // Resize viewport if section name contains a pixel width like "Mobile (375px)"
+    const vpMatch = section.name.match(/\((\d+)px\)/);
+    if (vpMatch) {
+      await page.setViewportSize({ width: parseInt(vpMatch[1]), height: 812 });
+    } else {
+      await page.setViewportSize({ width: 1280, height: 800 });
+    }
+
     console.log(`\n## ${section.name}`);
     for (const sub of section.subs) {
       if (sub.name) console.log(`\n### ${sub.name}`);

@@ -122,6 +122,16 @@
 - [ ] Wait 1s
 - [ ] Verify "policy.create" is visible
 
+## Mobile (375px)
+
+### Hamburger Menu
+- [ ] Visit `/dashboard/` — page contains "Total Devices"
+- [ ] Click "Toggle menu"
+- [ ] Wait 0.5s
+- [ ] Navigate to "Devices"
+- [ ] Wait 0.5s
+- [ ] Verify table header row is visible
+
 ## Logout
 
 ### Keycloak Logout
