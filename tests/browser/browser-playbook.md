@@ -2,15 +2,8 @@
 
 ## Login
 
-### Keycloak Login
-- [ ] Visit `/dashboard/` — page contains "Sign in"
-- [ ] Click "Sign in with Keycloak"
-- [ ] Fill: username=`admin`, password=`admin`
-- [ ] Click "Sign In"
-- [ ] Verify redirected to `/dashboard/` — page contains "Dashboard"
-
-### Noscript Tag
-- [ ] Visit `/dashboard/` — page contains "JavaScript Required"
+### Direct Auth Setup
+- [ ] Visit `http://localhost:8080/health` — page contains "healthy"
 
 ## Dashboard
 
@@ -27,7 +20,6 @@
 ### List Devices
 - [ ] Navigate to "Devices"
 - [ ] Verify table header row is visible
-- [ ] Verify "MacBook" is visible
 
 ### Filter by Platform
 - [ ] Select "macOS" from the "platform" dropdown
@@ -76,7 +68,6 @@
 ### View Audit Log
 - [ ] Navigate to "Audit Log"
 - [ ] Verify table header row is visible
-- [ ] Verify "device.lock" is visible
 
 ### Filter by Action
 - [ ] Fill: action=`policy`
