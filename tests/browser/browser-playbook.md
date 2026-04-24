@@ -2,8 +2,12 @@
 
 ## Login
 
-### Direct Auth Setup
-- [ ] Visit `http://localhost:8080/health` — page contains "healthy"
+### Keycloak Login
+- [ ] Visit `/dashboard/` — page contains "Sign in"
+- [ ] Fill: username=`admin`, password=`admin123`
+- [ ] Click "Sign In"
+- [ ] Wait 1s
+- [ ] Verify "Total Devices" is visible
 
 ## Dashboard
 
@@ -83,3 +87,10 @@
 - [ ] Verify "Engineering" is visible
 - [ ] Verify "Sales" is visible
 - [ ] Verify "Executives" is visible
+
+## Logout
+
+### Keycloak Logout
+- [ ] Click "Logout"
+- [ ] Wait 1s
+- [ ] Verify "log out" is visible

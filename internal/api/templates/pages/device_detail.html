@@ -54,12 +54,12 @@
             <h2 class="text-lg font-semibold mb-4">Actions</h2>
             {{if eq .Device.Status "enrolled"}}
             <div class="space-y-3">
-                {{if or (eq .UserRole "admin") (eq .UserRole "operator")}}
+                {{if or (eq .UserRole "admin") (eq .UserRole "operator") (eq .UserRole "super_admin")}}
                 <button hx-post="/dashboard/devices/{{.Device.ID}}/lock" hx-target="#device-actions" hx-swap="outerHTML"
                         hx-confirm="Lock this device? The user will be signed out."
                         class="btn-primary w-full">Lock Device</button>
                 {{end}}
-                {{if eq .UserRole "admin"}}
+                {{if or (eq .UserRole "admin") (eq .UserRole "super_admin")}}
                 <button hx-post="/dashboard/devices/{{.Device.ID}}/wipe" hx-target="#device-actions" hx-swap="outerHTML"
                         hx-confirm="WIPE this device? All data will be erased. This cannot be undone."
                         class="btn-danger w-full">Wipe Device</button>

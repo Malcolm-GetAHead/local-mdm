@@ -310,26 +310,6 @@ function parsePlaybook(mdPath) {
 
   const browser = await playwright[BROWSER].launch({ headless: !HEADED });
   const context = await browser.newContext();
-
-  // Inject session cookie to bypass Keycloak login
-  // Matches the webSession struct in web_session.go
-  const session = JSON.stringify({
-    uid: "b0000000-0000-0000-0000-000000000001",
-    email: "admin@acme.test",
-    role: "admin",
-    eid: "00000000-0000-0000-0000-000000000001",
-    exp: new Date(Date.now() + 8 * 3600 * 1000).toISOString(),
-  });
-  const sessionHex = Buffer.from(session).toString("hex");
-  await context.addCookies([{
-    name: "lmdm_session",
-    value: sessionHex,
-    domain: "localhost",
-    path: "/",
-    httpOnly: true,
-    sameSite: "Lax",
-  }]);
-
   const page = await context.newPage();
   page.on("dialog", (d) => d.accept());
   page.setDefaultTimeout(5000);

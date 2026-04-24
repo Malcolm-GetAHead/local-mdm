@@ -12,7 +12,7 @@
             <option value="android" {{if eq .Filter.Platform "android"}}selected{{end}}>Android</option>
         </select>
     </div>
-    {{if or (eq .UserRole "admin") (eq .UserRole "operator")}}
+    {{if or (eq .UserRole "admin") (eq .UserRole "operator") (eq .UserRole "super_admin")}}
     <a href="/dashboard/policies/new" class="btn-primary">Create Policy</a>
     {{end}}
 </div>
