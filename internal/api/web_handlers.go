@@ -67,8 +67,10 @@ func (s *Server) handleDashboardHome(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var platList []map[string]interface{}
-	for p, c := range platformCounts {
-		platList = append(platList, map[string]interface{}{"Platform": p, "Count": c})
+	for _, p := range []string{"android", "macos", "windows"} {
+		if c, ok := platformCounts[p]; ok {
+			platList = append(platList, map[string]interface{}{"Platform": p, "Count": c})
+		}
 	}
 
 	policies, _, _ := s.policyRepo.List(ctx, sess.EnterpriseID, 1000, 0)
