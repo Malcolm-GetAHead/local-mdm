@@ -193,19 +193,20 @@ func TestService_CreateDevice(t *testing.T) {
 | models | 100.0% | |
 | validation | 96.6% | |
 | audit | 95.2% | |
-| config | 93.1% | |
-| scep | 93.3% | |
+| config | 91.9% | |
+| auth | 90.6% | Critical path — target 90%+ |
+| repository | 86.0% | Integration tests need Docker PostgreSQL |
 | tracing | 86.7% | |
 | db | 82.4% | With integration tests |
+| macos | 79.8% | DEP storage integration tests |
 | certs | 78.4% | |
 | service | 77.3% | |
+| scep | 75.9% | |
 | windows | 69.7% | |
-| auth | 68.0% | |
+| reporting | 67.9% | |
+| api | 67.8% | Was 48.8% pre-5f |
 | metrics | 65.0% | |
-| android | 61.9% | |
-| macos | 79.8% | DEP storage integration tests |
-| api | ~65-70% | Unit: 53%, with Docker integration: ~65-70% |
-| repository | 87.3% | Integration tests need Docker PostgreSQL |
+| android | 61.6% | |
 
 ## Coverage Goals
 

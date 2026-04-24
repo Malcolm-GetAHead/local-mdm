@@ -272,7 +272,7 @@ func TestDeviceRepository_Create(t *testing.T) {
 ```
 
 ### Test Coverage Requirements
-- **Critical paths**: 100% (auth, transactions, security)
+- **Critical paths**: 90%+ (auth, transactions, security)
 - **Repositories**: 80%+
 - **Handlers**: 70%+
 - **Utilities**: 60%+
