@@ -1,0 +1,61 @@
+{{define "title"}}Policies — Local MDM{{end}}
+{{define "page_title"}}Policies{{end}}
+{{define "content"}}
+<div class="mb-6 flex flex-col md:flex-row gap-4 items-start md:items-center justify-between">
+    <div class="flex gap-2">
+        <select name="platform" hx-get="/dashboard/policies" hx-target="#policy-table" hx-include="[name='policy_type']"
+                class="rounded-lg border border-gray-300 px-3 py-2 text-sm">
+            <option value="">All Platforms</option>
+            <option value="all" {{if eq .Filter.Platform "all"}}selected{{end}}>Cross-Platform</option>
+            <option value="macos" {{if eq .Filter.Platform "macos"}}selected{{end}}>macOS</option>
+            <option value="windows" {{if eq .Filter.Platform "windows"}}selected{{end}}>Windows</option>
+            <option value="android" {{if eq .Filter.Platform "android"}}selected{{end}}>Android</option>
+        </select>
+    </div>
+    {{if or (eq .UserRole "admin") (eq .UserRole "operator")}}
+    <a href="/dashboard/policies/new" class="btn-primary">Create Policy</a>
+    {{end}}
+</div>
+
+<div id="policy-table">
+    {{template "policy_table_body" .}}
+</div>
+{{end}}
+
+{{define "policy_table_body"}}
+<div class="card overflow-hidden p-0">
+    <table class="w-full">
+        <thead>
+            <tr class="table-header">
+                <th class="px-6 py-3">Name</th>
+                <th class="px-6 py-3">Platform</th>
+                <th class="px-6 py-3">Type</th>
+                <th class="px-6 py-3">Status</th>
+                <th class="px-6 py-3"></th>
+            </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-200">
+            {{range .Policies}}
+            <tr class="hover:bg-gray-50">
+                <td class="px-6 py-4">
+                    <div class="text-sm font-medium">{{.Name}}</div>
+                    {{if .Description}}<div class="text-xs text-gray-500">{{.Description}}</div>{{end}}
+                </td>
+                <td class="px-6 py-4 text-sm capitalize">{{.Platform}}</td>
+                <td class="px-6 py-4 text-sm capitalize">{{.PolicyType}}</td>
+                <td class="px-6 py-4">
+                    {{if .IsTemplate}}<span class="badge badge-blue">Template</span>
+                    {{else if .IsActive}}<span class="badge badge-green">Active</span>
+                    {{else}}<span class="badge badge-gray">Inactive</span>{{end}}
+                </td>
+                <td class="px-6 py-4 text-sm">
+                    <a href="/dashboard/policies/{{.ID}}" class="text-blue-600 hover:text-blue-800">Edit</a>
+                </td>
+            </tr>
+            {{else}}
+            <tr><td colspan="5" class="px-6 py-8 text-center text-gray-500">No policies found</td></tr>
+            {{end}}
+        </tbody>
+    </table>
+</div>
+{{end}}

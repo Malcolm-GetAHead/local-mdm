@@ -1,0 +1,79 @@
+{{define "title"}}Devices — Local MDM{{end}}
+{{define "page_title"}}Devices{{end}}
+{{define "content"}}
+<div class="mb-6 flex flex-col md:flex-row gap-4 items-start md:items-center justify-between">
+    <div class="flex gap-2">
+        <select name="platform" hx-get="/dashboard/devices" hx-target="#device-table" hx-include="[name='q'],[name='status']"
+                class="rounded-lg border border-gray-300 px-3 py-2 text-sm">
+            <option value="">All Platforms</option>
+            <option value="macos" {{if eq .Filter.Platform "macos"}}selected{{end}}>macOS</option>
+            <option value="windows" {{if eq .Filter.Platform "windows"}}selected{{end}}>Windows</option>
+            <option value="android" {{if eq .Filter.Platform "android"}}selected{{end}}>Android</option>
+        </select>
+        <select name="status" hx-get="/dashboard/devices" hx-target="#device-table" hx-include="[name='q'],[name='platform']"
+                class="rounded-lg border border-gray-300 px-3 py-2 text-sm">
+            <option value="">All Statuses</option>
+            <option value="enrolled" {{if eq .Filter.Status "enrolled"}}selected{{end}}>Enrolled</option>
+            <option value="unenrolled" {{if eq .Filter.Status "unenrolled"}}selected{{end}}>Unenrolled</option>
+            <option value="wiped" {{if eq .Filter.Status "wiped"}}selected{{end}}>Wiped</option>
+        </select>
+    </div>
+    <input type="search" name="q" value="{{.Filter.Query}}" placeholder="Search devices..."
+           hx-get="/dashboard/devices" hx-trigger="keyup changed delay:300ms" hx-target="#device-table" hx-include="[name='platform'],[name='status']"
+           class="rounded-lg border border-gray-300 px-4 py-2 text-sm w-full md:w-64">
+</div>
+
+<div id="device-table">
+    {{template "device_table_body" .}}
+</div>
+{{end}}
+
+{{define "device_table_body"}}
+<div class="card overflow-hidden p-0">
+    <table class="w-full">
+        <thead>
+            <tr class="table-header">
+                <th class="px-6 py-3">Name</th>
+                <th class="px-6 py-3">Platform</th>
+                <th class="px-6 py-3">Model</th>
+                <th class="px-6 py-3">OS</th>
+                <th class="px-6 py-3">Status</th>
+                <th class="px-6 py-3">Last Seen</th>
+                <th class="px-6 py-3"></th>
+            </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-200">
+            {{range .Devices}}
+            <tr class="hover:bg-gray-50">
+                <td class="px-6 py-4 text-sm font-medium">{{.Name}}</td>
+                <td class="px-6 py-4 text-sm capitalize">{{.Platform}}</td>
+                <td class="px-6 py-4 text-sm text-gray-600">{{.Model}}</td>
+                <td class="px-6 py-4 text-sm text-gray-600">{{.OSVersion}}</td>
+                <td class="px-6 py-4">
+                    {{if eq .Status "enrolled"}}<span class="badge badge-green">Enrolled</span>
+                    {{else if eq .Status "unenrolled"}}<span class="badge badge-gray">Unenrolled</span>
+                    {{else if eq .Status "wiped"}}<span class="badge badge-red">Wiped</span>
+                    {{else}}<span class="badge badge-yellow">{{.Status}}</span>{{end}}
+                </td>
+                <td class="px-6 py-4 text-sm text-gray-500">{{if .LastSeen}}{{timeAgo .LastSeen}}{{else}}Never{{end}}</td>
+                <td class="px-6 py-4 text-sm">
+                    <a href="/dashboard/devices/{{.ID}}" class="text-blue-600 hover:text-blue-800">View</a>
+                </td>
+            </tr>
+            {{else}}
+            <tr><td colspan="7" class="px-6 py-8 text-center text-gray-500">No devices found</td></tr>
+            {{end}}
+        </tbody>
+    </table>
+</div>
+{{if gt .TotalPages 1}}
+<div class="mt-4 flex justify-center gap-2">
+    {{range pages .TotalPages .CurrentPage}}
+    <a href="/dashboard/devices?page={{.}}&platform={{$.Filter.Platform}}&status={{$.Filter.Status}}&q={{$.Filter.Query}}"
+       hx-get="/dashboard/devices?page={{.}}&platform={{$.Filter.Platform}}&status={{$.Filter.Status}}&q={{$.Filter.Query}}"
+       hx-target="#device-table"
+       class="px-3 py-1 rounded text-sm {{if eq . $.CurrentPage}}bg-blue-600 text-white{{else}}bg-white border border-gray-300 hover:bg-gray-50{{end}}">{{.}}</a>
+    {{end}}
+</div>
+{{end}}
+{{end}}

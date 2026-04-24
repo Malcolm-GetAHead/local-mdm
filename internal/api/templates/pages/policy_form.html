@@ -1,0 +1,57 @@
+{{define "title"}}{{if .Policy.ID}}Edit Policy{{else}}Create Policy{{end}} — Local MDM{{end}}
+{{define "page_title"}}{{if .Policy.ID}}Edit Policy{{else}}Create Policy{{end}}{{end}}
+{{define "content"}}
+<div class="mb-6">
+    <a href="/dashboard/policies" class="text-sm text-blue-600 hover:text-blue-800">← Back to Policies</a>
+</div>
+
+<div class="card max-w-2xl">
+    <form method="POST" action="/dashboard/policies{{if .Policy.ID}}/{{.Policy.ID}}{{end}}">
+        <div class="space-y-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Name</label>
+                <input type="text" name="name" value="{{.Policy.Name}}" required
+                       class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                <input type="text" name="description" value="{{.Policy.Description}}"
+                       class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Platform</label>
+                    <select name="platform" required class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm">
+                        <option value="all" {{if eq .Policy.Platform "all"}}selected{{end}}>Cross-Platform</option>
+                        <option value="macos" {{if eq .Policy.Platform "macos"}}selected{{end}}>macOS</option>
+                        <option value="windows" {{if eq .Policy.Platform "windows"}}selected{{end}}>Windows</option>
+                        <option value="android" {{if eq .Policy.Platform "android"}}selected{{end}}>Android</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Type</label>
+                    <select name="policy_type" required class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm">
+                        <option value="security" {{if eq .Policy.PolicyType "security"}}selected{{end}}>Security</option>
+                        <option value="restrictions" {{if eq .Policy.PolicyType "restrictions"}}selected{{end}}>Restrictions</option>
+                        <option value="wifi" {{if eq .Policy.PolicyType "wifi"}}selected{{end}}>WiFi</option>
+                        <option value="vpn" {{if eq .Policy.PolicyType "vpn"}}selected{{end}}>VPN</option>
+                    </select>
+                </div>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Configuration (JSON)</label>
+                <textarea name="policy_config" rows="6" required
+                          class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500">{{jsonPretty .Policy.PolicyConfig}}</textarea>
+            </div>
+            <div class="flex items-center gap-2">
+                <input type="checkbox" name="is_active" id="is_active" {{if .Policy.IsActive}}checked{{end}} class="rounded">
+                <label for="is_active" class="text-sm">Active</label>
+            </div>
+        </div>
+        <div class="mt-6 flex gap-3">
+            <button type="submit" class="btn-primary">{{if .Policy.ID}}Save Changes{{else}}Create Policy{{end}}</button>
+            <a href="/dashboard/policies" class="btn-secondary">Cancel</a>
+        </div>
+    </form>
+</div>
+{{end}}

@@ -134,3 +134,8 @@ func (s *GroupService) GetEffectivePolicies(ctx context.Context, deviceID, enter
 
 	return s.assignmentRepo.GetEffectivePolicies(ctx, deviceID, groupIDs, enterpriseID)
 }
+
+// GetDeviceGroups returns all groups a device belongs to.
+func (s *GroupService) GetDeviceGroups(ctx context.Context, deviceID uuid.UUID) ([]*models.DeviceGroup, error) {
+	return s.groupRepo.ListGroupsForDevice(ctx, deviceID)
+}

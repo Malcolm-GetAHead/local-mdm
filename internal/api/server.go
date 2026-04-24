@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"html/template"
 	"log/slog"
 	"net/http"
 	"strings"
@@ -81,6 +82,7 @@ type Server struct {
 	complianceService *service.ComplianceService
 	eventBus          *service.EventBus
 	cleanupCancel     context.CancelFunc
+	webTemplates      map[string]*template.Template
 }
 
 // New creates a new API server
@@ -358,6 +360,11 @@ func New(cfg *config.Config, database *db.DB, logger *slog.Logger) (*Server, err
 
 	// Wire API token auth into middleware
 	s.authMiddleware.SetTokenValidator(&tokenAuthAdapter{tokenService: s.tokenService})
+
+	// Load dashboard templates
+	if err := s.loadTemplates(); err != nil {
+		return nil, fmt.Errorf("failed to load dashboard templates: %w", err)
+	}
 
 	s.setupRoutes()
 	s.setupMiddleware()
@@ -790,6 +797,36 @@ func (s *Server) setupRoutes() {
 	)).Methods("POST")
 	api.HandleFunc("/android/enrollment-token/{token_id}/qr", s.handleAndroidEnrollmentQR).Methods("GET")
 	api.Handle("/android/webhook", enrollLimiter(http.HandlerFunc(s.handleAndroidWebhook))).Methods("POST")
+
+	// ── Dashboard (Sprint 5d) ────────────────────────────────────────────
+	// Static files
+	s.router.PathPrefix("/static/").Handler(http.StripPrefix("/static/", http.FileServer(http.Dir("web/static"))))
+
+	// Root redirect
+	s.router.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "/dashboard/", http.StatusFound)
+	}).Methods("GET")
+
+	// Auth routes (no session required)
+	s.router.HandleFunc("/dashboard/login", s.handleWebLogin).Methods("GET")
+	s.router.HandleFunc("/dashboard/callback", s.handleWebCallback).Methods("GET")
+	s.router.HandleFunc("/dashboard/logout", s.handleWebLogout).Methods("GET")
+
+	// Protected dashboard routes
+	dash := s.router.PathPrefix("/dashboard").Subrouter()
+	dash.Use(s.webAuthMiddleware)
+	dash.HandleFunc("/", s.handleDashboardHome).Methods("GET")
+	dash.HandleFunc("/devices", s.handleWebDeviceList).Methods("GET")
+	dash.HandleFunc("/devices/{id}", s.handleWebDeviceDetail).Methods("GET")
+	dash.HandleFunc("/devices/{id}/lock", s.handleWebDeviceLock).Methods("POST")
+	dash.HandleFunc("/devices/{id}/wipe", s.handleWebDeviceWipe).Methods("POST")
+	dash.HandleFunc("/policies", s.handleWebPolicyList).Methods("GET")
+	dash.HandleFunc("/policies/new", s.handleWebPolicyNew).Methods("GET")
+	dash.HandleFunc("/policies", s.handleWebPolicyCreate).Methods("POST")
+	dash.HandleFunc("/policies/{id}", s.handleWebPolicyEdit).Methods("GET")
+	dash.HandleFunc("/policies/{id}", s.handleWebPolicyUpdate).Methods("POST")
+	dash.HandleFunc("/compliance", s.handleWebCompliance).Methods("GET")
+	dash.HandleFunc("/audit", s.handleWebAuditLog).Methods("GET")
 }
 
 // setupMiddleware configures middleware

@@ -139,6 +139,18 @@ load-test: ## Run k6 load tests against local stack
 browser-test: ## Run Playwright browser tests against local stack
 	@cd tests/browser && npm install --silent 2>/dev/null && node run-playbook.js
 
+seed: ## Seed database with development data
+	@echo "Seeding database..."
+	@PGPASSWORD=postgres psql -h localhost -U postgres -d localmdm -f migrations/seed_data.sql
+	@echo "✓ Seed data loaded"
+
+css: ## Compile Tailwind CSS (requires ./tailwindcss binary)
+	@./tailwindcss --input web/static/css/input.css --output web/static/css/output.css --minify
+	@echo "✓ CSS compiled"
+
+css-watch: ## Watch and recompile Tailwind CSS on changes
+	@./tailwindcss --input web/static/css/input.css --output web/static/css/output.css --watch
+
 deps: ## Download dependencies
 	@echo "Downloading dependencies..."
 	@go mod download

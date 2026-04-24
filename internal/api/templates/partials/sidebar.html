@@ -1,0 +1,15 @@
+{{define "sidebar"}}
+<nav class="fixed inset-y-0 left-0 w-64 bg-white border-r border-gray-200 hidden md:block z-40">
+    <div class="p-4 border-b border-gray-200">
+        <span class="font-bold text-lg">Local MDM</span>
+    </div>
+    <ul class="p-2 space-y-1">
+        <li><a href="/dashboard/" class="block px-4 py-2 rounded hover:bg-gray-100 {{if eq .ActiveNav "dashboard"}}bg-gray-100 font-medium{{end}}">Dashboard</a></li>
+        <li><a href="/dashboard/devices" class="block px-4 py-2 rounded hover:bg-gray-100 {{if eq .ActiveNav "devices"}}bg-gray-100 font-medium{{end}}">Devices</a></li>
+        <li><a href="/dashboard/policies" class="block px-4 py-2 rounded hover:bg-gray-100 {{if eq .ActiveNav "policies"}}bg-gray-100 font-medium{{end}}">Policies</a></li>
+        <li><a href="/dashboard/groups" class="block px-4 py-2 rounded hover:bg-gray-100 {{if eq .ActiveNav "groups"}}bg-gray-100 font-medium{{end}}">Groups</a></li>
+        <li><a href="/dashboard/compliance" class="block px-4 py-2 rounded hover:bg-gray-100 {{if eq .ActiveNav "compliance"}}bg-gray-100 font-medium{{end}}">Compliance</a></li>
+        <li><a href="/dashboard/audit" class="block px-4 py-2 rounded hover:bg-gray-100 {{if eq .ActiveNav "audit"}}bg-gray-100 font-medium{{end}}">Audit Log</a></li>
+    </ul>
+</nav>
+{{end}}

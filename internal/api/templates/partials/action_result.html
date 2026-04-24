@@ -1,0 +1,8 @@
+{{define "action_result"}}
+<div class="card" id="device-actions">
+    <h2 class="text-lg font-semibold mb-4">Actions</h2>
+    <div class="p-3 rounded-lg text-sm {{if .Success}}bg-green-50 text-green-700{{else}}bg-red-50 text-red-700{{end}}">
+        {{.Message}}
+    </div>
+</div>
+{{end}}

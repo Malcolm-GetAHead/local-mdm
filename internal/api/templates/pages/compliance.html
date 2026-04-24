@@ -1,0 +1,51 @@
+{{define "title"}}Compliance — Local MDM{{end}}
+{{define "page_title"}}Compliance{{end}}
+{{define "content"}}
+<div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+    <div class="card">
+        <div class="text-sm text-gray-500">Compliant</div>
+        <div class="text-3xl font-bold mt-1 text-green-600">{{.Stats.Compliant}}</div>
+    </div>
+    <div class="card">
+        <div class="text-sm text-gray-500">Non-Compliant</div>
+        <div class="text-3xl font-bold mt-1 text-red-600">{{.Stats.NonCompliant}}</div>
+    </div>
+    <div class="card">
+        <div class="text-sm text-gray-500">Unknown</div>
+        <div class="text-3xl font-bold mt-1 text-yellow-600">{{.Stats.Unknown}}</div>
+    </div>
+</div>
+
+<div class="card overflow-hidden p-0">
+    <table class="w-full">
+        <thead>
+            <tr class="table-header">
+                <th class="px-6 py-3">Device</th>
+                <th class="px-6 py-3">Policy</th>
+                <th class="px-6 py-3">Status</th>
+                <th class="px-6 py-3">Violations</th>
+                <th class="px-6 py-3">Evaluated</th>
+            </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-200">
+            {{range .Results}}
+            <tr class="hover:bg-gray-50">
+                <td class="px-6 py-4 text-sm font-medium">
+                    <a href="/dashboard/devices/{{.DeviceID}}" class="text-blue-600 hover:text-blue-800">{{.DeviceName}}</a>
+                </td>
+                <td class="px-6 py-4 text-sm">{{.PolicyName}}</td>
+                <td class="px-6 py-4">
+                    {{if eq .Status "compliant"}}<span class="badge badge-green">Compliant</span>
+                    {{else if eq .Status "non_compliant"}}<span class="badge badge-red">Non-Compliant</span>
+                    {{else}}<span class="badge badge-yellow">Unknown</span>{{end}}
+                </td>
+                <td class="px-6 py-4 text-sm text-gray-600">{{if .Violations}}{{join .Violations ", "}}{{else}}—{{end}}</td>
+                <td class="px-6 py-4 text-sm text-gray-500">{{timeAgo .EvaluatedAt}}</td>
+            </tr>
+            {{else}}
+            <tr><td colspan="5" class="px-6 py-8 text-center text-gray-500">No compliance results</td></tr>
+            {{end}}
+        </tbody>
+    </table>
+</div>
+{{end}}

@@ -1,0 +1,50 @@
+{{define "title"}}Dashboard — Local MDM{{end}}
+{{define "page_title"}}Dashboard{{end}}
+{{define "content"}}
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+    <div class="card">
+        <div class="text-sm text-gray-500">Total Devices</div>
+        <div class="text-3xl font-bold mt-1">{{.Stats.TotalDevices}}</div>
+    </div>
+    <div class="card">
+        <div class="text-sm text-gray-500">Enrolled</div>
+        <div class="text-3xl font-bold mt-1 text-green-600">{{.Stats.Enrolled}}</div>
+    </div>
+    <div class="card">
+        <div class="text-sm text-gray-500">Non-Compliant</div>
+        <div class="text-3xl font-bold mt-1 text-red-600">{{.Stats.NonCompliant}}</div>
+    </div>
+    <div class="card">
+        <div class="text-sm text-gray-500">Active Policies</div>
+        <div class="text-3xl font-bold mt-1">{{.Stats.ActivePolicies}}</div>
+    </div>
+</div>
+
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <div class="card">
+        <h2 class="text-lg font-semibold mb-4">Devices by Platform</h2>
+        <div class="space-y-3">
+            {{range .Stats.PlatformCounts}}
+            <div class="flex items-center justify-between">
+                <span class="text-sm font-medium capitalize">{{.Platform}}</span>
+                <span class="badge badge-gray">{{.Count}}</span>
+            </div>
+            {{end}}
+        </div>
+    </div>
+    <div class="card">
+        <h2 class="text-lg font-semibold mb-4">Recent Activity</h2>
+        <div class="space-y-3">
+            {{range .RecentAudit}}
+            <div class="flex items-center justify-between text-sm">
+                <span>{{.Action}}</span>
+                <span class="text-gray-500">{{timeAgo .CreatedAt}}</span>
+            </div>
+            {{end}}
+            {{if not .RecentAudit}}
+            <p class="text-sm text-gray-500">No recent activity</p>
+            {{end}}
+        </div>
+    </div>
+</div>
+{{end}}
