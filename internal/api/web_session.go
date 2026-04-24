@@ -2,7 +2,9 @@ package api
 
 import (
 	"context"
+	"crypto/hmac"
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -18,7 +20,6 @@ const (
 )
 
 // webSession stores the authenticated user session in a cookie.
-// For simplicity, we store a signed JSON payload. In production, use gorilla/sessions with encryption.
 type webSession struct {
 	UserID       uuid.UUID `json:"uid"`
 	Email        string    `json:"email"`
@@ -27,12 +28,51 @@ type webSession struct {
 	ExpiresAt    time.Time `json:"exp"`
 }
 
+// sessionKey returns the HMAC signing key derived from the Keycloak client secret.
+func (s *Server) sessionKey() []byte {
+	return []byte(s.config.Keycloak.ClientSecret)
+}
+
+func (s *Server) signSession(data []byte) string {
+	mac := hmac.New(sha256.New, s.sessionKey())
+	mac.Write(data)
+	sig := hex.EncodeToString(mac.Sum(nil))
+	return hex.EncodeToString(data) + "." + sig
+}
+
+func (s *Server) verifySession(cookie string) ([]byte, error) {
+	parts := splitOnce(cookie, '.')
+	if len(parts) != 2 {
+		return nil, fmt.Errorf("invalid session format")
+	}
+	data, err := hex.DecodeString(parts[0])
+	if err != nil {
+		return nil, fmt.Errorf("invalid session encoding")
+	}
+	mac := hmac.New(sha256.New, s.sessionKey())
+	mac.Write(data)
+	expected := hex.EncodeToString(mac.Sum(nil))
+	if !hmac.Equal([]byte(parts[1]), []byte(expected)) {
+		return nil, fmt.Errorf("invalid session signature")
+	}
+	return data, nil
+}
+
+func splitOnce(s string, sep byte) []string {
+	for i := range s {
+		if s[i] == sep {
+			return []string{s[:i], s[i+1:]}
+		}
+	}
+	return []string{s}
+}
+
 func (s *Server) setWebSession(w http.ResponseWriter, sess *webSession) {
 	sess.ExpiresAt = time.Now().Add(sessionMaxAge)
 	data, _ := json.Marshal(sess)
 	http.SetCookie(w, &http.Cookie{
 		Name:     sessionCookieName,
-		Value:    hex.EncodeToString(data),
+		Value:    s.signSession(data),
 		Path:     "/",
 		HttpOnly: true,
 		SameSite: http.SameSiteLaxMode,
@@ -45,7 +85,7 @@ func (s *Server) getWebSession(r *http.Request) *webSession {
 	if err != nil {
 		return nil
 	}
-	data, err := hex.DecodeString(cookie.Value)
+	data, err := s.verifySession(cookie.Value)
 	if err != nil {
 		return nil
 	}
