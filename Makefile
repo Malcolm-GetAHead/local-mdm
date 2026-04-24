@@ -136,6 +136,9 @@ load-test: ## Run k6 load tests against local stack
 	@./tests/load/run_and_record.sh tests/load/enrollment_burst.js
 	@echo "Results appended to tests/load/results_history.csv"
 
+browser-test: ## Run Playwright browser tests against local stack
+	@cd tests/browser && npm install --silent 2>/dev/null && node run-playbook.js
+
 deps: ## Download dependencies
 	@echo "Downloading dependencies..."
 	@go mod download
