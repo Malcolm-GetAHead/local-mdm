@@ -476,15 +476,9 @@ When making significant decisions, document them here:
 - **Push after each commit** — work must survive session loss. Per-task commits are recovery checkpoints.
 - Don't squash or amend unless asked. Owner wants to see progression.
 
-## Session Closeout Process
+## Session Closeout
 
-After every sprint, the owner expects:
-
-1. **Retrospective (backward look)**: scope audit, dead code scan, stale docs, test coverage. Check ALL sprint OVERVIEWs (not just current). First action: update current sprint's OVERVIEW (mark complete, check DoD boxes).
-2. **Forward look**: next 2 sprints + future roadmap alignment. Flag broken dependencies, stale assumptions, gaps.
-3. **Doc & test audit**: Owner will prompt with: *"How's our test coverage and documentation? Are they still accurate? Are we skipping any integration tests we shouldn't? Please review documentation holistically for the project to ensure we haven't missed anything outside of the sprint."* — Do a thorough audit. Check API.md matches routes, DATABASE.md matches migrations, ARCHITECTURE.md matches packages. Don't just say "looks good."
-4. **Clean up**: delete merged branches, remove dead code, push to origin.
-5. **Owner asks for feedback**: At session end, the owner asks what they could do differently. Be honest and specific — they act on it. Also offer to update session notes before context is cleared.
+The owner drives a structured retrospective after each sprint. Wait for explicit prompts — don't run the retro autonomously. The retro typically covers: backward look (scope, dead code, stale docs), forward look (next sprints, roadmap alignment), doc/test audit, cleanup, and feedback.
 
 ## Production Architecture (decided Sprint 4b session)
 
