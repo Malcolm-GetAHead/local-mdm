@@ -114,6 +114,20 @@ func TestComplianceRepository(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, 0, summary.Total)
 	})
+
+	t.Run("delete by device removes all results", func(t *testing.T) {
+		err := repo.DeleteByDevice(ctx, device.ID)
+		require.NoError(t, err)
+
+		results, err := repo.GetByDevice(ctx, device.ID)
+		require.NoError(t, err)
+		assert.Empty(t, results)
+	})
+
+	t.Run("delete by device with no results is no-op", func(t *testing.T) {
+		err := repo.DeleteByDevice(ctx, uuid.New())
+		require.NoError(t, err)
+	})
 }
 
 func TestComplianceRepository_Constructor(t *testing.T) {

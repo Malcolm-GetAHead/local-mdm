@@ -129,6 +129,16 @@ Unified Control Plane (Go)
 - Consolidated 10+ duplicate `setupTestDB` functions into shared `testutil.ConnectDB(t)` / `testutil.ConnectRawDB(t)`
 - See [Sprint 5f Plan](docs/planning/sprints/sprint-5f-api-hardening/OVERVIEW.md)
 
+✅ **Sprint 5b Complete** - 7/7 tasks done (EventBus & Compliance Wiring)
+- EventBus LISTEN/NOTIFY listener using `pq.Listener` with pre-flight check, reconnect, keepalive
+- Migration 000011: 4 new triggers (platform_data, unassign, group membership) + `extra` context in payload
+- Compliance auto-evaluation wired to EventBus (7 subscribers: device/policy/group events)
+- macOS CheckinHandler enriched (serial, name, model, OS, build, enrolled status on TokenUpdate)
+- Windows security CSP URIs (BitLocker, firewall, password), Android webhook data persistence
+- ComplianceCleanupHook on device unenroll/wipe/delete, Android lifecycle hooks wired
+- k6 load testing framework with results history tracking (`results_history.csv`)
+- See [Sprint 5b Plan](docs/planning/sprints/sprint-5b-eventbus/OVERVIEW.md)
+
 ## Documentation
 
 ### Getting Started

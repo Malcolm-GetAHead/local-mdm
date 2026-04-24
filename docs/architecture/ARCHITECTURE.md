@@ -221,6 +221,25 @@ Generates enterprise-scoped reports:
 - **Compliance summary**: aggregated compliance state across all devices and policies
 - **Enrollment report**: enrollment trends over a configurable time window (default 30 days), broken down by platform and day
 
+### EventBus (Sprint 5b)
+
+PostgreSQL `LISTEN`/`NOTIFY` event bus using `pq.Listener`. Decouples event producers (database triggers) from consumers (compliance evaluation, lifecycle cleanup).
+
+**Architecture**:
+- 10 PostgreSQL triggers fire on a single `mdm_events` channel with JSON payload `{type, id, device_id, table, op, extra}`
+- `pq.Listener` maintains a dedicated connection (not from the pool) with automatic reconnection and 30s keepalive pings
+- Pre-flight `sql.Open` + `Ping` before creating the listener prevents uncontrollable reconnect goroutines on bad DSN
+- Subscribers registered at startup, dispatched by event type. Fire-and-forget — errors logged, don't stop the bus
+- Multi-instance safe: PostgreSQL NOTIFY is fan-out (all server instances receive all events). Subscribers must be idempotent.
+
+**Subscribers**:
+- `device.enrolled` / `device.info_updated` → compliance auto-evaluation
+- `policy.updated` / `policy.assigned` / `policy.unassigned` → re-evaluate affected devices
+- `group.member_added` / `group.member_removed` → re-evaluate device compliance
+- `ComplianceCleanupHook` → clear compliance results on unenroll/wipe/delete
+
+**Data flow**: Device checks in → handler updates `platform_data` → PostgreSQL trigger fires `device.info_updated` → EventBus dispatches → compliance subscriber evaluates device → results written to `compliance_results` → dashboard shows live compliance state.
+
 ## Data Flow
 
 ### Device Enrollment Flow
