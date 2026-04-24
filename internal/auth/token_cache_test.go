@@ -109,3 +109,36 @@ func TestTokenCacheErrors(t *testing.T) {
 		assert.Error(t, err)
 	})
 }
+
+func TestTokenCache_Close(t *testing.T) {
+	db := testutil.ConnectRawDB(t)
+	cache, err := NewTokenCache(db, 5*time.Minute)
+	require.NoError(t, err)
+
+	err = cache.Close()
+	assert.NoError(t, err)
+}
+
+func TestTokenCache_CleanupExpired(t *testing.T) {
+	db := testutil.ConnectRawDB(t)
+	cache, err := NewTokenCache(db, 1*time.Millisecond) // very short TTL
+	require.NoError(t, err)
+
+	ctx := context.Background()
+	token := "expire-test-" + uuid.New().String()
+	user := &AuthUser{ID: "user-cleanup", Email: "cleanup@test.com"}
+
+	err = cache.Set(ctx, token, user)
+	require.NoError(t, err)
+
+	// Wait for expiry
+	time.Sleep(10 * time.Millisecond)
+
+	deleted, err := cache.CleanupExpired(ctx)
+	require.NoError(t, err)
+	assert.True(t, deleted >= 1, "should have cleaned up at least 1 expired entry")
+
+	// Verify it's gone
+	_, err = cache.Get(ctx, token)
+	assert.Equal(t, ErrCacheMiss, err)
+}
