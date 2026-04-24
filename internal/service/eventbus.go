@@ -30,11 +30,39 @@ const (
 
 // MDMEvent is the JSON payload fired by PostgreSQL triggers.
 type MDMEvent struct {
-	Type     string     `json:"type"`
-	ID       uuid.UUID  `json:"id"`
-	DeviceID *uuid.UUID `json:"device_id"`
-	Table    string     `json:"table"`
-	Op       string     `json:"op"`
+	Type     string                 `json:"type"`
+	ID       uuid.UUID              `json:"id"`
+	DeviceID *uuid.UUID             `json:"device_id"`
+	Table    string                 `json:"table"`
+	Op       string                 `json:"op"`
+	Extra    map[string]interface{} `json:"extra,omitempty"`
+}
+
+// ExtraUUID extracts a UUID from the Extra map.
+func (e MDMEvent) ExtraUUID(key string) (uuid.UUID, bool) {
+	v, ok := e.Extra[key]
+	if !ok {
+		return uuid.Nil, false
+	}
+	s, ok := v.(string)
+	if !ok {
+		return uuid.Nil, false
+	}
+	id, err := uuid.Parse(s)
+	if err != nil {
+		return uuid.Nil, false
+	}
+	return id, true
+}
+
+// ExtraString extracts a string from the Extra map.
+func (e MDMEvent) ExtraString(key string) (string, bool) {
+	v, ok := e.Extra[key]
+	if !ok {
+		return "", false
+	}
+	s, ok := v.(string)
+	return s, ok
 }
 
 // EventHandler processes an event. Errors are logged but don't stop the bus.

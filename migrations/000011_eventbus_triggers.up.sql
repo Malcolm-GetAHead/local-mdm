@@ -1,13 +1,16 @@
 -- Sprint 5b: EventBus triggers — new triggers + fix notify_mdm_event for DELETE
+-- Includes extra context fields for policy_assignments and group_memberships
 
 -- 1. Replace notify_mdm_event to handle DELETE (use OLD instead of NEW)
---    and support tables without an id column (group_memberships uses composite PK)
+--    and support tables without an id column (group_memberships uses composite PK).
+--    Includes table-specific extra fields so subscribers can resolve affected devices.
 CREATE OR REPLACE FUNCTION notify_mdm_event() RETURNS TRIGGER AS $$
 DECLARE
     payload TEXT;
     event_type TEXT;
     entity_id UUID;
     device_id UUID;
+    extra JSONB;
     rec RECORD;
 BEGIN
     event_type := TG_ARGV[0];
@@ -19,7 +22,9 @@ BEGIN
         rec := NEW;
     END IF;
 
-    -- Determine IDs based on table
+    extra := '{}'::jsonb;
+
+    -- Determine IDs and extra context based on table
     CASE TG_TABLE_NAME
         WHEN 'devices' THEN
             entity_id := rec.id;
@@ -33,13 +38,20 @@ BEGIN
         WHEN 'policy_assignments' THEN
             entity_id := rec.id;
             device_id := NULL;
+            extra := json_build_object(
+                'policy_id', rec.policy_id,
+                'target_type', rec.target_type,
+                'target_id', rec.target_id
+            )::jsonb;
         WHEN 'compliance_results' THEN
             entity_id := rec.id;
             device_id := rec.device_id;
         WHEN 'group_memberships' THEN
-            -- No id column; use device_id as entity_id
             entity_id := rec.device_id;
             device_id := rec.device_id;
+            extra := json_build_object(
+                'group_id', rec.group_id
+            )::jsonb;
         ELSE
             entity_id := rec.id;
             device_id := NULL;
@@ -50,7 +62,8 @@ BEGIN
         'id', entity_id,
         'device_id', device_id,
         'table', TG_TABLE_NAME,
-        'op', TG_OP
+        'op', TG_OP,
+        'extra', extra
     )::text;
 
     PERFORM pg_notify('mdm_events', payload);

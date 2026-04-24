@@ -275,8 +275,6 @@ func New(cfg *config.Config, database *db.DB, logger *slog.Logger) (*Server, err
 
 	s.cmdDispatcher = newCommandDispatcher(s.cmdRepo, s.nanomdmService, logger)
 
-	// lifecycleService already created above
-
 	policyVersionRepo, err := repository.NewPolicyVersionRepository(database.Writer, database.Reader)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create policy version repository: %w", err)
@@ -314,7 +312,16 @@ func New(cfg *config.Config, database *db.DB, logger *slog.Logger) (*Server, err
 		return s.complianceService.EvaluateAllForPolicy(ctx, event.ID)
 	})
 	s.eventBus.Subscribe("policy.assigned", func(ctx context.Context, event service.MDMEvent) error {
-		logger.Info("policy assigned, compliance will evaluate on next check-in", "assignment_id", event.ID)
+		if policyID, ok := event.ExtraUUID("policy_id"); ok {
+			return s.complianceService.EvaluateAllForPolicy(ctx, policyID)
+		}
+		return nil
+	})
+	s.eventBus.Subscribe("policy.unassigned", func(ctx context.Context, event service.MDMEvent) error {
+		// Re-evaluate affected devices so stale compliance results are cleared
+		if policyID, ok := event.ExtraUUID("policy_id"); ok {
+			return s.complianceService.EvaluateAllForPolicy(ctx, policyID)
+		}
 		return nil
 	})
 	s.eventBus.Subscribe("group.member_added", func(ctx context.Context, event service.MDMEvent) error {
