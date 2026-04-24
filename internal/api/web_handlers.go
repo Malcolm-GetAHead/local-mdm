@@ -351,23 +351,67 @@ func buildComplianceRows(results []*models.ComplianceResult, s *Server) []map[st
 	var rows []map[string]interface{}
 	for _, cr := range results {
 		policyName := ""
+		var configKeys []string
 		if p, err := s.policyRepo.GetByID(ctx, cr.PolicyID); err == nil {
 			policyName = p.Name
+			for k := range p.PolicyConfig {
+				configKeys = append(configKeys, k)
+			}
 		}
-		var violations []string
+
+		// Build violation set for quick lookup
+		violationSet := map[string]bool{}
 		if v, ok := cr.Details["violations"]; ok {
 			if arr, ok := v.([]interface{}); ok {
 				for _, item := range arr {
 					if str, ok := item.(string); ok {
-						violations = append(violations, str)
+						violationSet[str] = true
 					}
 				}
 			}
 		}
-		rows = append(rows, map[string]interface{}{
-			"PolicyName": policyName, "Status": cr.Status, "EvaluatedAt": cr.EvaluatedAt,
-			"Violations": violations,
-		})
+
+		if cr.Status == "unknown" {
+			// Single row for unknown
+			rows = append(rows, map[string]interface{}{
+				"Setting": "all settings", "PolicyName": policyName,
+				"Status": "unknown", "EvaluatedAt": cr.EvaluatedAt,
+			})
+			continue
+		}
+
+		if len(configKeys) == 0 {
+			rows = append(rows, map[string]interface{}{
+				"Setting": "all settings", "PolicyName": policyName,
+				"Status": cr.Status, "EvaluatedAt": cr.EvaluatedAt,
+			})
+			continue
+		}
+
+		// One row per config key
+		for _, k := range configKeys {
+			status := "pass"
+			// Check if this key produced a violation
+			for viol := range violationSet {
+				if strings.Contains(strings.ToLower(viol), strings.ReplaceAll(k, "_", " ")) ||
+					strings.Contains(strings.ReplaceAll(strings.ToLower(viol), " ", "_"), k) {
+					status = "fail"
+					break
+				}
+			}
+			label := strings.ReplaceAll(k, "_", " ")
+			// Look up friendly label from catalog
+			for _, cs := range policySettingsCatalog {
+				if cs.Key == k {
+					label = cs.Label
+					break
+				}
+			}
+			rows = append(rows, map[string]interface{}{
+				"Setting": label, "PolicyName": policyName,
+				"Status": status, "EvaluatedAt": cr.EvaluatedAt,
+			})
+		}
 	}
 	return rows
 }

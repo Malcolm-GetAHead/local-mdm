@@ -124,24 +124,16 @@
 
 {{define "compliance_tab"}}
 <table class="w-full text-sm">
-    <thead><tr class="table-header"><th class="px-6 py-2">Policy</th><th class="px-6 py-2">Status</th><th class="px-6 py-2">Details</th><th class="px-6 py-2">Evaluated</th></tr></thead>
+    <thead><tr class="table-header"><th class="px-6 py-2">Setting</th><th class="px-6 py-2">Policy</th><th class="px-6 py-2">Status</th><th class="px-6 py-2">Evaluated</th></tr></thead>
     <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
     {{range .Compliance}}
     <tr>
-        <td class="px-6 py-2">{{.PolicyName}}</td>
+        <td class="px-6 py-2 font-medium">{{.Setting}}</td>
+        <td class="px-6 py-2 text-gray-600 dark:text-gray-400">{{.PolicyName}}</td>
         <td class="px-6 py-2">
-            {{if eq .Status "compliant"}}<span class="badge badge-green">Pass</span>
-            {{else if eq .Status "unknown"}}<span class="badge badge-yellow">Unknown</span>
-            {{else}}<span class="badge badge-red">Fail</span>{{end}}
-        </td>
-        <td class="px-6 py-2 text-gray-600 dark:text-gray-400">
-            {{if .Violations}}
-            {{range .Violations}}<span class="inline-block mr-2 text-xs text-red-600 dark:text-red-400">✗ {{.}}</span>{{end}}
-            {{else if eq .Status "compliant"}}
-            <span class="text-xs text-green-600 dark:text-green-400">All checks passed</span>
-            {{else}}
-            <span class="text-xs">—</span>
-            {{end}}
+            {{if eq .Status "pass"}}<span class="badge badge-green">Pass</span>
+            {{else if eq .Status "fail"}}<span class="badge badge-red">Fail</span>
+            {{else}}<span class="badge badge-yellow">Unknown</span>{{end}}
         </td>
         <td class="px-6 py-2 text-gray-500 dark:text-gray-400">{{timeAgo .EvaluatedAt}}</td>
     </tr>
