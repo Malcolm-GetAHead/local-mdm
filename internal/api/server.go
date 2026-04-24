@@ -1203,6 +1203,8 @@ func securityHeadersMiddleware(next http.Handler) http.Handler {
 		// Content Security Policy
 		if strings.HasPrefix(r.URL.Path, "/docs") {
 			w.Header().Set("Content-Security-Policy", "default-src 'self' https://unpkg.com; script-src 'self' 'unsafe-inline' https://unpkg.com; style-src 'self' 'unsafe-inline' https://unpkg.com")
+		} else if strings.HasPrefix(r.URL.Path, "/dashboard") || strings.HasPrefix(r.URL.Path, "/static") {
+			w.Header().Set("Content-Security-Policy", "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self'")
 		} else {
 			w.Header().Set("Content-Security-Policy", "default-src 'self'")
 		}
