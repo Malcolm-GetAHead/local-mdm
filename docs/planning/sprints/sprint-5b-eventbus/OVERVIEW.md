@@ -5,6 +5,8 @@
 **Goal**: Build the Go-side LISTEN/NOTIFY EventBus listener, wire compliance auto-evaluation into device and policy lifecycle events, fix device state parsing in check-in handlers  
 **Depends on**: Sprint 5f complete (5f changes `NewCAManager` to fail on missing files — tests that relied on auto-generation need updating first)
 
+**Test pattern**: All new integration tests must use `testutil.ConnectDB(t)` (returns `*db.DB`) or `testutil.ConnectRawDB(t)` (returns `*sql.DB`). Never create inline DB connections in test files. See `docs/TESTING.md`.
+
 ---
 
 ## Why This Sprint
@@ -49,7 +51,7 @@ All 6 triggers fire on a **single channel `mdm_events`** with JSON payload `{typ
 | S5b-04 | Device state parsing in check-in handlers | 1 day | S5b-03 |
 | S5b-05 | Register lifecycle hooks + fix Android lifecycle gap | 0.5 day | S5b-01 |
 | S5b-06 | Load testing framework (k6 scenarios) | 0.5 day | All API endpoints |
-| S5b-07 | Reporting integration test coverage (67.9% → 80%+) | 0.5 day | DB_HOST fix in 5e got it to 67.9%; add ComplianceReport, EnrollmentReport tests |
+| S5b-07 | Reporting integration test coverage (67.9% → 80%+) | 0.5 day | Use `testutil.ConnectDB(t)` / `testutil.ConnectRawDB(t)` for all new tests (consolidated in 5f) |
 
 ### S5b-01: EventBus LISTEN/NOTIFY Listener
 
