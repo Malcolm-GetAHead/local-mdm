@@ -418,6 +418,9 @@ func (s *Server) handleWebAuditLog(w http.ResponseWriter, r *http.Request) {
 		// Parse details into readable summary and map for expansion
 		summary := ""
 		detailsMap := map[string]string{}
+		if l.ResourceID != nil {
+			detailsMap["resource_id"] = l.ResourceID.String()
+		}
 		for k, v := range l.Details {
 			if k == "request_id" || k == "user_email" {
 				continue
@@ -430,6 +433,9 @@ func (s *Server) handleWebAuditLog(w http.ResponseWriter, r *http.Request) {
 		}
 		if len(summary) > 100 {
 			summary = summary[:100] + "…"
+		}
+		if summary == "" {
+			summary = "—"
 		}
 
 		auditLogs = append(auditLogs, map[string]interface{}{
@@ -736,6 +742,7 @@ func (s *Server) handleWebPolicyAssignPage(w http.ResponseWriter, r *http.Reques
 		"AvailableGroups":  availGroups,
 		"AvailableDevices": availDevices,
 		"Assignments":      rows,
+		"TotalAssignments": len(rows),
 	})
 }
 

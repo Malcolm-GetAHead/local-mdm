@@ -30,7 +30,7 @@
             <div class="space-y-2">
                 {{range .Legend}}
                 <div class="flex items-center gap-2">
-                    <span class="w-3 h-3 rounded-full shrink-0" style="background:{{.Color}}"></span>
+                    <svg width="12" height="12"><circle cx="6" cy="6" r="6" fill="{{.Color}}"/></svg>
                     <span class="text-sm text-gray-700 dark:text-gray-300">{{.Label}} ({{.Value}})</span>
                 </div>
                 {{end}}

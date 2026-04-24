@@ -28,6 +28,12 @@
 - [ ] Visit `/dashboard/devices?sort=platform&dir=asc` — page contains "Devices"
 - [ ] Verify table header row is visible
 
+### Pagination
+- [ ] Visit `/dashboard/devices` — page contains "Devices"
+- [ ] Verify "Page 1 of" is visible
+- [ ] Visit `/dashboard/devices?page=2` — page contains "Devices"
+- [ ] Verify "Page 2 of" is visible
+
 ### Filter by Platform
 - [ ] Visit `/dashboard/devices` — page contains "Devices"
 - [ ] Select "macOS" from the "platform" dropdown
