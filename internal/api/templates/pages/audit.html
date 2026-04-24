@@ -3,14 +3,14 @@
 {{define "content"}}
 <div class="mb-6 flex flex-col md:flex-row gap-4">
     <input type="search" name="action" value="{{.Filter.Action}}" placeholder="Filter by action..."
-           hx-get="/dashboard/audit" hx-trigger="keyup changed delay:300ms" hx-target="#audit-table" hx-include="[name='start_date'],[name='end_date']"
-           class="rounded-lg border border-gray-300 px-4 py-2 text-sm w-full md:w-64">
+           hx-get="/dashboard/audit" hx-trigger="keyup changed delay:500ms" hx-target="#audit-table" hx-include="[name='start_date'],[name='end_date']"
+           class="input-field w-full md:w-64">
     <input type="date" name="start_date" value="{{.Filter.StartDate}}"
            hx-get="/dashboard/audit" hx-target="#audit-table" hx-include="[name='action'],[name='end_date']"
-           class="rounded-lg border border-gray-300 px-3 py-2 text-sm">
+           class="input-field w-auto">
     <input type="date" name="end_date" value="{{.Filter.EndDate}}"
            hx-get="/dashboard/audit" hx-target="#audit-table" hx-include="[name='action'],[name='start_date']"
-           class="rounded-lg border border-gray-300 px-3 py-2 text-sm">
+           class="input-field w-auto">
 </div>
 
 <div id="audit-table">
@@ -30,19 +30,22 @@
                 <th class="px-6 py-3">Details</th>
             </tr>
         </thead>
-        <tbody class="divide-y divide-gray-200">
+        <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
             {{range .AuditLogs}}
-            <tr class="hover:bg-gray-50">
-                <td class="px-6 py-4 text-sm text-gray-500">{{formatDateTime .CreatedAt}}</td>
+            <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
+                <td class="px-6 py-4 text-sm text-gray-500 dark:text-gray-400">{{formatDateTime .CreatedAt}}</td>
                 <td class="px-6 py-4 text-sm">{{.UserEmail}}</td>
                 <td class="px-6 py-4"><span class="badge badge-gray">{{.Action}}</span></td>
                 <td class="px-6 py-4 text-sm">{{.ResourceType}}</td>
-                <td class="px-6 py-4 text-sm text-gray-600 truncate max-w-xs">{{jsonCompact .Details}}</td>
+                <td class="px-6 py-4 text-sm text-gray-600 dark:text-gray-400 max-w-xs">
+                    <span class="truncate block">{{.DetailsSummary}}</span>
+                </td>
             </tr>
             {{else}}
-            <tr><td colspan="5" class="px-6 py-8 text-center text-gray-500">No audit log entries</td></tr>
+            <tr><td colspan="5" class="px-6 py-8 text-center text-gray-500 dark:text-gray-400">No audit log entries</td></tr>
             {{end}}
         </tbody>
     </table>
 </div>
+{{template "pagination" dict "TotalPages" .TotalPages "CurrentPage" .CurrentPage "TotalItems" .TotalItems "BaseURL" "/dashboard/audit?" "QueryExtra" (printf "&action=%s&start_date=%s&end_date=%s" .Filter.Action .Filter.StartDate .Filter.EndDate) "Target" "#audit-table"}}
 {{end}}

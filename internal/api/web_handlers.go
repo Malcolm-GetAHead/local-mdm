@@ -3,6 +3,7 @@ package api
 import (
 	"html/template"
 	"net/http"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -101,7 +102,7 @@ func (s *Server) handleDashboardHome(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// handleWebDeviceList shows the device list with filtering and pagination.
+// handleWebDeviceList shows the device list with filtering, sorting, and pagination.
 func (s *Server) handleWebDeviceList(w http.ResponseWriter, r *http.Request) {
 	sess := getSession(r)
 	ctx := r.Context()
@@ -109,15 +110,23 @@ func (s *Server) handleWebDeviceList(w http.ResponseWriter, r *http.Request) {
 	platform := r.URL.Query().Get("platform")
 	status := r.URL.Query().Get("status")
 	query := strings.ToLower(r.URL.Query().Get("q"))
+	sortField := r.URL.Query().Get("sort")
+	sortDir := r.URL.Query().Get("dir")
+	if sortField == "" {
+		sortField = "name"
+	}
+	if sortDir == "" {
+		sortDir = "asc"
+	}
 	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
 	if page < 1 {
 		page = 1
 	}
-	perPage := 20
+	perPage := 50
 
-	// Fetch all devices then filter (repo doesn't support filter params)
 	allDevices, _, _ := s.deviceRepo.List(ctx, sess.EnterpriseID, 1000, 0)
 
+	// Filter
 	var filtered []*models.Device
 	for _, d := range allDevices {
 		if platform != "" && d.Platform != platform {
@@ -134,6 +143,10 @@ func (s *Server) handleWebDeviceList(w http.ResponseWriter, r *http.Request) {
 		filtered = append(filtered, d)
 	}
 
+	// Sort
+	sortDevices(filtered, sortField, sortDir)
+
+	// Paginate
 	total := len(filtered)
 	totalPages := (total + perPage - 1) / perPage
 	start := (page - 1) * perPage
@@ -150,10 +163,10 @@ func (s *Server) handleWebDeviceList(w http.ResponseWriter, r *http.Request) {
 		"Devices":     filtered[start:end],
 		"TotalPages":  totalPages,
 		"CurrentPage": page,
+		"TotalItems":  total,
 		"Filter": map[string]string{
-			"Platform": platform,
-			"Status":   status,
-			"Query":    r.URL.Query().Get("q"),
+			"Platform": platform, "Status": status, "Query": r.URL.Query().Get("q"),
+			"Sort": sortField, "Dir": sortDir,
 		},
 	}
 
@@ -281,3 +294,39 @@ func (s *Server) handleWebDeviceUnenroll(w http.ResponseWriter, r *http.Request)
 }
 
 // (end of file)
+
+func sortDevices(devices []*models.Device, field, dir string) {
+	sort.Slice(devices, func(i, j int) bool {
+		var less bool
+		switch field {
+		case "name":
+			less = strings.ToLower(devices[i].Name) < strings.ToLower(devices[j].Name)
+		case "platform":
+			less = devices[i].Platform < devices[j].Platform
+		case "model":
+			less = strings.ToLower(devices[i].Model) < strings.ToLower(devices[j].Model)
+		case "os_version":
+			less = devices[i].OSVersion < devices[j].OSVersion
+		case "status":
+			less = devices[i].Status < devices[j].Status
+		case "last_seen":
+			ti, tj := devices[i].LastSeen, devices[j].LastSeen
+			if ti == nil && tj == nil {
+				return false
+			}
+			if ti == nil {
+				return true
+			}
+			if tj == nil {
+				return false
+			}
+			less = ti.Before(*tj)
+		default:
+			less = strings.ToLower(devices[i].Name) < strings.ToLower(devices[j].Name)
+		}
+		if dir == "desc" {
+			return !less
+		}
+		return less
+	})
+}

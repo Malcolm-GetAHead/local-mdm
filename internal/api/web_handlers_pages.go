@@ -3,6 +3,7 @@ package api
 import (
 	"fmt"
 	"net/http"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -16,6 +17,14 @@ func (s *Server) handleWebPolicyList(w http.ResponseWriter, r *http.Request) {
 	sess := getSession(r)
 	ctx := r.Context()
 	platform := r.URL.Query().Get("platform")
+	sortField := r.URL.Query().Get("sort")
+	sortDir := r.URL.Query().Get("dir")
+	if sortField == "" {
+		sortField = "name"
+	}
+	if sortDir == "" {
+		sortDir = "asc"
+	}
 
 	policies, _, _ := s.policyRepo.List(ctx, sess.EnterpriseID, 1000, 0)
 
@@ -29,10 +38,19 @@ func (s *Server) handleWebPolicyList(w http.ResponseWriter, r *http.Request) {
 		policies = filtered
 	}
 
+	// Sort
+	sort.Slice(policies, func(i, j int) bool {
+		less := strings.ToLower(policies[i].Name) < strings.ToLower(policies[j].Name)
+		if sortDir == "desc" {
+			return !less
+		}
+		return less
+	})
+
 	data := map[string]interface{}{
 		"ActiveNav": "policies",
 		"Policies":  policies,
-		"Filter":    map[string]string{"Platform": platform},
+		"Filter":    map[string]string{"Platform": platform, "Sort": sortField, "Dir": sortDir},
 	}
 
 	if isHTMX(r) {
@@ -245,15 +263,39 @@ func detectPolicyType(config models.JSONB) string {
 	return best
 }
 
-// handleWebCompliance shows the compliance dashboard.
+// handleWebCompliance shows the compliance dashboard with filters and pagination.
 func (s *Server) handleWebCompliance(w http.ResponseWriter, r *http.Request) {
 	sess := getSession(r)
 	ctx := r.Context()
 
+	statusFilter := r.URL.Query().Get("status_filter")
+	query := strings.ToLower(r.URL.Query().Get("q"))
+	sortField := r.URL.Query().Get("sort")
+	sortDir := r.URL.Query().Get("dir")
+	if sortField == "" {
+		sortField = "device"
+	}
+	if sortDir == "" {
+		sortDir = "asc"
+	}
+	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
+	if page < 1 {
+		page = 1
+	}
+	perPage := 50
+
 	compRows, _ := s.reportService.ComplianceReport(ctx, sess.EnterpriseID)
 
 	compliant, nonCompliant, unknown := 0, 0, 0
-	var results []map[string]interface{}
+	type resultRow struct {
+		DeviceID    string
+		DeviceName  string
+		PolicyName  string
+		Status      string
+		Violations  []string
+		EvaluatedAt interface{}
+	}
+	var allResults []resultRow
 	for _, cr := range compRows {
 		switch cr.Status {
 		case "compliant":
@@ -264,30 +306,81 @@ func (s *Server) handleWebCompliance(w http.ResponseWriter, r *http.Request) {
 			unknown++
 		}
 
+		// Apply status filter
+		if statusFilter != "" && cr.Status != statusFilter {
+			continue
+		}
+		// Apply text filter
+		if query != "" && !strings.Contains(strings.ToLower(cr.DeviceName), query) &&
+			!strings.Contains(strings.ToLower(cr.PolicyName), query) {
+			continue
+		}
+
 		var violations []string
-		// ComplianceRow from reportService has DeviceName and PolicyName already
-		results = append(results, map[string]interface{}{
-			"DeviceID":    cr.DeviceID,
-			"DeviceName":  cr.DeviceName,
-			"PolicyName":  cr.PolicyName,
-			"Status":      cr.Status,
-			"Violations":  violations,
-			"EvaluatedAt": cr.EvaluatedAt,
+		// Parse violations from compliance_results details via DB
+		if cr.Status == "non_compliant" {
+			violations = append(violations, cr.Status)
+		}
+
+		allResults = append(allResults, resultRow{
+			DeviceID: cr.DeviceID.String(), DeviceName: cr.DeviceName,
+			PolicyName: cr.PolicyName, Status: cr.Status,
+			Violations: violations, EvaluatedAt: cr.EvaluatedAt,
 		})
 	}
 
-	s.renderPage(w, r, "compliance", map[string]interface{}{
-		"ActiveNav": "compliance",
-		"Stats": map[string]interface{}{
-			"Compliant":    compliant,
-			"NonCompliant": nonCompliant,
-			"Unknown":      unknown,
-		},
-		"Results": results,
+	// Sort
+	sort.Slice(allResults, func(i, j int) bool {
+		var less bool
+		switch sortField {
+		case "device":
+			less = strings.ToLower(allResults[i].DeviceName) < strings.ToLower(allResults[j].DeviceName)
+		case "policy":
+			less = strings.ToLower(allResults[i].PolicyName) < strings.ToLower(allResults[j].PolicyName)
+		case "status":
+			less = allResults[i].Status < allResults[j].Status
+		default:
+			less = strings.ToLower(allResults[i].DeviceName) < strings.ToLower(allResults[j].DeviceName)
+		}
+		if sortDir == "desc" {
+			return !less
+		}
+		return less
 	})
+
+	// Paginate
+	total := len(allResults)
+	totalPages := (total + perPage - 1) / perPage
+	start := (page - 1) * perPage
+	if start > total {
+		start = total
+	}
+	end := start + perPage
+	if end > total {
+		end = total
+	}
+
+	data := map[string]interface{}{
+		"ActiveNav":   "compliance",
+		"Stats":       map[string]int{"Compliant": compliant, "NonCompliant": nonCompliant, "Unknown": unknown},
+		"Results":     allResults[start:end],
+		"TotalPages":  totalPages,
+		"CurrentPage": page,
+		"TotalItems":  total,
+		"Filter": map[string]string{
+			"StatusFilter": statusFilter, "Query": r.URL.Query().Get("q"),
+			"Sort": sortField, "Dir": sortDir,
+		},
+	}
+
+	if isHTMX(r) {
+		s.renderFragment(w, s.webTemplates["compliance"], "compliance_table_body", data)
+		return
+	}
+	s.renderPage(w, r, "compliance", data)
 }
 
-// handleWebAuditLog shows the audit log with search/filter.
+// handleWebAuditLog shows the audit log with search/filter and pagination.
 func (s *Server) handleWebAuditLog(w http.ResponseWriter, r *http.Request) {
 	sess := getSession(r)
 	ctx := r.Context()
@@ -295,10 +388,15 @@ func (s *Server) handleWebAuditLog(w http.ResponseWriter, r *http.Request) {
 	action := r.URL.Query().Get("action")
 	startDate := r.URL.Query().Get("start_date")
 	endDate := r.URL.Query().Get("end_date")
+	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
+	if page < 1 {
+		page = 1
+	}
+	perPage := 50
 
-	logs, _, _ := s.auditLogRepo.Search(ctx, sess.EnterpriseID, action, startDate, endDate, 100, 0)
+	logs, total, _ := s.auditLogRepo.Search(ctx, sess.EnterpriseID, action, startDate, endDate, 1000, 0)
 
-	// Enrich with user emails
+	// Enrich with user emails and parse details
 	var auditLogs []map[string]interface{}
 	for _, l := range logs {
 		email := ""
@@ -311,22 +409,51 @@ func (s *Server) handleWebAuditLog(w http.ResponseWriter, r *http.Request) {
 				email = l.UserID.String()[:8] + "…"
 			}
 		}
+
+		// Parse details into readable summary: key: value; key: value
+		summary := ""
+		for k, v := range l.Details {
+			if k == "request_id" || k == "user_email" {
+				continue
+			}
+			if summary != "" {
+				summary += "; "
+			}
+			summary += fmt.Sprintf("%s: %v", k, v)
+		}
+		if len(summary) > 100 {
+			summary = summary[:100] + "…"
+		}
+
 		auditLogs = append(auditLogs, map[string]interface{}{
-			"CreatedAt":    l.CreatedAt,
-			"UserEmail":    email,
-			"Action":       l.Action,
-			"ResourceType": l.ResourceType,
-			"Details":      l.Details,
+			"CreatedAt":      l.CreatedAt,
+			"UserEmail":      email,
+			"Action":         l.Action,
+			"ResourceType":   l.ResourceType,
+			"DetailsSummary": summary,
 		})
 	}
 
+	_ = total
+	totalItems := len(auditLogs)
+	totalPages := (totalItems + perPage - 1) / perPage
+	start := (page - 1) * perPage
+	if start > totalItems {
+		start = totalItems
+	}
+	end := start + perPage
+	if end > totalItems {
+		end = totalItems
+	}
+
 	data := map[string]interface{}{
-		"ActiveNav": "audit",
-		"AuditLogs": auditLogs,
+		"ActiveNav":   "audit",
+		"AuditLogs":   auditLogs[start:end],
+		"TotalPages":  totalPages,
+		"CurrentPage": page,
+		"TotalItems":  totalItems,
 		"Filter": map[string]string{
-			"Action":    action,
-			"StartDate": startDate,
-			"EndDate":   endDate,
+			"Action": action, "StartDate": startDate, "EndDate": endDate,
 		},
 	}
 

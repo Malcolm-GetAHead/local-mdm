@@ -1,37 +1,56 @@
 {{define "title"}}Compliance — Local MDM{{end}}
 {{define "page_title"}}Compliance{{end}}
 {{define "content"}}
-<div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-    <div class="card">
-        <div class="text-sm text-gray-500">Compliant</div>
-        <div class="text-3xl font-bold mt-1 text-green-600">{{.Stats.Compliant}}</div>
-    </div>
-    <div class="card">
-        <div class="text-sm text-gray-500">Non-Compliant</div>
-        <div class="text-3xl font-bold mt-1 text-red-600">{{.Stats.NonCompliant}}</div>
-    </div>
-    <div class="card">
-        <div class="text-sm text-gray-500">Unknown</div>
-        <div class="text-3xl font-bold mt-1 text-yellow-600">{{.Stats.Unknown}}</div>
-    </div>
+<div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+    <a href="/dashboard/compliance?status_filter=compliant" class="card cursor-pointer hover:ring-2 hover:ring-green-500 transition-all {{if eq .Filter.StatusFilter "compliant"}}ring-2 ring-green-500{{end}}">
+        <div class="text-sm text-gray-500 dark:text-gray-400">Compliant</div>
+        <div class="text-3xl font-bold mt-1 text-green-600 dark:text-green-400">{{.Stats.Compliant}}</div>
+    </a>
+    <a href="/dashboard/compliance?status_filter=non_compliant" class="card cursor-pointer hover:ring-2 hover:ring-red-500 transition-all {{if eq .Filter.StatusFilter "non_compliant"}}ring-2 ring-red-500{{end}}">
+        <div class="text-sm text-gray-500 dark:text-gray-400">Non-Compliant</div>
+        <div class="text-3xl font-bold mt-1 text-red-600 dark:text-red-400">{{.Stats.NonCompliant}}</div>
+    </a>
+    <a href="/dashboard/compliance?status_filter=unknown" class="card cursor-pointer hover:ring-2 hover:ring-yellow-500 transition-all {{if eq .Filter.StatusFilter "unknown"}}ring-2 ring-yellow-500{{end}}">
+        <div class="text-sm text-gray-500 dark:text-gray-400">Unknown</div>
+        <div class="text-3xl font-bold mt-1 text-yellow-600 dark:text-yellow-400">{{.Stats.Unknown}}</div>
+    </a>
 </div>
 
+<div class="mb-4 flex gap-4">
+    <input type="search" name="q" value="{{.Filter.Query}}" placeholder="Search by device or policy..."
+           hx-get="/dashboard/compliance" hx-trigger="keyup changed delay:500ms" hx-target="#compliance-table"
+           hx-include="[name='status_filter'],[name='sort'],[name='dir']"
+           class="input-field w-full md:w-64">
+    <input type="hidden" name="status_filter" value="{{.Filter.StatusFilter}}">
+    <input type="hidden" name="sort" value="{{.Filter.Sort}}">
+    <input type="hidden" name="dir" value="{{.Filter.Dir}}">
+    {{if .Filter.StatusFilter}}
+    <a href="/dashboard/compliance" class="btn-secondary text-xs">Clear Filter</a>
+    {{end}}
+</div>
+
+<div id="compliance-table">
+    {{template "compliance_table_body" .}}
+</div>
+{{end}}
+
+{{define "compliance_table_body"}}
 <div class="card overflow-hidden p-0">
     <table class="w-full">
         <thead>
             <tr class="table-header">
-                <th class="px-6 py-3">Device</th>
-                <th class="px-6 py-3">Policy</th>
-                <th class="px-6 py-3">Status</th>
+                {{template "sort_header" dict "Label" "Device" "Field" "device" "Sort" $.Filter.Sort "Dir" $.Filter.Dir "URL" "/dashboard/compliance?" "Target" "#compliance-table" "Extra" (printf "status_filter=%s&q=%s" $.Filter.StatusFilter $.Filter.Query)}}
+                {{template "sort_header" dict "Label" "Policy" "Field" "policy" "Sort" $.Filter.Sort "Dir" $.Filter.Dir "URL" "/dashboard/compliance?" "Target" "#compliance-table" "Extra" (printf "status_filter=%s&q=%s" $.Filter.StatusFilter $.Filter.Query)}}
+                {{template "sort_header" dict "Label" "Status" "Field" "status" "Sort" $.Filter.Sort "Dir" $.Filter.Dir "URL" "/dashboard/compliance?" "Target" "#compliance-table" "Extra" (printf "status_filter=%s&q=%s" $.Filter.StatusFilter $.Filter.Query)}}
                 <th class="px-6 py-3">Violations</th>
-                <th class="px-6 py-3">Evaluated</th>
+                {{template "sort_header" dict "Label" "Evaluated" "Field" "evaluated_at" "Sort" $.Filter.Sort "Dir" $.Filter.Dir "URL" "/dashboard/compliance?" "Target" "#compliance-table" "Extra" (printf "status_filter=%s&q=%s" $.Filter.StatusFilter $.Filter.Query)}}
             </tr>
         </thead>
-        <tbody class="divide-y divide-gray-200">
+        <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
             {{range .Results}}
-            <tr class="hover:bg-gray-50">
+            <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
                 <td class="px-6 py-4 text-sm font-medium">
-                    <a href="/dashboard/devices/{{.DeviceID}}" class="text-blue-600 hover:text-blue-800">{{.DeviceName}}</a>
+                    <a href="/dashboard/devices/{{.DeviceID}}" class="text-blue-600 dark:text-blue-400 hover:underline">{{.DeviceName}}</a>
                 </td>
                 <td class="px-6 py-4 text-sm">{{.PolicyName}}</td>
                 <td class="px-6 py-4">
@@ -39,13 +58,14 @@
                     {{else if eq .Status "non_compliant"}}<span class="badge badge-red">Non-Compliant</span>
                     {{else}}<span class="badge badge-yellow">Unknown</span>{{end}}
                 </td>
-                <td class="px-6 py-4 text-sm text-gray-600">{{if .Violations}}{{join .Violations ", "}}{{else}}—{{end}}</td>
-                <td class="px-6 py-4 text-sm text-gray-500">{{timeAgo .EvaluatedAt}}</td>
+                <td class="px-6 py-4 text-sm text-gray-600 dark:text-gray-400">{{if .Violations}}{{join .Violations ", "}}{{else}}—{{end}}</td>
+                <td class="px-6 py-4 text-sm text-gray-500 dark:text-gray-400">{{timeAgo .EvaluatedAt}}</td>
             </tr>
             {{else}}
-            <tr><td colspan="5" class="px-6 py-8 text-center text-gray-500">No compliance results</td></tr>
+            <tr><td colspan="5" class="px-6 py-8 text-center text-gray-500 dark:text-gray-400">No compliance results</td></tr>
             {{end}}
         </tbody>
     </table>
 </div>
+{{template "pagination" dict "TotalPages" .TotalPages "CurrentPage" .CurrentPage "TotalItems" .TotalItems "BaseURL" "/dashboard/compliance?" "QueryExtra" (printf "&status_filter=%s&q=%s&sort=%s&dir=%s" .Filter.StatusFilter .Filter.Query .Filter.Sort .Filter.Dir) "Target" "#compliance-table"}}
 {{end}}

@@ -32,15 +32,16 @@
         </thead>
         <tbody class="divide-y divide-gray-200">
             {{range .Groups}}
-            <tr class="hover:bg-gray-50">
-                <td class="px-6 py-4 text-sm font-medium">{{.Name}}</td>
-                <td class="px-6 py-4 text-sm text-gray-600">{{.Description}}</td>
+            <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
+                <td class="px-6 py-4 text-sm font-medium">
+                    <a href="/dashboard/groups/{{.ID}}" class="text-blue-600 dark:text-blue-400 hover:underline">{{.Name}}</a>
+                </td>
+                <td class="px-6 py-4 text-sm text-gray-600 dark:text-gray-400">{{.Description}}</td>
                 <td class="px-6 py-4"><span class="badge badge-gray">{{.MemberCount}}</span></td>
-                <td class="px-6 py-4 text-sm flex gap-2">
-                    <a href="/dashboard/groups/{{.ID}}" class="text-blue-600 hover:text-blue-800">View</a>
-                    <button hx-post="/dashboard/groups/{{.ID}}/delete" hx-confirm="Delete group '{{.Name}}'? Members will be removed from the group."
+                <td class="px-6 py-4">
+                    <button hx-post="/dashboard/groups/{{.ID}}/delete" hx-confirm="Delete group '{{.Name}}'? Members will be removed."
                             hx-target="closest tr" hx-swap="outerHTML"
-                            class="text-red-600 hover:text-red-800">Delete</button>
+                            class="btn-danger text-xs px-2 py-1">Delete</button>
                 </td>
             </tr>
             {{else}}

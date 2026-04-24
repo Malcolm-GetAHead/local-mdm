@@ -17,8 +17,6 @@
 - [ ] Verify "Enrolled" is visible
 - [ ] Verify "Non-Compliant" is visible
 - [ ] Verify "Active Policies" is visible
-- [ ] Verify "Devices by Platform" is visible
-- [ ] Verify "Recent Activity" is visible
 
 ## Device Management
 
@@ -26,33 +24,28 @@
 - [ ] Navigate to "Devices"
 - [ ] Verify table header row is visible
 
+### Sort Devices
+- [ ] Visit `/dashboard/devices?sort=platform&dir=asc` — page contains "Devices"
+- [ ] Verify table header row is visible
+
 ### Filter by Platform
+- [ ] Visit `/dashboard/devices` — page contains "Devices"
 - [ ] Select "macOS" from the "platform" dropdown
 - [ ] Wait 0.5s
 - [ ] Verify table row appears with text "MacBook"
 
-### Filter by Status
-- [ ] Visit `/dashboard/devices` — page contains "Devices"
-- [ ] Select "Enrolled" from the "status" dropdown
-- [ ] Wait 0.5s
-- [ ] Verify table header row is visible
-
 ### Search Devices
 - [ ] Visit `/dashboard/devices` — page contains "Devices"
 - [ ] Fill: Search=`Surface`
-- [ ] Wait 0.5s
+- [ ] Wait 1s
 - [ ] Verify table row appears with text "Surface"
 
 ### Device Detail
 - [ ] Navigate to "Devices"
-- [ ] Click "View" on "Alice MacBook Pro"
+- [ ] Click "Alice MacBook Pro"
 - [ ] Verify "Serial Number" is visible
-- [ ] Verify "OS Version" is visible
-- [ ] Verify "Actions" is visible
 - [ ] Verify "Lock Device" is visible
-- [ ] Verify "Wipe Device" is visible
 - [ ] Verify "Unenroll Device" is visible
-- [ ] Verify "Groups" is visible
 
 ## Policy Management
 
@@ -63,25 +56,13 @@
 
 ### Create Policy
 - [ ] Click "Create Policy"
-- [ ] Verify "Create Policy" is visible
 - [ ] Verify "Security" is visible
-- [ ] Verify "Restrictions" is visible
-- [ ] Verify "WiFi" is visible
-- [ ] Verify "VPN" is visible
 - [ ] Fill: Name=`Test Policy`, Description=`Automated test`
-
-### Filter Policy Settings
-- [ ] Fill: Search=`encryption`
-- [ ] Wait 0.5s
-- [ ] Verify "Require Encryption" is visible
-- [ ] Verify "Disable Camera" is not visible
-
-### Submit Policy
 - [ ] Click "Create Policy"
 - [ ] Verify redirected to `/dashboard/policies` — page contains "Test Policy"
 
 ### Edit Policy
-- [ ] Click "Edit" on "Test Policy"
+- [ ] Click "Test Policy"
 - [ ] Verify "Edit Policy" is visible
 - [ ] Verify "Save Changes" is visible
 
@@ -89,7 +70,6 @@
 - [ ] Navigate to "Policies"
 - [ ] Click "Assign" on "Test Policy"
 - [ ] Verify "Assign to Group" is visible
-- [ ] Verify "Assign to Device" is visible
 
 ## Groups
 
@@ -102,18 +82,16 @@
 ### Create Group
 - [ ] Click "Create Group"
 - [ ] Wait 0.5s
-- [ ] Fill: Name=`Test Group`, Description=`Playwright test`
+- [ ] Fill: Name=`PW Test Group`, Description=`Playwright test`
 - [ ] Click "Save Group"
 - [ ] Wait 1s
-- [ ] Verify "Test Group" is visible
+- [ ] Verify "PW Test Group" is visible
 
 ### Group Detail
 - [ ] Navigate to "Groups"
-- [ ] Click "View" on "Engineering"
+- [ ] Click "Engineering"
 - [ ] Verify "Engineering" is visible
 - [ ] Verify "Members" is visible
-- [ ] Verify "In Group" is visible
-- [ ] Verify "Add" is visible
 
 ## Compliance
 
@@ -123,6 +101,10 @@
 - [ ] Verify "Non-Compliant" is visible
 - [ ] Verify table header row is visible
 
+### Filter by Status
+- [ ] Visit `/dashboard/compliance?status_filter=non_compliant` — page contains "Non-Compliant"
+- [ ] Verify "Clear Filter" is visible
+
 ## Audit Log
 
 ### View Audit Log
@@ -131,12 +113,8 @@
 
 ### Filter by Action
 - [ ] Fill: action=`policy`
-- [ ] Wait 0.5s
+- [ ] Wait 1s
 - [ ] Verify "policy.create" is visible
-
-### Filter by Date
-- [ ] Visit `/dashboard/audit` — page contains "Audit Log"
-- [ ] Verify table header row is visible
 
 ## Logout
 

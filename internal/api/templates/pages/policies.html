@@ -2,16 +2,14 @@
 {{define "page_title"}}Policies{{end}}
 {{define "content"}}
 <div class="mb-6 flex flex-col md:flex-row gap-4 items-start md:items-center justify-between">
-    <div class="flex gap-2">
-        <select name="platform" hx-get="/dashboard/policies" hx-target="#policy-table" hx-include="[name='policy_type']"
-                class="rounded-lg border border-gray-300 px-3 py-2 text-sm">
-            <option value="">All Platforms</option>
-            <option value="all" {{if eq .Filter.Platform "all"}}selected{{end}}>Cross-Platform</option>
-            <option value="macos" {{if eq .Filter.Platform "macos"}}selected{{end}}>macOS</option>
-            <option value="windows" {{if eq .Filter.Platform "windows"}}selected{{end}}>Windows</option>
-            <option value="android" {{if eq .Filter.Platform "android"}}selected{{end}}>Android</option>
-        </select>
-    </div>
+    <select name="platform" hx-get="/dashboard/policies" hx-target="#policy-table"
+            class="input-field w-auto">
+        <option value="">All Platforms</option>
+        <option value="all" {{if eq .Filter.Platform "all"}}selected{{end}}>Cross-Platform</option>
+        <option value="macos" {{if eq .Filter.Platform "macos"}}selected{{end}}>macOS</option>
+        <option value="windows" {{if eq .Filter.Platform "windows"}}selected{{end}}>Windows</option>
+        <option value="android" {{if eq .Filter.Platform "android"}}selected{{end}}>Android</option>
+    </select>
     {{if or (eq .UserRole "admin") (eq .UserRole "operator") (eq .UserRole "super_admin")}}
     <a href="/dashboard/policies/new" class="btn-primary">Create Policy</a>
     {{end}}
@@ -27,19 +25,19 @@
     <table class="w-full">
         <thead>
             <tr class="table-header">
-                <th class="px-6 py-3">Name</th>
+                {{template "sort_header" dict "Label" "Name" "Field" "name" "Sort" $.Filter.Sort "Dir" $.Filter.Dir "URL" "/dashboard/policies?" "Target" "#policy-table" "Extra" (printf "platform=%s" $.Filter.Platform)}}
                 <th class="px-6 py-3">Platform</th>
                 <th class="px-6 py-3">Type</th>
                 <th class="px-6 py-3">Status</th>
-                <th class="px-6 py-3"></th>
+                <th class="px-6 py-3">Actions</th>
             </tr>
         </thead>
-        <tbody class="divide-y divide-gray-200">
+        <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
             {{range .Policies}}
-            <tr class="hover:bg-gray-50">
+            <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
                 <td class="px-6 py-4">
-                    <div class="text-sm font-medium">{{.Name}}</div>
-                    {{if .Description}}<div class="text-xs text-gray-500">{{.Description}}</div>{{end}}
+                    <a href="/dashboard/policies/{{.ID}}" class="text-sm font-medium text-blue-600 dark:text-blue-400 hover:underline">{{.Name}}</a>
+                    {{if .Description}}<div class="text-xs text-gray-500 dark:text-gray-400">{{.Description}}</div>{{end}}
                 </td>
                 <td class="px-6 py-4 text-sm capitalize">{{.Platform}}</td>
                 <td class="px-6 py-4 text-sm capitalize">{{.PolicyType}}</td>
@@ -48,18 +46,17 @@
                     {{else if .IsActive}}<span class="badge badge-green">Active</span>
                     {{else}}<span class="badge badge-gray">Inactive</span>{{end}}
                 </td>
-                <td class="px-6 py-4 text-sm flex gap-2">
-                    <a href="/dashboard/policies/{{.ID}}" class="text-blue-600 hover:text-blue-800">Edit</a>
+                <td class="px-6 py-4 flex gap-2">
                     {{if not .IsTemplate}}
-                    <a href="/dashboard/policies/{{.ID}}/assign" class="text-green-600 hover:text-green-800">Assign</a>
+                    <a href="/dashboard/policies/{{.ID}}/assign" class="btn-secondary text-xs px-2 py-1">Assign</a>
                     <button hx-post="/dashboard/policies/{{.ID}}/delete" hx-confirm="Delete policy '{{.Name}}'?"
                             hx-target="closest tr" hx-swap="outerHTML"
-                            class="text-red-600 hover:text-red-800">Delete</button>
+                            class="btn-danger text-xs px-2 py-1">Delete</button>
                     {{end}}
                 </td>
             </tr>
             {{else}}
-            <tr><td colspan="5" class="px-6 py-8 text-center text-gray-500">No policies found</td></tr>
+            <tr><td colspan="5" class="px-6 py-8 text-center text-gray-500 dark:text-gray-400">No policies found</td></tr>
             {{end}}
         </tbody>
     </table>
