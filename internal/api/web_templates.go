@@ -117,6 +117,7 @@ var templateFuncs = template.FuncMap{
 		return m
 	},
 	"printf": fmt.Sprintf,
+	"safeHTML": func(s string) template.HTML { return template.HTML(s) },
 }
 
 func (s *Server) loadTemplates() error {

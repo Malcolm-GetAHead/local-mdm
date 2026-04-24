@@ -97,17 +97,17 @@ func (s *Server) handleDashboardHome(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Generate SVG charts
-	platformChart := svgPieChart("Platforms", []pieSlice{
+	platformChart := buildChart("Platforms", []pieSlice{
 		{"macOS", platformCounts["macos"], "#2563eb"},
 		{"Windows", platformCounts["windows"], "#7c3aed"},
 		{"Android", platformCounts["android"], "#059669"},
 	})
-	statusChart := svgPieChart("Device Status", []pieSlice{
+	statusChart := buildChart("Device Status", []pieSlice{
 		{"Enrolled", statusCounts["enrolled"], "#16a34a"},
 		{"Unenrolled", statusCounts["unenrolled"], "#6b7280"},
 		{"Wiped", statusCounts["wiped"], "#dc2626"},
 	})
-	complianceChart := svgPieChart("Compliance", []pieSlice{
+	complianceChart := buildChart("Compliance", []pieSlice{
 		{"Compliant", compliant, "#16a34a"},
 		{"Non-Compliant", nonCompliant, "#dc2626"},
 		{"Unknown", unknown, "#ca8a04"},
@@ -124,11 +124,7 @@ func (s *Server) handleDashboardHome(w http.ResponseWriter, r *http.Request) {
 			"ActivePolicies": activePolicies,
 			"PlatformCounts": platList,
 		},
-		"Charts": map[string]template.HTML{
-			"Platform":   template.HTML(platformChart),
-			"Status":     template.HTML(statusChart),
-			"Compliance": template.HTML(complianceChart),
-		},
+		"Charts": []chartData{platformChart, statusChart, complianceChart},
 		"RecentAudit": auditLogs,
 	})
 }

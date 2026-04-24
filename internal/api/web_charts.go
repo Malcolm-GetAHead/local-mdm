@@ -12,20 +12,23 @@ type pieSlice struct {
 	Color string
 }
 
-func svgPieChart(title string, slices []pieSlice) string {
+type chartData struct {
+	Title  string
+	Pie    string // SVG circle only
+	Legend []pieSlice
+}
+
+func buildChart(title string, slices []pieSlice) chartData {
 	total := 0
 	for _, s := range slices {
 		total += s.Value
 	}
-	if total == 0 {
-		return ""
-	}
 
-	var parts strings.Builder
-	cx, cy, r := 55.0, 75.0, 45.0
+	var paths strings.Builder
+	cx, cy, r := 50.0, 50.0, 48.0
 	startAngle := -math.Pi / 2
 
-	for i, s := range slices {
+	for _, s := range slices {
 		if s.Value == 0 {
 			continue
 		}
@@ -42,26 +45,28 @@ func svgPieChart(title string, slices []pieSlice) string {
 			largeArc = 1
 		}
 
-		parts.WriteString(`<g class="pie-slice" style="cursor:pointer">`)
-
 		if fraction >= 0.999 {
 			mx := cx + r*math.Cos(startAngle+math.Pi)
 			my := cy + r*math.Sin(startAngle+math.Pi)
-			parts.WriteString(fmt.Sprintf(`<path d="M%.1f,%.1f A%.1f,%.1f 0 1,1 %.1f,%.1f A%.1f,%.1f 0 1,1 %.1f,%.1f" fill="%s" class="pie-path"/>`,
+			paths.WriteString(fmt.Sprintf(`<path d="M%.1f,%.1f A%.1f,%.1f 0 1,1 %.1f,%.1f A%.1f,%.1f 0 1,1 %.1f,%.1f" fill="%s"/>`,
 				x1, y1, r, r, mx, my, r, r, x1, y1, s.Color))
 		} else {
-			parts.WriteString(fmt.Sprintf(`<path d="M%.1f,%.1f L%.1f,%.1f A%.1f,%.1f 0 %d,1 %.1f,%.1f Z" fill="%s" class="pie-path"/>`,
+			paths.WriteString(fmt.Sprintf(`<path d="M%.1f,%.1f L%.1f,%.1f A%.1f,%.1f 0 %d,1 %.1f,%.1f Z" fill="%s" class="hover:opacity-70 transition-opacity"/>`,
 				cx, cy, x1, y1, r, r, largeArc, x2, y2, s.Color))
 		}
-
-		ly := 42 + i*24
-		parts.WriteString(fmt.Sprintf(`<circle cx="120" cy="%d" r="6" fill="%s"/>`, ly, s.Color))
-		parts.WriteString(fmt.Sprintf(`<text x="132" y="%d" class="chart-label">%s (%d)</text>`, ly+4, s.Label, s.Value))
-		parts.WriteString(`</g>`)
-
 		startAngle = endAngle
 	}
 
-	return fmt.Sprintf(`<svg viewBox="0 0 270 130" class="w-full h-auto"><text x="135" y="18" text-anchor="middle" class="chart-title">%s</text>%s</svg>`,
-		title, parts.String())
+	var legend []pieSlice
+	for _, s := range slices {
+		if s.Value > 0 {
+			legend = append(legend, s)
+		}
+	}
+
+	return chartData{
+		Title:  title,
+		Pie:    fmt.Sprintf(`<svg viewBox="0 0 100 100" width="100" height="100">%s</svg>`, paths.String()),
+		Legend: legend,
+	}
 }

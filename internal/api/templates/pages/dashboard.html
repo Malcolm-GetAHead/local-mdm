@@ -1,12 +1,6 @@
 {{define "title"}}Dashboard — Local MDM{{end}}
 {{define "page_title"}}Dashboard{{end}}
 {{define "content"}}
-<style nonce="{{.CSPNonce}}">
-.chart-title{font-size:13px;font-weight:600;fill:currentColor}
-.chart-label{font-size:10px;fill:currentColor}
-.pie-slice:hover .pie-path{opacity:0.7;transform:scale(1.03);transform-origin:55px 75px;transition:all 0.15s}
-.pie-slice:hover .chart-label{font-weight:bold}
-</style>
 
 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
     <div class="card">
@@ -28,9 +22,22 @@
 </div>
 
 <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-    <div class="card">{{index .Charts "Platform"}}</div>
-    <div class="card">{{index .Charts "Status"}}</div>
-    <div class="card">{{index .Charts "Compliance"}}</div>
+    {{range .Charts}}
+    <div class="card">
+        <h2 class="text-lg font-semibold mb-4">{{.Title}}</h2>
+        <div class="flex items-center gap-4">
+            <div class="shrink-0">{{safeHTML .Pie}}</div>
+            <div class="space-y-2">
+                {{range .Legend}}
+                <div class="flex items-center gap-2">
+                    <span class="w-3 h-3 rounded-full shrink-0" style="background:{{.Color}}"></span>
+                    <span class="text-sm text-gray-700 dark:text-gray-300">{{.Label}} ({{.Value}})</span>
+                </div>
+                {{end}}
+            </div>
+        </div>
+    </div>
+    {{end}}
 </div>
 
 <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
