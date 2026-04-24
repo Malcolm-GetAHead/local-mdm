@@ -23,15 +23,15 @@
 
 <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
     {{range .Charts}}
-    <div class="card">
+    <div class="card" data-chart>
         <h2 class="text-lg font-semibold mb-4">{{.Title}}</h2>
         <div class="flex items-center gap-4">
             <div class="shrink-0">{{safeHTML .Pie}}</div>
             <div class="space-y-2">
-                {{range .Legend}}
-                <div class="flex items-center gap-2">
-                    <svg width="12" height="12"><circle cx="6" cy="6" r="6" fill="{{.Color}}"/></svg>
-                    <span class="text-sm text-gray-700 dark:text-gray-300">{{.Label}} ({{.Value}})</span>
+                {{range $i, $s := .Legend}}
+                <div class="flex items-center gap-2 cursor-pointer transition-opacity" data-slice="{{$i}}">
+                    <svg width="12" height="12"><circle cx="6" cy="6" r="6" fill="{{$s.Color}}"/></svg>
+                    <span class="text-sm text-gray-700 dark:text-gray-300">{{$s.Label}} ({{$s.Value}})</span>
                 </div>
                 {{end}}
             </div>
@@ -67,4 +67,31 @@
         </div>
     </div>
 </div>
+
+<script nonce="{{.CSPNonce}}">
+document.querySelectorAll('[data-chart]').forEach(function(chart) {
+    function highlight(idx) {
+        chart.querySelectorAll('[data-slice]').forEach(function(el) {
+            var match = el.getAttribute('data-slice') === String(idx);
+            if (el.tagName === 'path') {
+                el.style.opacity = match ? '0.6' : '1';
+            } else {
+                el.style.opacity = match ? '1' : '0.5';
+                if (match) el.querySelector('span').style.fontWeight = 'bold';
+                else el.querySelector('span').style.fontWeight = '';
+            }
+        });
+    }
+    function reset() {
+        chart.querySelectorAll('[data-slice]').forEach(function(el) {
+            el.style.opacity = ''; el.style.fontWeight = '';
+            var sp = el.querySelector('span'); if (sp) sp.style.fontWeight = '';
+        });
+    }
+    chart.querySelectorAll('[data-slice]').forEach(function(el) {
+        el.addEventListener('mouseenter', function() { highlight(el.getAttribute('data-slice')); });
+        el.addEventListener('mouseleave', reset);
+    });
+});
+</script>
 {{end}}

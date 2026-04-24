@@ -28,10 +28,13 @@ func buildChart(title string, slices []pieSlice) chartData {
 	cx, cy, r := 50.0, 50.0, 48.0
 	startAngle := -math.Pi / 2
 
+	visIdx := 0
 	for _, s := range slices {
 		if s.Value == 0 {
 			continue
 		}
+		i := visIdx
+		visIdx++
 		fraction := float64(s.Value) / float64(total)
 		endAngle := startAngle + fraction*2*math.Pi
 
@@ -48,11 +51,11 @@ func buildChart(title string, slices []pieSlice) chartData {
 		if fraction >= 0.999 {
 			mx := cx + r*math.Cos(startAngle+math.Pi)
 			my := cy + r*math.Sin(startAngle+math.Pi)
-			paths.WriteString(fmt.Sprintf(`<path d="M%.1f,%.1f A%.1f,%.1f 0 1,1 %.1f,%.1f A%.1f,%.1f 0 1,1 %.1f,%.1f" fill="%s"/>`,
-				x1, y1, r, r, mx, my, r, r, x1, y1, s.Color))
+			paths.WriteString(fmt.Sprintf(`<path d="M%.1f,%.1f A%.1f,%.1f 0 1,1 %.1f,%.1f A%.1f,%.1f 0 1,1 %.1f,%.1f" fill="%s" data-slice="%d" class="transition-opacity"/>`,
+				x1, y1, r, r, mx, my, r, r, x1, y1, s.Color, i))
 		} else {
-			paths.WriteString(fmt.Sprintf(`<path d="M%.1f,%.1f L%.1f,%.1f A%.1f,%.1f 0 %d,1 %.1f,%.1f Z" fill="%s" class="hover:opacity-70 transition-opacity"/>`,
-				cx, cy, x1, y1, r, r, largeArc, x2, y2, s.Color))
+			paths.WriteString(fmt.Sprintf(`<path d="M%.1f,%.1f L%.1f,%.1f A%.1f,%.1f 0 %d,1 %.1f,%.1f Z" fill="%s" data-slice="%d" class="transition-opacity"/>`,
+				cx, cy, x1, y1, r, r, largeArc, x2, y2, s.Color, i))
 		}
 		startAngle = endAngle
 	}
