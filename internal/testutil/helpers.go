@@ -5,7 +5,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/malcolm-getahead/local-mdm/internal/models"
-	"github.com/stretchr/testify/require"
 )
 
 // NewTestEnterprise creates a test enterprise with random slug
@@ -59,28 +58,4 @@ func NewTestPolicy(t *testing.T, enterpriseID uuid.UUID) *models.Policy {
 		},
 		IsActive: true,
 	}
-}
-
-// AssertNoError is a helper that fails the test if err is not nil
-func AssertNoError(t *testing.T, err error, msgAndArgs ...interface{}) {
-	t.Helper()
-	require.NoError(t, err, msgAndArgs...)
-}
-
-// AssertError is a helper that fails the test if err is nil
-func AssertError(t *testing.T, err error, msgAndArgs ...interface{}) {
-	t.Helper()
-	require.Error(t, err, msgAndArgs...)
-}
-
-// AssertEqual is a helper for equality assertions
-func AssertEqual(t *testing.T, expected, actual interface{}, msgAndArgs ...interface{}) {
-	t.Helper()
-	require.Equal(t, expected, actual, msgAndArgs...)
-}
-
-// AssertNotNil is a helper that fails if value is nil
-func AssertNotNil(t *testing.T, value interface{}, msgAndArgs ...interface{}) {
-	t.Helper()
-	require.NotNil(t, value, msgAndArgs...)
 }

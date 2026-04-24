@@ -11,7 +11,7 @@ import (
 )
 
 func TestDeviceRepository_List_ContextCancellation(t *testing.T) {
-	db := testutil.SetupTestDB(t)
+	db := testutil.ConnectDB(t)
 	repo, err := NewDeviceRepository(db.Writer, db.Writer)
 	if err != nil {
 		t.Fatalf("failed to create repository: %v", err)
@@ -77,7 +77,7 @@ func TestDeviceRepository_List_ContextCancellation(t *testing.T) {
 
 	t.Run("not cancelled", func(t *testing.T) {
 		// Use a fresh DB connection to avoid pool contamination from cancelled contexts
-		freshDB := testutil.SetupTestDB(t)
+		freshDB := testutil.ConnectDB(t)
 		freshRepo, err := NewDeviceRepository(freshDB.Writer, freshDB.Writer)
 		if err != nil {
 			t.Fatalf("failed to create fresh repository: %v", err)
@@ -97,7 +97,7 @@ func TestDeviceRepository_List_ContextCancellation(t *testing.T) {
 }
 
 func TestEnterpriseRepository_List_ContextCancellation(t *testing.T) {
-	db := testutil.SetupTestDB(t)
+	db := testutil.ConnectDB(t)
 	repo, err := NewEnterpriseRepository(db.Writer, db.Writer)
 	if err != nil {
 		t.Fatalf("failed to create repository: %v", err)
@@ -144,7 +144,7 @@ func TestEnterpriseRepository_List_ContextCancellation(t *testing.T) {
 	})
 
 	t.Run("not cancelled", func(t *testing.T) {
-		freshDB := testutil.SetupTestDB(t)
+		freshDB := testutil.ConnectDB(t)
 		freshRepo, err := NewEnterpriseRepository(freshDB.Writer, freshDB.Writer)
 		if err != nil {
 			t.Fatalf("failed to create fresh repository: %v", err)
@@ -165,7 +165,7 @@ func TestEnterpriseRepository_List_ContextCancellation(t *testing.T) {
 }
 
 func TestPolicyRepository_List_ContextCancellation(t *testing.T) {
-	db := testutil.SetupTestDB(t)
+	db := testutil.ConnectDB(t)
 	repo, err := NewPolicyRepository(db.Writer, db.Reader)
 	if err != nil {
 		t.Fatalf("failed to create repository: %v", err)
@@ -230,7 +230,7 @@ func TestPolicyRepository_List_ContextCancellation(t *testing.T) {
 	})
 
 	t.Run("not cancelled", func(t *testing.T) {
-		freshDB := testutil.SetupTestDB(t)
+		freshDB := testutil.ConnectDB(t)
 		freshRepo, err := NewPolicyRepository(freshDB.Writer, freshDB.Reader)
 		if err != nil {
 			t.Fatalf("failed to create fresh repository: %v", err)

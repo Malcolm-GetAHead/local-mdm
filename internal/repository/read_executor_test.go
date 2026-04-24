@@ -10,7 +10,7 @@ import (
 )
 
 func TestGetReadExecutor_ReturnsReaderWithoutTx(t *testing.T) {
-	db := testutil.SetupTestDB(t)
+	db := testutil.ConnectDB(t)
 	defer db.Close()
 
 	ctx := context.Background()
@@ -19,7 +19,7 @@ func TestGetReadExecutor_ReturnsReaderWithoutTx(t *testing.T) {
 }
 
 func TestGetReadExecutor_ReturnsTxWhenActive(t *testing.T) {
-	db := testutil.SetupTestDB(t)
+	db := testutil.ConnectDB(t)
 	defer db.Close()
 
 	tx, err := db.Writer.Begin()
@@ -39,7 +39,7 @@ func TestGetReadExecutor_PanicsOnUnsupportedType(t *testing.T) {
 
 func TestNewDeviceRepository_AsymmetricNilArgs(t *testing.T) {
 	t.Run("nil writer with valid reader", func(t *testing.T) {
-		db := testutil.SetupTestDB(t)
+		db := testutil.ConnectDB(t)
 		defer db.Close()
 
 		_, err := NewDeviceRepository(nil, db.Reader)
@@ -48,7 +48,7 @@ func TestNewDeviceRepository_AsymmetricNilArgs(t *testing.T) {
 	})
 
 	t.Run("valid writer with nil reader", func(t *testing.T) {
-		db := testutil.SetupTestDB(t)
+		db := testutil.ConnectDB(t)
 		defer db.Close()
 
 		_, err := NewDeviceRepository(db.Writer, nil)

@@ -16,7 +16,7 @@ import (
 )
 
 func TestStructuredLogging(t *testing.T) {
-	db := testutil.SetupTestDB(t)
+	db := testutil.ConnectDB(t)
 	defer db.Close()
 
 	ctx := context.Background()

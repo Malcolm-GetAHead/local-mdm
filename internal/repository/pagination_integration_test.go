@@ -14,7 +14,7 @@ import (
 )
 
 func TestDeviceRepository_List_PaginationValidation(t *testing.T) {
-	db := testutil.SetupTestDB(t)
+	db := testutil.ConnectDB(t)
 	defer db.Close()
 
 	repo, err := NewDeviceRepository(db.Writer, db.Writer)
@@ -59,7 +59,7 @@ func TestDeviceRepository_List_PaginationValidation(t *testing.T) {
 }
 
 func TestEnterpriseRepository_List_PaginationValidation(t *testing.T) {
-	db := testutil.SetupTestDB(t)
+	db := testutil.ConnectDB(t)
 	defer db.Close()
 
 	repo, err := NewEnterpriseRepository(db.Writer, db.Writer)
@@ -87,7 +87,7 @@ func TestEnterpriseRepository_List_PaginationValidation(t *testing.T) {
 }
 
 func TestPolicyRepository_List_PaginationValidation(t *testing.T) {
-	db := testutil.SetupTestDB(t)
+	db := testutil.ConnectDB(t)
 	defer db.Close()
 
 	repo, err := NewPolicyRepository(db.Writer, db.Reader)
@@ -125,7 +125,7 @@ func TestPolicyRepository_List_PaginationValidation(t *testing.T) {
 }
 
 func TestPaginationValidation_DoSPrevention(t *testing.T) {
-	db := testutil.SetupTestDB(t)
+	db := testutil.ConnectDB(t)
 	defer db.Close()
 
 	deviceRepo, err := NewDeviceRepository(db.Writer, db.Writer)

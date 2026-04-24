@@ -14,7 +14,7 @@ import (
 )
 
 func TestTransactionCommit(t *testing.T) {
-	db := testutil.SetupTestDB(t)
+	db := testutil.ConnectDB(t)
 	defer db.Close()
 
 	transactor, err := NewTransactor(db.Writer)
@@ -86,7 +86,7 @@ func TestTransactionCommit(t *testing.T) {
 }
 
 func TestTransactionRollback(t *testing.T) {
-	db := testutil.SetupTestDB(t)
+	db := testutil.ConnectDB(t)
 	defer db.Close()
 
 	transactor, err := NewTransactor(db.Writer)
@@ -166,7 +166,7 @@ func TestTransactionRollback(t *testing.T) {
 }
 
 func TestTransactionRollbackOnPanic(t *testing.T) {
-	db := testutil.SetupTestDB(t)
+	db := testutil.ConnectDB(t)
 	defer db.Close()
 
 	transactor, err := NewTransactor(db.Writer)
@@ -248,7 +248,7 @@ func TestTransactionRollbackOnPanic(t *testing.T) {
 }
 
 func TestNestedTransactions(t *testing.T) {
-	db := testutil.SetupTestDB(t)
+	db := testutil.ConnectDB(t)
 	defer db.Close()
 
 	transactor, err := NewTransactor(db.Writer)
@@ -335,7 +335,7 @@ func TestNestedTransactions(t *testing.T) {
 }
 
 func TestTransactionWithMultipleOperations(t *testing.T) {
-	db := testutil.SetupTestDB(t)
+	db := testutil.ConnectDB(t)
 	defer db.Close()
 
 	transactor, err := NewTransactor(db.Writer)
@@ -455,7 +455,7 @@ func TestTransactionWithMultipleOperations(t *testing.T) {
 }
 
 func TestGetExecutor(t *testing.T) {
-	db := testutil.SetupTestDB(t)
+	db := testutil.ConnectDB(t)
 	defer db.Close()
 
 	ctx := context.Background()
@@ -481,7 +481,7 @@ func TestGetExecutor(t *testing.T) {
 }
 
 func TestGetTx(t *testing.T) {
-	db := testutil.SetupTestDB(t)
+	db := testutil.ConnectDB(t)
 	defer db.Close()
 
 	ctx := context.Background()
@@ -507,7 +507,7 @@ func TestGetTx(t *testing.T) {
 }
 
 func TestTransactionUpdateOperations(t *testing.T) {
-	db := testutil.SetupTestDB(t)
+	db := testutil.ConnectDB(t)
 	defer db.Close()
 
 	transactor, err := NewTransactor(db.Writer)
@@ -605,7 +605,7 @@ func TestTransactionUpdateOperations(t *testing.T) {
 }
 
 func TestTransactionUpdateRollback(t *testing.T) {
-	db := testutil.SetupTestDB(t)
+	db := testutil.ConnectDB(t)
 	defer db.Close()
 
 	transactor, err := NewTransactor(db.Writer)
@@ -692,7 +692,7 @@ func TestTransactionUpdateRollback(t *testing.T) {
 }
 
 func TestTransactionDeleteOperations(t *testing.T) {
-	db := testutil.SetupTestDB(t)
+	db := testutil.ConnectDB(t)
 	defer db.Close()
 
 	transactor, err := NewTransactor(db.Writer)
@@ -802,7 +802,7 @@ func TestTransactionDeleteOperations(t *testing.T) {
 }
 
 func TestTransactionDeleteRollback(t *testing.T) {
-	db := testutil.SetupTestDB(t)
+	db := testutil.ConnectDB(t)
 	defer db.Close()
 
 	transactor, err := NewTransactor(db.Writer)
@@ -883,7 +883,7 @@ func TestTransactionDeleteRollback(t *testing.T) {
 }
 
 func TestTransactionErrorPaths(t *testing.T) {
-	db := testutil.SetupTestDB(t)
+	db := testutil.ConnectDB(t)
 	defer db.Close()
 
 	transactor, err := NewTransactor(db.Writer)
@@ -969,7 +969,7 @@ func TestNewTransactorWithNil(t *testing.T) {
 }
 
 func TestNewTransactorWithExecutor(t *testing.T) {
-	db := testutil.SetupTestDB(t)
+	db := testutil.ConnectDB(t)
 	defer db.Close()
 	
 	// Start a transaction to get an executor
@@ -1055,7 +1055,7 @@ func TestNewRepositoryWithNil(t *testing.T) {
 }
 
 func TestNewRepositoryWithExecutor(t *testing.T) {
-	db := testutil.SetupTestDB(t)
+	db := testutil.ConnectDB(t)
 	defer db.Close()
 	
 	// Start a transaction to get an executor
@@ -1108,7 +1108,7 @@ func TestGetExecutorWithInvalidType(t *testing.T) {
 }
 
 func TestTransactionWithCancelledContext(t *testing.T) {
-	db := testutil.SetupTestDB(t)
+	db := testutil.ConnectDB(t)
 	defer db.Close()
 
 	transactor, err := NewTransactor(db.Writer)
@@ -1155,7 +1155,7 @@ func TestTransactionWithCancelledContext(t *testing.T) {
 }
 
 func TestTransactionWithTimeout(t *testing.T) {
-	db := testutil.SetupTestDB(t)
+	db := testutil.ConnectDB(t)
 	defer db.Close()
 
 	transactor, err := NewTransactor(db.Writer)
@@ -1181,7 +1181,7 @@ func TestTransactionWithTimeout(t *testing.T) {
 }
 
 func TestTransactionIsolationLevels(t *testing.T) {
-	db := testutil.SetupTestDB(t)
+	db := testutil.ConnectDB(t)
 	defer db.Close()
 
 	transactor, err := NewTransactor(db.Writer)
@@ -1223,7 +1223,7 @@ func TestTransactionIsolationLevels(t *testing.T) {
 }
 
 func TestSerializableTransactionRetry(t *testing.T) {
-	db := testutil.SetupTestDB(t)
+	db := testutil.ConnectDB(t)
 	defer db.Close()
 
 	transactor, err := NewTransactor(db.Writer)
@@ -1348,7 +1348,7 @@ func TestToSQLIsolation(t *testing.T) {
 }
 
 func TestTransactionIsolationWithError(t *testing.T) {
-	db := testutil.SetupTestDB(t)
+	db := testutil.ConnectDB(t)
 	defer db.Close()
 
 	transactor, err := NewTransactor(db.Writer)
@@ -1373,7 +1373,7 @@ func TestTransactionIsolationWithError(t *testing.T) {
 }
 
 func TestNestedTransactionWithIsolation(t *testing.T) {
-	db := testutil.SetupTestDB(t)
+	db := testutil.ConnectDB(t)
 	defer db.Close()
 
 	transactor, err := NewTransactor(db.Writer)

@@ -63,9 +63,3 @@ func envOr(key, fallback string) string {
 	}
 	return fallback
 }
-
-// SetupTestDB is a backward-compatible alias for ConnectDB.
-// Deprecated: Use ConnectDB instead.
-func SetupTestDB(t testing.TB) *db.DB {
-	return ConnectDB(t)
-}

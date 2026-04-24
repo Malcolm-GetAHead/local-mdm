@@ -14,7 +14,7 @@ func TestDeviceRepository_JSONBValidation(t *testing.T) {
 		t.Skip("skipping integration test")
 	}
 
-	db := testutil.SetupTestDB(t)
+	db := testutil.ConnectDB(t)
 	defer db.Close()
 
 	repo, err := NewDeviceRepository(db.Writer, db.Writer)
@@ -183,7 +183,7 @@ func TestEnterpriseRepository_JSONBValidation(t *testing.T) {
 		t.Skip("skipping integration test")
 	}
 
-	db := testutil.SetupTestDB(t)
+	db := testutil.ConnectDB(t)
 	defer db.Close()
 
 	repo, err := NewEnterpriseRepository(db.Writer, db.Writer)
@@ -250,7 +250,7 @@ func TestPolicyRepository_JSONBValidation(t *testing.T) {
 		t.Skip("skipping integration test")
 	}
 
-	db := testutil.SetupTestDB(t)
+	db := testutil.ConnectDB(t)
 	defer db.Close()
 
 	repo, err := NewPolicyRepository(db.Writer, db.Reader)

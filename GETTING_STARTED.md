@@ -44,13 +44,22 @@ docker exec localmdm-server migrate -path /app/migrations \
 cp configs/config.example.yaml configs/config.yaml
 ```
 
+### 4. Generate CA Certificates
+
+```bash
+go build -o bin/localmdm-cli ./cmd/cli
+./bin/localmdm-cli certs init
+```
+
+This creates the CA certificate and key at the paths in your config (`./certs/ca.crt` and `./certs/ca.key`). Required for device certificate signing and SCEP enrollment.
+
 The defaults work out of the box with the Docker Compose services. The Keycloak client secret for dev is `localmdm-api-secret` — set it in your config or via environment variable:
 
 ```bash
 export KEYCLOAK_CLIENT_SECRET=localmdm-api-secret
 ```
 
-### 4. Start the Server
+### 5. Start the Server
 
 ```bash
 make run

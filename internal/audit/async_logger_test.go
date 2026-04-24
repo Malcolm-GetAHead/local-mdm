@@ -16,7 +16,7 @@ import (
 )
 
 func TestAsyncLogger_LogsEventsAsynchronously(t *testing.T) {
-	db := testutil.SetupTestDB(t)
+	db := testutil.ConnectDB(t)
 	defer db.Close()
 
 	ctx := context.Background()
@@ -59,7 +59,7 @@ func TestAsyncLogger_LogsEventsAsynchronously(t *testing.T) {
 }
 
 func TestAsyncLogger_HandlesQueueFull(t *testing.T) {
-	db := testutil.SetupTestDB(t)
+	db := testutil.ConnectDB(t)
 	defer db.Close()
 
 	ctx := context.Background()
@@ -101,7 +101,7 @@ func TestAsyncLogger_HandlesQueueFull(t *testing.T) {
 }
 
 func TestAsyncLogger_MultipleWorkersProcessConcurrently(t *testing.T) {
-	db := testutil.SetupTestDB(t)
+	db := testutil.ConnectDB(t)
 	defer db.Close()
 
 	ctx := context.Background()
@@ -151,7 +151,7 @@ func TestAsyncLogger_MultipleWorkersProcessConcurrently(t *testing.T) {
 }
 
 func TestAsyncLogger_GracefulShutdownDrainsQueue(t *testing.T) {
-	db := testutil.SetupTestDB(t)
+	db := testutil.ConnectDB(t)
 	defer db.Close()
 
 	ctx := context.Background()
@@ -197,7 +197,7 @@ func TestAsyncLogger_GracefulShutdownDrainsQueue(t *testing.T) {
 }
 
 func TestAsyncLogger_DatabaseFailureDoesNotBlockRequests(t *testing.T) {
-	db := testutil.SetupTestDB(t)
+	db := testutil.ConnectDB(t)
 	defer db.Close()
 
 	ctx := context.Background()
@@ -240,7 +240,7 @@ func TestAsyncLogger_DatabaseFailureDoesNotBlockRequests(t *testing.T) {
 }
 
 func TestAsyncLogger_WorkerErrorsAreLogged(t *testing.T) {
-	db := testutil.SetupTestDB(t)
+	db := testutil.ConnectDB(t)
 	defer db.Close()
 
 	ctx := context.Background()
@@ -274,7 +274,7 @@ func TestAsyncLogger_WorkerErrorsAreLogged(t *testing.T) {
 }
 
 func TestAsyncLogger_ConcurrentWritesAreSafe(t *testing.T) {
-	db := testutil.SetupTestDB(t)
+	db := testutil.ConnectDB(t)
 	defer db.Close()
 
 	ctx := context.Background()
@@ -330,7 +330,7 @@ func TestAsyncLogger_ConcurrentWritesAreSafe(t *testing.T) {
 }
 
 func TestAsyncLogger_IgnoresEventsAfterClose(t *testing.T) {
-	db := testutil.SetupTestDB(t)
+	db := testutil.ConnectDB(t)
 	defer db.Close()
 
 	ctx := context.Background()
@@ -350,7 +350,7 @@ func TestAsyncLogger_IgnoresEventsAfterClose(t *testing.T) {
 }
 
 func BenchmarkAsyncLogger_vs_SyncLogger(b *testing.B) {
-	db := testutil.SetupTestDB(&testing.T{})
+	db := testutil.ConnectDB(&testing.T{})
 	defer db.Close()
 
 	ctx := context.Background()
@@ -395,7 +395,7 @@ func BenchmarkAsyncLogger_vs_SyncLogger(b *testing.B) {
 }
 
 func BenchmarkAsyncLogger_HighThroughput(b *testing.B) {
-	db := testutil.SetupTestDB(&testing.T{})
+	db := testutil.ConnectDB(&testing.T{})
 	defer db.Close()
 
 	ctx := context.Background()
