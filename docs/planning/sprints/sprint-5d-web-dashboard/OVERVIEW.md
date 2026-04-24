@@ -54,6 +54,7 @@ Dashboard handlers are separate from API handlers — API returns JSON, dashboar
 | S5d-04 | Policy management (list, create/edit, assign to groups) | 2-3 days |
 | S5d-05 | Compliance & reporting (dashboard, audit log viewer) | 1-2 days |
 | S5d-06 | Seed data for development (mock devices, policies, compliance results) | 0.5 day |
+| S5d-07 | Playwright browser tests (markdown playbook + runner) | 1 day |
 
 > **Dependency**: S5d-05 (Compliance & reporting) depends on Sprint 5b (EventBus) and Sprint 5c (platform integration) for live compliance data from real devices. Use seed data (S5d-06) for development if those sprints are not yet complete.
 
@@ -102,6 +103,81 @@ Dashboard handlers are separate from API handlers — API returns JSON, dashboar
 - Audit log entries for recent actions
 - Allows dashboard development and visual testing without real devices or S5-09
 
+### S5d-07: Playwright Browser Tests
+
+**Pattern**: Markdown playbook + Playwright runner (same approach as dev-deployer-htmx).
+
+Tests are written as a **markdown playbook** (`tests/browser/browser-playbook.md`) — a human-readable test plan where each `- [ ]` checkbox is an executable step. A Node.js runner (`tests/browser/run-playbook.js`) parses the markdown and executes each step using Playwright.
+
+**Why this pattern**:
+- The playbook doubles as documentation — anyone can read it to understand what the UI does
+- No test framework boilerplate — just markdown and a ~300-line runner
+- Runs headed (watch the browser) or headless (CI)
+- Same pattern the owner uses in other projects — no learning curve
+
+**Structure**:
+```
+tests/browser/
+├── package.json              ← playwright dependency only
+├── run-playbook.js           ← step interpreter (Visit, Fill, Click, Verify)
+├── browser-playbook.md       ← the test plan (human + machine readable)
+└── fixtures/                 ← test data files if needed
+```
+
+**Playbook DSL** (subset — extend as needed):
+```markdown
+## Device Management
+
+### List Devices
+- [ ] Visit `/dashboard/devices` — page contains "Devices"
+- [ ] Verify table header row is visible
+
+### Lock Device
+- [ ] Click "View" on first device row
+- [ ] Click "Lock Device"
+- [ ] Accept the confirmation dialog
+- [ ] Verify toast appears with "Lock command sent"
+
+### Search
+- [ ] Fill: Search=`MacBook`
+- [ ] Wait 0.5s
+- [ ] Verify table row appears with text "MacBook"
+```
+
+**Field mapping**: The runner maps logical field names (from the playbook) to actual HTML locators. For Local MDM this will include:
+- `Search` → search input
+- `Name`, `Description`, `Platform` → policy form fields
+- Device/policy/group selectors
+
+**Running**:
+```bash
+# Headless (CI / make target)
+make browser-test
+
+# Headed (watch the browser)
+cd tests/browser && npm run playbook:headed
+
+# Single section
+cd tests/browser && node run-playbook.js --section "Device Management"
+```
+
+**Makefile target**:
+```makefile
+browser-test: ## Run Playwright browser tests against local stack
+	@cd tests/browser && npm install --silent && node run-playbook.js
+```
+
+**Auth handling**: The playbook starts with a login section that authenticates via Keycloak. The runner stores the session cookie for subsequent requests. Alternatively, seed a test API token and pass it as a cookie to skip the Keycloak redirect flow in tests.
+
+**Coverage**: The playbook should cover:
+1. Login via Keycloak
+2. Device list (pagination, search, filter by platform/status)
+3. Device detail + lock/wipe actions
+4. Policy CRUD (create, edit, assign to group)
+5. Compliance dashboard (compliant/non-compliant counts)
+6. Audit log search
+7. `<noscript>` message when JS disabled
+
 ## HTMX Patterns
 
 ```html
@@ -137,6 +213,7 @@ Dashboard handlers are separate from API handlers — API returns JSON, dashboar
 - [ ] Compliance view shows non-compliant devices with reasons
 - [ ] Audit log searchable by actor and date
 - [ ] Friendly "JavaScript required" message shown via `<noscript>` tag (Keycloak auth requires JS)
+- [ ] Playwright browser playbook passes (login, device CRUD, policy CRUD, compliance view, audit log)
 - [ ] Embedded in Go binary — single deploy artifact
 
 ---
