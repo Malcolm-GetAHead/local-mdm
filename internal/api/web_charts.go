@@ -21,8 +21,8 @@ func svgPieChart(title string, slices []pieSlice) string {
 		return ""
 	}
 
-	var paths, legends strings.Builder
-	cx, cy, r := 40.0, 52.0, 32.0
+	var parts strings.Builder
+	cx, cy, r := 55.0, 75.0, 45.0
 	startAngle := -math.Pi / 2
 
 	for i, s := range slices {
@@ -42,28 +42,26 @@ func svgPieChart(title string, slices []pieSlice) string {
 			largeArc = 1
 		}
 
-		// Each slice+legend pair in a group for hover
-		gOpen := fmt.Sprintf(`<g class="pie-slice" style="cursor:pointer">`)
-		paths.WriteString(gOpen)
+		parts.WriteString(`<g class="pie-slice" style="cursor:pointer">`)
 
 		if fraction >= 0.999 {
 			mx := cx + r*math.Cos(startAngle+math.Pi)
 			my := cy + r*math.Sin(startAngle+math.Pi)
-			paths.WriteString(fmt.Sprintf(`<path d="M%.1f,%.1f A%.1f,%.1f 0 1,1 %.1f,%.1f A%.1f,%.1f 0 1,1 %.1f,%.1f" fill="%s" class="pie-path"/>`,
+			parts.WriteString(fmt.Sprintf(`<path d="M%.1f,%.1f A%.1f,%.1f 0 1,1 %.1f,%.1f A%.1f,%.1f 0 1,1 %.1f,%.1f" fill="%s" class="pie-path"/>`,
 				x1, y1, r, r, mx, my, r, r, x1, y1, s.Color))
 		} else {
-			paths.WriteString(fmt.Sprintf(`<path d="M%.1f,%.1f L%.1f,%.1f A%.1f,%.1f 0 %d,1 %.1f,%.1f Z" fill="%s" class="pie-path"/>`,
+			parts.WriteString(fmt.Sprintf(`<path d="M%.1f,%.1f L%.1f,%.1f A%.1f,%.1f 0 %d,1 %.1f,%.1f Z" fill="%s" class="pie-path"/>`,
 				cx, cy, x1, y1, r, r, largeArc, x2, y2, s.Color))
 		}
 
-		ly := 28 + i*18
-		paths.WriteString(fmt.Sprintf(`<circle cx="88" cy="%d" r="5" fill="%s"/>`, ly, s.Color))
-		paths.WriteString(fmt.Sprintf(`<text x="98" y="%d" class="chart-label">%s (%d)</text>`, ly+4, s.Label, s.Value))
-		paths.WriteString(`</g>`)
+		ly := 42 + i*24
+		parts.WriteString(fmt.Sprintf(`<circle cx="120" cy="%d" r="6" fill="%s"/>`, ly, s.Color))
+		parts.WriteString(fmt.Sprintf(`<text x="132" y="%d" class="chart-label">%s (%d)</text>`, ly+4, s.Label, s.Value))
+		parts.WriteString(`</g>`)
 
 		startAngle = endAngle
 	}
 
-	return fmt.Sprintf(`<svg viewBox="0 0 185 95" class="w-full h-auto max-h-36"><text x="92" y="12" text-anchor="middle" class="chart-title">%s</text>%s%s</svg>`,
-		title, paths.String(), legends.String())
+	return fmt.Sprintf(`<svg viewBox="0 0 270 130" class="w-full h-auto"><text x="135" y="18" text-anchor="middle" class="chart-title">%s</text>%s</svg>`,
+		title, parts.String())
 }
