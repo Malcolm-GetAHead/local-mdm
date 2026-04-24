@@ -30,6 +30,12 @@
 - [ ] Wait 0.5s
 - [ ] Verify table row appears with text "MacBook"
 
+### Filter by Status
+- [ ] Visit `/dashboard/devices` — page contains "Devices"
+- [ ] Select "Enrolled" from the "status" dropdown
+- [ ] Wait 0.5s
+- [ ] Verify table header row is visible
+
 ### Search Devices
 - [ ] Visit `/dashboard/devices` — page contains "Devices"
 - [ ] Fill: Search=`Surface`
@@ -41,6 +47,9 @@
 - [ ] Verify "Serial Number" is visible
 - [ ] Verify "OS Version" is visible
 - [ ] Verify "Actions" is visible
+- [ ] Verify "Lock Device" is visible
+- [ ] Verify "Wipe Device" is visible
+- [ ] Verify "Groups" is visible
 
 ## Policy Management
 
@@ -59,6 +68,22 @@
 ### Edit Policy
 - [ ] Click "Edit" on "Test Policy"
 - [ ] Verify "Edit Policy" is visible
+- [ ] Verify "Save Changes" is visible
+
+## Groups
+
+### List Groups
+- [ ] Navigate to "Groups"
+- [ ] Verify table header row is visible
+- [ ] Verify "Engineering" is visible
+- [ ] Verify "Sales" is visible
+- [ ] Verify "Executives" is visible
+
+### Group Detail
+- [ ] Click "View" on "Engineering"
+- [ ] Verify "Engineering" is visible
+- [ ] Verify "Members" is visible
+- [ ] Verify table header row is visible
 
 ## Compliance
 
@@ -79,14 +104,9 @@
 - [ ] Wait 0.5s
 - [ ] Verify "policy.create" is visible
 
-## Groups
-
-### List Groups
-- [ ] Navigate to "Groups"
+### Filter by Date
+- [ ] Visit `/dashboard/audit` — page contains "Audit Log"
 - [ ] Verify table header row is visible
-- [ ] Verify "Engineering" is visible
-- [ ] Verify "Sales" is visible
-- [ ] Verify "Executives" is visible
 
 ## Logout
 

@@ -239,19 +239,16 @@ func (s *Server) handleWebGroups(w http.ResponseWriter, r *http.Request) {
 	groups, _, _ := s.groupService.ListGroups(ctx, sess.EnterpriseID, 100, 0)
 
 	type groupRow struct {
-		ID          uuid.UUID
+		ID          string
 		Name        string
 		Description string
 		MemberCount int
 	}
 	var rows []groupRow
 	for _, g := range groups {
-		members, _, _ := s.groupService.ListMembers(ctx, g.ID, 1, 0)
-		_ = members
-		// Get count via ListMembers with limit 0 — use total
-		_, total, _ := s.groupService.ListMembers(ctx, g.ID, 1000, 0)
+		_, total, _ := s.groupService.ListMembers(ctx, g.ID, 1, 0)
 		rows = append(rows, groupRow{
-			ID:          g.ID,
+			ID:          g.ID.String(),
 			Name:        g.Name,
 			Description: g.Description,
 			MemberCount: total,
@@ -261,5 +258,29 @@ func (s *Server) handleWebGroups(w http.ResponseWriter, r *http.Request) {
 	s.renderPage(w, r, "groups", map[string]interface{}{
 		"ActiveNav": "groups",
 		"Groups":    rows,
+	})
+}
+
+// handleWebGroupDetail shows a single group with its members.
+func (s *Server) handleWebGroupDetail(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	id, err := uuid.Parse(mux.Vars(r)["id"])
+	if err != nil {
+		http.Error(w, "Invalid group ID", http.StatusBadRequest)
+		return
+	}
+
+	group, err := s.groupService.GetGroup(ctx, id)
+	if err != nil {
+		http.Error(w, "Group not found", http.StatusNotFound)
+		return
+	}
+
+	members, _, _ := s.groupService.ListMembers(ctx, id, 1000, 0)
+
+	s.renderPage(w, r, "group_detail", map[string]interface{}{
+		"ActiveNav": "groups",
+		"Group":     group,
+		"Members":   members,
 	})
 }

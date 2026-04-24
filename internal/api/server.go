@@ -829,6 +829,7 @@ func (s *Server) setupRoutes() {
 	dash.HandleFunc("/policies/{id}", s.handleWebPolicyUpdate).Methods("POST")
 	dash.HandleFunc("/compliance", s.handleWebCompliance).Methods("GET")
 	dash.HandleFunc("/groups", s.handleWebGroups).Methods("GET")
+	dash.HandleFunc("/groups/{id}", s.handleWebGroupDetail).Methods("GET")
 	dash.HandleFunc("/audit", s.handleWebAuditLog).Methods("GET")
 }
 
