@@ -40,7 +40,7 @@ auth:
     worker_count: 2
 
 keycloak:
-  url: "http://keycloak:8080"
+  url: "http://keycloak:8180"
   realm: "localmdm"
   client_id: "localmdm-api"
   client_secret: "localmdm-dev-dashboard-secret-2026"

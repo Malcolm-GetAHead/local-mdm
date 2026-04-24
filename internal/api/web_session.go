@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -115,12 +114,8 @@ func (s *Server) handleWebLogin(w http.ResponseWriter, r *http.Request) {
 		MaxAge:   300,
 	})
 
-	// Rewrite Docker-internal Keycloak URL for browser access.
-	// Inside Docker: keycloak:8080. From browser (via /etc/hosts): keycloak:8180.
-	keycloakURL := strings.Replace(s.config.Keycloak.IssuerURL(), "keycloak:8080", "keycloak:8180", 1)
-
 	authURL := fmt.Sprintf("%s/protocol/openid-connect/auth?client_id=%s&response_type=code&redirect_uri=%s&scope=openid+email+profile&state=%s",
-		keycloakURL,
+		s.config.Keycloak.IssuerURL(),
 		s.config.Keycloak.ClientID,
 		s.webCallbackURL(r),
 		state,
