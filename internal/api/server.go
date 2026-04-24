@@ -837,6 +837,7 @@ func (s *Server) setupRoutes() {
 	dash.HandleFunc("/groups", s.handleWebGroups).Methods("GET")
 	dash.HandleFunc("/groups", s.handleWebGroupCreate).Methods("POST")
 	dash.HandleFunc("/groups/{id}", s.handleWebGroupDetail).Methods("GET")
+	dash.HandleFunc("/groups/{id}/edit", s.handleWebGroupEdit).Methods("POST")
 	dash.HandleFunc("/groups/{id}/delete", s.handleWebGroupDelete).Methods("POST")
 	dash.HandleFunc("/groups/{id}/members/{device_id}/add", s.handleWebGroupAddMember).Methods("POST")
 	dash.HandleFunc("/groups/{id}/members/{device_id}/remove", s.handleWebGroupRemoveMember).Methods("POST")

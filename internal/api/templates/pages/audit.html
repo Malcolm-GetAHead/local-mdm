@@ -16,6 +16,19 @@
 <div id="audit-table">
     {{template "audit_table_body" .}}
 </div>
+
+<script nonce="{{.CSPNonce}}">
+document.addEventListener('click', function(e) {
+    var row = e.target.closest('[data-expand="audit"]');
+    if (!row) return;
+    var detail = row.nextElementSibling;
+    if (detail && detail.classList.contains('detail-row')) {
+        detail.classList.toggle('hidden');
+        var arrow = row.querySelector('.expand-arrow');
+        if (arrow) arrow.textContent = detail.classList.contains('hidden') ? '▶' : '▼';
+    }
+});
+</script>
 {{end}}
 
 {{define "audit_table_body"}}
@@ -32,13 +45,28 @@
         </thead>
         <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
             {{range .AuditLogs}}
-            <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
+            <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors cursor-pointer" data-expand="audit">
                 <td class="px-6 py-4 text-sm text-gray-500 dark:text-gray-400">{{formatDateTime .CreatedAt}}</td>
                 <td class="px-6 py-4 text-sm">{{.UserEmail}}</td>
                 <td class="px-6 py-4"><span class="badge badge-gray">{{.Action}}</span></td>
                 <td class="px-6 py-4 text-sm">{{.ResourceType}}</td>
                 <td class="px-6 py-4 text-sm text-gray-600 dark:text-gray-400 max-w-xs">
-                    <span class="truncate block">{{.DetailsSummary}}</span>
+                    <span class="flex items-center gap-1">
+                        <span class="expand-arrow text-gray-400">▶</span>
+                        <span class="truncate">{{.DetailsSummary}}</span>
+                    </span>
+                </td>
+            </tr>
+            <tr class="hidden detail-row bg-gray-50 dark:bg-gray-900">
+                <td colspan="5" class="px-6 py-3">
+                    <table class="text-sm w-full">
+                        {{range $k, $v := .DetailsMap}}
+                        <tr>
+                            <td class="pr-4 py-1 font-medium text-gray-700 dark:text-gray-300 align-top whitespace-nowrap">{{$k}}</td>
+                            <td class="py-1 text-gray-600 dark:text-gray-400">{{$v}}</td>
+                        </tr>
+                        {{end}}
+                    </table>
                 </td>
             </tr>
             {{else}}

@@ -415,12 +415,14 @@ func (s *Server) handleWebAuditLog(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
-		// Parse details into readable summary: key: value; key: value
+		// Parse details into readable summary and map for expansion
 		summary := ""
+		detailsMap := map[string]string{}
 		for k, v := range l.Details {
 			if k == "request_id" || k == "user_email" {
 				continue
 			}
+			detailsMap[k] = fmt.Sprintf("%v", v)
 			if summary != "" {
 				summary += "; "
 			}
@@ -436,6 +438,7 @@ func (s *Server) handleWebAuditLog(w http.ResponseWriter, r *http.Request) {
 			"Action":         l.Action,
 			"ResourceType":   l.ResourceType,
 			"DetailsSummary": summary,
+			"DetailsMap":     detailsMap,
 		})
 	}
 
@@ -617,6 +620,24 @@ func (s *Server) handleWebGroupRemoveMember(w http.ResponseWriter, r *http.Reque
 	s.handleWebGroupDetail(w, r)
 }
 
+// handleWebGroupEdit updates a group's name/description.
+func (s *Server) handleWebGroupEdit(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	id, _ := uuid.Parse(mux.Vars(r)["id"])
+	r.ParseForm()
+
+	group, err := s.groupService.GetGroup(ctx, id)
+	if err != nil {
+		http.Error(w, "Group not found", http.StatusNotFound)
+		return
+	}
+	group.Name = r.FormValue("name")
+	group.Description = r.FormValue("description")
+	s.groupService.UpdateGroup(ctx, group)
+	s.logAudit(r, "group.update", "group", id, map[string]interface{}{"name": group.Name})
+	http.Redirect(w, r, fmt.Sprintf("/dashboard/groups/%s", id), http.StatusFound)
+}
+
 // handleWebGroupDelete deletes a group.
 func (s *Server) handleWebGroupDelete(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
@@ -669,6 +690,8 @@ func (s *Server) handleWebPolicyAssignPage(w http.ResponseWriter, r *http.Reques
 	devices, _, _ := s.deviceRepo.List(ctx, sess.EnterpriseID, 1000, 0)
 	assignments, _ := s.groupService.ListAssignmentsByPolicy(ctx, id)
 
+	// Build assigned set to filter out
+	assignedSet := map[string]bool{}
 	type assignRow struct {
 		ID         string
 		TargetType string
@@ -676,6 +699,8 @@ func (s *Server) handleWebPolicyAssignPage(w http.ResponseWriter, r *http.Reques
 	}
 	var rows []assignRow
 	for _, a := range assignments {
+		key := a.TargetType + ":" + a.TargetID.String()
+		assignedSet[key] = true
 		name := a.TargetID.String()
 		if a.TargetType == "group" {
 			if g, err := s.groupService.GetGroup(ctx, a.TargetID); err == nil {
@@ -691,12 +716,26 @@ func (s *Server) handleWebPolicyAssignPage(w http.ResponseWriter, r *http.Reques
 		rows = append(rows, assignRow{ID: a.ID.String(), TargetType: a.TargetType, TargetName: name})
 	}
 
+	// Filter out already-assigned groups and devices
+	var availGroups []*models.DeviceGroup
+	for _, g := range groups {
+		if !assignedSet["group:"+g.ID.String()] {
+			availGroups = append(availGroups, g)
+		}
+	}
+	var availDevices []*models.Device
+	for _, d := range devices {
+		if !assignedSet["device:"+d.ID.String()] {
+			availDevices = append(availDevices, d)
+		}
+	}
+
 	s.renderPage(w, r, "policy_assign", map[string]interface{}{
-		"ActiveNav":   "policies",
-		"Policy":      policy,
-		"Groups":      groups,
-		"Devices":     devices,
-		"Assignments": rows,
+		"ActiveNav":        "policies",
+		"Policy":           policy,
+		"AvailableGroups":  availGroups,
+		"AvailableDevices": availDevices,
+		"Assignments":      rows,
 	})
 }
 

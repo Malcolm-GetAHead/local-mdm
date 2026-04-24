@@ -5,9 +5,28 @@
     <a href="/dashboard/groups" class="text-sm text-blue-600 hover:text-blue-800">← Back to Groups</a>
 </div>
 
-<div class="card mb-6">
-    <h2 class="text-lg font-semibold">{{.Group.Name}}</h2>
-    {{if .Group.Description}}<p class="text-sm text-gray-600 mt-1">{{.Group.Description}}</p>{{end}}
+<div class="card mb-6" id="group-header">
+    <div class="flex items-start justify-between" id="group-display">
+        <div>
+            <h2 class="text-lg font-semibold">{{.Group.Name}}</h2>
+            {{if .Group.Description}}<p class="text-sm text-gray-600 dark:text-gray-400 mt-1">{{.Group.Description}}</p>{{end}}
+        </div>
+        <button id="edit-group-btn" class="btn-secondary text-xs">Edit</button>
+    </div>
+    <form id="group-edit-form" method="POST" action="/dashboard/groups/{{.Group.ID}}/edit" class="hidden space-y-3">
+        <div>
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Name</label>
+            <input type="text" name="name" value="{{.Group.Name}}" required class="input-field">
+        </div>
+        <div>
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Description</label>
+            <input type="text" name="description" value="{{.Group.Description}}" class="input-field">
+        </div>
+        <div class="flex gap-2">
+            <button type="submit" class="btn-primary text-xs">Save</button>
+            <button type="button" id="cancel-edit-btn" class="btn-secondary text-xs">Cancel</button>
+        </div>
+    </form>
 </div>
 
 <div class="card overflow-hidden p-0" id="member-list">
@@ -50,20 +69,27 @@
 </div>
 
 <script nonce="{{.CSPNonce}}">
-(function() {
+(function(){
     var filter = document.getElementById('member-filter');
-    if (!filter) return;
-    var timer;
-    filter.addEventListener('keydown', function(e) { if (e.key === 'Enter') e.preventDefault(); });
-    filter.addEventListener('input', function() {
-        clearTimeout(timer);
-        timer = setTimeout(function() {
-            var q = filter.value.toLowerCase();
-            document.querySelectorAll('[data-device-name]').forEach(function(row) {
-                row.classList.toggle('hidden', !row.getAttribute('data-device-name').toLowerCase().includes(q));
-            });
-        }, 200);
-    });
+    if(filter) {
+        var timer;
+        filter.addEventListener('keydown', function(e) { if (e.key === 'Enter') e.preventDefault(); });
+        filter.addEventListener('input', function() {
+            clearTimeout(timer);
+            timer = setTimeout(function() {
+                var q = filter.value.toLowerCase();
+                document.querySelectorAll('[data-device-name]').forEach(function(row) {
+                    row.classList.toggle('hidden', !row.getAttribute('data-device-name').toLowerCase().includes(q));
+                });
+            }, 200);
+        });
+    }
+    var editBtn = document.getElementById('edit-group-btn');
+    var cancelBtn = document.getElementById('cancel-edit-btn');
+    var display = document.getElementById('group-display');
+    var form = document.getElementById('group-edit-form');
+    if(editBtn) editBtn.addEventListener('click', function(){ display.classList.add('hidden'); form.classList.remove('hidden'); });
+    if(cancelBtn) cancelBtn.addEventListener('click', function(){ form.classList.add('hidden'); display.classList.remove('hidden'); });
 })();
 </script>
 {{end}}
