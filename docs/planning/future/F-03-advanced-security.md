@@ -382,6 +382,39 @@ func VerifySignature(r *http.Request) error {
 
 ---
 
+## Encryption Recovery Key Escrow
+
+*Added: Sprint 5b (2026-04-24)*
+
+Admins need to recover encrypted devices when users forget passwords or leave the organization. The MDM should escrow recovery keys for both platforms.
+
+**Windows BitLocker**:
+- CSP: `./Vendor/MSFT/BitLocker/RecoveryKey` — device reports its recovery key during encryption
+- Must be encrypted in transit (TLS) and at rest (pgcrypto `pgp_sym_encrypt`, same pattern as DEP tokens)
+- Store in a `device_recovery_keys` table, not in `platform_data` (secrets don't go in JSONB)
+- Admin API endpoint to retrieve key by device ID (audit-logged, role-restricted)
+
+**macOS FileVault**:
+- `FDERecoveryKeyEscrow` profile payload — installed via enrollment profile, causes the Mac to escrow its FileVault key to the MDM server
+- NanoMDM receives the key via `SecurityInfo` command response — forwarded to Local MDM via webhook
+- Same encrypted storage pattern as BitLocker
+
+**Storage pattern** (follows credential storage strategy from steering guide):
+```sql
+CREATE TABLE device_recovery_keys (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    device_id UUID NOT NULL REFERENCES devices(id) ON DELETE CASCADE,
+    key_type VARCHAR(20) NOT NULL,  -- 'bitlocker', 'filevault'
+    encrypted_key BYTEA NOT NULL,   -- pgp_sym_encrypt(key, encryption_key)
+    escrowed_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    UNIQUE(device_id, key_type)
+);
+```
+
+**Dependencies**: F-01 (real device testing — need actual encrypted devices to test escrow flow)
+
+---
+
 ## References
 
 - [OWASP Top 10](https://owasp.org/www-project-top-ten/)

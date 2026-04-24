@@ -1,0 +1,3 @@
+# Keep the CSV history, ignore raw k6 JSON output
+results/
+!results_history.csv

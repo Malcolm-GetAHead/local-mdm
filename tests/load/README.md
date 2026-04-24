@@ -23,15 +23,36 @@ docker run --rm -i grafana/k6 run - <scenario.js
 ## Running
 
 ```bash
-# From project root — targets the Docker stack
+# From project root — runs all scenarios and records results
 make load-test
 
-# Individual scenario
-k6 run tests/load/steady_state.js
+# Individual scenario with history recording
+./tests/load/run_and_record.sh tests/load/steady_state.js "Sprint 5b"
 
-# With custom base URL
-k6 run -e BASE_URL=http://localhost:8080 tests/load/steady_state.js
+# Individual scenario without recording
+k6 run tests/load/steady_state.js
 ```
+
+## Results History
+
+Results are appended to `results_history.csv` — a living document that tracks performance across sprints. Each row records:
+
+| Column | Description |
+|--------|-------------|
+| `timestamp` | UTC time of the run |
+| `git_ref` | Short commit hash |
+| `sprint` | Sprint label or branch name |
+| `scenario` | Which scenario was run |
+| `p50_ms` | Median response time |
+| `p95_ms` | 95th percentile response time |
+| `p99_ms` | 99th percentile response time |
+| `avg_ms` | Average response time |
+| `total_requests` | Total completed requests |
+| `error_rate_pct` | Percentage of failed requests |
+| `rps` | Requests per second (throughput) |
+| `json_file` | Path to raw k6 JSON output |
+
+Raw JSON files are in `results/` (gitignored). The CSV is committed so trends are visible across sprints.
 
 ## Performance Targets
 
@@ -42,15 +63,15 @@ k6 run -e BASE_URL=http://localhost:8080 tests/load/steady_state.js
 | Error rate | < 1% | Non-5xx responses |
 | Throughput | > 100 req/s | Sustained steady state |
 
-## Interpreting Results
+## Comparing Across Sprints
 
-k6 outputs a summary after each run. Key metrics:
-- `http_req_duration`: Response time distribution (p50, p95, p99)
-- `http_req_failed`: Error rate
-- `iterations`: Total completed requests
-- `vus`: Virtual users (concurrent connections)
-
-Save results for comparison between sprints:
 ```bash
-k6 run --out json=results/sprint-5b.json tests/load/steady_state.js
+# View the history
+column -t -s, tests/load/results_history.csv
+
+# Filter to a specific scenario
+grep steady_state tests/load/results_history.csv | column -t -s,
+
+# Check for regressions — p95 should stay under 200ms
+awk -F, 'NR>1 && $6>200 {print "REGRESSION:", $0}' tests/load/results_history.csv
 ```

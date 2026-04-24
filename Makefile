@@ -131,9 +131,10 @@ prod-down: ## Stop production stack
 
 load-test: ## Run k6 load tests against local stack
 	@echo "Running k6 load tests..."
-	@k6 run tests/load/steady_state.js
-	@k6 run tests/load/admin_dashboard.js
-	@k6 run tests/load/enrollment_burst.js
+	@./tests/load/run_and_record.sh tests/load/steady_state.js
+	@./tests/load/run_and_record.sh tests/load/admin_dashboard.js
+	@./tests/load/run_and_record.sh tests/load/enrollment_burst.js
+	@echo "Results appended to tests/load/results_history.csv"
 
 deps: ## Download dependencies
 	@echo "Downloading dependencies..."
