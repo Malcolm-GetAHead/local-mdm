@@ -31,9 +31,9 @@
       "name": "Local MDM API",
       "enabled": true,
       "clientAuthenticatorType": "client-secret",
-      "secret": "localmdm-api-secret",
-      "redirectUris": ["http://localhost:8080/*"],
-      "webOrigins": ["http://localhost:8080"],
+      "secret": "localmdm-dev-dashboard-secret-2026",
+      "redirectUris": ["*"],
+      "webOrigins": ["*"],
       "standardFlowEnabled": true,
       "directAccessGrantsEnabled": true,
       "serviceAccountsEnabled": true,
@@ -41,7 +41,22 @@
       "protocol": "openid-connect",
       "attributes": {
         "access.token.lifespan": "3600"
-      }
+      },
+      "protocolMappers": [
+        {
+          "name": "enterprise_id",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "config": {
+            "user.attribute": "enterprise_id",
+            "claim.name": "enterprise_id",
+            "jsonType.label": "String",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true"
+          }
+        }
+      ]
     },
     {
       "clientId": "localmdm-dashboard",
