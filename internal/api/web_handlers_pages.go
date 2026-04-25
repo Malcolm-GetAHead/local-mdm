@@ -404,13 +404,27 @@ func (s *Server) handleWebAuditLog(w http.ResponseWriter, r *http.Request) {
 
 	logs, total, _ := s.auditLogRepo.Search(ctx, sess.EnterpriseID, action, startDate, endDate, 1000, 0)
 
+	// Batch-resolve user emails (single pass instead of O(n) queries)
+	userIDs := make(map[uuid.UUID]bool)
+	for _, l := range logs {
+		if l.UserID != nil {
+			userIDs[*l.UserID] = true
+		}
+	}
+	emailMap := make(map[uuid.UUID]string, len(userIDs))
+	for uid := range userIDs {
+		if u, err := s.userService.Get(ctx, uid); err == nil {
+			emailMap[uid] = u.Email
+		}
+	}
+
 	// Enrich with user emails and parse details
 	var auditLogs []map[string]interface{}
 	for _, l := range logs {
 		email := ""
 		if l.UserID != nil {
-			if u, err := s.userService.Get(ctx, *l.UserID); err == nil {
-				email = u.Email
+			if e, ok := emailMap[*l.UserID]; ok {
+				email = e
 			} else if e, ok := l.Details["user_email"].(string); ok {
 				email = e
 			} else {
@@ -613,8 +627,7 @@ func (s *Server) handleWebGroupAddMember(w http.ResponseWriter, r *http.Request)
 	s.groupService.AddMember(ctx, groupID, deviceID)
 	s.logAudit(r, "group.add_member", "group", groupID, map[string]interface{}{"device_id": deviceID})
 
-	// Re-render the full member list
-	s.handleWebGroupDetail(w, r)
+	s.renderGroupMemberList(w, r, groupID)
 }
 
 // handleWebGroupRemoveMember removes a device from a group.
@@ -626,7 +639,49 @@ func (s *Server) handleWebGroupRemoveMember(w http.ResponseWriter, r *http.Reque
 	s.groupService.RemoveMember(ctx, groupID, deviceID)
 	s.logAudit(r, "group.remove_member", "group", groupID, map[string]interface{}{"device_id": deviceID})
 
-	s.handleWebGroupDetail(w, r)
+	s.renderGroupMemberList(w, r, groupID)
+}
+
+// renderGroupMemberList renders just the member list fragment.
+func (s *Server) renderGroupMemberList(w http.ResponseWriter, r *http.Request, groupID uuid.UUID) {
+	sess := getSession(r)
+	ctx := r.Context()
+
+	group, err := s.groupService.GetGroup(ctx, groupID)
+	if err != nil {
+		http.Error(w, "Group not found", http.StatusNotFound)
+		return
+	}
+
+	members, _, _ := s.groupService.ListMembers(ctx, groupID, 1000, 0)
+	memberSet := map[uuid.UUID]bool{}
+	for _, m := range members {
+		memberSet[m.ID] = true
+	}
+
+	allDevices, _, _ := s.deviceRepo.List(ctx, sess.EnterpriseID, 1000, 0)
+
+	type deviceRow struct {
+		ID       string
+		Name     string
+		Platform string
+		Model    string
+		Status   string
+		InGroup  bool
+	}
+	var rows []deviceRow
+	for _, d := range allDevices {
+		rows = append(rows, deviceRow{
+			ID: d.ID.String(), Name: d.Name, Platform: d.Platform,
+			Model: d.Model, Status: d.Status, InGroup: memberSet[d.ID],
+		})
+	}
+
+	data := map[string]interface{}{
+		"Group":      group,
+		"AllDevices": rows,
+	}
+	s.renderFragment(w, s.webTemplates["group_detail"], "member_list", data)
 }
 
 // handleWebGroupEdit updates a group's name/description.

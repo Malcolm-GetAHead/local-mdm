@@ -66,6 +66,10 @@ func (m *MockDeviceRepository) List(ctx context.Context, enterpriseID uuid.UUID,
 	return args.Get(0).([]*models.Device), args.Int(1), args.Error(2)
 }
 
+func (m *MockDeviceRepository) ListFiltered(_ context.Context, _ uuid.UUID, _, _, _, _, _ string, _, _ int) ([]*models.Device, int, error) {
+	return nil, 0, nil
+}
+
 func TestService_CreateDevice(t *testing.T) {
 	ctx := context.Background()
 	enterpriseID := uuid.New()

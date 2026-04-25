@@ -48,7 +48,7 @@ keycloak:
   url: "http://localhost:8180"
   realm: "localmdm"
   client_id: "localmdm-api"
-  client_secret: "localmdm-docker-dev-keycloak-secret"
+  client_secret: "localmdm-dev-dashboard-secret-2026"
 
 certificates:
   ca_cert_path: "./internal/api/certs/ca.crt"

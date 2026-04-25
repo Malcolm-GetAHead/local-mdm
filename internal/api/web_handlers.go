@@ -86,18 +86,17 @@ func (s *Server) handleDashboardHome(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Compliance counts
+	// Compliance counts (single query, reused for chart + needs-attention)
+	compRows, _ := s.reportService.ComplianceReport(ctx, sess.EnterpriseID)
 	compliant, nonCompliant, unknown := 0, 0, 0
-	if compRows, err := s.reportService.ComplianceReport(ctx, sess.EnterpriseID); err == nil {
-		for _, cr := range compRows {
-			switch cr.Status {
-			case "compliant":
-				compliant++
-			case "non_compliant":
-				nonCompliant++
-			default:
-				unknown++
-			}
+	for _, cr := range compRows {
+		switch cr.Status {
+		case "compliant":
+			compliant++
+		case "non_compliant":
+			nonCompliant++
+		default:
+			unknown++
 		}
 	}
 
@@ -128,12 +127,10 @@ func (s *Server) handleDashboardHome(w http.ResponseWriter, r *http.Request) {
 	}
 	var needsAttention []attentionItem
 	seen := map[string]bool{}
-	if compRows, err := s.reportService.ComplianceReport(ctx, sess.EnterpriseID); err == nil {
-		for _, cr := range compRows {
-			if cr.Status == "non_compliant" && !seen[cr.DeviceID.String()] {
-				needsAttention = append(needsAttention, attentionItem{cr.DeviceID.String(), cr.DeviceName, "non-compliant"})
-				seen[cr.DeviceID.String()] = true
-			}
+	for _, cr := range compRows {
+		if cr.Status == "non_compliant" && !seen[cr.DeviceID.String()] {
+			needsAttention = append(needsAttention, attentionItem{cr.DeviceID.String(), cr.DeviceName, "non-compliant"})
+			seen[cr.DeviceID.String()] = true
 		}
 	}
 	for _, d := range devices {
@@ -168,7 +165,7 @@ func (s *Server) handleWebDeviceList(w http.ResponseWriter, r *http.Request) {
 
 	platform := r.URL.Query().Get("platform")
 	status := r.URL.Query().Get("status")
-	query := strings.ToLower(r.URL.Query().Get("q"))
+	query := r.URL.Query().Get("q")
 	sortField := r.URL.Query().Get("sort")
 	sortDir := r.URL.Query().Get("dir")
 	if sortField == "" {
@@ -183,43 +180,13 @@ func (s *Server) handleWebDeviceList(w http.ResponseWriter, r *http.Request) {
 	}
 	perPage := 50
 
-	allDevices, _, _ := s.deviceRepo.List(ctx, sess.EnterpriseID, 1000, 0)
+	devices, total, _ := s.deviceRepo.ListFiltered(ctx, sess.EnterpriseID, platform, status, query, sortField, sortDir, perPage, (page-1)*perPage)
 
-	// Filter
-	var filtered []*models.Device
-	for _, d := range allDevices {
-		if platform != "" && d.Platform != platform {
-			continue
-		}
-		if status != "" && d.Status != status {
-			continue
-		}
-		if query != "" && !strings.Contains(strings.ToLower(d.Name), query) &&
-			!strings.Contains(strings.ToLower(d.Model), query) &&
-			!strings.Contains(strings.ToLower(d.SerialNumber), query) {
-			continue
-		}
-		filtered = append(filtered, d)
-	}
-
-	// Sort
-	sortDevices(filtered, sortField, sortDir)
-
-	// Paginate
-	total := len(filtered)
 	totalPages := (total + perPage - 1) / perPage
-	start := (page - 1) * perPage
-	if start > total {
-		start = total
-	}
-	end := start + perPage
-	if end > total {
-		end = total
-	}
 
 	data := map[string]interface{}{
 		"ActiveNav":   "devices",
-		"Devices":     filtered[start:end],
+		"Devices":     devices,
 		"TotalPages":  totalPages,
 		"CurrentPage": page,
 		"TotalItems":  total,
@@ -253,7 +220,7 @@ func (s *Server) handleWebDeviceDetail(w http.ResponseWriter, r *http.Request) {
 
 	// Compliance
 	compResults, _ := s.complianceService.GetDeviceCompliance(ctx, id)
-	compliance := buildComplianceRows(compResults, s)
+	compliance := buildComplianceRows(ctx, compResults, s)
 	var lastEvaluated interface{}
 	if len(compResults) > 0 {
 		lastEvaluated = compResults[0].EvaluatedAt
@@ -386,14 +353,13 @@ func (s *Server) handleWebDeviceEvaluate(w http.ResponseWriter, r *http.Request)
 
 	// Return updated compliance table
 	compResults, _ := s.complianceService.GetDeviceCompliance(ctx, id)
-	compliance := buildComplianceRows(compResults, s)
+	compliance := buildComplianceRows(ctx, compResults, s)
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	s.webTemplates["device_detail"].ExecuteTemplate(w, "compliance_tab", map[string]interface{}{"Compliance": compliance})
 }
 
-func buildComplianceRows(results []*models.ComplianceResult, s *Server) []map[string]interface{} {
-	ctx := context.Background()
+func buildComplianceRows(ctx context.Context, results []*models.ComplianceResult, s *Server) []map[string]interface{} {
 	var rows []map[string]interface{}
 	for _, cr := range results {
 		policyName := ""
@@ -435,12 +401,12 @@ func buildComplianceRows(results []*models.ComplianceResult, s *Server) []map[st
 		}
 
 		// One row per config key
+		sort.Strings(configKeys)
 		for _, k := range configKeys {
 			status := "pass"
 			// Check if this key produced a violation
 			for viol := range violationSet {
-				if strings.Contains(strings.ToLower(viol), strings.ReplaceAll(k, "_", " ")) ||
-					strings.Contains(strings.ReplaceAll(strings.ToLower(viol), " ", "_"), k) {
+				if violationMatchesKey(viol, k) {
 					status = "fail"
 					break
 				}
@@ -468,6 +434,30 @@ func buildComplianceRows(results []*models.ComplianceResult, s *Server) []map[st
 		return rows[i]["Setting"].(string) < rows[j]["Setting"].(string)
 	})
 	return rows
+}
+
+// violationMatchesKey maps a violation string to the config key that produced it.
+// Uses keyword matching: the violation must contain a keyword derived from the config key.
+var violationKeywords = map[string][]string{
+	"require_password":    {"password"},
+	"min_password_length": {"password length"},
+	"require_encryption":  {"encryption"},
+	"require_firewall":    {"firewall"},
+	"allow_camera":        {"camera"},
+}
+
+func violationMatchesKey(violation, configKey string) bool {
+	vLower := strings.ToLower(violation)
+	if keywords, ok := violationKeywords[configKey]; ok {
+		for _, kw := range keywords {
+			if strings.Contains(vLower, kw) {
+				return true
+			}
+		}
+		return false
+	}
+	// Fallback: check if violation contains the key with underscores replaced
+	return strings.Contains(vLower, strings.ReplaceAll(configKey, "_", " "))
 }
 
 func sortDevices(devices []*models.Device, field, dir string) {

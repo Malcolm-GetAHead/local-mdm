@@ -243,6 +243,10 @@ func (m *mockDeviceRepo) List(_ context.Context, _ uuid.UUID, limit, offset int)
 	return m.devices[offset:end], total, nil
 }
 
+func (m *mockDeviceRepo) ListFiltered(_ context.Context, _ uuid.UUID, _, _, _, _, _ string, limit, offset int) ([]*models.Device, int, error) {
+	return m.List(context.Background(), uuid.Nil, limit, offset)
+}
+
 func (m *mockDeviceRepo) Update(_ context.Context, d *models.Device) error {
 	if m.updateErr != nil {
 		return m.updateErr

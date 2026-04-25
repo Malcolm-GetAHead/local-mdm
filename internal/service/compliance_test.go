@@ -30,6 +30,9 @@ func (m *mockComplianceDeviceRepo) GetByID(_ context.Context, id uuid.UUID) (*mo
 func (m *mockComplianceDeviceRepo) List(_ context.Context, _ uuid.UUID, _, _ int) ([]*models.Device, int, error) {
 	return nil, 0, nil
 }
+func (m *mockComplianceDeviceRepo) ListFiltered(_ context.Context, _ uuid.UUID, _, _, _, _, _ string, _, _ int) ([]*models.Device, int, error) {
+	return nil, 0, nil
+}
 func (m *mockComplianceDeviceRepo) Update(_ context.Context, d *models.Device) error {
 	m.devices[d.ID] = d
 	return nil

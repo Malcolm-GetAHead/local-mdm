@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"strings"
 
 	"github.com/malcolm-getahead/local-mdm/internal/apperrors"
 
@@ -20,6 +21,7 @@ type DeviceRepository interface {
 	GetBySerial(ctx context.Context, enterpriseID uuid.UUID, serial string) (*models.Device, error)
 	GetByPlatformID(ctx context.Context, platform, deviceID string) (*models.Device, error)
 	List(ctx context.Context, enterpriseID uuid.UUID, limit, offset int) ([]*models.Device, int, error)
+	ListFiltered(ctx context.Context, enterpriseID uuid.UUID, platform, status, search string, sortField, sortDir string, limit, offset int) ([]*models.Device, int, error)
 	Update(ctx context.Context, device *models.Device) error
 	Delete(ctx context.Context, id uuid.UUID) error
 }
@@ -164,6 +166,80 @@ func (r *deviceRepository) List(ctx context.Context, enterpriseID uuid.UUID, lim
 		[]interface{}{enterpriseID, limit, offset},
 		scanFn,
 	)
+}
+
+func (r *deviceRepository) ListFiltered(ctx context.Context, enterpriseID uuid.UUID, platform, status, search string, sortField, sortDir string, limit, offset int) ([]*models.Device, int, error) {
+	limit, offset, err := ValidatePagination(limit, offset)
+	if err != nil {
+		return nil, 0, fmt.Errorf("invalid pagination: %w", err)
+	}
+
+	where := "WHERE enterprise_id = $1 AND deleted_at IS NULL"
+	args := []interface{}{enterpriseID}
+	argN := 2
+
+	if platform != "" {
+		where += fmt.Sprintf(" AND platform = $%d", argN)
+		args = append(args, platform)
+		argN++
+	}
+	if status != "" {
+		where += fmt.Sprintf(" AND status = $%d", argN)
+		args = append(args, status)
+		argN++
+	}
+	if search != "" {
+		where += fmt.Sprintf(" AND (LOWER(name) LIKE $%d OR LOWER(model) LIKE $%d OR LOWER(serial_number) LIKE $%d)", argN, argN, argN)
+		args = append(args, "%"+strings.ToLower(search)+"%")
+		argN++
+	}
+
+	// Validate sort field
+	orderCol := "name"
+	switch sortField {
+	case "name", "platform", "model", "os_version", "status":
+		orderCol = sortField
+	case "last_seen":
+		orderCol = "last_seen"
+	}
+	order := "ASC"
+	if strings.ToLower(sortDir) == "desc" {
+		order = "DESC"
+	}
+
+	exec := getReadExecutor(ctx, r.reader)
+	var total int
+	countArgs := make([]interface{}, len(args))
+	copy(countArgs, args)
+	if err := exec.QueryRowContext(ctx, "SELECT COUNT(*) FROM devices "+where, countArgs...).Scan(&total); err != nil {
+		return nil, 0, err
+	}
+
+	dataQuery := fmt.Sprintf(`SELECT id, enterprise_id, platform, device_id, serial_number, name, model, os_version,
+		enrollment_date, last_seen, status, platform_data, created_at, updated_at, deleted_at
+		FROM devices %s ORDER BY %s %s LIMIT $%d OFFSET $%d`, where, orderCol, order, argN, argN+1)
+	args = append(args, limit, offset)
+
+	rows, err := exec.QueryContext(ctx, dataQuery, args...)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer rows.Close()
+
+	var devices []*models.Device
+	for rows.Next() {
+		device := &models.Device{}
+		if err := rows.Scan(
+			&device.ID, &device.EnterpriseID, &device.Platform, &device.DeviceID,
+			&device.SerialNumber, &device.Name, &device.Model, &device.OSVersion,
+			&device.EnrollmentDate, &device.LastSeen, &device.Status, &device.PlatformData,
+			&device.CreatedAt, &device.UpdatedAt, &device.DeletedAt,
+		); err != nil {
+			return nil, 0, err
+		}
+		devices = append(devices, device)
+	}
+	return devices, total, rows.Err()
 }
 
 func (r *deviceRepository) Update(ctx context.Context, device *models.Device) error {
