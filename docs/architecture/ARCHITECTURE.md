@@ -11,8 +11,8 @@ Local MDM follows a layered architecture with clear separation of concerns:
 ┌─────────────────────────────────────────────────────────┐
 │                    HTTP Layer (API)                      │
 │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  │
-│  │   REST API   │  │  Platform    │  │   Webhooks   │  │
-│  │  Endpoints   │  │  Endpoints   │  │              │  │
+│  │   REST API   │  │  Platform    │  │  Dashboard   │  │
+│  │  Endpoints   │  │  Endpoints   │  │  (HTML/HTMX) │  │
 │  └──────────────┘  └──────────────┘  └──────────────┘  │
 └─────────────────────────────────────────────────────────┘
                           │
@@ -239,6 +239,42 @@ PostgreSQL `LISTEN`/`NOTIFY` event bus using `pq.Listener`. Decouples event prod
 - `ComplianceCleanupHook` → clear compliance results on unenroll/wipe/delete
 
 **Data flow**: Device checks in → handler updates `platform_data` → PostgreSQL trigger fires `device.info_updated` → EventBus dispatches → compliance subscriber evaluates device → results written to `compliance_results` → dashboard shows live compliance state.
+
+## Web Dashboard (Sprint 5d)
+
+The dashboard is a server-rendered web UI using Go HTML templates, HTMX, and Tailwind CSS. No separate frontend build pipeline — CSS is compiled in the Dockerfile.
+
+### Stack
+- **Go `html/template`** with `embed.FS` — templates compiled into the binary
+- **HTMX v2.0.9** — partial page updates (table filters, member toggles, device actions)
+- **Tailwind CSS v4.2.4** — compiled via standalone CLI in Dockerfile
+- **CSP nonces** — URL-safe base64, all JS in external `app.js` (no inline scripts)
+
+### SPA-like Navigation
+Sidebar links use `hx-get` targeting `#page-content` (wraps header + content area). The server returns just the header+content fragment for HTMX requests (`HX-Target: page-content`), preserving the sidebar and `app.js`. Table filter HTMX requests (`HX-Target` is a table div) return only the table fragment.
+
+### Key Files
+```
+internal/api/
+├── web_handlers.go          # Dashboard home, device list/detail/actions
+├── web_handlers_pages.go    # Policy, group, compliance, audit handlers
+├── web_session.go           # OIDC login/callback, CSRF, HMAC session cookies
+├── web_templates.go         # Template engine, helper functions
+├── web_charts.go            # SVG pie chart generator
+├── web_policy_catalog.go    # Settings catalog for policy forms
+├── templates/
+│   ├── base.html            # Layout shell (sidebar, header, content wrapper)
+│   ├── partials/            # Reusable fragments (header, sidebar, pagination)
+│   └── pages/               # Page templates (dashboard, devices, policies, etc.)
+web/static/
+├── js/htmx.min.js           # Vendored HTMX
+├── js/app.js                # All page JS (event delegation, survives content swaps)
+├── css/output.css           # Compiled Tailwind
+└── favicon.svg
+```
+
+### Authentication
+Keycloak OIDC code flow → HMAC-SHA256 signed session cookie. CSRF protection on POST forms (HTMX requests exempt). Dedicated `session_secret` config key with fallback to Keycloak client secret.
 
 ## Data Flow
 

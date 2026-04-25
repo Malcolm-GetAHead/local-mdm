@@ -119,7 +119,7 @@
 ### Previously Deferred Features to be completed
 - [x] HTMX SPA navigation — sidebar links swap header+content via `hx-get` targeting `#page-content`, all inline scripts consolidated into external `app.js` with event delegation
 - [x] Enrich device detail view — Platform Details tab renders platform_data as table (Category/Property/Value) with ✓/✗ for booleans
-- [ ] Visual polish — toast notifications for actions
+- [x] Visual polish — toast notifications on delete/unassign actions via HX-Trigger + showToast event
 - [ ] Playwright multi-select/checkbox testing (policy settings, group member toggles)
 - [x] Policy multi-platform selection — agreed: single platform is fine for now (no change needed)
 
@@ -143,7 +143,7 @@
 - [x] `config.local.yaml` — Keycloak client secret fixed
 - [x] `config.example.yaml` — `/etc/hosts` note and `session_secret` key added
 - [x] `GETTING_STARTED.md` — `/etc/hosts` prerequisite added
-- [ ] Architecture doc — doesn't mention dashboard, templates, or web handlers (would need significant rewrite)
+- [x] Architecture doc — dashboard section added (stack, SPA navigation, key files, auth)
 - [x] `docs/dev/QUICK_REFERENCE.md` — `make css`, `make seed`, `make browser-test`, dashboard URL, web handler files added
 - [x] New Go files documented in QUICK_REFERENCE file location reference
 
