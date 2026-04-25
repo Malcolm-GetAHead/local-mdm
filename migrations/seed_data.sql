@@ -15,7 +15,7 @@ DELETE FROM device_groups WHERE id::text NOT LIKE 'f0000000-0000-0000-0000-%' AN
 -- Enterprise
 INSERT INTO enterprises (id, name, slug, settings) VALUES
   ('00000000-0000-0000-0000-000000000001', 'Acme Corp', 'acme-corp', '{"timezone": "America/New_York", "max_devices": 100}')
-ON CONFLICT (slug) DO NOTHING;
+ON CONFLICT (slug) DO UPDATE SET name = EXCLUDED.name, settings = EXCLUDED.settings;
 
 -- Admin user (password_hash is nullable since Sprint 5c — OIDC-managed users)
 INSERT INTO users (id, enterprise_id, email, full_name, role, is_active) VALUES
@@ -144,5 +144,14 @@ INSERT INTO audit_logs (enterprise_id, user_id, action, resource_type, resource_
   ('00000000-0000-0000-0000-000000000001', 'b0000000-0000-0000-0000-000000000001', 'user.login', 'user', 'b0000000-0000-0000-0000-000000000001', '{"method": "oidc"}', '10.0.1.50', NOW() - interval '1 hour'),
   ('00000000-0000-0000-0000-000000000001', 'b0000000-0000-0000-0000-000000000002', 'user.login', 'user', 'b0000000-0000-0000-0000-000000000002', '{"method": "oidc"}', '10.0.1.100', NOW() - interval '2 hours')
 ;
+
+-- Seed enterprise_id: 00000000-0000-0000-0000-000000000001
+-- This MUST match the Keycloak admin user's enterprise_id attribute
+-- (set in docker/keycloak/realm-export.json → users → attributes → enterprise_id).
+-- If the dashboard shows no seed data after login, verify the JWT claim matches:
+--   curl -s -X POST "http://localhost:8180/realms/localmdm/protocol/openid-connect/token" \
+--     -d "grant_type=password&client_id=localmdm-api&client_secret=localmdm-dev-dashboard-secret-2026&username=admin&password=admin123" \
+--     | python3 -c "import sys,json,base64; t=json.load(sys.stdin)['access_token'].split('.')[1]; t+='='*(4-len(t)%4); print(json.loads(base64.urlsafe_b64decode(t)).get('enterprise_id'))"
+-- Expected output: 00000000-0000-0000-0000-000000000001
 
 COMMIT;
