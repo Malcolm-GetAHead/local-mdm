@@ -213,7 +213,13 @@
 - [ ] Verify table header row is visible
 
 ### Filter by Status
-- [ ] Visit `/dashboard/compliance?status_filter=non_compliant` — page contains "Non-Compliant"
+- [ ] Visit `/dashboard/compliance` — page contains "Compliance"
+- [ ] Click "Non-Compliant"
+- [ ] Wait 0.5s
+- [ ] Verify table header row is visible
+- [ ] Click "Non-Compliant"
+- [ ] Wait 0.5s
+- [ ] Verify table header row is visible
 
 ## Audit Log
 
