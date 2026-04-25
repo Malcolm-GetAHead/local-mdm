@@ -131,23 +131,6 @@
     </div>
 </div>
 
-<script nonce="{{.CSPNonce}}">
-(function(){
-    document.getElementById('device-tabs').addEventListener('click', function(e) {
-        var btn = e.target.closest('.tab-btn');
-        if (!btn) return;
-        var tab = btn.getAttribute('data-tab');
-        document.querySelectorAll('.tab-btn').forEach(function(b) {
-            b.classList.remove('border-blue-600','text-blue-600','dark:text-blue-400');
-            b.classList.add('border-transparent','text-gray-500');
-        });
-        btn.classList.add('border-blue-600','text-blue-600','dark:text-blue-400');
-        btn.classList.remove('border-transparent','text-gray-500');
-        document.querySelectorAll('.tab-panel').forEach(function(p) { p.classList.add('hidden'); });
-        document.getElementById('tab-' + tab).classList.remove('hidden');
-    });
-})();
-</script>
 {{end}}
 
 {{define "compliance_tab"}}

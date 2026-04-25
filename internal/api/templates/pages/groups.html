@@ -25,11 +25,6 @@
     {{template "groups_table_body" .}}
 </div>
 
-<script nonce="{{.CSPNonce}}">
-document.getElementById('toggle-create-form').addEventListener('click', function() {
-    document.getElementById('create-group-form').classList.toggle('hidden');
-});
-</script>
 {{end}}
 
 {{define "groups_table_body"}}

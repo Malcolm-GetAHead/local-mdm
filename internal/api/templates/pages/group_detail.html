@@ -32,30 +32,6 @@
 
 {{template "member_list" .}}
 
-<script nonce="{{.CSPNonce}}">
-(function(){
-    var filter = document.getElementById('member-filter');
-    if(filter) {
-        var timer;
-        filter.addEventListener('keydown', function(e) { if (e.key === 'Enter') e.preventDefault(); });
-        filter.addEventListener('input', function() {
-            clearTimeout(timer);
-            timer = setTimeout(function() {
-                var q = filter.value.toLowerCase();
-                document.querySelectorAll('[data-device-name]').forEach(function(row) {
-                    row.classList.toggle('hidden', !row.getAttribute('data-device-name').toLowerCase().includes(q));
-                });
-            }, 200);
-        });
-    }
-    var editBtn = document.getElementById('edit-group-btn');
-    var cancelBtn = document.getElementById('cancel-edit-btn');
-    var display = document.getElementById('group-display');
-    var form = document.getElementById('group-edit-form');
-    if(editBtn) editBtn.addEventListener('click', function(){ display.classList.add('hidden'); form.classList.remove('hidden'); });
-    if(cancelBtn) cancelBtn.addEventListener('click', function(){ form.classList.add('hidden'); display.classList.remove('hidden'); });
-})();
-</script>
 {{end}}
 
 {{define "member_list"}}

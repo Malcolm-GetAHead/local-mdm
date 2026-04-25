@@ -58,29 +58,6 @@
     </div>
 </form>
 
-<script nonce="{{.CSPNonce}}">
-(function() {
-    var filter = document.getElementById('settings-filter');
-    if (!filter) return;
-    var timer;
-    filter.addEventListener('keydown', function(e) { if (e.key === 'Enter') e.preventDefault(); });
-    filter.addEventListener('input', function() {
-        clearTimeout(timer);
-        timer = setTimeout(function() { filterSettings(filter.value); }, 200);
-    });
-})();
-function filterSettings(q) {
-    q = q.toLowerCase();
-    document.querySelectorAll('[data-setting]').forEach(function(el) {
-        var text = el.getAttribute('data-setting').toLowerCase();
-        el.classList.toggle('hidden', !text.includes(q));
-    });
-    document.querySelectorAll('[data-category]').forEach(function(cat) {
-        var visible = cat.querySelectorAll('[data-setting]:not(.hidden)').length;
-        cat.classList.toggle('hidden', visible === 0);
-    });
-}
-</script>
 {{end}}
 
 {{define "settings_catalog_body"}}

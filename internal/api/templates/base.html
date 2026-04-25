@@ -8,6 +8,7 @@
     <link rel="stylesheet" href="/static/css/output.css">
     <meta name="htmx-config" content='{"inlineStyleNonce":"{{.CSPNonce}}"}'>
     <script src="/static/js/htmx.min.js"></script>
+    <script src="/static/js/app.js" nonce="{{.CSPNonce}}"></script>
 </head>
 <body class="bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 min-h-screen">
     <noscript>
@@ -20,9 +21,11 @@
     <div class="flex min-h-screen">
         {{template "sidebar" .}}
         <main class="flex-1 md:ml-64">
+            <div id="page-content">
             {{template "header" .}}
             <div class="p-4 md:p-8">
                 {{block "content" .}}{{end}}
+            </div>
             </div>
         </main>
     </div>

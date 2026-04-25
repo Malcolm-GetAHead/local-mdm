@@ -66,26 +66,4 @@
 </div>
 {{end}}
 
-<script nonce="{{.CSPNonce}}">
-(function(){
-    function wireSearch(inputId, selectId) {
-        var input = document.getElementById(inputId);
-        var select = document.getElementById(selectId);
-        if (!input || !select) return;
-        var timer;
-        input.addEventListener('keydown', function(e) { if (e.key === 'Enter') e.preventDefault(); });
-        input.addEventListener('input', function() {
-            clearTimeout(timer);
-            timer = setTimeout(function() {
-                var q = input.value.toLowerCase();
-                Array.from(select.options).forEach(function(opt) {
-                    opt.hidden = q.length > 0 && !opt.getAttribute('data-search').toLowerCase().includes(q);
-                });
-            }, 300);
-        });
-    }
-    wireSearch('group-search', 'group-select');
-    wireSearch('device-search', 'device-select');
-})();
-</script>
 {{end}}

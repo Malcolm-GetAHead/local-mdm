@@ -37,6 +37,18 @@ func (s *Server) renderPage(w http.ResponseWriter, r *http.Request, name string,
 		data["CSRFToken"] = csrf
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	// HTMX sidebar navigation: return header+content fragment only
+	if isHTMX(r) && r.Header.Get("HX-Target") == "page-content" {
+		if err := tmpl.ExecuteTemplate(w, "header", data); err != nil {
+			s.logger.Error("Template render error", "template", name, "error", err)
+		}
+		fmt.Fprint(w, `<div class="p-4 md:p-8">`)
+		if err := tmpl.ExecuteTemplate(w, "content", data); err != nil {
+			s.logger.Error("Template render error", "template", name, "error", err)
+		}
+		fmt.Fprint(w, `</div>`)
+		return
+	}
 	if err := tmpl.ExecuteTemplate(w, "base", data); err != nil {
 		s.logger.Error("Template render error", "template", name, "error", err)
 	}

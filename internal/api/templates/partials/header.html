@@ -18,22 +18,4 @@
         {{end}}
     </div>
 </header>
-<script nonce="{{.CSPNonce}}">
-(function(){
-    if(localStorage.getItem('darkMode')==='true') document.documentElement.classList.add('dark');
-    document.getElementById('dark-toggle').addEventListener('click', function(){
-        document.documentElement.classList.toggle('dark');
-        localStorage.setItem('darkMode', document.documentElement.classList.contains('dark'));
-    });
-    var sidebar = document.getElementById('sidebar');
-    var backdrop = document.getElementById('sidebar-backdrop');
-    var toggle = document.getElementById('menu-toggle');
-    function openMenu() { sidebar.classList.remove('-translate-x-full'); backdrop.classList.remove('hidden'); }
-    function closeMenu() { sidebar.classList.add('-translate-x-full'); backdrop.classList.add('hidden'); }
-    if (toggle) toggle.addEventListener('click', function() {
-        sidebar.classList.contains('-translate-x-full') ? openMenu() : closeMenu();
-    });
-    if (backdrop) backdrop.addEventListener('click', closeMenu);
-})();
-</script>
 {{end}}

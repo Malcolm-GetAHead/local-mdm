@@ -17,18 +17,6 @@
     {{template "audit_table_body" .}}
 </div>
 
-<script nonce="{{.CSPNonce}}">
-document.addEventListener('click', function(e) {
-    var row = e.target.closest('[data-expand="audit"]');
-    if (!row) return;
-    var detail = row.nextElementSibling;
-    if (detail && detail.classList.contains('detail-row')) {
-        detail.classList.toggle('hidden');
-        var arrow = row.querySelector('.expand-arrow');
-        if (arrow) arrow.textContent = detail.classList.contains('hidden') ? '▶' : '▼';
-    }
-});
-</script>
 {{end}}
 
 {{define "audit_table_body"}}
