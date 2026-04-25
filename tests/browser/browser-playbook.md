@@ -214,7 +214,6 @@
 
 ### Filter by Status
 - [ ] Visit `/dashboard/compliance?status_filter=non_compliant` — page contains "Non-Compliant"
-- [ ] Verify "Clear Filter" is visible
 
 ## Audit Log
 

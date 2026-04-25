@@ -49,15 +49,21 @@
                 <th class="px-6 py-3">Status</th>
             </tr>
         </thead>
-        <tbody class="divide-y divide-gray-200">
+        {{template "member_tbody" .}}
+    </table>
+</div>
+{{end}}
+
+{{define "member_tbody"}}
+<tbody id="member-tbody" class="divide-y divide-gray-200">
             {{range .AllDevices}}
             <tr class="hover:bg-gray-50" data-device-name="{{.Name}} {{.Platform}} {{.Model}}">
                 <td class="px-6 py-3">
                     {{if .InGroup}}
-                    <button hx-post="/dashboard/groups/{{$.Group.ID}}/members/{{.ID}}/remove" hx-target="#member-list" hx-swap="outerHTML"
+                    <button hx-post="/dashboard/groups/{{$.Group.ID}}/members/{{.ID}}/remove" hx-target="#member-tbody" hx-swap="outerHTML"
                             class="badge badge-green cursor-pointer">✓ In Group</button>
                     {{else}}
-                    <button hx-post="/dashboard/groups/{{$.Group.ID}}/members/{{.ID}}/add" hx-target="#member-list" hx-swap="outerHTML"
+                    <button hx-post="/dashboard/groups/{{$.Group.ID}}/members/{{.ID}}/add" hx-target="#member-tbody" hx-swap="outerHTML"
                             class="badge badge-gray cursor-pointer">Add</button>
                     {{end}}
                 </td>
@@ -70,7 +76,5 @@
                 </td>
             </tr>
             {{end}}
-        </tbody>
-    </table>
-</div>
+</tbody>
 {{end}}

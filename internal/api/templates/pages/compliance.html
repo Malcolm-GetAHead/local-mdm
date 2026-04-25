@@ -24,9 +24,6 @@
     <input type="hidden" name="status_filter" value="{{.Filter.StatusFilter}}">
     <input type="hidden" name="sort" value="{{.Filter.Sort}}">
     <input type="hidden" name="dir" value="{{.Filter.Dir}}">
-    {{if .Filter.StatusFilter}}
-    <a href="/dashboard/compliance" class="btn-secondary text-xs">Clear Filter</a>
-    {{end}}
 </div>
 
 <div id="compliance-table">

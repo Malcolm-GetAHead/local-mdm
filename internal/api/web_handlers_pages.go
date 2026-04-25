@@ -681,7 +681,7 @@ func (s *Server) renderGroupMemberList(w http.ResponseWriter, r *http.Request, g
 		"Group":      group,
 		"AllDevices": rows,
 	}
-	s.renderFragment(w, s.webTemplates["group_detail"], "member_list", data)
+	s.renderFragment(w, s.webTemplates["group_detail"], "member_tbody", data)
 }
 
 // handleWebGroupEdit updates a group's name/description.

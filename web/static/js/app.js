@@ -26,6 +26,18 @@
         }
     });
 
+    // ── Sidebar active highlight on HTMX navigation ──
+    document.body.addEventListener('htmx:pushedIntoHistory', function() {
+        var path = window.location.pathname.replace(/\/$/, '');
+        document.querySelectorAll('#sidebar a').forEach(function(a) {
+            var href = a.getAttribute('href').replace(/\/$/, '');
+            var isActive = (path === href) || (href === '/dashboard' && path === '/dashboard');
+            a.classList.toggle('bg-gray-100', isActive);
+            a.classList.toggle('dark:bg-gray-700', isActive);
+            a.classList.toggle('font-medium', isActive);
+        });
+    });
+
     // ── Audit log expand ──
     document.addEventListener('click', function(e) {
         var row = e.target.closest('[data-expand="audit"]');
@@ -79,6 +91,7 @@
 
     // ── Chart hover highlight ──
     document.addEventListener('mouseenter', function(e) {
+        if (!e.target || !e.target.closest) return;
         var el = e.target.closest('[data-slice]');
         if (!el) return;
         var chart = el.closest('[data-chart]');
@@ -91,6 +104,7 @@
         });
     }, true);
     document.addEventListener('mouseleave', function(e) {
+        if (!e.target || !e.target.closest) return;
         var el = e.target.closest('[data-slice]');
         if (!el) return;
         var chart = el.closest('[data-chart]');
