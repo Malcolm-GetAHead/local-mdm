@@ -125,6 +125,25 @@
 - **EventBus compliance evaluation is fire-and-forget** — no retry on failure. Fix: `event_queue` table + background retry worker (5 attempts, then audit log failure).
 - **Session cookie HMAC key uses Keycloak client secret** — if secret rotates, sessions invalidate. Fix: dedicated `session_secret` config key, source from AWS SSM in prod.
 
+### Test Coverage Gaps
+- [ ] `internal/api` coverage dropped from 67.8% to 36.9% — ~800 lines of web handler code with zero Go unit tests
+- [ ] No Go unit tests for any dashboard handler (web_handlers.go, web_handlers_pages.go)
+- [ ] No Go integration test for OIDC callback flow
+- [ ] No Go integration test for CSRF validation
+- [ ] No Go integration test for session cookie HMAC verification
+- [ ] `DeviceService.Unenroll` method has no unit test
+- [ ] `reporting.ComplianceRow.Details` field added but no test updated
+- [ ] `internal/auth` and `internal/db` tests FAIL without Docker (pre-existing)
+
+### Documentation Gaps
+- [ ] `docs/TESTING.md` — no mention of Playwright browser tests, `make browser-test`, or playbook DSL
+- [ ] `config.local.yaml` — still has wrong Keycloak client secret (`localmdm-docker-dev-keycloak-secret` vs `localmdm-dev-dashboard-secret-2026`)
+- [ ] `config.example.yaml` — doesn't mention Keycloak port 8180 or `/etc/hosts` requirement
+- [ ] `GETTING_STARTED.md` — doesn't mention `/etc/hosts` entry for dashboard Keycloak login
+- [ ] Architecture doc — doesn't mention dashboard, templates, or web handlers
+- [ ] `docs/dev/QUICK_REFERENCE.md` — doesn't mention `make css`, `make seed`, `make browser-test`
+- [ ] New Go files not documented in file location reference: `web_handlers.go`, `web_session.go`, `web_templates.go`, `web_charts.go`, `web_policy_catalog.go`, `docker/entrypoint.sh`
+
 ---
 
 ## Architecture
