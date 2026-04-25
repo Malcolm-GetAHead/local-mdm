@@ -413,6 +413,14 @@ func buildComplianceRows(results []*models.ComplianceResult, s *Server) []map[st
 			})
 		}
 	}
+	sort.Slice(rows, func(i, j int) bool {
+		pi := rows[i]["PolicyName"].(string)
+		pj := rows[j]["PolicyName"].(string)
+		if pi != pj {
+			return pi < pj
+		}
+		return rows[i]["Setting"].(string) < rows[j]["Setting"].(string)
+	})
 	return rows
 }
 
