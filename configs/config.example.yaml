@@ -67,10 +67,11 @@ auth:
     worker_count: 3      # Number of background workers
 
 keycloak:
-  url: "http://localhost:8180"
+  url: "http://localhost:8180"  # Port 8180 same internal/external. Add `127.0.0.1 keycloak` to /etc/hosts for dashboard login.
   realm: "localmdm"
   client_id: "localmdm-api"
   client_secret: "REPLACE_WITH_ENV_VAR"  # CRITICAL: Set KEYCLOAK_CLIENT_SECRET environment variable
+  session_secret: ""  # Optional: dedicated HMAC key for dashboard sessions. Falls back to client_secret.
 
 certificates:
   ca_cert_path: "./certs/ca.crt"

@@ -31,6 +31,9 @@ make run            # Start server
 | `make prod-test` | Build prod + run full E2E suite |
 | `make docker-up` | Start infrastructure services |
 | `make docker-down` | Stop all containers |
+| `make seed` | Reset seed data (run before browser tests) |
+| `make browser-test` | Run Playwright browser tests (113 tests) |
+| `make css` | Compile Tailwind CSS (requires ./tailwindcss binary) |
 | `make migrate-create NAME=xxx` | Create new migration |
 | `go vet ./...` | Static analysis (can run on host) |
 
@@ -38,9 +41,11 @@ make run            # Start server
 
 | Service | URL |
 |---------|-----|
+| Dashboard | http://localhost:8080/dashboard/ |
 | API Server | http://localhost:8080 |
 | Health Check | http://localhost:8080/health |
 | Version | http://localhost:8080/version |
+| Keycloak | http://localhost:8180 (requires `/etc/hosts` entry for `keycloak`) |
 | Prometheus Metrics | http://127.0.0.1:9090/metrics (internal only) |
 | Adminer (DB UI) | http://localhost:8081 |
 
@@ -51,6 +56,12 @@ local-mdm/
 ├── cmd/server/              # Main application entry point
 ├── internal/
 │   ├── api/                 # HTTP handlers, middleware, routing
+│   │   ├── web_handlers.go      # Dashboard handlers (HTML)
+│   │   ├── web_handlers_pages.go # Policy/group/compliance/audit pages
+│   │   ├── web_session.go       # OIDC session, CSRF, HMAC cookies
+│   │   ├── web_templates.go     # Template engine, helper functions
+│   │   ├── web_charts.go        # SVG pie chart generator
+│   │   └── web_policy_catalog.go # Settings catalog for policy forms
 │   ├── apperrors/           # Structured application errors
 │   ├── audit/               # Async audit logging
 │   ├── auth/                # OIDC authentication (Keycloak)

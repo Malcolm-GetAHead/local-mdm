@@ -185,7 +185,45 @@ func TestService_CreateDevice(t *testing.T) {
 }
 ```
 
-## Current Coverage (Sprint 5f)
+## Browser Tests (Playwright)
+
+The dashboard UI is tested with Playwright via a markdown-based playbook DSL.
+
+### Running Browser Tests
+```bash
+make seed          # Reset test data (run before each test)
+make browser-test  # Run all 113 Playwright tests headless
+```
+
+For visual debugging:
+```bash
+cd tests/browser && node run-playbook.js --headed
+```
+
+Run a specific section:
+```bash
+cd tests/browser && node run-playbook.js --section "Groups"
+```
+
+### Playbook DSL
+
+Tests are defined in `tests/browser/browser-playbook.md` using a simple DSL:
+- `Visit /path` — navigate to URL
+- `Navigate to "Link"` — click a sidebar/nav link
+- `Fill: field=value` — fill form fields
+- `Click "Button"` — click a button or link
+- `Select "Option" from "dropdown"` — select dropdown option
+- `Verify "text" is visible` / `is not visible` — assert text presence
+- `Wait Ns` — pause for timing-sensitive operations
+
+### Key Notes
+- Tests run against the live Docker stack (localhost:8080)
+- Real Keycloak login — no cookie bypass
+- Console errors and HTTP 4xx/5xx are tracked and fail the run
+- Seed data enterprise_id differs from Keycloak user — tests create their own data
+- Run `make seed` before each test run to clean up mutations from previous runs
+
+## Current Coverage (Sprint 5d)
 
 | Package | Coverage | Notes |
 |---------|----------|-------|
