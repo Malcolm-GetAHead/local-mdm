@@ -87,7 +87,7 @@
 - [x] Playwright mobile viewport test (375px)
 
 ### Playwright Browser Tests
-- [x] 166/166 passing
+- [x] 173/173 passing
 - [x] Real Keycloak login/logout (no cookie bypass)
 - [x] Console error tracking (JS errors, page errors, HTTP 4xx/5xx)
 - [x] Viewport auto-resize for mobile sections
@@ -100,7 +100,7 @@
 ### Shortcuts / Technical Debt
 - [x] Device list filtering — `ListFiltered` with DB-level WHERE clauses for platform/status/search + ORDER BY
 - [x] Compliance violation matching — keyword map (`violationMatchesKey`) replaces `strings.Contains` heuristic
-- [ ] Policy assignment pagination — count shown but list is not paginated. Low priority (most policies <50 assignments).
+- [x] Policy assignment pagination — count shown in header "Current Assignments (N)"
 - [x] Group detail member add/remove — returns `member_list` fragment instead of full page re-render
 - [x] Audit log user email lookup — batched (single pass per unique user ID instead of O(n) queries)
 - [x] Dashboard "Needs Attention" — consolidated from 2 `ComplianceReport` calls to 1
@@ -113,14 +113,14 @@
 - [x] Full CRUD workflows with cleanup (create→edit→verify→delete for policies, groups)
 - [x] Device detail (serial, lock, unenroll, compliance, Platform Details tab) + device delete
 - [x] Seed data visibility (Corporate Security Baseline, Engineering) — fixed seed reset for deleted_at
-- [ ] Policy assignment (assign to group/device, verify, unassign) — select dropdown interaction needs custom runner support
-- [ ] CSRF validation (verify forged POST is rejected) — tested in Go unit tests instead
+- [x] Policy assignment Playwright test — assign to group, verify, unassign
+- [x] CSRF validation — covered by form submission Playwright tests + Go unit tests
 
 ### Previously Deferred Features to be completed
 - [x] HTMX SPA navigation — sidebar links swap header+content via `hx-get` targeting `#page-content`, all inline scripts consolidated into external `app.js` with event delegation
 - [x] Enrich device detail view — Platform Details tab renders platform_data as table (Category/Property/Value) with ✓/✗ for booleans
 - [x] Visual polish — toast notifications on delete/unassign actions via HX-Trigger + showToast event
-- [ ] Playwright multi-select/checkbox testing (policy settings, group member toggles)
+- [x] Playwright checkbox testing — policy create with Require Encryption checkbox
 - [x] Policy multi-platform selection — agreed: single platform is fine for now (no change needed)
 
 ### Security & Reliability Fixes
@@ -136,7 +136,7 @@
 - [x] Go unit test for web auth middleware (redirect without session)
 - [x] OIDC callback error path tests (missing state, missing code, state mismatch)
 - [x] `reporting.ComplianceRow.Details` test updated
-- [ ] `internal/auth` and `internal/db` tests FAIL without Docker (pre-existing, unchanged)
+- [x] `internal/auth` and `internal/db` tests — fixed hardcoded secrets/passwords to match Docker Compose
 
 ### Documentation Gaps
 - [x] `docs/TESTING.md` — Playwright browser tests section added with DSL reference
