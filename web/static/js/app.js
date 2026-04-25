@@ -117,17 +117,29 @@
     // ── Debounced filter inputs ──
     // Handles: member-filter, settings-filter, group-search/group-select, device-search/device-select
     var filterTimers = {};
+
+    function applyMemberFilter() {
+        var el = document.getElementById('member-filter');
+        if (!el || !el.value) return;
+        var q = el.value.toLowerCase();
+        document.querySelectorAll('[data-device-name]').forEach(function(row) {
+            row.classList.toggle('hidden', !row.getAttribute('data-device-name').toLowerCase().includes(q));
+        });
+    }
+
+    // Re-apply member filter after HTMX swaps the tbody
+    document.body.addEventListener('htmx:afterSwap', function(e) {
+        if (e.detail.target && e.detail.target.id === 'member-tbody') {
+            applyMemberFilter();
+        }
+    });
+
     document.addEventListener('input', function(e) {
         var el = e.target;
         // Member filter (group detail)
         if (el.id === 'member-filter') {
             clearTimeout(filterTimers.member);
-            filterTimers.member = setTimeout(function() {
-                var q = el.value.toLowerCase();
-                document.querySelectorAll('[data-device-name]').forEach(function(row) {
-                    row.classList.toggle('hidden', !row.getAttribute('data-device-name').toLowerCase().includes(q));
-                });
-            }, 200);
+            filterTimers.member = setTimeout(applyMemberFilter, 200);
         }
         // Settings filter (policy form)
         if (el.id === 'settings-filter') {
