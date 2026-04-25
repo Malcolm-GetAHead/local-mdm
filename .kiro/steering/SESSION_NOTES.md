@@ -8,8 +8,8 @@
 - **Sprint 5b**: ✅ COMPLETE, on branch `sprint-5b/eventbus` (not yet merged to main)
 - **Sprint 5f**: ✅ COMPLETE, on branch `sprint-5f/api-hardening` (not yet merged to main)
 - **Sprint 5e**: ✅ COMPLETE, merged to main
+- **Sprint 5d**: 🟡 IN PROGRESS, on branch `sprint-5d/web-dashboard`
 - **Retrospective**: Pending (Sprint 5b)
-- **Next sprint**: **5d** (Web dashboard, HTMX)
 
 ---
 
@@ -113,5 +113,5 @@
 | 5e | ✅ Complete | NanoMDM cert verification fix (path bug), assert.ErrorIs migration, SCEP tests, coverage improvements |
 | 5f | ✅ Complete | API hardening, explicit CA generation, test DB helper consolidation |
 | 5b | ✅ Complete | EventBus listener, compliance wiring, lifecycle hooks, k6 load tests |
-| 5d | 🔲 Not Started | Web dashboard (HTMX) |
+| 5d | 🟡 In Progress | Web dashboard (HTMX) |
 | 6 | 🔲 Not Started | macOS Platform SSO (Java/Swift) — requires Apple Developer account |

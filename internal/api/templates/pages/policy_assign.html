@@ -14,6 +14,7 @@
     <div class="card">
         <h3 class="text-sm font-semibold mb-4">Assign to Group</h3>
         <form method="POST" action="/dashboard/policies/{{.Policy.ID}}/assign" class="space-y-3">
+            {{csrfField .CSRFToken}}
             <input type="hidden" name="target_type" value="group">
             <input type="search" id="group-search" placeholder="Search groups..." class="input-field mb-2"
                    autocomplete="off">
@@ -29,6 +30,7 @@
     <div class="card">
         <h3 class="text-sm font-semibold mb-4">Assign to Device</h3>
         <form method="POST" action="/dashboard/policies/{{.Policy.ID}}/assign" class="space-y-3">
+            {{csrfField .CSRFToken}}
             <input type="hidden" name="target_type" value="device">
             <input type="search" id="device-search" placeholder="Search by name, model, serial, platform..." class="input-field mb-2"
                    autocomplete="off">

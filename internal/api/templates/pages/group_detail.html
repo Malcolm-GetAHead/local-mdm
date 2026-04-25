@@ -14,6 +14,7 @@
         <button id="edit-group-btn" class="btn-secondary text-xs">Edit</button>
     </div>
     <form id="group-edit-form" method="POST" action="/dashboard/groups/{{.Group.ID}}/edit" class="hidden space-y-3">
+        {{csrfField .CSRFToken}}
         <div>
             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Name</label>
             <input type="text" name="name" value="{{.Group.Name}}" required class="input-field">
