@@ -133,7 +133,7 @@ func TestComplianceReport_WithData(t *testing.T) {
 
 	_, err = db.ExecContext(ctx,
 		`INSERT INTO compliance_results (id, device_id, policy_id, status, details, evaluated_at)
-		 VALUES ($1, $2, $3, 'compliant', '{}', NOW())`,
+		 VALUES ($1, $2, $3, 'compliant', '{"violations": []}', NOW())`,
 		uuid.New(), devID, polID)
 	require.NoError(t, err)
 
@@ -144,6 +144,7 @@ func TestComplianceReport_WithData(t *testing.T) {
 	assert.Equal(t, "Surface", rows[0].DeviceName)
 	assert.Equal(t, "compliant", rows[0].Status)
 	assert.Equal(t, "Security Policy", rows[0].PolicyName)
+	assert.NotNil(t, rows[0].Details)
 }
 
 func TestEnrollmentReport_WithData(t *testing.T) {

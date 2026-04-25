@@ -203,3 +203,29 @@ func TestWebAuthMiddleware_RedirectsWithoutSession(t *testing.T) {
 	assert.Equal(t, http.StatusFound, rec.Code)
 	assert.Contains(t, rec.Header().Get("Location"), "/dashboard/login")
 }
+
+func TestWebCallback_MissingState(t *testing.T) {
+	ts := newTestServer(t)
+	r, _ := http.NewRequest("GET", "/dashboard/callback?code=test", nil)
+	w := httptest.NewRecorder()
+	ts.server.handleWebCallback(w, r)
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+}
+
+func TestWebCallback_MissingCode(t *testing.T) {
+	ts := newTestServer(t)
+	r, _ := http.NewRequest("GET", "/dashboard/callback?state=abc", nil)
+	r.AddCookie(&http.Cookie{Name: "oauth_state", Value: "abc"})
+	w := httptest.NewRecorder()
+	ts.server.handleWebCallback(w, r)
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+}
+
+func TestWebCallback_StateMismatch(t *testing.T) {
+	ts := newTestServer(t)
+	r, _ := http.NewRequest("GET", "/dashboard/callback?state=wrong&code=test", nil)
+	r.AddCookie(&http.Cookie{Name: "oauth_state", Value: "expected"})
+	w := httptest.NewRecorder()
+	ts.server.handleWebCallback(w, r)
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+}
