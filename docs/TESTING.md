@@ -242,7 +242,7 @@ Tests are defined in `tests/browser/browser-playbook.md` using a simple DSL:
 | scep | 75.9% | |
 | windows | 69.7% | |
 | reporting | 67.9% | |
-| api | 67.8% | Was 48.8% pre-5f |
+| api | 41.4% | Was 67.8% pre-5d (new web handler code); 173 Playwright browser tests cover UI |
 | metrics | 65.0% | |
 | android | 61.6% | |
 

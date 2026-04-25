@@ -86,8 +86,6 @@
 - **pq.Listener spawns uncontrollable reconnect goroutine** — EventBus.Start() does a pre-flight sql.Open+Ping before creating the listener to avoid hangs. If you see EventBus connection issues, check the DSN has `connect_timeout`.
 - **F-07 expanded significantly in Sprint 5b** — 12 new features added (iOS, kiosk, lost mode, selective wipe, OS updates, inventory, zero-touch, alerting, self-service, app store, conditional access sync, SCIM). Review before planning next sprints.
 - **Recovery key escrow tracked in F-03** — gap analysis with 7 specific items (migration, repo, profile payloads, response parsing, API endpoint). Depends on F-01.
-- **EventBus compliance evaluation is fire-and-forget** (Sprint 5d) — if evaluation fails after a policy.assigned event, there's no retry. The user must click "Re-evaluate" on the device detail page. Fix: add `event_queue` table with `retry_count`, background worker retries up to 5 times, then logs failure to audit_logs. Tracked for next sprint.
-- **Session cookie HMAC key uses Keycloak client secret** (Sprint 5d) — if the client secret rotates, all dashboard sessions invalidate. Fix: add `session_secret` config key (source from AWS SSM in prod), fall back to client secret if not set.
 
 ## Project-Specific Knowledge
 

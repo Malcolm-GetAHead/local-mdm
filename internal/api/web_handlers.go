@@ -558,39 +558,3 @@ func buildPlatformDetails(pd models.JSONB) []platformDetailGroup {
 	}
 	return result
 }
-
-func sortDevices(devices []*models.Device, field, dir string) {
-	sort.Slice(devices, func(i, j int) bool {
-		var less bool
-		switch field {
-		case "name":
-			less = strings.ToLower(devices[i].Name) < strings.ToLower(devices[j].Name)
-		case "platform":
-			less = devices[i].Platform < devices[j].Platform
-		case "model":
-			less = strings.ToLower(devices[i].Model) < strings.ToLower(devices[j].Model)
-		case "os_version":
-			less = devices[i].OSVersion < devices[j].OSVersion
-		case "status":
-			less = devices[i].Status < devices[j].Status
-		case "last_seen":
-			ti, tj := devices[i].LastSeen, devices[j].LastSeen
-			if ti == nil && tj == nil {
-				return false
-			}
-			if ti == nil {
-				return true
-			}
-			if tj == nil {
-				return false
-			}
-			less = ti.Before(*tj)
-		default:
-			less = strings.ToLower(devices[i].Name) < strings.ToLower(devices[j].Name)
-		}
-		if dir == "desc" {
-			return !less
-		}
-		return less
-	})
-}

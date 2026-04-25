@@ -502,7 +502,7 @@ func (c *Config) validateSecrets() error {
 	if c.Keycloak.ClientSecret == "" {
 		return fmt.Errorf("CRITICAL: keycloak client_secret is required")
 	}
-	if c.Keycloak.ClientSecret == "localmdm-api-secret" {
+	if c.Keycloak.ClientSecret == "localmdm-api-secret" || c.Keycloak.ClientSecret == "REPLACE_WITH_ENV_VAR" {
 		return fmt.Errorf("CRITICAL: keycloak client_secret must be changed from default value")
 	}
 	if len(c.Keycloak.ClientSecret) < 16 {

@@ -32,22 +32,6 @@ func TestViolationMatchesKey(t *testing.T) {
 	}
 }
 
-func TestSortDevices(t *testing.T) {
-	d1 := &models.Device{Name: "Bravo", Platform: "macos"}
-	d2 := &models.Device{Name: "Alpha", Platform: "windows"}
-	devices := []*models.Device{d1, d2}
-
-	sortDevices(devices, "name", "asc")
-	assert.Equal(t, "Alpha", devices[0].Name)
-	assert.Equal(t, "Bravo", devices[1].Name)
-
-	sortDevices(devices, "name", "desc")
-	assert.Equal(t, "Bravo", devices[0].Name)
-
-	sortDevices(devices, "platform", "asc")
-	assert.Equal(t, "macos", devices[0].Platform)
-}
-
 func TestIsHTMX(t *testing.T) {
 	r, _ := http.NewRequest("GET", "/", nil)
 	assert.False(t, isHTMX(r))
