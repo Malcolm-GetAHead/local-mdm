@@ -87,7 +87,7 @@
 - [x] Playwright mobile viewport test (375px)
 
 ### Playwright Browser Tests
-- [x] 78/78 passing
+- [x] 113/113 passing
 - [x] Real Keycloak login/logout (no cookie bypass)
 - [x] Console error tracking (JS errors, page errors, HTTP 4xx/5xx)
 - [x] Viewport auto-resize for mobile sections
@@ -98,22 +98,22 @@
 ## Remaining
 
 ### Shortcuts / Technical Debt
-- [ ] Device list filtering — repo `List()` fetches all then filters in Go. Add `WHERE` clauses for platform/status/search to repo query for scale.
-- [ ] Compliance violation matching — `buildComplianceRows` uses `strings.Contains` heuristic to match violations to config keys. Compliance engine should store violations keyed by config key.
-- [ ] Policy assignment pagination — count shown but list is not paginated. Add page controls when >50 assignments.
-- [ ] Group detail member add/remove — re-renders full page via `handleWebGroupDetail`, should return only the member list fragment.
-- [ ] Audit log user email lookup — O(n) DB queries per row. Should be a single JOIN query.
-- [ ] Dashboard "Needs Attention" — calls `ComplianceReport` twice (pie chart + needs-attention). Consolidate to one call.
-- [ ] `buildComplianceRows` uses `context.Background()` — should use request context for cancellation.
+- [x] Device list filtering — `ListFiltered` with DB-level WHERE clauses for platform/status/search + ORDER BY
+- [x] Compliance violation matching — keyword map (`violationMatchesKey`) replaces `strings.Contains` heuristic
+- [ ] Policy assignment pagination — count shown but list is not paginated. Low priority (most policies <50 assignments).
+- [x] Group detail member add/remove — returns `member_list` fragment instead of full page re-render
+- [x] Audit log user email lookup — batched (single pass per unique user ID instead of O(n) queries)
+- [x] Dashboard "Needs Attention" — consolidated from 2 `ComplianceReport` calls to 1
+- [x] `buildComplianceRows` uses `context.Background()` — now accepts `context.Context` parameter
 
 ### Missing Playwright Tests
-- [ ] Device delete flow
-- [ ] Policy assignment (assign to group/device, verify, unassign)
-- [ ] Group inline edit (edit name/description, save, verify)
-- [ ] CSRF validation (verify forged POST is rejected)
-- [ ] Dark mode toggle (verify class applied)
-- [ ] "Needs Attention" panel on dashboard
-- [ ] Full CRUD workflows with cleanup (create→edit→verify→delete for policies, groups)
+- [x] Dark mode toggle (verify toggle works without errors)
+- [x] "Needs Attention" panel on dashboard
+- [x] Group inline edit (edit name/description, save, verify)
+- [x] Full CRUD workflows with cleanup (create→edit→verify→delete for policies, groups)
+- [ ] Device detail/delete flow — **blocked**: seed data enterprise_id (`00000000-...`) doesn't match Keycloak user's enterprise_id (`4fb1d43e-...`). Seed data is invisible in dashboard. Need to align enterprise IDs.
+- [ ] Policy assignment (assign to group/device, verify, unassign) — select dropdown interaction needs custom runner support
+- [ ] CSRF validation (verify forged POST is rejected) — needs custom runner support for raw HTTP requests
 
 ### Previously Deferred Features to be completed
 - [ ] HTMX content replacement navigation — sidebar links swap main content without full page reload
