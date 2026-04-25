@@ -44,6 +44,7 @@ keycloak:
   realm: "localmdm"
   client_id: "localmdm-api"
   client_secret: "localmdm-dev-dashboard-secret-2026"
+  session_secret: "" # Optional: dedicated HMAC key for sessions. Falls back to client_secret.
 
 certificates:
   ca_cert_path: "/app/certs/ca.crt"

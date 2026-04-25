@@ -303,7 +303,7 @@ func New(cfg *config.Config, database *db.DB, logger *slog.Logger) (*Server, err
 	s.complianceService = service.NewComplianceService(complianceRepo, s.groupService, s.policyRepo, s.deviceRepo, logger)
 
 	// Initialize EventBus (LISTEN/NOTIFY on Writer pool DSN)
-	s.eventBus = service.NewEventBus(cfg.Database.DSN(), logger)
+	s.eventBus = service.NewEventBus(cfg.Database.DSN(), database.Writer, logger)
 
 	// Register compliance auto-evaluation subscribers
 	s.eventBus.Subscribe("device.enrolled", func(ctx context.Context, event service.MDMEvent) error {

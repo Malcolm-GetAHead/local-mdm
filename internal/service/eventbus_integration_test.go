@@ -27,7 +27,7 @@ func testDSN() string {
 }
 
 func TestEventBus_StartStop_RealDB(t *testing.T) {
-	eb := NewEventBus(testDSN(), slog.Default())
+	eb := NewEventBus(testDSN(), nil, slog.Default())
 
 	err := eb.Start(context.Background())
 	if err != nil {
@@ -50,7 +50,7 @@ func TestEventBus_StartStop_RealDB(t *testing.T) {
 }
 
 func TestEventBus_StartStop_BadDSN(t *testing.T) {
-	eb := NewEventBus("host=192.0.2.1 port=5432 dbname=nope sslmode=disable connect_timeout=1", slog.Default())
+	eb := NewEventBus("host=192.0.2.1 port=5432 dbname=nope sslmode=disable connect_timeout=1", nil, slog.Default())
 
 	err := eb.Start(context.Background())
 	// Should return an error, not hang forever
@@ -61,7 +61,7 @@ func TestEventBus_StartStop_BadDSN(t *testing.T) {
 }
 
 func TestEventBus_StartStop_EmptyDSN(t *testing.T) {
-	eb := NewEventBus("", slog.Default())
+	eb := NewEventBus("", nil, slog.Default())
 
 	err := eb.Start(context.Background())
 	assert.Error(t, err, "Start with empty DSN should return error")
@@ -71,7 +71,7 @@ func TestEventBus_StartStop_EmptyDSN(t *testing.T) {
 
 func TestEventBus_ReceivesNotify(t *testing.T) {
 	dsn := testDSN()
-	eb := NewEventBus(dsn, slog.Default())
+	eb := NewEventBus(dsn, nil, slog.Default())
 
 	received := make(chan MDMEvent, 1)
 	eb.Subscribe("test.event", func(ctx context.Context, event MDMEvent) error {

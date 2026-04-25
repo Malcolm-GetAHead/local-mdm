@@ -29,8 +29,12 @@ type webSession struct {
 	ExpiresAt    time.Time `json:"exp"`
 }
 
-// sessionKey returns the HMAC signing key derived from the Keycloak client secret.
+// sessionKey returns the HMAC signing key for dashboard sessions.
+// Prefers dedicated session_secret; falls back to Keycloak client secret.
 func (s *Server) sessionKey() []byte {
+	if s.config.Keycloak.SessionSecret != "" {
+		return []byte(s.config.Keycloak.SessionSecret)
+	}
 	return []byte(s.config.Keycloak.ClientSecret)
 }
 

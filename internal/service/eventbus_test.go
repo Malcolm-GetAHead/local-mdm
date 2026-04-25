@@ -14,7 +14,7 @@ import (
 )
 
 func TestEventBus_Subscribe(t *testing.T) {
-	eb := NewEventBus("", slog.Default())
+	eb := NewEventBus("", nil, slog.Default())
 
 	eb.Subscribe("device.enrolled", func(ctx context.Context, event MDMEvent) error {
 		return nil
@@ -25,7 +25,7 @@ func TestEventBus_Subscribe(t *testing.T) {
 }
 
 func TestEventBus_SubscribeMultiple(t *testing.T) {
-	eb := NewEventBus("", slog.Default())
+	eb := NewEventBus("", nil, slog.Default())
 
 	eb.Subscribe("device.enrolled", func(ctx context.Context, event MDMEvent) error { return nil })
 	eb.Subscribe("device.enrolled", func(ctx context.Context, event MDMEvent) error { return nil })
@@ -36,7 +36,7 @@ func TestEventBus_SubscribeMultiple(t *testing.T) {
 }
 
 func TestEventBus_Dispatch(t *testing.T) {
-	eb := NewEventBus("", slog.Default())
+	eb := NewEventBus("", nil, slog.Default())
 
 	deviceID := uuid.New()
 	var received MDMEvent
@@ -62,7 +62,7 @@ func TestEventBus_Dispatch(t *testing.T) {
 }
 
 func TestEventBus_DispatchNoSubscribers(t *testing.T) {
-	eb := NewEventBus("", slog.Default())
+	eb := NewEventBus("", nil, slog.Default())
 
 	// Should not panic when no subscribers
 	payload, _ := json.Marshal(MDMEvent{
@@ -75,14 +75,14 @@ func TestEventBus_DispatchNoSubscribers(t *testing.T) {
 }
 
 func TestEventBus_DispatchInvalidJSON(t *testing.T) {
-	eb := NewEventBus("", slog.Default())
+	eb := NewEventBus("", nil, slog.Default())
 
 	// Should not panic on bad JSON
 	eb.dispatch(context.Background(), "not json")
 }
 
 func TestEventBus_DispatchSubscriberError(t *testing.T) {
-	eb := NewEventBus("", slog.Default())
+	eb := NewEventBus("", nil, slog.Default())
 
 	// First handler errors, second should still be called
 	var secondCalled bool
@@ -106,7 +106,7 @@ func TestEventBus_DispatchSubscriberError(t *testing.T) {
 }
 
 func TestEventBus_DispatchConcurrentSafe(t *testing.T) {
-	eb := NewEventBus("", slog.Default())
+	eb := NewEventBus("", nil, slog.Default())
 
 	var mu sync.Mutex
 	count := 0
@@ -140,7 +140,7 @@ func TestEventBus_DispatchConcurrentSafe(t *testing.T) {
 }
 
 func TestEventBus_NullDeviceID(t *testing.T) {
-	eb := NewEventBus("", slog.Default())
+	eb := NewEventBus("", nil, slog.Default())
 
 	var received MDMEvent
 	eb.Subscribe("policy.updated", func(ctx context.Context, event MDMEvent) error {

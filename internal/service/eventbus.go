@@ -71,6 +71,7 @@ type EventHandler func(ctx context.Context, event MDMEvent) error
 // EventBus listens on PostgreSQL LISTEN/NOTIFY and dispatches to subscribers.
 type EventBus struct {
 	dsn         string
+	db          *sql.DB
 	listener    *pq.Listener
 	subscribers map[string][]EventHandler
 	mu          sync.RWMutex
@@ -80,9 +81,10 @@ type EventBus struct {
 }
 
 // NewEventBus creates an EventBus. Call Start() to begin listening.
-func NewEventBus(dsn string, logger *slog.Logger) *EventBus {
+func NewEventBus(dsn string, db *sql.DB, logger *slog.Logger) *EventBus {
 	return &EventBus{
 		dsn:         dsn,
+		db:          db,
 		subscribers: make(map[string][]EventHandler),
 		logger:      logger,
 		done:        make(chan struct{}),
@@ -169,6 +171,9 @@ func (eb *EventBus) loop(ctx context.Context) {
 	pingTicker := time.NewTicker(PingInterval)
 	defer pingTicker.Stop()
 
+	retryTicker := time.NewTicker(60 * time.Second)
+	defer retryTicker.Stop()
+
 	for {
 		select {
 		case <-ctx.Done():
@@ -176,8 +181,6 @@ func (eb *EventBus) loop(ctx context.Context) {
 
 		case n := <-eb.listener.Notify:
 			if n == nil {
-				// nil notification means the connection was lost and re-established.
-				// pq.Listener handles reconnection; we just log it.
 				eb.logger.Warn("eventbus: received nil notification (reconnect)")
 				continue
 			}
@@ -187,6 +190,9 @@ func (eb *EventBus) loop(ctx context.Context) {
 			if err := eb.listener.Ping(); err != nil {
 				eb.logger.Error("eventbus: ping failed", "error", err)
 			}
+
+		case <-retryTicker.C:
+			eb.ProcessRetries(ctx)
 		}
 	}
 }
@@ -220,6 +226,78 @@ func (eb *EventBus) dispatch(ctx context.Context, payload string) {
 				"type", event.Type,
 				"error", err,
 			)
+			eb.enqueueRetry(event, err)
+		}
+	}
+}
+
+// enqueueRetry inserts a failed event into event_queue for later retry.
+func (eb *EventBus) enqueueRetry(event MDMEvent, handlerErr error) {
+	if eb.db == nil {
+		return
+	}
+	payload, _ := json.Marshal(event)
+	_, err := eb.db.Exec(
+		`INSERT INTO event_queue (event_type, payload, last_error, next_retry_at) VALUES ($1, $2, $3, NOW() + interval '30 seconds')`,
+		event.Type, payload, handlerErr.Error(),
+	)
+	if err != nil {
+		eb.logger.Error("eventbus: failed to enqueue retry", "error", err)
+	}
+}
+
+// ProcessRetries checks event_queue for pending retries and re-dispatches them.
+// Call periodically from a background goroutine.
+func (eb *EventBus) ProcessRetries(ctx context.Context) {
+	if eb.db == nil {
+		return
+	}
+	rows, err := eb.db.QueryContext(ctx,
+		`SELECT id, event_type, payload, retry_count FROM event_queue
+		 WHERE completed_at IS NULL AND retry_count < max_retries AND next_retry_at <= NOW()
+		 ORDER BY next_retry_at LIMIT 10`)
+	if err != nil {
+		eb.logger.Error("eventbus: retry query failed", "error", err)
+		return
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var id uuid.UUID
+		var eventType string
+		var payload []byte
+		var retryCount int
+		if err := rows.Scan(&id, &eventType, &payload, &retryCount); err != nil {
+			continue
+		}
+
+		var event MDMEvent
+		if err := json.Unmarshal(payload, &event); err != nil {
+			eb.db.Exec(`UPDATE event_queue SET completed_at = NOW(), last_error = $1 WHERE id = $2`, "invalid payload", id)
+			continue
+		}
+
+		eb.mu.RLock()
+		handlers := eb.subscribers[event.Type]
+		eb.mu.RUnlock()
+
+		success := true
+		var lastErr string
+		for _, h := range handlers {
+			if err := h(ctx, event); err != nil {
+				success = false
+				lastErr = err.Error()
+			}
+		}
+
+		if success {
+			eb.db.Exec(`UPDATE event_queue SET completed_at = NOW() WHERE id = $1`, id)
+			eb.logger.Info("eventbus: retry succeeded", "id", id, "type", eventType, "attempt", retryCount+1)
+		} else {
+			backoff := time.Duration(1<<uint(retryCount+1)) * 30 * time.Second // exponential: 60s, 120s, 240s...
+			eb.db.Exec(`UPDATE event_queue SET retry_count = retry_count + 1, last_error = $1, next_retry_at = NOW() + $2::interval WHERE id = $3`,
+				lastErr, fmt.Sprintf("%d seconds", int(backoff.Seconds())), id)
+			eb.logger.Warn("eventbus: retry failed", "id", id, "type", eventType, "attempt", retryCount+1, "error", lastErr)
 		}
 	}
 }
