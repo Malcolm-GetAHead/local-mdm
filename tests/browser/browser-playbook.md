@@ -171,10 +171,12 @@
 ## Audit Log
 
 ### View Audit Log
-- [ ] Navigate to "Audit Log"
+- [ ] Visit `/dashboard/audit` — page contains "Audit Log"
 - [ ] Verify table header row is visible
 
 ### Filter by Action
+- [ ] Visit `/dashboard/audit` — page contains "Audit Log"
+- [ ] Wait 0.5s
 - [ ] Fill: action=`policy`
 - [ ] Wait 1s
 - [ ] Verify "policy.create" is visible
@@ -192,6 +194,7 @@
 ## Logout
 
 ### Keycloak Logout
+- [ ] Visit `/dashboard/` — page contains "Total Devices"
 - [ ] Click "Logout"
 - [ ] Wait 1s
 - [ ] Verify "log out" is visible
