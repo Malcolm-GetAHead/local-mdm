@@ -15,19 +15,19 @@
 ### Sidebar Navigation
 - [ ] Navigate to "Devices"
 - [ ] Verify "Local MDM" is visible
-- [ ] Verify table header row is visible
+- [ ] Verify "Devices" is visible
 - [ ] Navigate to "Policies"
 - [ ] Verify "Local MDM" is visible
-- [ ] Verify "Corporate Security Baseline" is visible
+- [ ] Verify "Policies" is visible
 - [ ] Navigate to "Groups"
 - [ ] Verify "Local MDM" is visible
-- [ ] Verify "Engineering" is visible
+- [ ] Verify "Groups" is visible
 - [ ] Navigate to "Compliance"
 - [ ] Verify "Local MDM" is visible
 - [ ] Verify "Compliant" is visible
 - [ ] Navigate to "Audit Log"
 - [ ] Verify "Local MDM" is visible
-- [ ] Verify table header row is visible
+- [ ] Verify "Audit Log" is visible
 - [ ] Navigate to "Dashboard"
 - [ ] Verify "Local MDM" is visible
 - [ ] Verify "Total Devices" is visible

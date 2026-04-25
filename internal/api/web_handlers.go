@@ -36,6 +36,10 @@ func (s *Server) renderPage(w http.ResponseWriter, r *http.Request, name string,
 	if csrf, ok := r.Context().Value(csrfTokenKey).(string); ok {
 		data["CSRFToken"] = csrf
 	}
+	// Resolve page title
+	var titleBuf strings.Builder
+	tmpl.ExecuteTemplate(&titleBuf, "page_title", data)
+	data["PageTitle"] = titleBuf.String()
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	// HTMX sidebar navigation: return header+content fragment only
 	if isHTMX(r) && r.Header.Get("HX-Target") == "page-content" {
