@@ -1,223 +1,152 @@
 # Sprint 5d: Web Dashboard
 
-**Status**: 🔲 Not Started  
-**Duration**: 1-2 weeks  
+**Status**: 🟡 In Progress (Phase 2 polish)  
+**Branch**: `sprint-5d/web-dashboard`  
+**Duration**: Started 2026-04-24  
 **Goal**: Web-based admin dashboard for device management, policy management, and compliance monitoring  
-**Depends on**: Sprint 5b complete (EventBus + compliance wiring provides live data for dashboard)  
-**Stack**: Go HTML templates + HTMX + Tailwind CSS — no separate frontend build pipeline
+**Depends on**: Sprint 5b (EventBus), Sprint 5f (API hardening) — both merged into branch  
+**Stack**: Go HTML templates + HTMX v2.0.9 + Tailwind CSS v4.2.4 — no separate frontend build pipeline
 
 ---
 
-## Why HTMX over React
+## Completed
 
-**Decision (2026-04-20):** The dashboard is read-heavy, form-based CRUD — tables, status indicators, forms. HTMX handles this with zero JavaScript build toolchain:
+### Infrastructure
+- [x] Go HTML template engine with `embed.FS`, `Clone()` for block overrides
+- [x] HTMX v2.0.9 vendored at `web/static/js/htmx.min.js`
+- [x] Tailwind CSS v4.2.4 standalone CLI — compiled in Dockerfile (arch-aware: arm64/x64 musl)
+- [x] CSP nonces (URL-safe base64) for inline scripts/styles — no `unsafe-inline`
+- [x] HMAC-SHA256 signed session cookies (prevents forgery)
+- [x] CSRF protection on all POST forms (HMAC token, HTMX requests exempt)
+- [x] Keycloak OIDC login/logout flow (code exchange, SSO session termination)
+- [x] `KC_HTTP_PORT: 8180` — same port internal/external (requires `/etc/hosts` entry for `keycloak`)
+- [x] Enterprise ID claim mapper in Keycloak JWT
+- [x] Auto-run migrations on container startup (`docker/entrypoint.sh`)
+- [x] Seed data: 55 devices, 8 policies, 3 groups, compliance results, audit logs
+- [x] Favicon SVG shield with "MDM"
 
-- **Same repo, same language** — Go templates live alongside the backend code. No Node.js, no npm, no webpack.
-- **No separate build pipeline** — templates are compiled into the Go binary. One deploy artifact.
-- **Simpler for the team** — HTML + Go templates is closer to Python/Jinja than React/JSX.
-- **14KB JS** — HTMX is a single vendored JS file vs 100KB+ React bundle.
-- **Server-rendered** — handlers return HTML fragments for partial page updates. Same auth middleware, same server, same port.
+### Dashboard Home
+- [x] Stat cards: Total Devices, Enrolled, Non-Compliant, Active Policies
+- [x] SVG pie charts: Platforms, Device Status, Compliance (server-rendered, fixed-size, HTML legends)
+- [x] Chart hover: cross-highlight between pie slices and legend items
+- [x] "Needs Attention" panel: non-compliant devices + devices not seen in 7+ days
+- [x] Recent Activity feed (last 5 audit entries)
 
-React would be better for highly interactive real-time UIs (drag-and-drop, live collaboration, offline-capable). An MDM dashboard doesn't need any of that.
+### Devices
+- [x] List with server-side sorting (all 6 columns), pagination (50/page), platform/status filters, debounced search
+- [x] Name-as-link pattern (no separate "View" column)
+- [x] Detail page: 3-column layout (Hardware, OS, Enrollment)
+- [x] Tabbed section: Compliance (per-setting rows), Policies (all effective with "Assigned Via"), Commands
+- [x] Actions: Lock, Unenroll, Wipe, Delete (with confirmation dialogs)
+- [x] Auto-evaluate compliance via EventBus on policy assignment
+- [x] Manual "Re-evaluate" button (circular arrow icon) in Enrollment card
+- [x] "Last Evaluated" timestamp in Enrollment card
+
+### Policies
+- [x] List with sortable name column, platform filter
+- [x] Settings catalog: 15 settings across Security/Restrictions/WiFi/VPN categories
+- [x] Platform-aware filtering (Cross-Platform shows only `platforms: ["all"]` settings)
+- [x] Debounced filter input with CSP-safe event binding
+- [x] Create/Edit with checkbox/input/select per setting (no raw JSON)
+- [x] Invalid setting keys rejected on submit
+- [x] Policy type auto-detected from selected settings
+- [x] Assignment count + "Manage Assignments" link on edit page
+- [x] Assign page: dynamic text search for groups/devices, filter out already-assigned
+- [x] Delete with assignment check (blocked if assigned, error message shown)
+- [x] Assign/Delete as styled buttons
+
+### Groups
+- [x] List with sortable name column, name-as-link, delete button
+- [x] Create group form (toggle visibility, CSP-safe)
+- [x] Detail page: inline edit name/description (Edit/Save/Cancel)
+- [x] Member toggle: all enterprise devices listed with "In Group" / "Add" buttons
+- [x] Debounced device filter in member list
+
+### Compliance
+- [x] Summary cards: Compliant/Non-Compliant/Unknown (clickable toggles, toggle off on re-click)
+- [x] Table with sortable columns (device, policy, status, evaluated_at)
+- [x] Text search filter, "Clear Filter" button
+- [x] Real violation details from DB (not just status)
+- [x] Server-side pagination (50/page)
+
+### Audit Log
+- [x] Parsed details: `key: value; key: value` format, truncated at 100 chars
+- [x] Expandable detail rows (▶ arrow, styled key/value table card)
+- [x] User email resolution (users table → details fallback → truncated UUID)
+- [x] Action filter with debounce, date range filters
+- [x] Server-side pagination (50/page)
+- [x] `audit_logs.user_id` FK dropped (migration 000012) — allows OIDC users not in users table
+
+### Dark Mode
+- [x] Toggle in header (sun/moon icon), persists via localStorage
+- [x] `dark:` variants on all components, cards, tables, badges, sidebar, header
+- [x] Tailwind v4 `@variant dark` configured
+
+### Mobile
+- [x] Responsive sidebar: hidden on mobile, hamburger menu toggle with backdrop overlay
+- [x] Playwright mobile viewport test (375px)
+
+### Playwright Browser Tests
+- [x] 78/78 passing
+- [x] Real Keycloak login/logout (no cookie bypass)
+- [x] Console error tracking (JS errors, page errors, HTTP 4xx/5xx)
+- [x] Viewport auto-resize for mobile sections
+- [x] Covers: login, dashboard, devices (list/sort/filter/search/detail), policies (list/create/edit/assign), groups (list/create/detail), compliance (filters/toggles), audit (filter), mobile hamburger, logout
 
 ---
 
-## Why a Separate Sprint
+## Remaining
 
-The dashboard adds HTML templates, CSS, and HTMX patterns that are distinct from the Go backend API work. Keeping it separate:
+### Low Priority (deferred to next session)
+- [ ] Playwright full CRUD workflow rewrite + cleanup (create→edit→delete cycles with verification)
+- [ ] Visual polish — page transitions, loading indicators on HTMX requests, toast notifications
+- [ ] HTMX content replacement navigation (sidebar links swap main content without full reload)
+- [ ] Playwright multi-select/checkbox testing
 
-- Lets the API stabilize in Sprint 5 before building a UI on top of it
-- Keeps Sprint 5 focused on backend polish (reporting, testing, CLI)
-- Dashboard can be parallelized with Sprint 5 if desired
+### Known Issues (tracked in SESSION_NOTES.md)
+- **EventBus compliance evaluation is fire-and-forget** — no retry on failure. Fix: `event_queue` table + background retry worker (5 attempts, then audit log failure).
+- **Session cookie HMAC key uses Keycloak client secret** — if secret rotates, sessions invalidate. Fix: dedicated `session_secret` config key, source from AWS SSM in prod.
+
+---
 
 ## Architecture
 
 ```
 Browser
   ↕ HTML (full pages + HTMX partial fragments)
-Go Server
-  ├── internal/api/templates/     ← Go HTML templates
+Go Server (:8080)
+  ├── internal/api/templates/     ← Go HTML templates (embed.FS)
   ├── internal/api/web_handlers.go ← dashboard handlers (return HTML)
-  ├── web/static/htmx.min.js     ← vendored HTMX (~14KB)
-  └── web/static/styles.css       ← Tailwind CSS (CDN or vendored)
+  ├── internal/api/web_handlers_pages.go ← policy/group/compliance/audit handlers
+  ├── internal/api/web_session.go  ← OIDC session, CSRF, HMAC cookies
+  ├── internal/api/web_templates.go ← template engine, helper functions
+  ├── internal/api/web_charts.go   ← SVG pie chart generator
+  ├── internal/api/web_policy_catalog.go ← settings catalog
+  ├── web/static/js/htmx.min.js  ← vendored HTMX v2.0.9
+  ├── web/static/css/input.css    ← Tailwind v4 source
+  ├── web/static/css/output.css   ← compiled CSS (built in Dockerfile)
+  └── web/static/favicon.svg      ← shield icon
 ```
 
-Dashboard handlers are separate from API handlers — API returns JSON, dashboard returns HTML. Both use the same services and auth middleware.
+Dashboard handlers are separate from API handlers — API returns JSON, dashboard returns HTML. Both use the same services, repos, and auth middleware.
 
-## Tasks
+## Commits (sprint-5d/web-dashboard)
 
-| ID | Task | Effort |
-|---|---|---|
-| S5d-01 | Project setup (templates, HTMX, Tailwind, auth) | 1 day |
-| S5d-02 | Login & navigation (Keycloak redirect, sidebar, layout) | 1 day |
-| S5d-03 | Device management (list, detail, lock/wipe actions) | 2-3 days |
-| S5d-04 | Policy management (list, create/edit, assign to groups) | 2-3 days |
-| S5d-05 | Compliance & reporting (dashboard, audit log viewer) | 1-2 days |
-| S5d-06 | Seed data for development (mock devices, policies, compliance results) | 0.5 day |
-| S5d-07 | Playwright browser tests (markdown playbook + runner) | 1 day |
+Key commits (not exhaustive):
+- S5d-06: Seed data (25 devices, policies, groups, compliance, audit)
+- S5d-01: Project setup (templates, HTMX, Tailwind, routes)
+- S5d-07: Playwright browser playbook
+- S5d: Keycloak port alignment (8180 internal+external)
+- S5d: HMAC-SHA256 signed session cookies
+- S5d: Policy settings catalog with filter/checkbox UI
+- S5d: Group management (create/delete/edit/member toggle)
+- S5d: Sortable columns, pagination, compliance filters
+- S5d: Dashboard SVG pie charts
+- S5d: Device detail 3-column layout with tabs
+- S5d: Dark mode, favicon, mobile hamburger menu
+- S5d: CSRF protection, device delete, needs-attention dashboard
+- S5d: Auto-run migrations on container startup
+- S5d: Compliance per-setting rows, EventBus trigger fix
 
-> **Dependency**: S5d-05 (Compliance & reporting) depends on Sprint 5b (EventBus) and Sprint 5c (platform integration) for live compliance data from real devices. Use seed data (S5d-06) for development if those sprints are not yet complete.
-
-### S5d-01: Project Setup
-- Go HTML template layout (base template, partials, components)
-- Vendor HTMX JS into `web/static/`
-- Tailwind CSS via CDN (or vendored for production)
-- Keycloak OIDC login redirect (reuse existing auth middleware)
-- Template helper functions (format dates, status badges, pagination)
-- Embed static files in Go binary via `embed.FS`
-
-### S5d-02: Login & Navigation
-- Keycloak login redirect flow
-- Role-based navigation (admin sees everything, viewer sees read-only)
-- Sidebar: Dashboard, Devices, Policies, Groups, Apps, Audit Logs
-- Header: user info, enterprise name, logout
-- Base layout template with HTMX boost for SPA-like navigation
-
-### S5d-03: Device Management
-- Device list table with HTMX pagination, filtering (platform, status), search
-- Device detail page: info, enrolled policies, command history
-- Lock/wipe actions with HTMX confirmation dialog
-- Platform-specific info display (Windows OMA-DM data, macOS DEP status, Android compliance)
-- HTMX partial updates: action buttons swap to status indicators after click
-
-### S5d-04: Policy Management
-- Policy list with filtering by platform and type
-- Create/edit policy form — settings catalog rendered as checkboxes + value inputs
-- Assign policy to device or group (HTMX-powered select + submit)
-- Policy status per device (pending, applied, failed)
-
-### S5d-05: Compliance & Reporting
-- Compliance dashboard: compliant/non-compliant counts per enterprise
-- Device inventory table with CSV export link
-- Audit log viewer with search by actor, action, date range
-- HTMX infinite scroll or pagination for large result sets
-
-### S5d-06: Seed Data for Development
-- SQL script or Go command (`make seed`) that populates the database with realistic mock data
-- Sample enterprise with 20-30 devices across all three platforms (macOS, Windows, Android)
-- Mix of device statuses (enrolled, unenrolled, wiped)
-- 3-4 policy templates and 5-6 enterprise policies (security, WiFi, VPN, restrictions)
-- 2-3 device groups with memberships
-- Policy assignments at device, group, and enterprise levels
-- Compliance results with a mix of compliant, non-compliant, and unknown statuses
-- Audit log entries for recent actions
-- Allows dashboard development and visual testing without real devices or S5-09
-
-### S5d-07: Playwright Browser Tests
-
-**Pattern**: Markdown playbook + Playwright runner (same approach as dev-deployer-htmx).
-
-Tests are written as a **markdown playbook** (`tests/browser/browser-playbook.md`) — a human-readable test plan where each `- [ ]` checkbox is an executable step. A Node.js runner (`tests/browser/run-playbook.js`) parses the markdown and executes each step using Playwright.
-
-**Why this pattern**:
-- The playbook doubles as documentation — anyone can read it to understand what the UI does
-- No test framework boilerplate — just markdown and a ~300-line runner
-- Runs headed (watch the browser) or headless (CI)
-- Same pattern the owner uses in other projects — no learning curve
-
-**Structure**:
-```
-tests/browser/
-├── package.json              ← playwright dependency only
-├── run-playbook.js           ← step interpreter (Visit, Fill, Click, Verify)
-├── browser-playbook.md       ← the test plan (human + machine readable)
-└── fixtures/                 ← test data files if needed
-```
-
-**Playbook DSL** (subset — extend as needed):
-```markdown
-## Device Management
-
-### List Devices
-- [ ] Visit `/dashboard/devices` — page contains "Devices"
-- [ ] Verify table header row is visible
-
-### Lock Device
-- [ ] Click "View" on first device row
-- [ ] Click "Lock Device"
-- [ ] Accept the confirmation dialog
-- [ ] Verify toast appears with "Lock command sent"
-
-### Search
-- [ ] Fill: Search=`MacBook`
-- [ ] Wait 0.5s
-- [ ] Verify table row appears with text "MacBook"
-```
-
-**Field mapping**: The runner maps logical field names (from the playbook) to actual HTML locators. For Local MDM this will include:
-- `Search` → search input
-- `Name`, `Description`, `Platform` → policy form fields
-- Device/policy/group selectors
-
-**Running**:
-```bash
-# Headless (CI / make target)
-make browser-test
-
-# Headed (watch the browser)
-cd tests/browser && npm run playbook:headed
-
-# Single section
-cd tests/browser && node run-playbook.js --section "Device Management"
-```
-
-**Makefile target**:
-```makefile
-browser-test: ## Run Playwright browser tests against local stack
-	@cd tests/browser && npm install --silent && node run-playbook.js
-```
-
-**Auth handling**: The playbook starts with a login section that authenticates via Keycloak. The runner stores the session cookie for subsequent requests. Alternatively, seed a test API token and pass it as a cookie to skip the Keycloak redirect flow in tests.
-
-**Coverage**: The playbook should cover:
-1. Login via Keycloak
-2. Device list (pagination, search, filter by platform/status)
-3. Device detail + lock/wipe actions
-4. Policy CRUD (create, edit, assign to group)
-5. Compliance dashboard (compliant/non-compliant counts)
-6. Audit log search
-7. `<noscript>` message when JS disabled
-
-## HTMX Patterns
-
-```html
-<!-- Device list with pagination -->
-<table id="device-list">
-  <tr hx-get="/dashboard/devices?page=2" hx-target="#device-list" hx-swap="innerHTML">
-    <!-- rows -->
-  </tr>
-</table>
-
-<!-- Lock device with confirmation -->
-<button hx-post="/dashboard/devices/{{.ID}}/lock"
-        hx-confirm="Lock this device?"
-        hx-target="#device-status"
-        hx-swap="outerHTML">
-  Lock Device
-</button>
-
-<!-- Search with debounce -->
-<input type="search" name="q"
-       hx-get="/dashboard/devices"
-       hx-trigger="keyup changed delay:300ms"
-       hx-target="#device-list">
-```
-
-## Definition of Done
-
-- [ ] Admin logs in via Keycloak
-- [ ] Dashboard shows device counts and compliance summary
-- [ ] Device list with pagination, filtering, and search
-- [ ] Remote lock/wipe from device detail page
-- [ ] Policy create, edit, and assign from UI
-- [ ] Compliance view shows non-compliant devices with reasons
-- [ ] Audit log searchable by actor and date
-- [ ] Friendly "JavaScript required" message shown via `<noscript>` tag (Keycloak auth requires JS)
-- [ ] Playwright browser playbook passes (login, device CRUD, policy CRUD, compliance view, audit log)
-- [ ] Embedded in Go binary — single deploy artifact
-
----
-
-*Created: 2026-04-18 — Split from Sprint 5 (S5-01)*  
-*Updated: 2026-04-20 — Changed from React to HTMX + Go templates*  
-*Updated: 2026-04-22 — Renamed from Sprint 5b to Sprint 5d (EventBus work inserted as Sprint 5b)*
+*Created: 2026-04-18*  
+*Updated: 2026-04-24 — Sprint in progress, Phase 2 polish*
