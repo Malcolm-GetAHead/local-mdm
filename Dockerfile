@@ -24,10 +24,11 @@ COPY --from=builder /go/bin/migrate /usr/local/bin/migrate
 COPY configs/ /app/configs/
 COPY migrations/ /app/migrations/
 COPY web/ /app/web/
+COPY docker/entrypoint.sh /app/entrypoint.sh
 RUN /app/localmdm-cli certs init --cert /app/certs/ca.crt --key /app/certs/ca.key
 WORKDIR /app
 EXPOSE 8080 9090
-ENTRYPOINT ["/app/localmdm"]
+ENTRYPOINT ["/app/entrypoint.sh"]
 
 # === Dev mode (hot reload + test tools) ===
 FROM golang:1.26-alpine AS dev
