@@ -115,11 +115,13 @@
 - [ ] "Needs Attention" panel on dashboard
 - [ ] Full CRUD workflows with cleanup (create→edit→verify→delete for policies, groups)
 
-### Deferred Features
+### Previously Deferred Features to be completed
 - [ ] HTMX content replacement navigation — sidebar links swap main content without full page reload
 - [ ] Visual polish — page transitions, loading indicators on HTMX requests, toast notifications for actions
 - [ ] Playwright multi-select/checkbox testing (policy settings, group member toggles)
 - [ ] Policy multi-platform selection (agreed: single platform is fine for now)
+- [ ] Is there more we can add to the device view, maybe draw some inspiration from here (but not the style, it's ugly):
+      https://camo.githubusercontent.com/666037c1a40ed2042806be3af525c5c1a4e96baaccd8b2f443e791f0f66e38f2/68747470733a2f2f7777772e64726f70626f782e636f6d2f73636c2f66692f6866736463767930676936753931396e716e6e71732f456e64706f696e742e6a7065673f726c6b65793d36336561756c706469627871726c77676a33776e6f347136752673743d737a35666b687167267261773d31
 
 ### Security & Reliability Fixes
 - [ ] EventBus compliance retry — add `event_queue` table with `retry_count` column, background worker retries failed evaluations up to 5 times, then logs failure to `audit_logs`. Currently fire-and-forget with no retry.
