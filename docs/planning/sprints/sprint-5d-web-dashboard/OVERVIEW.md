@@ -121,7 +121,7 @@
 - [ ] Playwright multi-select/checkbox testing (policy settings, group member toggles)
 - [ ] Policy multi-platform selection (agreed: single platform is fine for now)
 
-### Known Issues
+### Security & Reliability Fixes
 - [ ] EventBus compliance retry — add `event_queue` table with `retry_count` column, background worker retries failed evaluations up to 5 times, then logs failure to `audit_logs`. Currently fire-and-forget with no retry.
 - [ ] Dedicated session secret — add `session_secret` config key (source from AWS SSM in prod), fall back to Keycloak client secret if not set. Currently HMAC key is the client secret, so secret rotation invalidates all sessions.
 
