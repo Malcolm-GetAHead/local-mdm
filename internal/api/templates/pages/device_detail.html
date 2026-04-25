@@ -49,6 +49,7 @@
         <dl class="space-y-2 text-sm">
             <div class="flex justify-between"><dt class="text-gray-500 dark:text-gray-400">Enrolled</dt><dd class="font-medium">{{formatDate .Device.EnrollmentDate}}</dd></div>
             <div class="flex justify-between"><dt class="text-gray-500 dark:text-gray-400">Last Seen</dt><dd class="font-medium">{{if .Device.LastSeen}}{{timeAgo .Device.LastSeen}}{{else}}Never{{end}}</dd></div>
+            <div class="flex justify-between"><dt class="text-gray-500 dark:text-gray-400">Last Evaluated</dt><dd class="font-medium">{{if .LastEvaluated}}{{timeAgo .LastEvaluated}}{{else}}Never{{end}}</dd></div>
             <div class="flex justify-between"><dt class="text-gray-500 dark:text-gray-400">Groups</dt><dd>
                 {{range .Groups}}<a href="/dashboard/groups/{{.ID}}" class="badge badge-blue mr-1">{{.Name}}</a>{{else}}<span class="text-gray-400">None</span>{{end}}
             </dd></div>
@@ -124,7 +125,7 @@
 
 {{define "compliance_tab"}}
 <table class="w-full text-sm">
-    <thead><tr class="table-header"><th class="px-6 py-2">Setting</th><th class="px-6 py-2">Policy</th><th class="px-6 py-2">Status</th><th class="px-6 py-2">Evaluated</th></tr></thead>
+    <thead><tr class="table-header"><th class="px-6 py-2">Setting</th><th class="px-6 py-2">Policy</th><th class="px-6 py-2">Status</th></tr></thead>
     <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
     {{range .Compliance}}
     <tr>
@@ -135,9 +136,8 @@
             {{else if eq .Status "fail"}}<span class="badge badge-red">Fail</span>
             {{else}}<span class="badge badge-yellow">Unknown</span>{{end}}
         </td>
-        <td class="px-6 py-2 text-gray-500 dark:text-gray-400">{{timeAgo .EvaluatedAt}}</td>
     </tr>
-    {{else}}<tr><td colspan="4" class="px-6 py-4 text-center text-gray-500 dark:text-gray-400">No compliance data — click Re-evaluate</td></tr>{{end}}
+    {{else}}<tr><td colspan="3" class="px-6 py-4 text-center text-gray-500 dark:text-gray-400">No compliance data — click Re-evaluate</td></tr>{{end}}
     </tbody>
 </table>
 {{end}}

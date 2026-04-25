@@ -223,6 +223,10 @@ func (s *Server) handleWebDeviceDetail(w http.ResponseWriter, r *http.Request) {
 	// Compliance
 	compResults, _ := s.complianceService.GetDeviceCompliance(ctx, id)
 	compliance := buildComplianceRows(compResults, s)
+	var lastEvaluated interface{}
+	if len(compResults) > 0 {
+		lastEvaluated = compResults[0].EvaluatedAt
+	}
 
 	// Groups
 	groups, _ := s.groupService.GetDeviceGroups(ctx, id)
@@ -245,6 +249,7 @@ func (s *Server) handleWebDeviceDetail(w http.ResponseWriter, r *http.Request) {
 		"ActiveNav":        "devices",
 		"Device":           device,
 		"Compliance":       compliance,
+		"LastEvaluated":    lastEvaluated,
 		"Groups":           groups,
 		"Commands":         commands,
 		"AssignedPolicies": assignedPolicies,
