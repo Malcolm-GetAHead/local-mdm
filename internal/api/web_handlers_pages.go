@@ -712,6 +712,7 @@ func (s *Server) handleWebGroupDelete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.logAudit(r, "group.delete", "group", groupID, nil)
+	w.Header().Set("HX-Trigger", `{"showToast":{"message":"Group deleted","type":"success"}}`)
 	// Return empty string to remove the table row via hx-swap="outerHTML"
 	w.WriteHeader(http.StatusOK)
 }
@@ -735,6 +736,7 @@ func (s *Server) handleWebPolicyDelete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.logAudit(r, "policy.delete", "policy", id, nil)
+	w.Header().Set("HX-Trigger", `{"showToast":{"message":"Policy deleted","type":"success"}}`)
 	w.WriteHeader(http.StatusOK)
 }
 
@@ -825,5 +827,6 @@ func (s *Server) handleWebPolicyUnassign(w http.ResponseWriter, r *http.Request)
 
 	s.groupService.UnassignPolicy(ctx, assignmentID)
 	s.logAudit(r, "policy.unassign", "policy", uuid.Nil, map[string]interface{}{"assignment_id": assignmentID})
+	w.Header().Set("HX-Trigger", `{"showToast":{"message":"Assignment removed","type":"success"}}`)
 	w.WriteHeader(http.StatusOK)
 }

@@ -362,6 +362,7 @@ func (s *Server) handleWebDeviceDelete(w http.ResponseWriter, r *http.Request) {
 	id, _ := uuid.Parse(mux.Vars(r)["id"])
 	s.deviceService.Delete(ctx, id)
 	s.logAudit(r, "device.delete", "device", id, nil)
+	w.Header().Set("HX-Trigger", `{"showToast":{"message":"Device deleted","type":"success"}}`)
 	w.Header().Set("HX-Redirect", "/dashboard/devices")
 	w.WriteHeader(http.StatusOK)
 }

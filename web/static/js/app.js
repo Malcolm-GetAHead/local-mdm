@@ -150,4 +150,31 @@
             e.preventDefault();
         }
     });
+
+    // ── Toast notifications ──
+    function showToast(message, type) {
+        var container = document.getElementById('toast-container');
+        if (!container) return;
+        var colors = type === 'error' ? 'bg-red-600' : 'bg-green-600';
+        var toast = document.createElement('div');
+        toast.className = colors + ' text-white px-4 py-2 rounded-lg shadow-lg text-sm transition-opacity duration-300';
+        toast.textContent = message;
+        container.appendChild(toast);
+        setTimeout(function() { toast.style.opacity = '0'; }, 2500);
+        setTimeout(function() { toast.remove(); }, 3000);
+    }
+    // Listen for HX-Trigger events from server
+    document.body.addEventListener('showToast', function(e) {
+        showToast(e.detail.message || 'Done', e.detail.type || 'success');
+    });
+    // Auto-toast on successful HTMX actions (non-navigation)
+    document.body.addEventListener('htmx:afterRequest', function(e) {
+        var target = e.detail.target;
+        if (!target) return;
+        var id = target.id || '';
+        // Toast for device actions
+        if (id === 'device-actions' && e.detail.successful) {
+            showToast('Action sent successfully', 'success');
+        }
+    });
 })();
