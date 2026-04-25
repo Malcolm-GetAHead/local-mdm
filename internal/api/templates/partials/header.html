@@ -34,12 +34,6 @@
         sidebar.classList.contains('-translate-x-full') ? openMenu() : closeMenu();
     });
     if (backdrop) backdrop.addEventListener('click', closeMenu);
-    // HTMX loading indicator
-    var indicator = document.getElementById('htmx-indicator');
-    if (indicator) {
-        document.body.addEventListener('htmx:beforeRequest', function() { indicator.style.opacity='1'; indicator.style.width='70%'; });
-        document.body.addEventListener('htmx:afterRequest', function() { indicator.style.width='100%'; setTimeout(function(){ indicator.style.opacity='0'; indicator.style.width='0'; }, 200); });
-    }
 })();
 </script>
 {{end}}

@@ -12,6 +12,26 @@
 
 ## Dashboard
 
+### Sidebar Navigation
+- [ ] Navigate to "Devices"
+- [ ] Verify "Local MDM" is visible
+- [ ] Verify table header row is visible
+- [ ] Navigate to "Policies"
+- [ ] Verify "Local MDM" is visible
+- [ ] Verify "Corporate Security Baseline" is visible
+- [ ] Navigate to "Groups"
+- [ ] Verify "Local MDM" is visible
+- [ ] Verify "Engineering" is visible
+- [ ] Navigate to "Compliance"
+- [ ] Verify "Local MDM" is visible
+- [ ] Verify "Compliant" is visible
+- [ ] Navigate to "Audit Log"
+- [ ] Verify "Local MDM" is visible
+- [ ] Verify table header row is visible
+- [ ] Navigate to "Dashboard"
+- [ ] Verify "Local MDM" is visible
+- [ ] Verify "Total Devices" is visible
+
 ### Overview Stats
 - [ ] Visit `/dashboard/` — page contains "Total Devices"
 - [ ] Verify "Enrolled" is visible
@@ -183,6 +203,13 @@
 - [ ] Fill: action=`policy`
 - [ ] Wait 1s
 - [ ] Verify "policy.create" is visible
+
+### Audit Log Expand Detail
+- [ ] Visit `/dashboard/audit` — page contains "Audit Log"
+- [ ] Wait 0.5s
+- [ ] Click "▶"
+- [ ] Wait 0.5s
+- [ ] Verify "▼" is visible
 
 ## Mobile (375px)
 

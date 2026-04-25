@@ -21,10 +21,9 @@
         {{template "sidebar" .}}
         <main class="flex-1 md:ml-64">
             {{template "header" .}}
-            <div id="main-content" class="p-4 md:p-8">
+            <div class="p-4 md:p-8">
                 {{block "content" .}}{{end}}
             </div>
-            <div id="htmx-indicator" class="fixed top-0 left-0 w-full h-0.5 bg-blue-500 transition-all duration-300 opacity-0 z-50"></div>
         </main>
     </div>
     {{else}}
