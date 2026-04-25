@@ -87,7 +87,7 @@
 - [x] Playwright mobile viewport test (375px)
 
 ### Playwright Browser Tests
-- [x] 113/113 passing
+- [x] 129/129 passing
 - [x] Real Keycloak login/logout (no cookie bypass)
 - [x] Console error tracking (JS errors, page errors, HTTP 4xx/5xx)
 - [x] Viewport auto-resize for mobile sections
@@ -111,16 +111,17 @@
 - [x] "Needs Attention" panel on dashboard
 - [x] Group inline edit (edit name/description, save, verify)
 - [x] Full CRUD workflows with cleanup (create→edit→verify→delete for policies, groups)
-- [ ] Device detail/delete flow — **blocked**: seed data enterprise_id (`00000000-...`) doesn't match Keycloak user's enterprise_id (`4fb1d43e-...`). Seed data is invisible in dashboard. Need to align enterprise IDs.
+- [x] Device detail (serial, lock, unenroll, compliance, Platform Details tab) + device delete
+- [x] Seed data visibility (Corporate Security Baseline, Engineering) — fixed seed reset for deleted_at
 - [ ] Policy assignment (assign to group/device, verify, unassign) — select dropdown interaction needs custom runner support
-- [ ] CSRF validation (verify forged POST is rejected) — needs custom runner support for raw HTTP requests
+- [ ] CSRF validation (verify forged POST is rejected) — tested in Go unit tests instead
 
 ### Previously Deferred Features to be completed
-- [ ] HTMX content replacement navigation — sidebar links swap main content without full page reload
-- [ ] Visual polish — page transitions, loading indicators on HTMX requests, toast notifications for actions
+- [x] HTMX boosted navigation — sidebar links do AJAX body swap via `hx-boost="true"`, loading indicator bar
+- [x] Enrich device detail view — Platform Details tab renders platform_data JSONB as categorized cards (Hardware, Network, Security, OS, MDM) with friendly labels and ✓/✗ for booleans
+- [ ] Visual polish — toast notifications for actions (loading indicator done)
 - [ ] Playwright multi-select/checkbox testing (policy settings, group member toggles)
 - [x] Policy multi-platform selection — agreed: single platform is fine for now (no change needed)
-- [ ] Enrich device detail view — draw inspiration from [this endpoint management screenshot](https://camo.githubusercontent.com/666037c1a40ed2042806be3af525c5c1a4e96baaccd8b2f443e791f0f66e38f2/68747470733a2f2f7777772e64726f70626f782e636f6d2f73636c2f66692f6866736463767930676936753931396e716e6e71732f456e64706f696e742e6a7065673f726c6b65793d36336561756c706469627871726c77676a33776e6f347136752673743d737a35666b687167267261773d31) (layout/data, not the style)
 
 ### Security & Reliability Fixes
 - [x] EventBus compliance retry — `event_queue` table (migration 000013) with retry_count, exponential backoff, max 5 retries, 60s processing interval
@@ -129,12 +130,12 @@
 ### Test Coverage Gaps
 - [x] Web handler pure function tests added (violationMatchesKey, sortDevices, isHTMX, detectPolicyType, parseSettingsFromForm, pickBestRole, buildChart, generateCSRF, splitOnce)
 - [x] `DeviceService.Unenroll` unit test added
-- [x] `internal/api` coverage: 36.7% → 41.6% (pure function tests + session/CSRF/auth middleware tests)
+- [x] `internal/api` coverage: 36.7% → 41.4% (pure function tests + session/CSRF/auth middleware + OIDC callback error paths)
 - [x] Go unit tests for CSRF validation (forged POST rejected, valid token accepted, HTMX exempt)
 - [x] Go unit tests for session cookie HMAC (sign/verify, tamper detection, expiry, session secret preference)
 - [x] Go unit test for web auth middleware (redirect without session)
-- [ ] Go integration test for OIDC callback flow (token exchange with real Keycloak)
-- [ ] `reporting.ComplianceRow.Details` field added but no test updated (low priority)
+- [x] OIDC callback error path tests (missing state, missing code, state mismatch)
+- [x] `reporting.ComplianceRow.Details` test updated
 - [ ] `internal/auth` and `internal/db` tests FAIL without Docker (pre-existing, unchanged)
 
 ### Documentation Gaps
