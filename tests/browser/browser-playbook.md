@@ -59,18 +59,27 @@
 - [ ] Verify table row appears with text "Surface"
 
 ### Device Detail
-- [ ] Navigate to "Devices"
-- [ ] Verify table header row is visible
+- [ ] Visit `/dashboard/devices` — page contains "Devices"
+- [ ] Click "Alice MacBook Pro"
+- [ ] Verify "Serial Number" is visible
+- [ ] Verify "Lock" is visible
+- [ ] Verify "Unenroll" is visible
+- [ ] Verify "Compliance" is visible
 
 ### Device Delete
-- [ ] Navigate to "Devices"
-- [ ] Verify table header row is visible
+- [ ] Visit `/dashboard/devices` — page contains "Devices"
+- [ ] Click "Dev Mac Mini"
+- [ ] Click "Delete"
+- [ ] Wait 1s
+- [ ] Visit `/dashboard/devices` — page contains "Devices"
+- [ ] Verify "Dev Mac Mini" is not visible
 
 ## Policy Management
 
 ### List Policies
-- [ ] Navigate to "Policies"
+- [ ] Visit `/dashboard/policies` — page contains "Policies"
 - [ ] Verify table header row is visible
+- [ ] Verify "Corporate Security Baseline" is visible
 
 ### Create Policy
 - [ ] Click "Create Policy"
@@ -105,8 +114,9 @@
 ## Groups
 
 ### List Groups
-- [ ] Navigate to "Groups"
+- [ ] Visit `/dashboard/groups` — page contains "Groups"
 - [ ] Verify table header row is visible
+- [ ] Verify "Engineering" is visible
 - [ ] Verify "Create Group" is visible
 
 ### Create Group
