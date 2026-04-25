@@ -121,9 +121,9 @@
 - [ ] Playwright multi-select/checkbox testing (policy settings, group member toggles)
 - [ ] Policy multi-platform selection (agreed: single platform is fine for now)
 
-### Known Issues (tracked in SESSION_NOTES.md)
-- **EventBus compliance evaluation is fire-and-forget** — no retry on failure. Fix: `event_queue` table + background retry worker (5 attempts, then audit log failure).
-- **Session cookie HMAC key uses Keycloak client secret** — if secret rotates, sessions invalidate. Fix: dedicated `session_secret` config key, source from AWS SSM in prod.
+### Known Issues
+- [ ] EventBus compliance retry — add `event_queue` table with `retry_count` column, background worker retries failed evaluations up to 5 times, then logs failure to `audit_logs`. Currently fire-and-forget with no retry.
+- [ ] Dedicated session secret — add `session_secret` config key (source from AWS SSM in prod), fall back to Keycloak client secret if not set. Currently HMAC key is the client secret, so secret rotation invalidates all sessions.
 
 ### Test Coverage Gaps
 - [ ] `internal/api` coverage dropped from 67.8% to 36.9% — ~800 lines of web handler code with zero Go unit tests
