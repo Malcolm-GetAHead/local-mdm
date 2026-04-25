@@ -133,18 +133,50 @@ func TestComplianceReport_WithData(t *testing.T) {
 
 	_, err = db.ExecContext(ctx,
 		`INSERT INTO compliance_results (id, device_id, policy_id, status, details, evaluated_at)
-		 VALUES ($1, $2, $3, 'compliant', '{"violations": []}', NOW())`,
+		 VALUES ($1, $2, $3, 'compliant', '{"policy_type": "security", "violations": []}', NOW())`,
 		uuid.New(), devID, polID)
+	require.NoError(t, err)
+
+	// Add a non-compliant result
+	devID2 := uuid.New()
+	_, err = db.ExecContext(ctx,
+		`INSERT INTO devices (id, enterprise_id, platform, device_id, name, status, enrollment_date)
+		 VALUES ($1, $2, 'macos', $3, 'MacBook', 'enrolled', NOW())`,
+		devID2, entID, devID2.String())
+	require.NoError(t, err)
+
+	_, err = db.ExecContext(ctx,
+		`INSERT INTO compliance_results (id, device_id, policy_id, status, details, evaluated_at)
+		 VALUES ($1, $2, $3, 'non_compliant', '{"policy_type": "security", "violations": ["disk encryption not enabled", "firewall not enabled"]}', NOW())`,
+		uuid.New(), devID2, polID)
 	require.NoError(t, err)
 
 	rows, err := svc.ComplianceReport(ctx, entID)
 	require.NoError(t, err)
-	require.Len(t, rows, 1)
-	assert.Equal(t, devID, rows[0].DeviceID)
-	assert.Equal(t, "Surface", rows[0].DeviceName)
-	assert.Equal(t, "compliant", rows[0].Status)
-	assert.Equal(t, "Security Policy", rows[0].PolicyName)
-	assert.NotNil(t, rows[0].Details)
+	require.Len(t, rows, 2)
+
+	// Compliant row
+	compliant := rows[0]
+	if compliant.Status != "compliant" {
+		compliant = rows[1]
+	}
+	assert.Equal(t, "compliant", compliant.Status)
+	assert.NotNil(t, compliant.Details)
+	violations, ok := compliant.Details["violations"].([]interface{})
+	assert.True(t, ok)
+	assert.Empty(t, violations)
+
+	// Non-compliant row
+	nonCompliant := rows[1]
+	if nonCompliant.Status != "non_compliant" {
+		nonCompliant = rows[0]
+	}
+	assert.Equal(t, "non_compliant", nonCompliant.Status)
+	assert.Equal(t, "security", nonCompliant.Details["policy_type"])
+	ncViolations, ok := nonCompliant.Details["violations"].([]interface{})
+	assert.True(t, ok)
+	assert.Len(t, ncViolations, 2)
+	assert.Equal(t, "disk encryption not enabled", ncViolations[0])
 }
 
 func TestEnrollmentReport_WithData(t *testing.T) {

@@ -796,13 +796,31 @@ func (s *Server) handleWebPolicyAssignPage(w http.ResponseWriter, r *http.Reques
 		}
 	}
 
+	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
+	if page < 1 {
+		page = 1
+	}
+	perPage := 50
+	totalAssign := len(rows)
+	totalPages := (totalAssign + perPage - 1) / perPage
+	start := (page - 1) * perPage
+	if start > totalAssign {
+		start = totalAssign
+	}
+	end := start + perPage
+	if end > totalAssign {
+		end = totalAssign
+	}
+
 	s.renderPage(w, r, "policy_assign", map[string]interface{}{
 		"ActiveNav":        "policies",
 		"Policy":           policy,
 		"AvailableGroups":  availGroups,
 		"AvailableDevices": availDevices,
-		"Assignments":      rows,
-		"TotalAssignments": len(rows),
+		"Assignments":      rows[start:end],
+		"TotalAssignments": totalAssign,
+		"CurrentPage":      page,
+		"TotalPages":       totalPages,
 	})
 }
 

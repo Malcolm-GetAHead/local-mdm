@@ -117,6 +117,8 @@ var templateFuncs = template.FuncMap{
 		return m
 	},
 	"printf": fmt.Sprintf,
+	"add": func(a, b int) int { return a + b },
+	"sub": func(a, b int) int { return a - b },
 	"safeHTML": func(s string) template.HTML { return template.HTML(s) },
 	"csrfField": func(token interface{}) template.HTML {
 		if t, ok := token.(string); ok && t != "" {
