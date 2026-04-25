@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"fmt"
 	"html/template"
 	"net/http"
 	"sort"
@@ -251,6 +252,7 @@ func (s *Server) handleWebDeviceDetail(w http.ResponseWriter, r *http.Request) {
 		"Groups":           groups,
 		"Commands":         commands,
 		"AssignedPolicies": assignedPolicies,
+		"PlatformDetails":  buildPlatformDetails(device.PlatformData),
 	})
 }
 
@@ -458,6 +460,80 @@ func violationMatchesKey(violation, configKey string) bool {
 	}
 	// Fallback: check if violation contains the key with underscores replaced
 	return strings.Contains(vLower, strings.ReplaceAll(configKey, "_", " "))
+}
+
+type platformDetailItem struct {
+	Label   string
+	Value   string
+	Type    string // "text" or "bool"
+	BoolVal bool
+}
+
+type platformDetailGroup struct {
+	Category string
+	Items    []platformDetailItem
+}
+
+var platformKeyCategories = map[string]string{
+	"serial": "Hardware", "architecture": "Hardware", "storage_total_gb": "Hardware",
+	"storage_free_gb": "Hardware", "product_name": "Hardware",
+	"hostname": "Network", "ip_address": "Network", "mac_address": "Network",
+	"FileVaultEnabled": "Security", "firewall_enabled": "Security", "password_present": "Security",
+	"password_length": "Security", "bitlocker_enabled": "Security", "bitlocker_status": "Security",
+	"encryption_enabled": "Security", "supervised": "Security",
+	"build_version": "Operating System", "topic": "MDM", "push_magic": "MDM",
+	"has_token": "MDM", "mdm_enrolled": "MDM",
+}
+
+var platformKeyLabels = map[string]string{
+	"serial": "Serial Number", "architecture": "Architecture", "storage_total_gb": "Total Storage (GB)",
+	"storage_free_gb": "Free Storage (GB)", "product_name": "Product Name",
+	"hostname": "Hostname", "ip_address": "IP Address", "mac_address": "MAC Address",
+	"FileVaultEnabled": "FileVault", "firewall_enabled": "Firewall", "password_present": "Password Set",
+	"password_length": "Password Length", "bitlocker_enabled": "BitLocker", "bitlocker_status": "BitLocker Status",
+	"encryption_enabled": "Encryption", "supervised": "Supervised",
+	"build_version": "Build Version", "topic": "Push Topic", "push_magic": "Push Magic",
+	"has_token": "Has Token", "mdm_enrolled": "MDM Enrolled",
+}
+
+func buildPlatformDetails(pd models.JSONB) []platformDetailGroup {
+	if len(pd) == 0 {
+		return nil
+	}
+	groups := map[string][]platformDetailItem{}
+	for k, v := range pd {
+		cat := platformKeyCategories[k]
+		if cat == "" {
+			cat = "Other"
+		}
+		label := platformKeyLabels[k]
+		if label == "" {
+			label = strings.ReplaceAll(k, "_", " ")
+			if len(label) > 0 {
+				label = strings.ToUpper(label[:1]) + label[1:]
+			}
+		}
+		item := platformDetailItem{Label: label, Type: "text"}
+		switch val := v.(type) {
+		case bool:
+			item.Type = "bool"
+			item.BoolVal = val
+		default:
+			item.Value = fmt.Sprintf("%v", v)
+		}
+		groups[cat] = append(groups[cat], item)
+	}
+	order := []string{"Hardware", "Network", "Security", "Operating System", "MDM", "Other"}
+	var result []platformDetailGroup
+	for _, cat := range order {
+		items := groups[cat]
+		if len(items) == 0 {
+			continue
+		}
+		sort.Slice(items, func(i, j int) bool { return items[i].Label < items[j].Label })
+		result = append(result, platformDetailGroup{Category: cat, Items: items})
+	}
+	return result
 }
 
 func sortDevices(devices []*models.Device, field, dir string) {

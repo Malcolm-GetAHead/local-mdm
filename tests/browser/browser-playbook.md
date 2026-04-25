@@ -65,6 +65,9 @@
 - [ ] Verify "Lock" is visible
 - [ ] Verify "Unenroll" is visible
 - [ ] Verify "Compliance" is visible
+- [ ] Click "Platform Details"
+- [ ] Verify "Architecture" is visible
+- [ ] Verify "FileVault" is visible
 
 ### Device Delete
 - [ ] Visit `/dashboard/devices` — page contains "Devices"

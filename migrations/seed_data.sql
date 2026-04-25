@@ -27,7 +27,7 @@ ON CONFLICT (enterprise_id, email) DO NOTHING;
 -- Devices: 25 across macOS, Windows, Android
 INSERT INTO devices (id, enterprise_id, platform, device_id, serial_number, name, model, os_version, status, last_seen, platform_data) VALUES
   -- macOS devices (8)
-  ('d0000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000001', 'macos', 'mac-001', 'C02X1234ABCD', 'Alice MacBook Pro', 'MacBook Pro 16"', '14.4.1', 'enrolled', NOW() - interval '10 minutes', '{"serial": "C02X1234ABCD", "mdm_enrolled": true}'),
+  ('d0000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000001', 'macos', 'mac-001', 'C02X1234ABCD', 'Alice MacBook Pro', 'MacBook Pro 16"', '14.4.1', 'enrolled', NOW() - interval '10 minutes', '{"serial": "C02X1234ABCD", "mdm_enrolled": true, "build_version": "23E224", "FileVaultEnabled": true, "firewall_enabled": true, "password_present": true, "password_length": 12, "hostname": "Alices-MBP.local", "ip_address": "10.0.1.42", "mac_address": "A4:83:E7:2B:1F:90", "storage_total_gb": 512, "storage_free_gb": 287, "supervised": false, "architecture": "Apple Silicon"}'),
   ('d0000000-0000-0000-0000-000000000002', '00000000-0000-0000-0000-000000000001', 'macos', 'mac-002', 'C02X5678EFGH', 'Bob MacBook Air', 'MacBook Air M2', '14.3', 'enrolled', NOW() - interval '2 hours', '{"serial": "C02X5678EFGH", "mdm_enrolled": true}'),
   ('d0000000-0000-0000-0000-000000000003', '00000000-0000-0000-0000-000000000001', 'macos', 'mac-003', 'C02X9012IJKL', 'Conf Room iMac', 'iMac 24"', '14.4.1', 'enrolled', NOW() - interval '1 day', '{"serial": "C02X9012IJKL", "mdm_enrolled": true}'),
   ('d0000000-0000-0000-0000-000000000004', '00000000-0000-0000-0000-000000000001', 'macos', 'mac-004', 'C02X3456MNOP', 'Dev Mac Mini', 'Mac Mini M2', '14.2', 'enrolled', NOW() - interval '3 days', '{}'),
@@ -54,7 +54,7 @@ INSERT INTO devices (id, enterprise_id, platform, device_id, serial_number, name
   ('d0000000-0000-0000-0000-000000000024', '00000000-0000-0000-0000-000000000001', 'android', 'and-005', 'R58NQRST5678', 'Lost Android', 'Samsung Galaxy S23', '13', 'wiped', NOW() - interval '14 days', '{}'),
   ('d0000000-0000-0000-0000-000000000025', '00000000-0000-0000-0000-000000000001', 'android', 'and-006', 'PIXEL5678UVWX', 'Exec Phone', 'Google Pixel 8 Pro', '14', 'enrolled', NOW() - interval '10 minutes', '{"security_patch": "2024-03-05"}'),
   ('d0000000-0000-0000-0000-000000000026', '00000000-0000-0000-0000-000000000001', 'android', 'and-007', 'R58NYZAB9012', 'Shared Tablet', 'Samsung Galaxy Tab A9', '13', 'enrolled', NOW() - interval '2 days', '{}')
-ON CONFLICT (enterprise_id, platform, device_id) DO UPDATE SET status = EXCLUDED.status, name = EXCLUDED.name;
+ON CONFLICT (enterprise_id, platform, device_id) DO UPDATE SET status = EXCLUDED.status, name = EXCLUDED.name, platform_data = EXCLUDED.platform_data;
 
 -- Policies (6 enterprise policies + 2 templates)
 INSERT INTO policies (id, enterprise_id, name, description, platform, policy_type, policy_config, is_active, is_template) VALUES
