@@ -129,10 +129,11 @@
 ### Test Coverage Gaps
 - [x] Web handler pure function tests added (violationMatchesKey, sortDevices, isHTMX, detectPolicyType, parseSettingsFromForm, pickBestRole, buildChart, generateCSRF, splitOnce)
 - [x] `DeviceService.Unenroll` unit test added
-- [x] `internal/api` coverage: 36.7% → 39.8% (remaining gap is handler functions requiring template infrastructure — tested via 113 Playwright tests)
-- [ ] No Go integration test for OIDC callback flow (needs real Keycloak in test)
-- [ ] No Go integration test for CSRF validation (needs real Keycloak in test)
-- [ ] No Go integration test for session cookie HMAC verification (needs real Keycloak in test)
+- [x] `internal/api` coverage: 36.7% → 41.6% (pure function tests + session/CSRF/auth middleware tests)
+- [x] Go unit tests for CSRF validation (forged POST rejected, valid token accepted, HTMX exempt)
+- [x] Go unit tests for session cookie HMAC (sign/verify, tamper detection, expiry, session secret preference)
+- [x] Go unit test for web auth middleware (redirect without session)
+- [ ] Go integration test for OIDC callback flow (token exchange with real Keycloak)
 - [ ] `reporting.ComplianceRow.Details` field added but no test updated (low priority)
 - [ ] `internal/auth` and `internal/db` tests FAIL without Docker (pre-existing, unchanged)
 
