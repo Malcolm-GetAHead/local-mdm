@@ -97,12 +97,29 @@
 
 ## Remaining
 
-### Low Priority (deferred to next session)
-- [ ] Playwright full CRUD workflow rewrite + cleanup (create→edit→delete cycles with verification)
-- [ ] Visual polish — page transitions, loading indicators on HTMX requests, toast notifications
-- [ ] HTMX content replacement navigation (sidebar links swap main content without full reload)
-- [ ] Playwright multi-select/checkbox testing
-- [ ] Is there more we can to the device view, maybe draw some inspiration from here (but not the style, it's ugly): https://camo.githubusercontent.com/666037c1a40ed2042806be3af525c5c1a4e96baaccd8b2f443e791f0f66e38f2/68747470733a2f2f7777772e64726f70626f782e636f6d2f73636c2f66692f6866736463767930676936753931396e716e6e71732f456e64706f696e742e6a7065673f726c6b65793d36336561756c706469627871726c77676a33776e6f347136752673743d737a35666b687167267261773d31
+### Shortcuts / Technical Debt
+- [ ] Device list filtering — repo `List()` fetches all then filters in Go. Add `WHERE` clauses for platform/status/search to repo query for scale.
+- [ ] Compliance violation matching — `buildComplianceRows` uses `strings.Contains` heuristic to match violations to config keys. Compliance engine should store violations keyed by config key.
+- [ ] Policy assignment pagination — count shown but list is not paginated. Add page controls when >50 assignments.
+- [ ] Group detail member add/remove — re-renders full page via `handleWebGroupDetail`, should return only the member list fragment.
+- [ ] Audit log user email lookup — O(n) DB queries per row. Should be a single JOIN query.
+- [ ] Dashboard "Needs Attention" — calls `ComplianceReport` twice (pie chart + needs-attention). Consolidate to one call.
+- [ ] `buildComplianceRows` uses `context.Background()` — should use request context for cancellation.
+
+### Missing Playwright Tests
+- [ ] Device delete flow
+- [ ] Policy assignment (assign to group/device, verify, unassign)
+- [ ] Group inline edit (edit name/description, save, verify)
+- [ ] CSRF validation (verify forged POST is rejected)
+- [ ] Dark mode toggle (verify class applied)
+- [ ] "Needs Attention" panel on dashboard
+- [ ] Full CRUD workflows with cleanup (create→edit→verify→delete for policies, groups)
+
+### Deferred Features
+- [ ] HTMX content replacement navigation — sidebar links swap main content without full page reload
+- [ ] Visual polish — page transitions, loading indicators on HTMX requests, toast notifications for actions
+- [ ] Playwright multi-select/checkbox testing (policy settings, group member toggles)
+- [ ] Policy multi-platform selection (agreed: single platform is fine for now)
 
 ### Known Issues (tracked in SESSION_NOTES.md)
 - **EventBus compliance evaluation is fire-and-forget** — no retry on failure. Fix: `event_queue` table + background retry worker (5 attempts, then audit log failure).
