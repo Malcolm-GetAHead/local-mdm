@@ -4,6 +4,12 @@
 
 BEGIN;
 
+-- Reset test mutations: restore seed devices, remove test-created data
+UPDATE devices SET deleted_at = NULL WHERE id::text LIKE 'd0000000-0000-0000-0000-%' AND enterprise_id = '00000000-0000-0000-0000-000000000001';
+DELETE FROM policy_assignments WHERE policy_id::text NOT LIKE 'e0000000-0000-0000-0000-%';
+DELETE FROM policies WHERE id::text NOT LIKE 'e0000000-0000-0000-0000-%' AND enterprise_id = '00000000-0000-0000-0000-000000000001';
+DELETE FROM device_groups WHERE id::text NOT LIKE 'f0000000-0000-0000-0000-%' AND enterprise_id = '00000000-0000-0000-0000-000000000001';
+
 -- Enterprise
 INSERT INTO enterprises (id, name, slug, settings) VALUES
   ('00000000-0000-0000-0000-000000000001', 'Acme Corp', 'acme-corp', '{"timezone": "America/New_York", "max_devices": 100}')
