@@ -120,10 +120,11 @@
 - [ ] Verify table header row is visible
 - [ ] Verify "Corporate Security Baseline" is visible
 
-### Create Policy
+### Create Policy with Settings
 - [ ] Click "Create Policy"
 - [ ] Verify "Security" is visible
 - [ ] Fill: Name=`Test Policy`, Description=`Automated test`
+- [ ] Click "Require Encryption"
 - [ ] Click "Create Policy"
 - [ ] Verify redirected to `/dashboard/policies` — page contains "Test Policy"
 
@@ -136,6 +137,14 @@
 - [ ] Navigate to "Policies"
 - [ ] Click "Assign" on "Test Policy"
 - [ ] Verify "Assign to Group" is visible
+
+### Policy Assign and Unassign
+- [ ] Select "Engineering" from the "group-select" dropdown
+- [ ] Click "Assign to Group"
+- [ ] Wait 1s
+- [ ] Verify "Current Assignments" is visible
+- [ ] Click "Remove" on "Engineering"
+- [ ] Wait 1s
 
 ### Policy Full CRUD
 - [ ] Visit `/dashboard/policies` — page contains "Policies"
