@@ -220,6 +220,9 @@ func (s *Server) handleWebDeviceDetail(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Auto-evaluate compliance on page load so it's always fresh
+	s.complianceService.EvaluateDeviceByID(ctx, id)
+
 	// Compliance
 	compResults, _ := s.complianceService.GetDeviceCompliance(ctx, id)
 	compliance := buildComplianceRows(compResults, s)
