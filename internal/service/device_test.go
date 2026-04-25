@@ -170,3 +170,14 @@ func TestDeviceService_Restart_WindowsRejected(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "not supported")
 }
+
+func TestDeviceService_Unenroll(t *testing.T) {
+	dr := newMockDeviceRepo()
+	d := newTestDevice(models.PlatformMacOS)
+	dr.devices[d.ID] = d
+	svc := NewDeviceService(dr, &mockCmdRepo{}, &mockDispatcher{}, NewLifecycleService(testLogger()), testLogger())
+
+	result, err := svc.Unenroll(context.Background(), d.ID)
+	require.NoError(t, err)
+	assert.Equal(t, "unenrolled", result.Status)
+}

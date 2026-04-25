@@ -124,8 +124,8 @@
       https://camo.githubusercontent.com/666037c1a40ed2042806be3af525c5c1a4e96baaccd8b2f443e791f0f66e38f2/68747470733a2f2f7777772e64726f70626f782e636f6d2f73636c2f66692f6866736463767930676936753931396e716e6e71732f456e64706f696e742e6a7065673f726c6b65793d36336561756c706469627871726c77676a33776e6f347136752673743d737a35666b687167267261773d31
 
 ### Security & Reliability Fixes
-- [ ] EventBus compliance retry — add `event_queue` table with `retry_count` column, background worker retries failed evaluations up to 5 times, then logs failure to `audit_logs`. Currently fire-and-forget with no retry.
-- [ ] Dedicated session secret — add `session_secret` config key (source from AWS SSM in prod), fall back to Keycloak client secret if not set. Currently HMAC key is the client secret, so secret rotation invalidates all sessions.
+- [x] EventBus compliance retry — `event_queue` table (migration 000013) with retry_count, exponential backoff, max 5 retries, 60s processing interval
+- [x] Dedicated session secret — `session_secret` config key, falls back to Keycloak client secret if not set
 
 ### Test Coverage Gaps
 - [ ] `internal/api` coverage dropped from 67.8% to 36.9% — ~800 lines of web handler code with zero Go unit tests
