@@ -6,6 +6,7 @@
 </div>
 
 <form method="POST" action="/dashboard/policies{{if .IsEdit}}/{{.Policy.ID}}{{end}}" class="space-y-6">
+    {{csrfField .CSRFToken}}
     <div class="card">
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
@@ -47,9 +48,13 @@
         </div>
     </div>
 
-    <div class="flex gap-3">
+    <div class="flex gap-3 items-center">
         <button type="submit" class="btn-primary">{{if .IsEdit}}Save Changes{{else}}Create Policy{{end}}</button>
         <a href="/dashboard/policies" class="btn-secondary">Cancel</a>
+        {{if .IsEdit}}
+        <span class="ml-auto text-sm text-gray-500 dark:text-gray-400">{{.AssignmentCount}} assignment{{if ne .AssignmentCount 1}}s{{end}}</span>
+        <a href="/dashboard/policies/{{.Policy.ID}}/assign" class="btn-secondary text-xs">Manage Assignments</a>
+        {{end}}
     </div>
 </form>
 

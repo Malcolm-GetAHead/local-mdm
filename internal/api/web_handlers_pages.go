@@ -140,12 +140,15 @@ func (s *Server) handleWebPolicyEdit(w http.ResponseWriter, r *http.Request) {
 		active[k] = fmt.Sprintf("%v", v)
 	}
 
+	assignments, _ := s.groupService.ListAssignmentsByPolicy(ctx, id)
+
 	s.renderPage(w, r, "policy_form", map[string]interface{}{
-		"ActiveNav":      "policies",
-		"IsEdit":         true,
-		"Policy":         policy,
-		"SettingGroups":  settingsByCategory(policy.Platform),
-		"ActiveSettings": active,
+		"ActiveNav":       "policies",
+		"IsEdit":          true,
+		"Policy":          policy,
+		"SettingGroups":   settingsByCategory(policy.Platform),
+		"ActiveSettings":  active,
+		"AssignmentCount": len(assignments),
 	})
 }
 

@@ -15,6 +15,9 @@
             <button hx-post="/dashboard/devices/{{.Device.ID}}/wipe" hx-target="#device-actions" hx-swap="innerHTML"
                     hx-confirm="WIPE this device? All data will be erased." class="btn-danger text-xs">Wipe</button>
             {{end}}
+            <button hx-post="/dashboard/devices/{{.Device.ID}}/delete" hx-swap="none"
+                    hx-confirm="DELETE this device record permanently?"
+                    class="btn-danger text-xs">Delete</button>
         </span>
         {{end}}
         {{else}}
@@ -49,8 +52,11 @@
         <dl class="space-y-2 text-sm">
             <div class="flex justify-between"><dt class="text-gray-500 dark:text-gray-400">Enrolled</dt><dd class="font-medium">{{formatDate .Device.EnrollmentDate}}</dd></div>
             <div class="flex justify-between"><dt class="text-gray-500 dark:text-gray-400">Last Seen</dt><dd class="font-medium">{{if .Device.LastSeen}}{{timeAgo .Device.LastSeen}}{{else}}Never{{end}}</dd></div>
-            <div class="flex justify-between"><dt class="text-gray-500 dark:text-gray-400">Last Evaluated</dt><dd class="flex items-center gap-2"><span class="font-medium">{{if .LastEvaluated}}{{timeAgo .LastEvaluated}}{{else}}Never{{end}}</span>
-                <button hx-post="/dashboard/devices/{{.Device.ID}}/evaluate" hx-target="#tab-compliance" hx-swap="innerHTML" class="text-xs text-blue-600 dark:text-blue-400 hover:underline">Re-evaluate</button>
+            <div class="flex justify-between"><dt class="text-gray-500 dark:text-gray-400">Last Evaluated</dt><dd class="flex items-center gap-2">
+                <button hx-post="/dashboard/devices/{{.Device.ID}}/evaluate" hx-target="#tab-compliance" hx-swap="innerHTML" title="Manual re-evaluate" class="text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 4v5h5M20 20v-5h-5"/><path d="M20.49 9A9 9 0 005.64 5.64L4 4m16 16l-1.64-1.64A9 9 0 019 20.49"/></svg>
+                </button>
+                <span class="font-medium">{{if .LastEvaluated}}{{timeAgo .LastEvaluated}}{{else}}Never{{end}}</span>
             </dd></div>
             <div class="flex justify-between"><dt class="text-gray-500 dark:text-gray-400">Groups</dt><dd>
                 {{range .Groups}}<a href="/dashboard/groups/{{.ID}}" class="badge badge-blue mr-1">{{.Name}}</a>{{else}}<span class="text-gray-400">None</span>{{end}}

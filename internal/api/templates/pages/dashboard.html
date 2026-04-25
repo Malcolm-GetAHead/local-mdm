@@ -42,13 +42,15 @@
 
 <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
     <div class="card">
-        <h2 class="text-lg font-semibold mb-4">Devices by Platform</h2>
+        <h2 class="text-lg font-semibold mb-4">Needs Attention</h2>
         <div class="space-y-3">
-            {{range .Stats.PlatformCounts}}
-            <div class="flex items-center justify-between">
-                <span class="text-sm font-medium capitalize">{{.Platform}}</span>
-                <span class="badge badge-gray">{{.Count}}</span>
+            {{range .NeedsAttention}}
+            <div class="flex items-center justify-between text-sm">
+                <a href="/dashboard/devices/{{.ID}}" class="text-blue-600 dark:text-blue-400 hover:underline">{{.Name}}</a>
+                <span class="badge {{if eq .Reason "non-compliant"}}badge-red{{else}}badge-yellow{{end}}">{{.Reason}}</span>
             </div>
+            {{else}}
+            <p class="text-sm text-green-600 dark:text-green-400">All devices healthy ✓</p>
             {{end}}
         </div>
     </div>

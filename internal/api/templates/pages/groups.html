@@ -8,6 +8,7 @@
 <div id="create-group-form" class="card mb-6 hidden">
     <h2 class="text-lg font-semibold mb-4">Create Group</h2>
     <form method="POST" action="/dashboard/groups" class="flex gap-4 items-end">
+        {{csrfField .CSRFToken}}
         <div class="flex-1">
             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Name</label>
             <input type="text" name="name" required class="input-field">

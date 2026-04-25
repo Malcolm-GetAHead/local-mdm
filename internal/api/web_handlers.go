@@ -7,6 +7,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/gorilla/mux"
@@ -30,6 +31,9 @@ func (s *Server) renderPage(w http.ResponseWriter, r *http.Request, name string,
 	}
 	if nonce, ok := r.Context().Value(cspNonceKey).(string); ok {
 		data["CSPNonce"] = nonce
+	}
+	if csrf, ok := r.Context().Value(csrfTokenKey).(string); ok {
+		data["CSRFToken"] = csrf
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	if err := tmpl.ExecuteTemplate(w, "base", data); err != nil {
@@ -116,6 +120,32 @@ func (s *Server) handleDashboardHome(w http.ResponseWriter, r *http.Request) {
 
 	auditLogs, _, _ := s.auditLogRepo.Search(ctx, sess.EnterpriseID, "", "", "", 5, 0)
 
+	// Devices needing attention: non-compliant or not seen in 7 days
+	type attentionItem struct {
+		ID     string
+		Name   string
+		Reason string
+	}
+	var needsAttention []attentionItem
+	seen := map[string]bool{}
+	if compRows, err := s.reportService.ComplianceReport(ctx, sess.EnterpriseID); err == nil {
+		for _, cr := range compRows {
+			if cr.Status == "non_compliant" && !seen[cr.DeviceID.String()] {
+				needsAttention = append(needsAttention, attentionItem{cr.DeviceID.String(), cr.DeviceName, "non-compliant"})
+				seen[cr.DeviceID.String()] = true
+			}
+		}
+	}
+	for _, d := range devices {
+		if d.LastSeen != nil && time.Since(*d.LastSeen) > 7*24*time.Hour && !seen[d.ID.String()] {
+			needsAttention = append(needsAttention, attentionItem{d.ID.String(), d.Name, "not seen 7d+"})
+			seen[d.ID.String()] = true
+		}
+	}
+	if len(needsAttention) > 10 {
+		needsAttention = needsAttention[:10]
+	}
+
 	s.renderPage(w, r, "dashboard", map[string]interface{}{
 		"ActiveNav": "dashboard",
 		"Stats": map[string]interface{}{
@@ -126,7 +156,8 @@ func (s *Server) handleDashboardHome(w http.ResponseWriter, r *http.Request) {
 			"PlatformCounts": platList,
 		},
 		"Charts": []chartData{platformChart, statusChart, complianceChart},
-		"RecentAudit": auditLogs,
+		"RecentAudit":    auditLogs,
+		"NeedsAttention": needsAttention,
 	})
 }
 
@@ -334,6 +365,16 @@ func (s *Server) handleWebDeviceUnenroll(w http.ResponseWriter, r *http.Request)
 // (end of file)
 
 // handleWebDeviceEvaluate triggers compliance evaluation for a device.
+// handleWebDeviceDelete deletes a device record.
+func (s *Server) handleWebDeviceDelete(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	id, _ := uuid.Parse(mux.Vars(r)["id"])
+	s.deviceService.Delete(ctx, id)
+	s.logAudit(r, "device.delete", "device", id, nil)
+	w.Header().Set("HX-Redirect", "/dashboard/devices")
+	w.WriteHeader(http.StatusOK)
+}
+
 func (s *Server) handleWebDeviceEvaluate(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	id, _ := uuid.Parse(mux.Vars(r)["id"])

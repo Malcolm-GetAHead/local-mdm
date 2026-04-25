@@ -118,6 +118,12 @@ var templateFuncs = template.FuncMap{
 	},
 	"printf": fmt.Sprintf,
 	"safeHTML": func(s string) template.HTML { return template.HTML(s) },
+	"csrfField": func(token interface{}) template.HTML {
+		if t, ok := token.(string); ok && t != "" {
+			return template.HTML(`<input type="hidden" name="_csrf" value="` + t + `">`)
+		}
+		return ""
+	},
 }
 
 func (s *Server) loadTemplates() error {

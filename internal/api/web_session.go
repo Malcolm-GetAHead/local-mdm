@@ -119,7 +119,6 @@ func (s *Server) webAuthMiddleware(next http.Handler) http.Handler {
 			return
 		}
 		ctx := context.WithValue(r.Context(), webSessionCtxKey, sess)
-		// Also inject auth.AuthUser so logAudit and other auth-aware code works
 		authUser := &auth.AuthUser{
 			ID:           sess.UserID.String(),
 			Email:        sess.Email,
@@ -127,13 +126,36 @@ func (s *Server) webAuthMiddleware(next http.Handler) http.Handler {
 			EnterpriseID: sess.EnterpriseID,
 		}
 		ctx = auth.WithUser(ctx, authUser)
+
+		// CSRF: generate token for GET, validate for POST
+		if r.Method == "POST" {
+			token := r.FormValue("_csrf")
+			if token == "" {
+				token = r.Header.Get("X-CSRF-Token")
+			}
+			expected := generateCSRF(sess.UserID.String(), s.sessionKey())
+			if !hmac.Equal([]byte(token), []byte(expected)) && r.Header.Get("HX-Request") == "" {
+				http.Error(w, "Invalid CSRF token", http.StatusForbidden)
+				return
+			}
+		}
+		csrfToken := generateCSRF(sess.UserID.String(), s.sessionKey())
+		ctx = context.WithValue(ctx, csrfTokenKey, csrfToken)
+
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
+}
+
+func generateCSRF(userID string, key []byte) string {
+	mac := hmac.New(sha256.New, key)
+	mac.Write([]byte("csrf:" + userID))
+	return hex.EncodeToString(mac.Sum(nil))[:32]
 }
 
 type webSessionKey_ string
 
 const webSessionCtxKey webSessionKey_ = "web_session"
+const csrfTokenKey webSessionKey_ = "csrf_token"
 
 func getSession(r *http.Request) *webSession {
 	sess, _ := r.Context().Value(webSessionCtxKey).(*webSession)
