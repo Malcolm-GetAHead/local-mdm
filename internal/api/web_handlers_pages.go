@@ -53,7 +53,7 @@ func (s *Server) handleWebPolicyList(w http.ResponseWriter, r *http.Request) {
 		"Filter":    map[string]string{"Platform": platform, "Sort": sortField, "Dir": sortDir},
 	}
 
-	if isHTMX(r) {
+	if isHTMXFragment(r) {
 		s.renderFragment(w, s.webTemplates["policies"], "policy_table_body", data)
 		return
 	}
@@ -381,7 +381,7 @@ func (s *Server) handleWebCompliance(w http.ResponseWriter, r *http.Request) {
 		},
 	}
 
-	if isHTMX(r) {
+	if isHTMXFragment(r) {
 		s.renderFragment(w, s.webTemplates["compliance"], "compliance_table_body", data)
 		return
 	}
@@ -488,7 +488,7 @@ func (s *Server) handleWebAuditLog(w http.ResponseWriter, r *http.Request) {
 		},
 	}
 
-	if isHTMX(r) {
+	if isHTMXFragment(r) {
 		s.renderFragment(w, s.webTemplates["audit"], "audit_table_body", data)
 		return
 	}
@@ -539,7 +539,7 @@ func (s *Server) handleWebGroups(w http.ResponseWriter, r *http.Request) {
 		"Dir":       sortDir,
 	}
 
-	if isHTMX(r) {
+	if isHTMXFragment(r) {
 		s.renderFragment(w, s.webTemplates["groups"], "groups_table_body", data)
 		return
 	}
@@ -592,7 +592,7 @@ func (s *Server) handleWebGroupDetail(w http.ResponseWriter, r *http.Request) {
 		"AllDevices": rows,
 	}
 
-	if isHTMX(r) {
+	if isHTMXFragment(r) {
 		s.renderFragment(w, s.webTemplates["group_detail"], "content", data)
 		return
 	}

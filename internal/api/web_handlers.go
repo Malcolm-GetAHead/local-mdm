@@ -70,6 +70,12 @@ func isHTMX(r *http.Request) bool {
 	return r.Header.Get("HX-Request") == "true"
 }
 
+// isHTMXFragment returns true for HTMX requests that target a specific fragment
+// (e.g. table body), not full page-content navigation swaps.
+func isHTMXFragment(r *http.Request) bool {
+	return r.Header.Get("HX-Request") == "true" && r.Header.Get("HX-Target") != "page-content"
+}
+
 // handleDashboardHome shows the main dashboard with stats.
 func (s *Server) handleDashboardHome(w http.ResponseWriter, r *http.Request) {
 	sess := getSession(r)
@@ -213,7 +219,7 @@ func (s *Server) handleWebDeviceList(w http.ResponseWriter, r *http.Request) {
 		},
 	}
 
-	if isHTMX(r) {
+	if isHTMXFragment(r) {
 		s.renderFragment(w, s.webTemplates["devices"], "device_table_body", data)
 		return
 	}
