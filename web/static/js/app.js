@@ -42,7 +42,7 @@
     document.addEventListener('click', function(e) {
         var btn = e.target.closest('.tab-btn');
         if (!btn) return;
-        var container = btn.closest('.card, [id*="tab"]');
+        var container = btn.closest('.card');
         if (!container) return;
         var tab = btn.getAttribute('data-tab');
         container.querySelectorAll('.tab-btn').forEach(function(b) {

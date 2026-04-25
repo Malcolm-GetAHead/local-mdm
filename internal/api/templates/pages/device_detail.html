@@ -110,21 +110,18 @@
 
     <div class="tab-panel hidden" id="tab-platform">
         {{if .PlatformDetails}}
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 p-6">
-            {{range .PlatformDetails}}
-            <div>
-                <h4 class="text-xs font-semibold uppercase text-gray-500 dark:text-gray-400 mb-3">{{.Category}}</h4>
-                <dl class="space-y-2 text-sm">
-                    {{range .Items}}
-                    <div class="flex justify-between">
-                        <dt class="text-gray-500 dark:text-gray-400">{{.Label}}</dt>
-                        <dd class="font-medium">{{if eq .Type "bool"}}{{if .BoolVal}}<span class="text-green-600">✓</span>{{else}}<span class="text-red-500">✗</span>{{end}}{{else}}{{.Value}}{{end}}</dd>
-                    </div>
-                    {{end}}
-                </dl>
-            </div>
-            {{end}}
-        </div>
+        <table class="w-full text-sm">
+            <thead><tr class="table-header"><th class="px-6 py-2">Category</th><th class="px-6 py-2">Property</th><th class="px-6 py-2">Value</th></tr></thead>
+            <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+            {{range .PlatformDetails}}{{$cat := .Category}}{{range .Items}}
+            <tr>
+                <td class="px-6 py-2 text-gray-500 dark:text-gray-400">{{$cat}}</td>
+                <td class="px-6 py-2 font-medium">{{.Label}}</td>
+                <td class="px-6 py-2">{{if eq .Type "bool"}}{{if .BoolVal}}<span class="text-green-600">✓ Enabled</span>{{else}}<span class="text-red-500">✗ Disabled</span>{{end}}{{else}}{{.Value}}{{end}}</td>
+            </tr>
+            {{end}}{{end}}
+            </tbody>
+        </table>
         {{else}}
         <p class="px-6 py-8 text-center text-gray-500 dark:text-gray-400">No platform data available. Data is populated when the device checks in.</p>
         {{end}}

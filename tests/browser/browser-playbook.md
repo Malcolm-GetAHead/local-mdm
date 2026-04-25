@@ -89,6 +89,20 @@
 - [ ] Verify "Compliance" is visible
 - [ ] Click "Platform Details"
 - [ ] Verify "Architecture" is visible
+
+### Device Tab Switching
+- [ ] Visit `/dashboard/devices` — page contains "Devices"
+- [ ] Click "Alice MacBook Pro"
+- [ ] Verify "Compliance" is visible
+- [ ] Click "Policies"
+- [ ] Verify "Assigned Via" is visible
+- [ ] Verify "Compliance" is visible
+- [ ] Click "Compliance"
+- [ ] Wait 0.5s
+- [ ] Click "Commands"
+- [ ] Verify "Command" is visible
+- [ ] Click "Platform Details"
+- [ ] Verify "Architecture" is visible
 - [ ] Verify "FileVault" is visible
 
 ### Device Delete
