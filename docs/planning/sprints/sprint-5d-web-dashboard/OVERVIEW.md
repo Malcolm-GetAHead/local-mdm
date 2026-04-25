@@ -87,7 +87,7 @@
 - [x] Playwright mobile viewport test (375px)
 
 ### Playwright Browser Tests
-- [x] 129/129 passing
+- [x] 166/166 passing
 - [x] Real Keycloak login/logout (no cookie bypass)
 - [x] Console error tracking (JS errors, page errors, HTTP 4xx/5xx)
 - [x] Viewport auto-resize for mobile sections
@@ -117,9 +117,9 @@
 - [ ] CSRF validation (verify forged POST is rejected) — tested in Go unit tests instead
 
 ### Previously Deferred Features to be completed
-- [x] HTMX boosted navigation — sidebar links do AJAX body swap via `hx-boost="true"`, loading indicator bar
-- [x] Enrich device detail view — Platform Details tab renders platform_data JSONB as categorized cards (Hardware, Network, Security, OS, MDM) with friendly labels and ✓/✗ for booleans
-- [ ] Visual polish — toast notifications for actions (loading indicator done)
+- [x] HTMX SPA navigation — sidebar links swap header+content via `hx-get` targeting `#page-content`, all inline scripts consolidated into external `app.js` with event delegation
+- [x] Enrich device detail view — Platform Details tab renders platform_data as table (Category/Property/Value) with ✓/✗ for booleans
+- [ ] Visual polish — toast notifications for actions
 - [ ] Playwright multi-select/checkbox testing (policy settings, group member toggles)
 - [x] Policy multi-platform selection — agreed: single platform is fine for now (no change needed)
 
