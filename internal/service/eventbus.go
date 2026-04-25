@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/google/uuid"
@@ -70,14 +71,15 @@ type EventHandler func(ctx context.Context, event MDMEvent) error
 
 // EventBus listens on PostgreSQL LISTEN/NOTIFY and dispatches to subscribers.
 type EventBus struct {
-	dsn         string
-	db          *sql.DB
-	listener    *pq.Listener
-	subscribers map[string][]EventHandler
-	mu          sync.RWMutex
-	logger      *slog.Logger
-	cancel      context.CancelFunc
-	done        chan struct{}
+	dsn              string
+	db               *sql.DB
+	listener         *pq.Listener
+	subscribers      map[string][]EventHandler
+	mu               sync.RWMutex
+	logger           *slog.Logger
+	cancel           context.CancelFunc
+	done             chan struct{}
+	retriesExhausted atomic.Int64
 }
 
 // NewEventBus creates an EventBus. Call Start() to begin listening.
@@ -150,6 +152,11 @@ func (eb *EventBus) Start(ctx context.Context) error {
 
 	eb.logger.Info("eventbus: started", "channel", EventChannel)
 	return nil
+}
+
+// RetriesExhausted returns the count of events that exhausted all retries since startup.
+func (eb *EventBus) RetriesExhausted() int64 {
+	return eb.retriesExhausted.Load()
 }
 
 // Shutdown stops the listener loop and closes the connection.
@@ -294,10 +301,21 @@ func (eb *EventBus) ProcessRetries(ctx context.Context) {
 			eb.db.Exec(`UPDATE event_queue SET completed_at = NOW() WHERE id = $1`, id)
 			eb.logger.Info("eventbus: retry succeeded", "id", id, "type", eventType, "attempt", retryCount+1)
 		} else {
-			backoff := time.Duration(1<<uint(retryCount+1)) * 30 * time.Second // exponential: 60s, 120s, 240s...
-			eb.db.Exec(`UPDATE event_queue SET retry_count = retry_count + 1, last_error = $1, next_retry_at = NOW() + $2::interval WHERE id = $3`,
-				lastErr, fmt.Sprintf("%d seconds", int(backoff.Seconds())), id)
-			eb.logger.Warn("eventbus: retry failed", "id", id, "type", eventType, "attempt", retryCount+1, "error", lastErr)
+			newCount := retryCount + 1
+			if newCount >= 5 { // max_retries
+				eb.db.Exec(`UPDATE event_queue SET retry_count = $1, last_error = $2, completed_at = NOW() WHERE id = $3`,
+					newCount, "exhausted: "+lastErr, id)
+				eb.retriesExhausted.Add(1)
+				eb.logger.Error("eventbus: retries exhausted", "id", id, "type", eventType, "error", lastErr)
+				// Log to audit_logs
+				eb.db.Exec(`INSERT INTO audit_logs (enterprise_id, action, resource_type, details) VALUES ('00000000-0000-0000-0000-000000000000', 'eventbus.retry_exhausted', $1, $2)`,
+					eventType, fmt.Sprintf(`{"event_id": "%s", "error": "%s", "attempts": %d}`, id, lastErr, newCount))
+			} else {
+				backoff := time.Duration(1<<uint(newCount)) * 30 * time.Second
+				eb.db.Exec(`UPDATE event_queue SET retry_count = $1, last_error = $2, next_retry_at = NOW() + $3::interval WHERE id = $4`,
+					newCount, lastErr, fmt.Sprintf("%d seconds", int(backoff.Seconds())), id)
+			}
+			eb.logger.Warn("eventbus: retry failed", "id", id, "type", eventType, "attempt", newCount, "error", lastErr)
 		}
 	}
 }
