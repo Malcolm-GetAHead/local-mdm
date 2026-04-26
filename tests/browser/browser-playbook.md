@@ -127,6 +127,14 @@
 - [ ] Visit `/dashboard/devices` — page contains "Devices"
 - [ ] Verify "Dev Mac Mini" is not visible
 
+### Sub-page Navigation (hx-boost)
+- [ ] Visit `/dashboard/devices` — page contains "Devices"
+- [ ] Click "Alice MacBook Pro"
+- [ ] Wait 0.5s
+- [ ] Verify "Serial Number" is visible
+- [ ] Verify "Local MDM" is visible
+- [ ] Verify "Logout" is visible
+
 ## Policy Management
 
 ### List Policies
