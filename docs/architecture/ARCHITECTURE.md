@@ -382,6 +382,12 @@ viewer (per enterprise)
   └─ View audit logs
 ```
 
+### Dashboard Security (Sprint 5d)
+- **Session**: HMAC-SHA256 signed cookies, 8-hour TTL, dedicated `session_secret` config key
+- **CSRF**: HMAC token on all POST forms, HTMX requests exempt (same-origin)
+- **CSP**: Nonces for external scripts (`app.js`, `htmx.min.js`), no `unsafe-inline`
+- **Auth**: Keycloak OIDC code flow, enterprise_id from JWT claim
+
 ## Database Design Principles
 
 ### Multi-Tenancy
@@ -466,7 +472,7 @@ GET /health
 
 ```
 Docker Compose (all services on Alpine Linux)
-├── localmdm        — Go API server (port 8080) or localmdm-dev (hot reload)
+├── localmdm        — Go API server + web dashboard (port 8080)
 ├── nanomdm         — Apple MDM protocol handler (port 9000)
 ├── postgres        — PostgreSQL 15 (databases: localmdm, keycloak, nanomdm)
 ├── keycloak        — OIDC identity provider (port 8180)
@@ -510,6 +516,14 @@ Load Balancer (TLS termination)
 - Middleware support
 - Well-documented
 - Battle-tested
+
+### Why HTMX + Go Templates (not React)?
+
+- No separate frontend build pipeline — CSS compiled in Dockerfile
+- Server-rendered HTML with progressive enhancement
+- HTMX handles partial updates (table filters, member toggles, SPA navigation)
+- Go `html/template` with `embed.FS` — templates compiled into binary
+- Tailwind CSS v4 standalone CLI — no Node.js in production
 
 ## External Dependencies
 
@@ -606,16 +620,22 @@ In production (ECS Fargate), NanoMDM runs as a separate ECS service behind the A
 - Policy application
 - Device commands
 
+### Browser Tests (Sprint 5d)
+
+- Playwright playbook DSL (`tests/browser/browser-playbook.md`)
+- 178 tests covering: login, navigation, CRUD workflows, tab switching, dark mode, mobile
+- Real Keycloak OIDC login (no cookie bypass)
+- Console error tracking (JS errors, HTTP 4xx/5xx fail the run)
+- Run: `make seed && make browser-test`
+
 ### Test Coverage Goals
 
 - Service layer: 80%+
 - Repository layer: 70%+
+- API layer: 48%+ (web handlers tested via Playwright + Go unit tests)
 - Overall: 70%+
 
 ---
 
-**Next Steps**:
-1. Sprint 5f: API hardening, explicit CA generation, test DB helper consolidation
-2. Sprint 5b: EventBus listener, compliance wiring, load testing
-3. Sprint 5d: Web dashboard (Go templates + HTMX + Tailwind CSS)
-4. Sprint 6: macOS Platform SSO (Java/Swift)
+**Current Sprint**: 5d (Web Dashboard) — complete
+**Next**: Sprint 6 (macOS Platform SSO — Java/Swift, requires Apple Developer account)
