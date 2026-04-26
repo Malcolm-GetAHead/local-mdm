@@ -52,6 +52,20 @@
 - [ ] Wait 0.5s
 - [ ] Verify "Total Devices" is visible
 
+### Theme Switcher
+- [ ] Visit `/dashboard/` — page contains "Total Devices"
+- [ ] Click "Change theme"
+- [ ] Wait 0.3s
+- [ ] Verify "Violet" is visible
+- [ ] Click "Violet"
+- [ ] Wait 0.3s
+- [ ] Click "Change theme"
+- [ ] Wait 0.3s
+- [ ] Verify "Ocean" is visible
+- [ ] Click "Default"
+- [ ] Wait 0.3s
+- [ ] Verify "Total Devices" is visible
+
 ## Device Management
 
 ### List Devices
@@ -112,6 +126,14 @@
 - [ ] Wait 1s
 - [ ] Visit `/dashboard/devices` — page contains "Devices"
 - [ ] Verify "Dev Mac Mini" is not visible
+
+### Sub-page Navigation (hx-boost)
+- [ ] Visit `/dashboard/devices` — page contains "Devices"
+- [ ] Click "Alice MacBook Pro"
+- [ ] Wait 0.5s
+- [ ] Verify "Serial Number" is visible
+- [ ] Verify "Local MDM" is visible
+- [ ] Verify "Logout" is visible
 
 ## Policy Management
 

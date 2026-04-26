@@ -151,6 +151,9 @@ css: ## Compile Tailwind CSS (requires ./tailwindcss binary)
 css-watch: ## Watch and recompile Tailwind CSS on changes
 	@./tailwindcss --input web/static/css/input.css --output web/static/css/output.css --watch
 
+coverage-combined: ## Combined Go + Playwright coverage report
+	@./scripts/coverage-combined.sh
+
 deps: ## Download dependencies
 	@echo "Downloading dependencies..."
 	@go mod download

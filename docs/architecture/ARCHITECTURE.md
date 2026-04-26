@@ -52,6 +52,11 @@ Local MDM follows a layered architecture with clear separation of concerns:
 - `server.go` - Server setup, routing, middleware
 - `handlers.go` - Shared handler helpers (parseJSON, pagination, audit)
 - `handlers_device.go`, `handlers_policy.go`, `handlers_enterprise.go`, `handlers_app.go`, `handlers_user.go`, `handlers_report.go`, `handlers_compliance.go`, `handlers_group.go`, `handlers_command.go`, `handlers_health.go` - Domain-specific HTTP handlers
+- `web_handlers.go`, `web_handlers_pages.go` - Dashboard HTML handlers (device list, policy CRUD, groups, compliance, audit)
+- `web_session.go` - OIDC login/callback, CSRF, HMAC session cookies
+- `web_templates.go` - Template engine with `embed.FS`, helper functions
+- `web_charts.go` - SVG pie chart generator
+- `web_policy_catalog.go` - Settings catalog for policy forms
 - `platform_handlers.go` - Platform enrollment and webhook handlers
 - `ratelimit.go`, `auth_ratelimit.go`, `compression.go`, `idempotency.go` - Middleware
 
@@ -277,6 +282,22 @@ web/static/
 Keycloak OIDC code flow → HMAC-SHA256 signed session cookie. CSRF protection on POST forms (HTMX requests exempt). Dedicated `session_secret` config key with fallback to Keycloak client secret.
 
 ## Data Flow
+
+### Dashboard Navigation Flow
+
+```
+Full page load (first visit or hard refresh):
+  Browser → GET /dashboard/devices → Server renders base.html + header + content → Full HTML page
+
+HTMX sidebar navigation (subsequent clicks):
+  Browser → GET /dashboard/policies (HX-Target: page-content) → Server renders header + content fragment only → HTMX swaps #page-content innerHTML
+
+HTMX sub-page navigation (hx-boost on content links):
+  Browser → GET /dashboard/devices/{id} (HX-Target: page-content) → Same fragment response → Sidebar stays, content swaps
+
+HTMX table filter (search/filter inputs):
+  Browser → GET /dashboard/devices?q=mac (HX-Target: device-table) → Server renders table body fragment only → HTMX swaps table div
+```
 
 ### Device Enrollment Flow
 

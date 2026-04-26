@@ -841,3 +841,21 @@ All triggers call `notify_mdm_event()` which sends JSON payload to `mdm_events` 
 ```
 
 The `extra` field contains table-specific context: `policy_id`/`target_type`/`target_id` for policy_assignments, `group_id` for group_memberships. The function uses `OLD` for DELETE operations and `NEW` for INSERT/UPDATE.
+
+### event_queue (Sprint 5d)
+
+Retry queue for failed EventBus subscriber actions. Background worker retries with exponential backoff.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| id | UUID PK | Queue entry identifier |
+| event_type | TEXT | Event type (e.g., `device.info_updated`) |
+| payload | JSONB | Full event payload for replay |
+| retry_count | INT | Current retry attempt (0-based) |
+| max_retries | INT | Maximum retries (default 5) |
+| last_error | TEXT | Last error message |
+| next_retry_at | TIMESTAMPTZ | When to retry next (exponential backoff) |
+| created_at | TIMESTAMPTZ | When the event first failed |
+| completed_at | TIMESTAMPTZ | NULL while pending, set on success or exhaustion |
+
+**Index**: `idx_event_queue_pending` on `next_retry_at` WHERE `completed_at IS NULL AND retry_count < max_retries`

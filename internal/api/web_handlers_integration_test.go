@@ -1,6 +1,10 @@
 package api
 
 import (
+	"encoding/json"
+	"fmt"
+	"io"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -11,6 +15,7 @@ import (
 	"github.com/malcolm-getahead/local-mdm/internal/auth"
 	"github.com/malcolm-getahead/local-mdm/internal/models"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestWebDashboardHome(t *testing.T) {
@@ -178,4 +183,83 @@ func TestWebOIDCCallbackHappyPath(t *testing.T) {
 	}
 	assert.NotNil(t, stateCookie, "oauth_state cookie should be set")
 	assert.Contains(t, location, "state="+stateCookie.Value)
+}
+
+func TestWebDashboardHome_EmptyData(t *testing.T) {
+	ts := newTestServerWithTemplates(t)
+	ts.server.reportService = &mockReportService{}
+	// No devices, no policies — should still render
+	req := httptest.NewRequest("GET", "/dashboard/", nil)
+	w := ts.doWithSession(req)
+	assert.Equal(t, http.StatusOK, w.Code)
+	assert.Contains(t, w.Body.String(), "Total Devices")
+}
+
+func TestWebDeviceDetail_NotFound(t *testing.T) {
+	ts := newTestServerWithTemplates(t)
+	ts.deviceRepo.getErr = fmt.Errorf("not found")
+	req := httptest.NewRequest("GET", "/dashboard/devices/"+uuid.New().String(), nil)
+	w := ts.doWithSession(req)
+	assert.Equal(t, http.StatusNotFound, w.Code)
+}
+
+func TestWebDeviceList_NoAuth(t *testing.T) {
+	ts := newTestServerWithTemplates(t)
+	// Add web auth middleware to test redirect
+	handler := ts.server.webAuthMiddleware(http.HandlerFunc(ts.server.handleWebDeviceList))
+	req := httptest.NewRequest("GET", "/dashboard/devices", nil)
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusFound, w.Code)
+	assert.Contains(t, w.Header().Get("Location"), "/dashboard/login")
+}
+
+func TestWebOIDCFullFlow_DirectGrant(t *testing.T) {
+	// Test token validation against real Keycloak via direct grant
+	keycloakURL := "http://localhost:8180"
+	if u := os.Getenv("KEYCLOAK_URL"); u != "" {
+		keycloakURL = u
+	}
+	clientSecret := "localmdm-dev-dashboard-secret-2026"
+	if s := os.Getenv("KEYCLOAK_CLIENT_SECRET"); s != "" {
+		clientSecret = s
+	}
+
+	// Get a real token via direct grant
+	resp, err := http.PostForm(keycloakURL+"/realms/localmdm/protocol/openid-connect/token", map[string][]string{
+		"grant_type":    {"password"},
+		"client_id":     {"localmdm-api"},
+		"client_secret": {clientSecret},
+		"username":      {"admin"},
+		"password":      {"admin123"},
+	})
+	if err != nil {
+		t.Skip("Keycloak not available")
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != 200 {
+		t.Skip("Keycloak login failed")
+	}
+
+	var tokenResp struct {
+		AccessToken string `json:"access_token"`
+	}
+	json.NewDecoder(resp.Body).Decode(&tokenResp)
+	assert.NotEmpty(t, tokenResp.AccessToken)
+
+	// Validate the token using our auth middleware
+	validator, err := auth.NewOIDCValidator(
+		keycloakURL+"/realms/localmdm", "localmdm-api",
+		nil, 5, 30*time.Second, 5*time.Minute, nil,
+	)
+	if err != nil {
+		t.Skipf("Failed to create validator: %v", err)
+	}
+	mw := auth.NewMiddleware(validator, slog.New(slog.NewTextHandler(io.Discard, nil)))
+
+	claims, err := mw.ValidateTokenDirect(tokenResp.AccessToken)
+	require.NoError(t, err)
+	assert.NotEmpty(t, claims.Email)
+	assert.Equal(t, uuid.MustParse("00000000-0000-0000-0000-000000000001"), claims.EnterpriseID)
+	assert.Contains(t, claims.Roles, "super_admin")
 }

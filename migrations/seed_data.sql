@@ -154,4 +154,15 @@ INSERT INTO audit_logs (enterprise_id, user_id, action, resource_type, resource_
 --     | python3 -c "import sys,json,base64; t=json.load(sys.stdin)['access_token'].split('.')[1]; t+='='*(4-len(t)%4); print(json.loads(base64.urlsafe_b64decode(t)).get('enterprise_id'))"
 -- Expected output: 00000000-0000-0000-0000-000000000001
 
+-- Verify seed enterprise exists and has expected data
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM enterprises WHERE id = '00000000-0000-0000-0000-000000000001') THEN
+    RAISE WARNING 'SEED ERROR: Enterprise 00000000-0000-0000-0000-000000000001 does not exist!';
+  END IF;
+  IF (SELECT COUNT(*) FROM devices WHERE enterprise_id = '00000000-0000-0000-0000-000000000001' AND deleted_at IS NULL) = 0 THEN
+    RAISE WARNING 'SEED ERROR: No active devices found for seed enterprise!';
+  END IF;
+END $$;
+
 COMMIT;
