@@ -1,7 +1,8 @@
 # Compliance Violation Matching — Design Notes
 
-**Status**: Current implementation works, engine-level fix deferred  
+**Status**: ✅ Implemented — engine stores violations as `map[string]string` keyed by config key  
 **Created**: 2026-04-25  
+**Implemented**: 2026-04-26  
 **Context**: Sprint 5d device detail compliance tab
 
 ## Problem
