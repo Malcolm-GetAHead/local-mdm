@@ -2,9 +2,57 @@
 
 @variant dark (&:where(.dark, .dark *));
 
+/* ── Theme system: CSS custom properties ── */
+:root {
+  --accent: 37 99 235;        /* blue-600 */
+  --accent-hover: 29 78 216;  /* blue-700 */
+  --sidebar-bg: 255 255 255;
+  --sidebar-border: 229 231 235;
+  --sidebar-active: 243 244 246;
+}
+.dark {
+  --sidebar-bg: 31 41 55;
+  --sidebar-border: 55 65 81;
+  --sidebar-active: 55 65 81;
+}
+
+/* Theme: Ocean */
+.theme-ocean { --accent: 6 182 212; --accent-hover: 8 145 178; }
+/* Theme: Emerald */
+.theme-emerald { --accent: 16 185 129; --accent-hover: 5 150 105; }
+/* Theme: Violet */
+.theme-violet { --accent: 139 92 246; --accent-hover: 124 58 237; }
+/* Theme: Rose */
+.theme-rose { --accent: 244 63 94; --accent-hover: 225 29 72; }
+/* Theme: Amber */
+.theme-amber { --accent: 245 158 11; --accent-hover: 217 119 6; }
+/* Theme: Slate */
+.theme-slate { --accent: 100 116 139; --accent-hover: 71 85 105; }
+/* Theme: Teal */
+.theme-teal { --accent: 20 184 166; --accent-hover: 13 148 136; }
+/* Theme: Indigo */
+.theme-indigo { --accent: 99 102 241; --accent-hover: 79 70 229; }
+/* Theme: Fuchsia */
+.theme-fuchsia { --accent: 217 70 239; --accent-hover: 192 38 211; }
+
+/* Sidebar themes */
+.theme-ocean .dark, .theme-ocean.dark { --sidebar-bg: 22 78 99; --sidebar-border: 21 94 117; --sidebar-active: 21 94 117; }
+.theme-emerald .dark, .theme-emerald.dark { --sidebar-bg: 6 78 59; --sidebar-border: 4 120 87; --sidebar-active: 4 120 87; }
+.theme-violet .dark, .theme-violet.dark { --sidebar-bg: 46 16 101; --sidebar-border: 76 29 149; --sidebar-active: 76 29 149; }
+.theme-rose .dark, .theme-rose.dark { --sidebar-bg: 76 5 25; --sidebar-border: 136 19 55; --sidebar-active: 136 19 55; }
+.theme-amber .dark, .theme-amber.dark { --sidebar-bg: 69 26 3; --sidebar-border: 120 53 15; --sidebar-active: 120 53 15; }
+.theme-slate .dark, .theme-slate.dark { --sidebar-bg: 30 41 59; --sidebar-border: 51 65 85; --sidebar-active: 51 65 85; }
+.theme-teal .dark, .theme-teal.dark { --sidebar-bg: 19 78 74; --sidebar-border: 17 94 89; --sidebar-active: 17 94 89; }
+.theme-indigo .dark, .theme-indigo.dark { --sidebar-bg: 30 27 75; --sidebar-border: 49 46 129; --sidebar-active: 49 46 129; }
+.theme-fuchsia .dark, .theme-fuchsia.dark { --sidebar-bg: 74 4 78; --sidebar-border: 112 26 117; --sidebar-active: 112 26 117; }
+
 @layer components {
   .btn-primary {
-    @apply bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors font-medium text-sm;
+    background-color: rgb(var(--accent));
+    @apply text-white px-4 py-2 rounded-lg transition-colors font-medium text-sm;
+  }
+  .btn-primary:hover {
+    background-color: rgb(var(--accent-hover));
   }
   .btn-danger {
     @apply bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors font-medium text-sm;
@@ -22,11 +70,55 @@
   .badge-red { @apply bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200; }
   .badge-yellow { @apply bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200; }
   .badge-gray { @apply bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200; }
-  .badge-blue { @apply bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200; }
+  .badge-blue {
+    background-color: rgb(var(--accent) / 0.15);
+    color: rgb(var(--accent));
+  }
+  .dark .badge-blue {
+    background-color: rgb(var(--accent) / 0.25);
+    color: rgb(var(--accent));
+  }
   .table-header {
     @apply bg-gray-50 dark:bg-gray-900 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider;
   }
   .input-field {
-    @apply w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 dark:text-gray-100;
+    @apply w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-gray-100;
   }
+  .input-field:focus {
+    outline: none;
+    box-shadow: 0 0 0 2px rgb(var(--accent) / 0.5);
+  }
+
+  /* Accent-colored links */
+  .accent-link {
+    color: rgb(var(--accent));
+  }
+  .accent-link:hover {
+    text-decoration: underline;
+  }
+
+  /* Sidebar using theme variables */
+  #sidebar {
+    background-color: rgb(var(--sidebar-bg));
+    border-color: rgb(var(--sidebar-border));
+  }
+  #sidebar a.active, #sidebar a.bg-gray-100, #sidebar a.dark\:bg-gray-700 {
+    background-color: rgb(var(--sidebar-active));
+  }
+
+  /* Tab active state */
+  .tab-btn.border-blue-600 {
+    border-color: rgb(var(--accent));
+    color: rgb(var(--accent));
+  }
+
+  /* Override blue accent colors with theme accent */
+  [class*="theme-"] .text-blue-600,
+  [class*="theme-"] .dark\:text-blue-400 { color: rgb(var(--accent)); }
+  [class*="theme-"] .bg-blue-600 { background-color: rgb(var(--accent)); }
+  [class*="theme-"] .bg-blue-600:hover,
+  [class*="theme-"] .hover\:bg-blue-700:hover { background-color: rgb(var(--accent-hover)); }
+  [class*="theme-"] .dark\:bg-blue-500 { background-color: rgb(var(--accent)); }
+  [class*="theme-"] .focus\:ring-blue-500:focus { --tw-ring-color: rgb(var(--accent) / 0.5); }
+  [class*="theme-"] .border-blue-600 { border-color: rgb(var(--accent)); }
 }

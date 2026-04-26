@@ -3,11 +3,39 @@
     // ── Dark mode (runs once on load) ──
     if(localStorage.getItem('darkMode')==='true') document.documentElement.classList.add('dark');
 
+    // ── Theme (runs once on load) ──
+    var savedTheme = localStorage.getItem('theme') || '';
+    if (savedTheme) document.documentElement.classList.add(savedTheme);
+
     // ── Dark mode toggle ──
     document.addEventListener('click', function(e) {
         if (e.target.closest('#dark-toggle')) {
             document.documentElement.classList.toggle('dark');
             localStorage.setItem('darkMode', document.documentElement.classList.contains('dark'));
+        }
+    });
+
+    // ── Theme switcher ──
+    document.addEventListener('click', function(e) {
+        var menu = document.getElementById('theme-menu');
+        if (!menu) return;
+        if (e.target.closest('#theme-toggle')) {
+            menu.classList.toggle('hidden');
+            return;
+        }
+        var opt = e.target.closest('.theme-option');
+        if (opt) {
+            var theme = opt.getAttribute('data-theme');
+            // Remove all theme classes
+            document.documentElement.className = document.documentElement.className.replace(/theme-\S+/g, '').trim();
+            if (theme) document.documentElement.classList.add(theme);
+            localStorage.setItem('theme', theme);
+            menu.classList.add('hidden');
+            return;
+        }
+        // Close menu on outside click
+        if (!e.target.closest('#theme-menu')) {
+            menu.classList.add('hidden');
         }
     });
 

@@ -52,6 +52,18 @@
 - [ ] Wait 0.5s
 - [ ] Verify "Total Devices" is visible
 
+### Theme Switcher
+- [ ] Visit `/dashboard/` — page contains "Total Devices"
+- [ ] Click "Change theme"
+- [ ] Wait 0.3s
+- [ ] Click "Violet"
+- [ ] Wait 0.3s
+- [ ] Click "Change theme"
+- [ ] Wait 0.3s
+- [ ] Click "Default"
+- [ ] Wait 0.3s
+- [ ] Verify "Total Devices" is visible
+
 ## Device Management
 
 ### List Devices
