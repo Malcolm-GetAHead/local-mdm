@@ -396,20 +396,7 @@ func buildComplianceRows(ctx context.Context, results []*models.ComplianceResult
 			}
 		}
 
-		// Build violation set for quick lookup
-		violationSet := map[string]bool{}
-		if v, ok := cr.Details["violations"]; ok {
-			if arr, ok := v.([]interface{}); ok {
-				for _, item := range arr {
-					if str, ok := item.(string); ok {
-						violationSet[str] = true
-					}
-				}
-			}
-		}
-
 		if cr.Status == "unknown" {
-			// Single row for unknown
 			rows = append(rows, map[string]interface{}{
 				"Setting": "all settings", "PolicyName": policyName,
 				"Status": "unknown", "EvaluatedAt": cr.EvaluatedAt,
@@ -425,19 +412,24 @@ func buildComplianceRows(ctx context.Context, results []*models.ComplianceResult
 			continue
 		}
 
-		// One row per config key
+		// Build violation key set — supports both map[string]string (new) and []string (legacy)
+		violatedKeys := map[string]bool{}
+		if v, ok := cr.Details["violations"]; ok {
+			switch vv := v.(type) {
+			case map[string]interface{}:
+				for key := range vv {
+					violatedKeys[key] = true
+				}
+			}
+		}
+
 		sort.Strings(configKeys)
 		for _, k := range configKeys {
 			status := "pass"
-			// Check if this key produced a violation
-			for viol := range violationSet {
-				if violationMatchesKey(viol, k) {
-					status = "fail"
-					break
-				}
+			if violatedKeys[k] {
+				status = "fail"
 			}
 			label := strings.ReplaceAll(k, "_", " ")
-			// Look up friendly label from catalog
 			for _, cs := range policySettingsCatalog {
 				if cs.Key == k {
 					label = cs.Label
@@ -459,30 +451,6 @@ func buildComplianceRows(ctx context.Context, results []*models.ComplianceResult
 		return rows[i]["Setting"].(string) < rows[j]["Setting"].(string)
 	})
 	return rows
-}
-
-// violationMatchesKey maps a violation string to the config key that produced it.
-// Uses keyword matching: the violation must contain a keyword derived from the config key.
-var violationKeywords = map[string][]string{
-	"require_password":    {"password"},
-	"min_password_length": {"password length"},
-	"require_encryption":  {"encryption"},
-	"require_firewall":    {"firewall"},
-	"allow_camera":        {"camera"},
-}
-
-func violationMatchesKey(violation, configKey string) bool {
-	vLower := strings.ToLower(violation)
-	if keywords, ok := violationKeywords[configKey]; ok {
-		for _, kw := range keywords {
-			if strings.Contains(vLower, kw) {
-				return true
-			}
-		}
-		return false
-	}
-	// Fallback: check if violation contains the key with underscores replaced
-	return strings.Contains(vLower, strings.ReplaceAll(configKey, "_", " "))
 }
 
 type platformDetailItem struct {

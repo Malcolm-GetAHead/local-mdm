@@ -321,8 +321,15 @@ func (s *Server) handleWebCompliance(w http.ResponseWriter, r *http.Request) {
 
 		var violations []string
 		if v, ok := cr.Details["violations"]; ok {
-			if arr, ok := v.([]interface{}); ok {
-				for _, item := range arr {
+			switch vv := v.(type) {
+			case map[string]interface{}:
+				for _, msg := range vv {
+					if s, ok := msg.(string); ok {
+						violations = append(violations, s)
+					}
+				}
+			case []interface{}:
+				for _, item := range vv {
 					if s, ok := item.(string); ok {
 						violations = append(violations, s)
 					}

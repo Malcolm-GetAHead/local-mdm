@@ -105,54 +105,49 @@ func (s *ComplianceService) evaluatePolicy(device *models.Device, policy *models
 	}
 }
 
-// checkPolicy returns a list of violation descriptions.
-func (s *ComplianceService) checkPolicy(device *models.Device, policyType string, config models.JSONB) []string {
+// checkPolicy returns violations keyed by config key.
+func (s *ComplianceService) checkPolicy(device *models.Device, policyType string, config models.JSONB) map[string]string {
 	switch policyType {
 	case "security":
 		return s.checkSecurityPolicy(device, config)
 	case "restriction":
 		return s.checkRestrictionPolicy(device, config)
 	default:
-		return nil // wifi, vpn, app policies don't have compliance checks
+		return nil
 	}
 }
 
-func (s *ComplianceService) checkSecurityPolicy(device *models.Device, config models.JSONB) []string {
-	var violations []string
+func (s *ComplianceService) checkSecurityPolicy(device *models.Device, config models.JSONB) map[string]string {
+	violations := map[string]string{}
 	pd := device.PlatformData
 
-	// Check password requirements
 	if req, ok := getBool(config, "require_password"); ok && req {
 		if val, ok := getBool(pd, "password_present"); ok && !val {
-			violations = append(violations, "password not set")
+			violations["require_password"] = "password not set"
 		}
 	}
 	if minLen, ok := getFloat(config, "min_password_length"); ok {
 		if actual, ok := getFloat(pd, "password_length"); ok && actual < minLen {
-			violations = append(violations, fmt.Sprintf("password length %v < required %v", actual, minLen))
+			violations["min_password_length"] = fmt.Sprintf("password length %v < required %v", actual, minLen)
 		}
 	}
 
-	// Check encryption
 	if req, ok := getBool(config, "require_encryption"); ok && req {
 		encrypted := false
 		if v, ok := getBool(pd, "encryption_enabled"); ok {
 			encrypted = v
 		}
-		// macOS uses FileVault
 		if v, ok := getBool(pd, "FileVaultEnabled"); ok {
 			encrypted = v
 		}
-		// Windows uses BitLocker
 		if v, ok := getString(pd, "bitlocker_status"); ok && strings.EqualFold(v, "enabled") {
 			encrypted = true
 		}
 		if !encrypted {
-			violations = append(violations, "disk encryption not enabled")
+			violations["require_encryption"] = "disk encryption not enabled"
 		}
 	}
 
-	// Check firewall
 	if req, ok := getBool(config, "require_firewall"); ok && req {
 		firewallOn := false
 		if v, ok := getBool(pd, "firewall_enabled"); ok {
@@ -162,20 +157,20 @@ func (s *ComplianceService) checkSecurityPolicy(device *models.Device, config mo
 			firewallOn = v
 		}
 		if !firewallOn {
-			violations = append(violations, "firewall not enabled")
+			violations["require_firewall"] = "firewall not enabled"
 		}
 	}
 
 	return violations
 }
 
-func (s *ComplianceService) checkRestrictionPolicy(device *models.Device, config models.JSONB) []string {
-	var violations []string
+func (s *ComplianceService) checkRestrictionPolicy(device *models.Device, config models.JSONB) map[string]string {
+	violations := map[string]string{}
 	pd := device.PlatformData
 
 	if req, ok := getBool(config, "allow_camera"); ok && !req {
 		if v, ok := getBool(pd, "camera_enabled"); ok && v {
-			violations = append(violations, "camera is enabled but restricted")
+			violations["allow_camera"] = "camera is enabled but restricted"
 		}
 	}
 

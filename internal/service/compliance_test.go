@@ -364,8 +364,12 @@ func TestComplianceService_SecurityPolicy_Violations(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, results, 1)
 	assert.Equal(t, models.ComplianceStatusNonCompliant, results[0].Status)
-	violations := results[0].Details["violations"].([]string)
-	assert.Len(t, violations, 4) // password not set, password too short, no encryption, no firewall
+	violations := results[0].Details["violations"].(map[string]string)
+	assert.Len(t, violations, 4)
+	assert.Contains(t, violations, "require_password")
+	assert.Contains(t, violations, "min_password_length")
+	assert.Contains(t, violations, "require_encryption")
+	assert.Contains(t, violations, "require_firewall")
 }
 
 func TestComplianceService_SecurityPolicy_Compliant(t *testing.T) {

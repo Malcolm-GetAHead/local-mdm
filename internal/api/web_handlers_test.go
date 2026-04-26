@@ -9,29 +9,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestViolationMatchesKey(t *testing.T) {
-	tests := []struct {
-		violation string
-		key       string
-		want      bool
-	}{
-		{"password not set", "require_password", true},
-		{"password length 4 < required 8", "min_password_length", true},
-		{"disk encryption not enabled", "require_encryption", true},
-		{"firewall not enabled", "require_firewall", true},
-		{"camera is enabled but restricted", "allow_camera", true},
-		{"password not set", "require_encryption", false},
-		{"firewall not enabled", "allow_camera", false},
-		{"unknown violation", "unknown_key", false}, // fallback: "unknown key" not in "unknown violation"
-	}
-	for _, tt := range tests {
-		t.Run(tt.violation+"→"+tt.key, func(t *testing.T) {
-			got := violationMatchesKey(tt.violation, tt.key)
-			assert.Equal(t, tt.want, got)
-		})
-	}
-}
-
 func TestIsHTMX(t *testing.T) {
 	r, _ := http.NewRequest("GET", "/", nil)
 	assert.False(t, isHTMX(r))
