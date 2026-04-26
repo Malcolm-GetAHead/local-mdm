@@ -72,18 +72,18 @@
 .theme-fuchsia.dark { --page-bg: 20 5 22; --sidebar-bg: 30 5 33; --card-bg: 45 10 50; --card-border: 100 15 110; --header-bg: 45 10 50; --header-border: 100 15 110; --table-header-bg: 20 5 22; --table-hover: 100 15 110; }
 
 /* ── Apply theme variables to components ── */
-body { background-color: rgb(var(--page-bg)); color: rgb(var(--text-primary)); }
-#sidebar { background-color: rgb(var(--sidebar-bg)); border-color: rgb(var(--sidebar-border)); color: rgb(var(--sidebar-text)); }
+body { background-color: rgb(var(--page-bg)) !important; color: rgb(var(--text-primary)); }
+#sidebar { background-color: rgb(var(--sidebar-bg)) !important; border-color: rgb(var(--sidebar-border)) !important; color: rgb(var(--sidebar-text)); }
 #sidebar a { color: rgb(var(--sidebar-text)); }
 header { background-color: rgb(var(--header-bg)) !important; border-color: rgb(var(--header-border)) !important; }
-.card { background-color: rgb(var(--card-bg)); border-color: rgb(var(--card-border)); border-radius: var(--card-radius); box-shadow: var(--card-shadow); }
-.table-header { background-color: rgb(var(--table-header-bg)); }
+.card { background-color: rgb(var(--card-bg)) !important; border-color: rgb(var(--card-border)) !important; border-radius: var(--card-radius) !important; box-shadow: var(--card-shadow) !important; }
+.table-header { background-color: rgb(var(--table-header-bg)) !important; }
 tbody tr:hover { background-color: rgb(var(--table-hover)) !important; }
-.badge { border-radius: var(--badge-radius); }
+.badge { border-radius: var(--badge-radius) !important; }
 
 /* Accent-driven overrides */
-.btn-primary { background-color: rgb(var(--accent)); }
-.btn-primary:hover { background-color: rgb(var(--accent-hover)); }
+.btn-primary { background-color: rgb(var(--accent)) !important; }
+.btn-primary:hover { background-color: rgb(var(--accent-hover)) !important; }
 .input-field:focus { box-shadow: 0 0 0 2px rgb(var(--accent) / 0.5); outline: none; }
 .badge-blue { background-color: rgb(var(--accent) / 0.15); color: rgb(var(--accent)); }
 .dark .badge-blue { background-color: rgb(var(--accent) / 0.25); }

@@ -307,9 +307,16 @@ func (eb *EventBus) ProcessRetries(ctx context.Context) {
 					newCount, "exhausted: "+lastErr, id)
 				eb.retriesExhausted.Add(1)
 				eb.logger.Error("eventbus: retries exhausted", "id", id, "type", eventType, "error", lastErr)
-				// Log to audit_logs
-				eb.db.Exec(`INSERT INTO audit_logs (enterprise_id, action, resource_type, details) VALUES ('00000000-0000-0000-0000-000000000000', 'eventbus.retry_exhausted', $1, $2)`,
-					eventType, fmt.Sprintf(`{"event_id": "%s", "error": "%s", "attempts": %d}`, id, lastErr, newCount))
+				// Log to audit_logs — resolve enterprise from device if possible
+				entID := "00000000-0000-0000-0000-000000000000"
+				if event.DeviceID != nil {
+					var eid string
+					if err := eb.db.QueryRow(`SELECT enterprise_id FROM devices WHERE id = $1`, *event.DeviceID).Scan(&eid); err == nil {
+						entID = eid
+					}
+				}
+				eb.db.Exec(`INSERT INTO audit_logs (enterprise_id, action, resource_type, details) VALUES ($1, 'eventbus.retry_exhausted', $2, $3)`,
+					entID, eventType, fmt.Sprintf(`{"event_id": "%s", "error": "%s", "attempts": %d}`, id, lastErr, newCount))
 			} else {
 				backoff := time.Duration(1<<uint(newCount)) * 30 * time.Second
 				eb.db.Exec(`UPDATE event_queue SET retry_count = $1, last_error = $2, next_retry_at = NOW() + $3::interval WHERE id = $4`,
