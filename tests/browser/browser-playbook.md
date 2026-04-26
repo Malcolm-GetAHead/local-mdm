@@ -56,10 +56,12 @@
 - [ ] Visit `/dashboard/` — page contains "Total Devices"
 - [ ] Click "Change theme"
 - [ ] Wait 0.3s
+- [ ] Verify "Violet" is visible
 - [ ] Click "Violet"
 - [ ] Wait 0.3s
 - [ ] Click "Change theme"
 - [ ] Wait 0.3s
+- [ ] Verify "Ocean" is visible
 - [ ] Click "Default"
 - [ ] Wait 0.3s
 - [ ] Verify "Total Devices" is visible

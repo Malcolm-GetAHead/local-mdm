@@ -1,0 +1,49 @@
+/* Theme system — loaded separately from Tailwind */
+:root {
+  --accent: 37 99 235;
+  --accent-hover: 29 78 216;
+  --sidebar-bg: 255 255 255;
+  --sidebar-border: 229 231 235;
+  --sidebar-active: 243 244 246;
+}
+.dark {
+  --sidebar-bg: 31 41 55;
+  --sidebar-border: 55 65 81;
+  --sidebar-active: 55 65 81;
+}
+.theme-ocean { --accent: 6 182 212; --accent-hover: 8 145 178; }
+.theme-emerald { --accent: 16 185 129; --accent-hover: 5 150 105; }
+.theme-violet { --accent: 139 92 246; --accent-hover: 124 58 237; }
+.theme-rose { --accent: 244 63 94; --accent-hover: 225 29 72; }
+.theme-amber { --accent: 245 158 11; --accent-hover: 217 119 6; }
+.theme-slate { --accent: 100 116 139; --accent-hover: 71 85 105; }
+.theme-teal { --accent: 20 184 166; --accent-hover: 13 148 136; }
+.theme-indigo { --accent: 99 102 241; --accent-hover: 79 70 229; }
+.theme-fuchsia { --accent: 217 70 239; --accent-hover: 192 38 211; }
+
+.theme-ocean.dark { --sidebar-bg: 22 78 99; --sidebar-border: 21 94 117; --sidebar-active: 21 94 117; }
+.theme-emerald.dark { --sidebar-bg: 6 78 59; --sidebar-border: 4 120 87; --sidebar-active: 4 120 87; }
+.theme-violet.dark { --sidebar-bg: 46 16 101; --sidebar-border: 76 29 149; --sidebar-active: 76 29 149; }
+.theme-rose.dark { --sidebar-bg: 76 5 25; --sidebar-border: 136 19 55; --sidebar-active: 136 19 55; }
+.theme-amber.dark { --sidebar-bg: 69 26 3; --sidebar-border: 120 53 15; --sidebar-active: 120 53 15; }
+.theme-slate.dark { --sidebar-bg: 30 41 59; --sidebar-border: 51 65 85; --sidebar-active: 51 65 85; }
+.theme-teal.dark { --sidebar-bg: 19 78 74; --sidebar-border: 17 94 89; --sidebar-active: 17 94 89; }
+.theme-indigo.dark { --sidebar-bg: 30 27 75; --sidebar-border: 49 46 129; --sidebar-active: 49 46 129; }
+.theme-fuchsia.dark { --sidebar-bg: 74 4 78; --sidebar-border: 112 26 117; --sidebar-active: 112 26 117; }
+
+/* Accent-driven component overrides */
+.btn-primary { background-color: rgb(var(--accent)); }
+.btn-primary:hover { background-color: rgb(var(--accent-hover)); }
+.input-field:focus { box-shadow: 0 0 0 2px rgb(var(--accent) / 0.5); outline: none; }
+.badge-blue { background-color: rgb(var(--accent) / 0.15); color: rgb(var(--accent)); }
+.dark .badge-blue { background-color: rgb(var(--accent) / 0.25); }
+.tab-btn.border-blue-600 { border-color: rgb(var(--accent)); color: rgb(var(--accent)); }
+#sidebar { background-color: rgb(var(--sidebar-bg)); border-color: rgb(var(--sidebar-border)); }
+
+/* Theme accent on links */
+[class*="theme-"] .text-blue-600 { color: rgb(var(--accent)); }
+.dark [class*="theme-"] .text-blue-400,
+[class*="theme-"].dark .text-blue-400 { color: rgb(var(--accent)); }
+[class*="theme-"] .bg-blue-600 { background-color: rgb(var(--accent)); }
+[class*="theme-"] .bg-blue-600:hover { background-color: rgb(var(--accent-hover)); }
+[class*="theme-"] .border-blue-600 { border-color: rgb(var(--accent)); }
