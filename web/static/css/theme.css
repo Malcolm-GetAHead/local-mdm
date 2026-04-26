@@ -1,44 +1,93 @@
-/* Theme system — loaded separately from Tailwind */
+/* Theme system — 10 visually distinct themes */
 :root {
   --accent: 37 99 235;
   --accent-hover: 29 78 216;
+  --page-bg: 249 250 251;
   --sidebar-bg: 255 255 255;
+  --sidebar-text: 55 65 81;
   --sidebar-border: 229 231 235;
   --sidebar-active: 243 244 246;
+  --card-bg: 255 255 255;
+  --card-border: 229 231 235;
+  --card-radius: 0.5rem;
+  --card-shadow: 0 1px 2px rgb(0 0 0 / 0.05);
+  --header-bg: 255 255 255;
+  --header-border: 229 231 235;
+  --table-header-bg: 249 250 251;
+  --table-hover: 249 250 251;
+  --text-primary: 17 24 39;
+  --text-secondary: 107 114 128;
+  --badge-radius: 9999px;
 }
 .dark {
+  --page-bg: 17 24 39;
   --sidebar-bg: 31 41 55;
+  --sidebar-text: 209 213 219;
   --sidebar-border: 55 65 81;
   --sidebar-active: 55 65 81;
+  --card-bg: 31 41 55;
+  --card-border: 55 65 81;
+  --header-bg: 31 41 55;
+  --header-border: 55 65 81;
+  --table-header-bg: 17 24 39;
+  --table-hover: 55 65 81;
+  --text-primary: 243 244 246;
+  --text-secondary: 156 163 175;
 }
-.theme-ocean { --accent: 6 182 212; --accent-hover: 8 145 178; }
-.theme-emerald { --accent: 16 185 129; --accent-hover: 5 150 105; }
-.theme-violet { --accent: 139 92 246; --accent-hover: 124 58 237; }
-.theme-rose { --accent: 244 63 94; --accent-hover: 225 29 72; }
-.theme-amber { --accent: 245 158 11; --accent-hover: 217 119 6; }
-.theme-slate { --accent: 100 116 139; --accent-hover: 71 85 105; }
-.theme-teal { --accent: 20 184 166; --accent-hover: 13 148 136; }
-.theme-indigo { --accent: 99 102 241; --accent-hover: 79 70 229; }
-.theme-fuchsia { --accent: 217 70 239; --accent-hover: 192 38 211; }
 
-.theme-ocean.dark { --sidebar-bg: 22 78 99; --sidebar-border: 21 94 117; --sidebar-active: 21 94 117; }
-.theme-emerald.dark { --sidebar-bg: 6 78 59; --sidebar-border: 4 120 87; --sidebar-active: 4 120 87; }
-.theme-violet.dark { --sidebar-bg: 46 16 101; --sidebar-border: 76 29 149; --sidebar-active: 76 29 149; }
-.theme-rose.dark { --sidebar-bg: 76 5 25; --sidebar-border: 136 19 55; --sidebar-active: 136 19 55; }
-.theme-amber.dark { --sidebar-bg: 69 26 3; --sidebar-border: 120 53 15; --sidebar-active: 120 53 15; }
-.theme-slate.dark { --sidebar-bg: 30 41 59; --sidebar-border: 51 65 85; --sidebar-active: 51 65 85; }
-.theme-teal.dark { --sidebar-bg: 19 78 74; --sidebar-border: 17 94 89; --sidebar-active: 17 94 89; }
-.theme-indigo.dark { --sidebar-bg: 30 27 75; --sidebar-border: 49 46 129; --sidebar-active: 49 46 129; }
-.theme-fuchsia.dark { --sidebar-bg: 74 4 78; --sidebar-border: 112 26 117; --sidebar-active: 112 26 117; }
+/* ── Ocean: Deep navy + cyan accents, glass-like cards ── */
+.theme-ocean { --accent: 6 182 212; --accent-hover: 8 145 178; --page-bg: 236 246 250; --sidebar-bg: 15 23 42; --sidebar-text: 186 230 253; --sidebar-border: 30 58 95; --sidebar-active: 30 58 95; --card-bg: 255 255 255; --card-border: 186 230 253; --card-shadow: 0 4px 12px rgb(6 182 212 / 0.08); --header-bg: 240 249 255; --header-border: 186 230 253; --table-header-bg: 236 246 250; }
+.theme-ocean.dark { --page-bg: 8 15 30; --sidebar-bg: 12 20 40; --card-bg: 15 23 42; --card-border: 30 58 95; --header-bg: 15 23 42; --header-border: 30 58 95; --table-header-bg: 8 15 30; --table-hover: 30 58 95; }
 
-/* Accent-driven component overrides */
+/* ── Emerald: Warm earth tones + green accents, organic feel ── */
+.theme-emerald { --accent: 16 185 129; --accent-hover: 5 150 105; --page-bg: 243 247 243; --sidebar-bg: 20 30 22; --sidebar-text: 187 227 196; --sidebar-border: 34 60 40; --sidebar-active: 34 60 40; --card-bg: 255 255 253; --card-border: 209 226 209; --card-shadow: 0 2px 8px rgb(16 185 129 / 0.06); --header-bg: 243 250 245; --header-border: 209 226 209; --table-header-bg: 240 247 240; }
+.theme-emerald.dark { --page-bg: 10 18 12; --sidebar-bg: 14 24 16; --card-bg: 20 30 22; --card-border: 34 60 40; --header-bg: 20 30 22; --header-border: 34 60 40; --table-header-bg: 10 18 12; --table-hover: 34 60 40; }
+
+/* ── Violet: Rich purple + lavender, creative/modern ── */
+.theme-violet { --accent: 139 92 246; --accent-hover: 124 58 237; --page-bg: 245 243 255; --sidebar-bg: 30 20 60; --sidebar-text: 216 200 255; --sidebar-border: 60 40 110; --sidebar-active: 60 40 110; --card-bg: 252 251 255; --card-border: 221 214 254; --card-shadow: 0 4px 16px rgb(139 92 246 / 0.08); --header-bg: 248 246 255; --header-border: 221 214 254; --table-header-bg: 245 243 255; --card-radius: 0.75rem; }
+.theme-violet.dark { --page-bg: 15 10 30; --sidebar-bg: 20 14 40; --card-bg: 30 20 55; --card-border: 60 40 110; --header-bg: 30 20 55; --header-border: 60 40 110; --table-header-bg: 15 10 30; --table-hover: 60 40 110; }
+
+/* ── Rose: Warm pink + soft cream, elegant ── */
+.theme-rose { --accent: 244 63 94; --accent-hover: 225 29 72; --page-bg: 255 245 247; --sidebar-bg: 50 10 20; --sidebar-text: 255 200 210; --sidebar-border: 100 20 40; --sidebar-active: 100 20 40; --card-bg: 255 252 253; --card-border: 252 220 226; --card-shadow: 0 2px 10px rgb(244 63 94 / 0.06); --header-bg: 255 248 250; --header-border: 252 220 226; --table-header-bg: 255 245 247; }
+.theme-rose.dark { --page-bg: 25 8 14; --sidebar-bg: 35 10 18; --card-bg: 50 15 25; --card-border: 100 20 40; --header-bg: 50 15 25; --header-border: 100 20 40; --table-header-bg: 25 8 14; --table-hover: 100 20 40; }
+
+/* ── Amber: Warm gold + dark chocolate, luxurious ── */
+.theme-amber { --accent: 245 158 11; --accent-hover: 217 119 6; --page-bg: 255 251 240; --sidebar-bg: 40 25 5; --sidebar-text: 253 224 168; --sidebar-border: 80 50 10; --sidebar-active: 80 50 10; --card-bg: 255 253 248; --card-border: 253 230 180; --card-shadow: 0 2px 8px rgb(245 158 11 / 0.08); --header-bg: 255 252 243; --header-border: 253 230 180; --table-header-bg: 255 251 240; }
+.theme-amber.dark { --page-bg: 20 14 5; --sidebar-bg: 30 20 5; --card-bg: 40 28 10; --card-border: 80 50 10; --header-bg: 40 28 10; --header-border: 80 50 10; --table-header-bg: 20 14 5; --table-hover: 80 50 10; }
+
+/* ── Slate: Monochrome, minimal, no-nonsense ── */
+.theme-slate { --accent: 100 116 139; --accent-hover: 71 85 105; --page-bg: 241 245 249; --sidebar-bg: 15 23 42; --sidebar-text: 203 213 225; --sidebar-border: 30 41 59; --sidebar-active: 30 41 59; --card-bg: 248 250 252; --card-border: 203 213 225; --card-shadow: none; --card-radius: 0.25rem; --header-bg: 248 250 252; --header-border: 203 213 225; --table-header-bg: 241 245 249; --badge-radius: 0.25rem; }
+.theme-slate.dark { --page-bg: 2 6 23; --sidebar-bg: 15 23 42; --card-bg: 15 23 42; --card-border: 30 41 59; --header-bg: 15 23 42; --header-border: 30 41 59; --table-header-bg: 2 6 23; --table-hover: 30 41 59; }
+
+/* ── Teal: Tropical, vibrant, high contrast ── */
+.theme-teal { --accent: 20 184 166; --accent-hover: 13 148 136; --page-bg: 240 253 250; --sidebar-bg: 4 47 46; --sidebar-text: 153 246 228; --sidebar-border: 15 80 75; --sidebar-active: 15 80 75; --card-bg: 247 254 252; --card-border: 153 246 228; --card-shadow: 0 2px 12px rgb(20 184 166 / 0.1); --header-bg: 240 253 250; --header-border: 153 246 228; --table-header-bg: 236 252 248; }
+.theme-teal.dark { --page-bg: 2 20 20; --sidebar-bg: 4 30 30; --card-bg: 8 40 38; --card-border: 15 80 75; --header-bg: 8 40 38; --header-border: 15 80 75; --table-header-bg: 2 20 20; --table-hover: 15 80 75; }
+
+/* ── Indigo: Deep, rich, corporate premium ── */
+.theme-indigo { --accent: 99 102 241; --accent-hover: 79 70 229; --page-bg: 238 242 255; --sidebar-bg: 22 20 60; --sidebar-text: 199 200 255; --sidebar-border: 49 46 129; --sidebar-active: 49 46 129; --card-bg: 248 248 255; --card-border: 199 210 254; --card-shadow: 0 4px 14px rgb(99 102 241 / 0.07); --card-radius: 0.75rem; --header-bg: 243 244 255; --header-border: 199 210 254; --table-header-bg: 238 242 255; }
+.theme-indigo.dark { --page-bg: 10 10 30; --sidebar-bg: 16 14 45; --card-bg: 22 20 55; --card-border: 49 46 129; --header-bg: 22 20 55; --header-border: 49 46 129; --table-header-bg: 10 10 30; --table-hover: 49 46 129; }
+
+/* ── Fuchsia: Bold, playful, high energy ── */
+.theme-fuchsia { --accent: 217 70 239; --accent-hover: 192 38 211; --page-bg: 253 244 255; --sidebar-bg: 50 5 55; --sidebar-text: 245 180 255; --sidebar-border: 100 15 110; --sidebar-active: 100 15 110; --card-bg: 254 250 255; --card-border: 240 200 250; --card-shadow: 0 4px 16px rgb(217 70 239 / 0.08); --card-radius: 1rem; --header-bg: 253 248 255; --header-border: 240 200 250; --table-header-bg: 253 244 255; --badge-radius: 0.5rem; }
+.theme-fuchsia.dark { --page-bg: 20 5 22; --sidebar-bg: 30 5 33; --card-bg: 45 10 50; --card-border: 100 15 110; --header-bg: 45 10 50; --header-border: 100 15 110; --table-header-bg: 20 5 22; --table-hover: 100 15 110; }
+
+/* ── Apply theme variables to components ── */
+body { background-color: rgb(var(--page-bg)); color: rgb(var(--text-primary)); }
+#sidebar { background-color: rgb(var(--sidebar-bg)); border-color: rgb(var(--sidebar-border)); color: rgb(var(--sidebar-text)); }
+#sidebar a { color: rgb(var(--sidebar-text)); }
+header { background-color: rgb(var(--header-bg)) !important; border-color: rgb(var(--header-border)) !important; }
+.card { background-color: rgb(var(--card-bg)); border-color: rgb(var(--card-border)); border-radius: var(--card-radius); box-shadow: var(--card-shadow); }
+.table-header { background-color: rgb(var(--table-header-bg)); }
+tbody tr:hover { background-color: rgb(var(--table-hover)) !important; }
+.badge { border-radius: var(--badge-radius); }
+
+/* Accent-driven overrides */
 .btn-primary { background-color: rgb(var(--accent)); }
 .btn-primary:hover { background-color: rgb(var(--accent-hover)); }
 .input-field:focus { box-shadow: 0 0 0 2px rgb(var(--accent) / 0.5); outline: none; }
 .badge-blue { background-color: rgb(var(--accent) / 0.15); color: rgb(var(--accent)); }
 .dark .badge-blue { background-color: rgb(var(--accent) / 0.25); }
 .tab-btn.border-blue-600 { border-color: rgb(var(--accent)); color: rgb(var(--accent)); }
-#sidebar { background-color: rgb(var(--sidebar-bg)); border-color: rgb(var(--sidebar-border)); }
 
 /* Theme accent on links */
 [class*="theme-"] .text-blue-600 { color: rgb(var(--accent)); }
@@ -47,3 +96,4 @@
 [class*="theme-"] .bg-blue-600 { background-color: rgb(var(--accent)); }
 [class*="theme-"] .bg-blue-600:hover { background-color: rgb(var(--accent-hover)); }
 [class*="theme-"] .border-blue-600 { border-color: rgb(var(--accent)); }
+[class*="theme-"] .bg-blue-500 { background-color: rgb(var(--accent)); }
