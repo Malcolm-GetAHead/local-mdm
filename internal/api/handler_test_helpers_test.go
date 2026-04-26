@@ -243,6 +243,10 @@ func (m *mockDeviceRepo) List(_ context.Context, _ uuid.UUID, limit, offset int)
 	return m.devices[offset:end], total, nil
 }
 
+func (m *mockDeviceRepo) ListFiltered(_ context.Context, _ uuid.UUID, _, _, _, _, _ string, limit, offset int) ([]*models.Device, int, error) {
+	return m.List(context.Background(), uuid.Nil, limit, offset)
+}
+
 func (m *mockDeviceRepo) Update(_ context.Context, d *models.Device) error {
 	if m.updateErr != nil {
 		return m.updateErr
@@ -806,11 +810,50 @@ func newTestServer(t *testing.T) *testServer {
 	}
 }
 
+func newTestServerWithTemplates(t *testing.T) *testServer {
+	t.Helper()
+	ts := newTestServer(t)
+	ts.server.config.Keycloak.ClientSecret = "test-secret-32chars-minimum!!"
+	if err := ts.server.loadTemplates(); err != nil {
+		t.Fatalf("failed to load templates: %v", err)
+	}
+	// Register web routes
+	dash := ts.server.router.PathPrefix("/dashboard").Subrouter()
+	dash.HandleFunc("/", ts.server.handleDashboardHome).Methods("GET")
+	dash.HandleFunc("/devices", ts.server.handleWebDeviceList).Methods("GET")
+	dash.HandleFunc("/devices/{id}", ts.server.handleWebDeviceDetail).Methods("GET")
+	dash.HandleFunc("/policies", ts.server.handleWebPolicyList).Methods("GET")
+	dash.HandleFunc("/groups", ts.server.handleWebGroups).Methods("GET")
+	dash.HandleFunc("/compliance", ts.server.handleWebCompliance).Methods("GET")
+	dash.HandleFunc("/audit", ts.server.handleWebAuditLog).Methods("GET")
+	return ts
+}
+
 // do executes a request against the test server and returns the recorder
 func (ts *testServer) do(req *http.Request) *httptest.ResponseRecorder {
 	w := httptest.NewRecorder()
 	ts.server.router.ServeHTTP(w, req)
 	return w
+}
+
+// doWithSession executes a request with a valid web session cookie
+func (ts *testServer) doWithSession(req *http.Request) *httptest.ResponseRecorder {
+	sess := &webSession{
+		UserID:       uuid.MustParse("b0000000-0000-0000-0000-000000000001"),
+		Email:        "admin@test.com",
+		Role:         "admin",
+		EnterpriseID: uuid.MustParse("00000000-0000-0000-0000-000000000001"),
+	}
+	w := httptest.NewRecorder()
+	ts.server.setWebSession(w, sess)
+	cookie := w.Result().Cookies()[0]
+	req.AddCookie(cookie)
+	// Add CSRF to context
+	ctx := context.WithValue(req.Context(), webSessionCtxKey, sess)
+	ctx = context.WithValue(ctx, csrfTokenKey, generateCSRF(sess.UserID.String(), ts.server.sessionKey()))
+	rec := httptest.NewRecorder()
+	ts.server.router.ServeHTTP(rec, req.WithContext(ctx))
+	return rec
 }
 
 // doWithAuth executes a request with an authenticated user in context
@@ -1013,6 +1056,9 @@ func (m *mockComplianceRepo) GetByDevice(_ context.Context, deviceID uuid.UUID) 
 }
 func (m *mockComplianceRepo) GetSummary(_ context.Context, _ uuid.UUID) (*models.ComplianceSummary, error) {
 	return &models.ComplianceSummary{}, nil
+}
+func (m *mockComplianceRepo) DeleteByDevice(_ context.Context, _ uuid.UUID) error {
+	return nil
 }
 
 // Mock report service for handler tests

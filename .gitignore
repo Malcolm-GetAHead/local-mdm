@@ -75,3 +75,6 @@ tests/device-testing/**/*.log
 tests/device-testing/results/
 tests/device-testing/.vm_config
 *.srl
+
+# Tailwind CSS standalone CLI binary (downloaded per-platform)
+tailwindcss

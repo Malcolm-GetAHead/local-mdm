@@ -382,6 +382,51 @@ func VerifySignature(r *http.Request) error {
 
 ---
 
+## Encryption Recovery Key Escrow
+
+*Added: Sprint 5b (2026-04-24)*
+
+Admins need to recover encrypted devices when users forget passwords or leave the organization. The MDM should escrow recovery keys for both platforms.
+
+### What exists (Sprint 5b)
+
+- ✅ pgcrypto extension enabled (migration 000001)
+- ✅ Proven encrypt/decrypt pattern: DEP storage uses `pgp_sym_encrypt`/`pgp_sym_decrypt` with config key
+- ✅ `BuildSecurityInfoCommand()` — can request security info from macOS devices
+- ✅ Windows BitLocker status CSP reads encryption state (`DeviceEncryptionStatus`)
+- ✅ Windows CSP framework for Get/Replace commands
+- ✅ NanoMDM webhook pipeline receives command results
+- ✅ CommandHandler receives raw plist responses from NanoMDM
+
+### What's missing
+
+1. **Migration**: `device_recovery_keys` table (schema below)
+2. **Repository**: CRUD with pgcrypto encrypt/decrypt, following DEP storage pattern
+3. **macOS — `FDERecoveryKeyEscrow` profile payload**: Enrollment profile generator (`GenerateEnrollmentProfile`) doesn't include it. This payload tells the Mac to escrow its FileVault key to the MDM on encryption.
+4. **macOS — SecurityInfo response parsing**: `CommandHandler` receives raw plist but doesn't extract `FDE_PersonalRecoveryKeyCMS` or `FDE_HasPersonalRecoveryKey`
+5. **Windows — Recovery key CSP**: We read encryption *status* but don't request the *key*. Need `RequireStoringRecoveryPasswordsToAD` policy CSP to trigger escrow, and a handler for the `./Vendor/MSFT/BitLocker/RecoveryKey` response.
+6. **Admin API endpoint**: `GET /api/v1/devices/{id}/recovery-key` — audit-logged, role-restricted (`admin`/`super_admin` only)
+7. **Config key**: Recovery key encryption key (can share `dep_encryption_key` or add a dedicated one)
+
+### Storage pattern
+
+Follows credential storage strategy from steering guide (device-bound secrets → pgcrypto in DB):
+
+```sql
+CREATE TABLE device_recovery_keys (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    device_id UUID NOT NULL REFERENCES devices(id) ON DELETE CASCADE,
+    key_type VARCHAR(20) NOT NULL,  -- 'bitlocker', 'filevault'
+    encrypted_key BYTEA NOT NULL,   -- pgp_sym_encrypt(key, encryption_key)
+    escrowed_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    UNIQUE(device_id, key_type)
+);
+```
+
+**Dependencies**: F-01 (real device testing — need actual encrypted devices to test escrow flow)
+
+---
+
 ## References
 
 - [OWASP Top 10](https://owasp.org/www-project-top-ten/)

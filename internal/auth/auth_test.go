@@ -18,7 +18,7 @@ func TestKeycloakLogin(t *testing.T) {
 	kc := auth.NewKeycloakClient(
 		keycloakTestURL(),
 		"localmdm-api",
-		"localmdm-api-secret",
+		keycloakTestSecret(),
 	)
 	
 	tokenResp, err := kc.Login("admin", "admin123")
@@ -44,7 +44,7 @@ func TestOIDCValidator(t *testing.T) {
 	kc := auth.NewKeycloakClient(
 		keycloakTestURL(),
 		"localmdm-api",
-		"localmdm-api-secret",
+		keycloakTestSecret(),
 	)
 	
 	tokenResp, err := kc.Login("admin", "admin123")
@@ -78,7 +78,7 @@ func TestAuthMiddleware(t *testing.T) {
 	kc := auth.NewKeycloakClient(
 		keycloakTestURL(),
 		"localmdm-api",
-		"localmdm-api-secret",
+		keycloakTestSecret(),
 	)
 	
 	tokenResp, err := kc.Login("admin", "admin123")
@@ -134,7 +134,7 @@ func TestRequireRole(t *testing.T) {
 	kc := auth.NewKeycloakClient(
 		keycloakTestURL(),
 		"localmdm-api",
-		"localmdm-api-secret",
+		keycloakTestSecret(),
 	)
 	
 	tokenResp, _ := kc.Login("admin", "admin123")
@@ -228,7 +228,7 @@ func TestJWKSRefreshRaceCondition(t *testing.T) {
 	kc := auth.NewKeycloakClient(
 		keycloakTestURL(),
 		"localmdm-api",
-		"localmdm-api-secret",
+		keycloakTestSecret(),
 	)
 	
 	tokenResp, err := kc.Login("admin", "admin123")
@@ -418,7 +418,7 @@ func TestOptionalAuth(t *testing.T) {
 	kc := auth.NewKeycloakClient(
 		keycloakTestURL(),
 		"localmdm-api",
-		"localmdm-api-secret",
+		keycloakTestSecret(),
 	)
 	
 	tokenResp, err := kc.Login("admin", "admin123")
@@ -505,4 +505,11 @@ func keycloakTestURL() string {
 		return u + "/realms/localmdm"
 	}
 	return "http://localhost:8180/realms/localmdm"
+}
+
+func keycloakTestSecret() string {
+	if s := os.Getenv("KEYCLOAK_CLIENT_SECRET"); s != "" {
+		return s
+	}
+	return "localmdm-dev-dashboard-secret-2026"
 }

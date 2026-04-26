@@ -216,6 +216,24 @@ Without real device testing:
 
 ---
 
+## Deferred from Sprint 5b: SecurityInfo Response Parsing
+
+*Added: Sprint 5b retro (2026-04-24)*
+
+The macOS `CommandHandler` receives command results from NanoMDM but doesn't parse `SecurityInfo` responses. When a `SecurityInfo` command is sent to a real device, the response contains:
+
+- `FDE_Enabled` → `FileVaultEnabled` in platform_data
+- `FirewallEnabled` → `firewall_enabled` in platform_data
+- `IsPasscodePresent` → `password_present` in platform_data
+
+These fields feed directly into the compliance engine's security policy checks. Without parsing them, compliance evaluation for macOS devices relies on whatever the device reports during check-in (which doesn't include security state).
+
+**What exists**: `BuildSecurityInfoCommand()` can build the command. `CommandHandler.ServeHTTP()` receives results. Compliance engine checks `FileVaultEnabled`, `firewall_enabled`, `password_present`.
+
+**What's needed**: Parse the SecurityInfo plist response in `CommandHandler`, extract the fields above, update the device's `platform_data`. This requires a real macOS device (or mdmb with SecurityInfo support) to test the response format.
+
+---
+
 ## References
 
 - [S1-07: Testing Framework Setup](../sprint-1-foundation/S1-07-testing-framework.md)

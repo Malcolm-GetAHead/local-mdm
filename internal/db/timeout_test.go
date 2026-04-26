@@ -151,5 +151,5 @@ func testDBPassword() string {
 	if p := os.Getenv("DB_PASSWORD"); p != "" {
 		return p
 	}
-	return "postgres"
+	return "postgres-dev-password-1234"
 }

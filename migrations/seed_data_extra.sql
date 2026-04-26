@@ -1,0 +1,35 @@
+-- Extra seed data for pagination testing (50+ devices)
+BEGIN;
+INSERT INTO devices (enterprise_id, platform, device_id, serial_number, name, model, os_version, status, last_seen) VALUES
+('00000000-0000-0000-0000-000000000001', 'windows', 'pag-w01', 'PAG001', 'Paginate PC 01', 'Dell Latitude', '10.0.22631', 'enrolled', NOW()),
+('00000000-0000-0000-0000-000000000001', 'windows', 'pag-w02', 'PAG002', 'Paginate PC 02', 'Dell Latitude', '10.0.22631', 'enrolled', NOW()),
+('00000000-0000-0000-0000-000000000001', 'windows', 'pag-w03', 'PAG003', 'Paginate PC 03', 'Dell Latitude', '10.0.22631', 'enrolled', NOW()),
+('00000000-0000-0000-0000-000000000001', 'windows', 'pag-w04', 'PAG004', 'Paginate PC 04', 'Dell Latitude', '10.0.22631', 'enrolled', NOW()),
+('00000000-0000-0000-0000-000000000001', 'windows', 'pag-w05', 'PAG005', 'Paginate PC 05', 'Dell Latitude', '10.0.22631', 'enrolled', NOW()),
+('00000000-0000-0000-0000-000000000001', 'windows', 'pag-w06', 'PAG006', 'Paginate PC 06', 'Dell Latitude', '10.0.22631', 'enrolled', NOW()),
+('00000000-0000-0000-0000-000000000001', 'windows', 'pag-w07', 'PAG007', 'Paginate PC 07', 'Dell Latitude', '10.0.22631', 'enrolled', NOW()),
+('00000000-0000-0000-0000-000000000001', 'windows', 'pag-w08', 'PAG008', 'Paginate PC 08', 'Dell Latitude', '10.0.22631', 'enrolled', NOW()),
+('00000000-0000-0000-0000-000000000001', 'windows', 'pag-w09', 'PAG009', 'Paginate PC 09', 'Dell Latitude', '10.0.22631', 'enrolled', NOW()),
+('00000000-0000-0000-0000-000000000001', 'windows', 'pag-w10', 'PAG010', 'Paginate PC 10', 'Dell Latitude', '10.0.22631', 'enrolled', NOW()),
+('00000000-0000-0000-0000-000000000001', 'macos', 'pag-m01', 'PAG011', 'Paginate Mac 01', 'MacBook Air', '14.4', 'enrolled', NOW()),
+('00000000-0000-0000-0000-000000000001', 'macos', 'pag-m02', 'PAG012', 'Paginate Mac 02', 'MacBook Air', '14.4', 'enrolled', NOW()),
+('00000000-0000-0000-0000-000000000001', 'macos', 'pag-m03', 'PAG013', 'Paginate Mac 03', 'MacBook Air', '14.4', 'enrolled', NOW()),
+('00000000-0000-0000-0000-000000000001', 'macos', 'pag-m04', 'PAG014', 'Paginate Mac 04', 'MacBook Air', '14.4', 'enrolled', NOW()),
+('00000000-0000-0000-0000-000000000001', 'macos', 'pag-m05', 'PAG015', 'Paginate Mac 05', 'MacBook Air', '14.4', 'enrolled', NOW()),
+('00000000-0000-0000-0000-000000000001', 'android', 'pag-a01', 'PAG016', 'Paginate Phone 01', 'Pixel 8', '14', 'enrolled', NOW()),
+('00000000-0000-0000-0000-000000000001', 'android', 'pag-a02', 'PAG017', 'Paginate Phone 02', 'Pixel 8', '14', 'enrolled', NOW()),
+('00000000-0000-0000-0000-000000000001', 'android', 'pag-a03', 'PAG018', 'Paginate Phone 03', 'Pixel 8', '14', 'enrolled', NOW()),
+('00000000-0000-0000-0000-000000000001', 'android', 'pag-a04', 'PAG019', 'Paginate Phone 04', 'Pixel 8', '14', 'enrolled', NOW()),
+('00000000-0000-0000-0000-000000000001', 'android', 'pag-a05', 'PAG020', 'Paginate Phone 05', 'Pixel 8', '14', 'enrolled', NOW()),
+('00000000-0000-0000-0000-000000000001', 'windows', 'pag-w11', 'PAG021', 'Paginate PC 11', 'HP EliteBook', '10.0.22631', 'enrolled', NOW()),
+('00000000-0000-0000-0000-000000000001', 'windows', 'pag-w12', 'PAG022', 'Paginate PC 12', 'HP EliteBook', '10.0.22631', 'enrolled', NOW()),
+('00000000-0000-0000-0000-000000000001', 'windows', 'pag-w13', 'PAG023', 'Paginate PC 13', 'HP EliteBook', '10.0.22631', 'enrolled', NOW()),
+('00000000-0000-0000-0000-000000000001', 'windows', 'pag-w14', 'PAG024', 'Paginate PC 14', 'HP EliteBook', '10.0.22631', 'enrolled', NOW()),
+('00000000-0000-0000-0000-000000000001', 'windows', 'pag-w15', 'PAG025', 'Paginate PC 15', 'HP EliteBook', '10.0.22631', 'enrolled', NOW()),
+('00000000-0000-0000-0000-000000000001', 'macos', 'pag-m06', 'PAG026', 'Paginate Mac 06', 'iMac 24"', '14.4', 'enrolled', NOW()),
+('00000000-0000-0000-0000-000000000001', 'macos', 'pag-m07', 'PAG027', 'Paginate Mac 07', 'iMac 24"', '14.4', 'enrolled', NOW()),
+('00000000-0000-0000-0000-000000000001', 'macos', 'pag-m08', 'PAG028', 'Paginate Mac 08', 'iMac 24"', '14.4', 'enrolled', NOW()),
+('00000000-0000-0000-0000-000000000001', 'macos', 'pag-m09', 'PAG029', 'Paginate Mac 09', 'Mac Mini', '14.4', 'enrolled', NOW()),
+('00000000-0000-0000-0000-000000000001', 'macos', 'pag-m10', 'PAG030', 'Paginate Mac 10', 'Mac Mini', '14.4', 'enrolled', NOW())
+ON CONFLICT (enterprise_id, platform, device_id) DO NOTHING;
+COMMIT;

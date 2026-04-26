@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/malcolm-getahead/local-mdm/internal/models"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -23,6 +24,11 @@ func testMacOSService(t *testing.T) *Service {
 	t.Helper()
 	repo := &MockDeviceRepository{}
 	repo.On("Create", mock.Anything, mock.Anything).Return(nil)
+	repo.On("GetByPlatformID", mock.Anything, mock.Anything, mock.Anything).Return(&models.Device{
+		BaseModel: models.BaseModel{ID: [16]byte{1}},
+		Status:    "pending",
+	}, nil)
+	repo.On("Update", mock.Anything, mock.Anything).Return(nil)
 	return &Service{deviceRepo: repo}
 }
 

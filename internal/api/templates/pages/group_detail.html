@@ -1,0 +1,80 @@
+{{define "title"}}{{.Group.Name}} — Local MDM{{end}}
+{{define "page_title"}}Group Detail{{end}}
+{{define "content"}}
+<div class="mb-6">
+    <a href="/dashboard/groups" class="text-sm text-blue-600 hover:text-blue-800">← Back to Groups</a>
+</div>
+
+<div class="card mb-6" id="group-header">
+    <div class="flex items-start justify-between" id="group-display">
+        <div>
+            <h2 class="text-lg font-semibold">{{.Group.Name}}</h2>
+            {{if .Group.Description}}<p class="text-sm text-gray-600 dark:text-gray-400 mt-1">{{.Group.Description}}</p>{{end}}
+        </div>
+        <button id="edit-group-btn" class="btn-secondary text-xs">Edit</button>
+    </div>
+    <form id="group-edit-form" method="POST" action="/dashboard/groups/{{.Group.ID}}/edit" class="hidden space-y-3">
+        {{csrfField .CSRFToken}}
+        <div>
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Name</label>
+            <input type="text" name="name" value="{{.Group.Name}}" required class="input-field">
+        </div>
+        <div>
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Description</label>
+            <input type="text" name="description" value="{{.Group.Description}}" class="input-field">
+        </div>
+        <div class="flex gap-2">
+            <button type="submit" class="btn-primary text-xs">Save</button>
+            <button type="button" id="cancel-edit-btn" class="btn-secondary text-xs">Cancel</button>
+        </div>
+    </form>
+</div>
+
+{{template "member_list" .}}
+
+{{end}}
+
+{{define "member_list"}}
+<div class="card overflow-hidden p-0" id="member-list">
+    <div class="px-6 py-3 border-b border-gray-200 flex items-center justify-between">
+        <h3 class="text-sm font-semibold">Members</h3>
+        <input type="search" id="member-filter" placeholder="Filter devices..." class="rounded-lg border border-gray-300 px-3 py-1.5 text-sm w-48">
+    </div>
+    <table class="w-full">
+        <thead>
+            <tr class="table-header">
+                <th class="px-6 py-3">Member</th>
+                <th class="px-6 py-3">Name</th>
+                <th class="px-6 py-3">Platform</th>
+                <th class="px-6 py-3">Status</th>
+            </tr>
+        </thead>
+        {{template "member_tbody" .}}
+    </table>
+</div>
+{{end}}
+
+{{define "member_tbody"}}
+<tbody id="member-tbody" class="divide-y divide-gray-200">
+            {{range .AllDevices}}
+            <tr class="hover:bg-gray-50" data-device-name="{{.Name}} {{.Platform}} {{.Model}}">
+                <td class="px-6 py-3">
+                    {{if .InGroup}}
+                    <button hx-post="/dashboard/groups/{{$.Group.ID}}/members/{{.ID}}/remove" hx-target="#member-tbody" hx-swap="outerHTML"
+                            class="badge badge-green cursor-pointer">✓ In Group</button>
+                    {{else}}
+                    <button hx-post="/dashboard/groups/{{$.Group.ID}}/members/{{.ID}}/add" hx-target="#member-tbody" hx-swap="outerHTML"
+                            class="badge badge-gray cursor-pointer">Add</button>
+                    {{end}}
+                </td>
+                <td class="px-6 py-4 text-sm font-medium">{{.Name}}</td>
+                <td class="px-6 py-4 text-sm capitalize">{{.Platform}}</td>
+                <td class="px-6 py-4">
+                    {{if eq .Status "enrolled"}}<span class="badge badge-green">Enrolled</span>
+                    {{else if eq .Status "unenrolled"}}<span class="badge badge-gray">Unenrolled</span>
+                    {{else}}<span class="badge badge-red">{{.Status}}</span>{{end}}
+                </td>
+            </tr>
+            {{end}}
+</tbody>
+{{end}}

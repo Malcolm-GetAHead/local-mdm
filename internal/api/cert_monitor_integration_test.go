@@ -16,13 +16,33 @@ import (
 func TestServer_CertificateMonitorIntegration(t *testing.T) {
 	database := testutil.ConnectDB(t)
 
+	dbHost := "localhost"
+	if h := os.Getenv("DB_HOST"); h != "" {
+		dbHost = h
+	}
+	dbPass := "postgres"
+	if p := os.Getenv("DB_PASSWORD"); p != "" {
+		dbPass = p
+	}
+
 	cfg := &config.Config{
 		Server: config.ServerConfig{
-			Host:         func() string { if h := os.Getenv("DB_HOST"); h != "" { return h }; return "localhost" }(),
+			Host:         dbHost,
 			Port:         8080,
 			ReadTimeout:  30 * time.Second,
 			WriteTimeout: 30 * time.Second,
 			IdleTimeout:  60 * time.Second,
+		},
+		Database: config.DatabaseConfig{
+			Host:            dbHost,
+			Port:            5432,
+			User:            "postgres",
+			Password:        dbPass,
+			Database:        "localmdm",
+			SSLMode:         "disable",
+			MaxOpenConns:    2,
+			MaxIdleConns:    1,
+			ConnMaxLifetime: 5 * time.Minute,
 		},
 		Auth: config.AuthConfig{
 			JWTSecret:            "test-secret-key-for-testing-only",
@@ -86,13 +106,33 @@ func TestServer_CertificateMonitorIntegration(t *testing.T) {
 func TestServer_CertificateMonitorDisabled(t *testing.T) {
 	database := testutil.ConnectDB(t)
 
+	dbHost := "localhost"
+	if h := os.Getenv("DB_HOST"); h != "" {
+		dbHost = h
+	}
+	dbPass := "postgres"
+	if p := os.Getenv("DB_PASSWORD"); p != "" {
+		dbPass = p
+	}
+
 	cfg := &config.Config{
 		Server: config.ServerConfig{
-			Host:         func() string { if h := os.Getenv("DB_HOST"); h != "" { return h }; return "localhost" }(),
+			Host:         dbHost,
 			Port:         8080,
 			ReadTimeout:  30 * time.Second,
 			WriteTimeout: 30 * time.Second,
 			IdleTimeout:  60 * time.Second,
+		},
+		Database: config.DatabaseConfig{
+			Host:            dbHost,
+			Port:            5432,
+			User:            "postgres",
+			Password:        dbPass,
+			Database:        "localmdm",
+			SSLMode:         "disable",
+			MaxOpenConns:    2,
+			MaxIdleConns:    1,
+			ConnMaxLifetime: 5 * time.Minute,
 		},
 		Auth: config.AuthConfig{
 			JWTSecret:            "test-secret-key-for-testing-only",

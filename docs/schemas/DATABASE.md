@@ -820,18 +820,24 @@ Unique: (policy_id, version)
 
 ### Event Triggers
 
-PostgreSQL `LISTEN`/`NOTIFY` triggers for event-driven architecture (Go listener in Sprint 5b).
+PostgreSQL `LISTEN`/`NOTIFY` triggers for event-driven architecture (Go EventBus listener in Sprint 5b).
 
 | Trigger | Table | Event Type | Fires On |
 |---------|-------|------------|----------|
 | device_enrolled_event | devices | device.enrolled | INSERT |
 | device_updated_event | devices | device.status_changed | UPDATE OF status (when changed) |
+| device_info_updated_event | devices | device.info_updated | UPDATE OF platform_data (when changed) |
 | policy_updated_event | policies | policy.updated | UPDATE |
 | command_created_event | device_commands | command.created | INSERT |
 | policy_assigned_event | policy_assignments | policy.assigned | INSERT |
+| policy_unassigned_event | policy_assignments | policy.unassigned | DELETE |
 | compliance_evaluated_event | compliance_results | compliance.evaluated | INSERT OR UPDATE |
+| group_member_added_event | group_memberships | group.member_added | INSERT |
+| group_member_removed_event | group_memberships | group.member_removed | DELETE |
 
 All triggers call `notify_mdm_event()` which sends JSON payload to `mdm_events` channel:
 ```json
-{"type": "event.type", "id": "entity-uuid", "device_id": "device-uuid", "table": "table_name", "op": "INSERT"}
+{"type": "event.type", "id": "entity-uuid", "device_id": "device-uuid", "table": "table_name", "op": "INSERT", "extra": {}}
 ```
+
+The `extra` field contains table-specific context: `policy_id`/`target_type`/`target_id` for policy_assignments, `group_id` for group_memberships. The function uses `OLD` for DELETE operations and `NEW` for INSERT/UPDATE.

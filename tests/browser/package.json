@@ -1,0 +1,12 @@
+{
+  "private": true,
+  "description": "Browser tests for Local MDM dashboard (not a project dependency)",
+  "scripts": {
+    "playbook": "node run-playbook.js",
+    "playbook:headed": "node run-playbook.js --headed",
+    "playbook:section": "node run-playbook.js --section"
+  },
+  "devDependencies": {
+    "playwright": "1.52.0"
+  }
+}

@@ -2,8 +2,11 @@ package api
 
 import (
 	"context"
+	crypto_rand "crypto/rand"
+	base64Std "encoding/base64"
 	"encoding/json"
 	"fmt"
+	"html/template"
 	"log/slog"
 	"net/http"
 	"strings"
@@ -79,7 +82,9 @@ type Server struct {
 	policyVersionRepo repository.PolicyVersionRepository
 	groupService     *service.GroupService
 	complianceService *service.ComplianceService
+	eventBus          *service.EventBus
 	cleanupCancel     context.CancelFunc
+	webTemplates      map[string]*template.Template
 }
 
 // New creates a new API server
@@ -176,11 +181,10 @@ func New(cfg *config.Config, database *db.DB, logger *slog.Logger) (*Server, err
 		caManager, err = certs.NewCAManager(cfg.Certificates.CACertPath, cfg.Certificates.CAKeyPath)
 	}
 	if err != nil {
-		logger.Warn("CA manager not available, certificate operations disabled", "error", err)
-	} else {
-		s.caManager = caManager
-		s.certService = certs.NewCertificateService(caManager, database.Writer)
+		return nil, fmt.Errorf("failed to load CA certificate: %w", err)
 	}
+	s.caManager = caManager
+	s.certService = certs.NewCertificateService(caManager, database.Writer)
 	
 	// Create certificate expiration monitor if enabled
 	if cfg.Certificates.ExpirationMonitor.Enabled {
@@ -241,6 +245,9 @@ func New(cfg *config.Config, database *db.DB, logger *slog.Logger) (*Server, err
 	// Initialize platform services
 	s.macosService = macos.NewService(s.deviceRepo)
 
+	if cfg.MacOS.NanoMDMURL == "" {
+		logger.Warn("macos.nanomdm_url not configured — macOS command delivery will fail")
+	}
 	s.nanomdmService = macos.NewNanoMDMService(
 		cfg.MacOS.NanoMDMURL, cfg.MacOS.NanoMDMAPIKey,
 		s.cmdRepo, s.deviceRepo, logger,
@@ -266,12 +273,11 @@ func New(cfg *config.Config, database *db.DB, logger *slog.Logger) (*Server, err
 	}
 
 	s.androidService = android.NewService(s.deviceRepo, s.enterpriseRepo, cfg.Android.ProjectID, cfg.Android.ServiceAccountJSON)
-	// Wire webhook handler without Google client (graceful degradation)
+	s.lifecycleService = service.NewLifecycleService(logger)
 	s.androidWebhookHandler = android.NewWebhookHandler(s.androidService, nil, logger)
+	s.androidWebhookHandler.SetLifecycle(s.lifecycleService)
 
 	s.cmdDispatcher = newCommandDispatcher(s.cmdRepo, s.nanomdmService, logger)
-
-	s.lifecycleService = service.NewLifecycleService(logger)
 
 	policyVersionRepo, err := repository.NewPolicyVersionRepository(database.Writer, database.Reader)
 	if err != nil {
@@ -296,6 +302,48 @@ func New(cfg *config.Config, database *db.DB, logger *slog.Logger) (*Server, err
 	}
 	s.complianceService = service.NewComplianceService(complianceRepo, s.groupService, s.policyRepo, s.deviceRepo, logger)
 
+	// Initialize EventBus (LISTEN/NOTIFY on Writer pool DSN)
+	s.eventBus = service.NewEventBus(cfg.Database.DSN(), database.Writer, logger)
+
+	// Register compliance auto-evaluation subscribers
+	s.eventBus.Subscribe("device.enrolled", func(ctx context.Context, event service.MDMEvent) error {
+		return s.complianceService.EvaluateDeviceByID(ctx, event.ID)
+	})
+	s.eventBus.Subscribe("device.info_updated", func(ctx context.Context, event service.MDMEvent) error {
+		return s.complianceService.EvaluateDeviceByID(ctx, event.ID)
+	})
+	s.eventBus.Subscribe("policy.updated", func(ctx context.Context, event service.MDMEvent) error {
+		return s.complianceService.EvaluateAllForPolicy(ctx, event.ID)
+	})
+	s.eventBus.Subscribe("policy.assigned", func(ctx context.Context, event service.MDMEvent) error {
+		if policyID, ok := event.ExtraUUID("policy_id"); ok {
+			return s.complianceService.EvaluateAllForPolicy(ctx, policyID)
+		}
+		return nil
+	})
+	s.eventBus.Subscribe("policy.unassigned", func(ctx context.Context, event service.MDMEvent) error {
+		// Re-evaluate affected devices so stale compliance results are cleared
+		if policyID, ok := event.ExtraUUID("policy_id"); ok {
+			return s.complianceService.EvaluateAllForPolicy(ctx, policyID)
+		}
+		return nil
+	})
+	s.eventBus.Subscribe("group.member_added", func(ctx context.Context, event service.MDMEvent) error {
+		if event.DeviceID != nil {
+			return s.complianceService.EvaluateDeviceByID(ctx, *event.DeviceID)
+		}
+		return nil
+	})
+	s.eventBus.Subscribe("group.member_removed", func(ctx context.Context, event service.MDMEvent) error {
+		if event.DeviceID != nil {
+			return s.complianceService.EvaluateDeviceByID(ctx, *event.DeviceID)
+		}
+		return nil
+	})
+
+	// Register lifecycle hooks
+	s.lifecycleService.RegisterHook(service.NewComplianceCleanupHook(complianceRepo, logger))
+
 	s.deviceService = service.NewDeviceService(s.deviceRepo, s.cmdRepo, s.cmdDispatcher, s.lifecycleService, logger)
 	s.appService = service.NewAppService(s.appRepo, s.deviceRepo, s.cmdRepo, s.cmdDispatcher, logger)
 
@@ -314,6 +362,11 @@ func New(cfg *config.Config, database *db.DB, logger *slog.Logger) (*Server, err
 
 	// Wire API token auth into middleware
 	s.authMiddleware.SetTokenValidator(&tokenAuthAdapter{tokenService: s.tokenService})
+
+	// Load dashboard templates
+	if err := s.loadTemplates(); err != nil {
+		return nil, fmt.Errorf("failed to load dashboard templates: %w", err)
+	}
 
 	s.setupRoutes()
 	s.setupMiddleware()
@@ -746,6 +799,51 @@ func (s *Server) setupRoutes() {
 	)).Methods("POST")
 	api.HandleFunc("/android/enrollment-token/{token_id}/qr", s.handleAndroidEnrollmentQR).Methods("GET")
 	api.Handle("/android/webhook", enrollLimiter(http.HandlerFunc(s.handleAndroidWebhook))).Methods("POST")
+
+	// ── Dashboard (Sprint 5d) ────────────────────────────────────────────
+	// Static files
+	s.router.PathPrefix("/static/").Handler(http.StripPrefix("/static/", http.FileServer(http.Dir("web/static"))))
+
+	// Root redirect
+	s.router.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "/dashboard/", http.StatusFound)
+	}).Methods("GET")
+
+	// Auth routes (no session required)
+	s.router.HandleFunc("/dashboard/login", s.handleWebLogin).Methods("GET")
+	s.router.HandleFunc("/dashboard/callback", s.handleWebCallback).Methods("GET")
+	s.router.HandleFunc("/dashboard/logout", s.handleWebLogout).Methods("GET")
+
+	// Protected dashboard routes
+	dash := s.router.PathPrefix("/dashboard").Subrouter()
+	dash.Use(s.webAuthMiddleware)
+	dash.HandleFunc("/", s.handleDashboardHome).Methods("GET")
+	dash.HandleFunc("/devices", s.handleWebDeviceList).Methods("GET")
+	dash.HandleFunc("/devices/{id}", s.handleWebDeviceDetail).Methods("GET")
+	dash.HandleFunc("/devices/{id}/lock", s.handleWebDeviceLock).Methods("POST")
+	dash.HandleFunc("/devices/{id}/wipe", s.handleWebDeviceWipe).Methods("POST")
+	dash.HandleFunc("/devices/{id}/unenroll", s.handleWebDeviceUnenroll).Methods("POST")
+	dash.HandleFunc("/devices/{id}/evaluate", s.handleWebDeviceEvaluate).Methods("POST")
+	dash.HandleFunc("/devices/{id}/delete", s.handleWebDeviceDelete).Methods("POST")
+	dash.HandleFunc("/policies", s.handleWebPolicyList).Methods("GET")
+	dash.HandleFunc("/policies/new", s.handleWebPolicyNew).Methods("GET")
+	dash.HandleFunc("/policies/settings-catalog", s.handleWebSettingsCatalog).Methods("GET")
+	dash.HandleFunc("/policies", s.handleWebPolicyCreate).Methods("POST")
+	dash.HandleFunc("/policies/{id}", s.handleWebPolicyEdit).Methods("GET")
+	dash.HandleFunc("/policies/{id}", s.handleWebPolicyUpdate).Methods("POST")
+	dash.HandleFunc("/policies/{id}/delete", s.handleWebPolicyDelete).Methods("POST")
+	dash.HandleFunc("/policies/{id}/assign", s.handleWebPolicyAssignPage).Methods("GET")
+	dash.HandleFunc("/policies/{id}/assign", s.handleWebPolicyAssign).Methods("POST")
+	dash.HandleFunc("/policies/{id}/unassign/{assignment_id}", s.handleWebPolicyUnassign).Methods("POST")
+	dash.HandleFunc("/compliance", s.handleWebCompliance).Methods("GET")
+	dash.HandleFunc("/groups", s.handleWebGroups).Methods("GET")
+	dash.HandleFunc("/groups", s.handleWebGroupCreate).Methods("POST")
+	dash.HandleFunc("/groups/{id}", s.handleWebGroupDetail).Methods("GET")
+	dash.HandleFunc("/groups/{id}/edit", s.handleWebGroupEdit).Methods("POST")
+	dash.HandleFunc("/groups/{id}/delete", s.handleWebGroupDelete).Methods("POST")
+	dash.HandleFunc("/groups/{id}/members/{device_id}/add", s.handleWebGroupAddMember).Methods("POST")
+	dash.HandleFunc("/groups/{id}/members/{device_id}/remove", s.handleWebGroupRemoveMember).Methods("POST")
+	dash.HandleFunc("/audit", s.handleWebAuditLog).Methods("GET")
 }
 
 // setupMiddleware configures middleware
@@ -819,8 +917,13 @@ func (s *Server) Start() error {
 	}
 	
 	// Start command dispatcher
-	if s.cmdDispatcher != nil {
-		s.cmdDispatcher.Start()
+	s.cmdDispatcher.Start()
+
+	// Start EventBus listener
+	if s.eventBus != nil {
+		if err := s.eventBus.Start(context.Background()); err != nil {
+			s.logger.Error("EventBus failed to start", "error", err)
+		}
 	}
 
 	// Start periodic cleanup for expired token cache and idempotency keys
@@ -875,8 +978,11 @@ func (s *Server) Shutdown(ctx context.Context) error {
 	}
 
 	// Stop command dispatcher (drain queue)
-	if s.cmdDispatcher != nil {
-		s.cmdDispatcher.Stop()
+	s.cmdDispatcher.Stop()
+
+	// Stop EventBus listener
+	if s.eventBus != nil {
+		s.eventBus.Shutdown()
 	}
 
 	// Stop cleanup ticker
@@ -956,6 +1062,13 @@ func (s *Server) refreshGaugeMetrics() {
 type contextKey string
 
 const requestIDKey contextKey = "request_id"
+const cspNonceKey contextKey = "csp_nonce"
+
+func generateCSPNonce() string {
+	b := make([]byte, 16)
+	crypto_rand.Read(b)
+	return base64Std.RawURLEncoding.EncodeToString(b)
+}
 
 func requestIDMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -1114,6 +1227,11 @@ func securityHeadersMiddleware(next http.Handler) http.Handler {
 		// Content Security Policy
 		if strings.HasPrefix(r.URL.Path, "/docs") {
 			w.Header().Set("Content-Security-Policy", "default-src 'self' https://unpkg.com; script-src 'self' 'unsafe-inline' https://unpkg.com; style-src 'self' 'unsafe-inline' https://unpkg.com")
+		} else if strings.HasPrefix(r.URL.Path, "/dashboard") || strings.HasPrefix(r.URL.Path, "/static") {
+			// Generate nonce for HTMX inline styles
+			nonce := generateCSPNonce()
+			r = r.WithContext(context.WithValue(r.Context(), cspNonceKey, nonce))
+			w.Header().Set("Content-Security-Policy", fmt.Sprintf("default-src 'self'; script-src 'self' 'nonce-%s'; style-src 'self' 'nonce-%s'; connect-src 'self'", nonce, nonce))
 		} else {
 			w.Header().Set("Content-Security-Policy", "default-src 'self'")
 		}

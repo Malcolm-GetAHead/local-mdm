@@ -10,3 +10,4 @@ tests/device-testing/
 docker/
 !docker/nanomdm/
 !docker/postgres/
+!docker/entrypoint.sh

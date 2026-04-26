@@ -36,6 +36,12 @@ func (m *Middleware) SetTokenValidator(tv TokenValidator) {
 	m.tokenValidator = tv
 }
 
+// ValidateTokenDirect validates a token string and returns the AuthUser.
+// Used by the web dashboard OIDC callback to validate tokens outside of HTTP middleware.
+func (m *Middleware) ValidateTokenDirect(token string) (*AuthUser, error) {
+	return m.validator.ValidateToken(token)
+}
+
 // SetAuditLogger sets the audit logger for the middleware.
 // This should be called after creating the middleware to enable audit logging.
 func (m *Middleware) SetAuditLogger(auditLogger audit.AuditLogger) {

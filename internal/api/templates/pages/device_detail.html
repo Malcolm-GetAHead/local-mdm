@@ -1,0 +1,150 @@
+{{define "title"}}{{.Device.Name}} — Local MDM{{end}}
+{{define "page_title"}}{{.Device.Name}}{{end}}
+{{define "content"}}
+<div class="mb-6 flex items-center justify-between">
+    <a href="/dashboard/devices" class="text-sm text-blue-600 dark:text-blue-400 hover:underline">← Back to Devices</a>
+    <div>
+        {{if eq .Device.Status "enrolled"}}
+        {{if or (eq .UserRole "admin") (eq .UserRole "operator") (eq .UserRole "super_admin")}}
+        <span id="device-actions" class="flex gap-2">
+            <button hx-post="/dashboard/devices/{{.Device.ID}}/lock" hx-target="#device-actions" hx-swap="innerHTML"
+                    hx-confirm="Lock this device?" class="btn-secondary text-xs">Lock</button>
+            <button hx-post="/dashboard/devices/{{.Device.ID}}/unenroll" hx-target="#device-actions" hx-swap="innerHTML"
+                    hx-confirm="Unenroll this device?" class="btn-secondary text-xs">Unenroll</button>
+            {{if or (eq .UserRole "admin") (eq .UserRole "super_admin")}}
+            <button hx-post="/dashboard/devices/{{.Device.ID}}/wipe" hx-target="#device-actions" hx-swap="innerHTML"
+                    hx-confirm="WIPE this device? All data will be erased." class="btn-danger text-xs">Wipe</button>
+            {{end}}
+            <button hx-post="/dashboard/devices/{{.Device.ID}}/delete" hx-swap="none"
+                    hx-confirm="DELETE this device record permanently?"
+                    class="btn-danger text-xs">Delete</button>
+        </span>
+        {{end}}
+        {{else}}
+        <span class="badge {{if eq .Device.Status "unenrolled"}}badge-gray{{else}}badge-red{{end}}">{{.Device.Status}}</span>
+        {{end}}
+    </div>
+</div>
+
+<div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+    <div class="card">
+        <h3 class="text-sm font-semibold uppercase text-gray-500 dark:text-gray-400 mb-3">Hardware</h3>
+        <dl class="space-y-2 text-sm">
+            <div class="flex justify-between"><dt class="text-gray-500 dark:text-gray-400">Serial Number</dt><dd class="font-medium">{{.Device.SerialNumber}}</dd></div>
+            <div class="flex justify-between"><dt class="text-gray-500 dark:text-gray-400">Model</dt><dd class="font-medium">{{.Device.Model}}</dd></div>
+            <div class="flex justify-between"><dt class="text-gray-500 dark:text-gray-400">Device ID</dt><dd class="font-mono text-xs">{{.Device.DeviceID}}</dd></div>
+        </dl>
+    </div>
+    <div class="card">
+        <h3 class="text-sm font-semibold uppercase text-gray-500 dark:text-gray-400 mb-3">Operating System</h3>
+        <dl class="space-y-2 text-sm">
+            <div class="flex justify-between"><dt class="text-gray-500 dark:text-gray-400">Platform</dt><dd class="font-medium capitalize">{{.Device.Platform}}</dd></div>
+            <div class="flex justify-between"><dt class="text-gray-500 dark:text-gray-400">OS Version</dt><dd class="font-medium">{{.Device.OSVersion}}</dd></div>
+            <div class="flex justify-between"><dt class="text-gray-500 dark:text-gray-400">Status</dt><dd>
+                {{if eq .Device.Status "enrolled"}}<span class="badge badge-green">Enrolled</span>
+                {{else if eq .Device.Status "unenrolled"}}<span class="badge badge-gray">Unenrolled</span>
+                {{else}}<span class="badge badge-red">{{.Device.Status}}</span>{{end}}
+            </dd></div>
+        </dl>
+    </div>
+    <div class="card">
+        <h3 class="text-sm font-semibold uppercase text-gray-500 dark:text-gray-400 mb-3">Enrollment</h3>
+        <dl class="space-y-2 text-sm">
+            <div class="flex justify-between"><dt class="text-gray-500 dark:text-gray-400">Enrolled</dt><dd class="font-medium">{{formatDate .Device.EnrollmentDate}}</dd></div>
+            <div class="flex justify-between"><dt class="text-gray-500 dark:text-gray-400">Last Seen</dt><dd class="font-medium">{{if .Device.LastSeen}}{{timeAgo .Device.LastSeen}}{{else}}Never{{end}}</dd></div>
+            <div class="flex justify-between"><dt class="text-gray-500 dark:text-gray-400">Last Evaluated</dt><dd class="flex items-center gap-2">
+                <button hx-post="/dashboard/devices/{{.Device.ID}}/evaluate" hx-target="#tab-compliance" hx-swap="innerHTML" title="Manual re-evaluate" class="text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 4v5h5M20 20v-5h-5"/><path d="M20.49 9A9 9 0 005.64 5.64L4 4m16 16l-1.64-1.64A9 9 0 019 20.49"/></svg>
+                </button>
+                <span class="font-medium">{{if .LastEvaluated}}{{timeAgo .LastEvaluated}}{{else}}Never{{end}}</span>
+            </dd></div>
+            <div class="flex justify-between"><dt class="text-gray-500 dark:text-gray-400">Groups</dt><dd>
+                {{range .Groups}}<a href="/dashboard/groups/{{.ID}}" class="badge badge-blue mr-1">{{.Name}}</a>{{else}}<span class="text-gray-400">None</span>{{end}}
+            </dd></div>
+        </dl>
+    </div>
+</div>
+
+<!-- Tabs -->
+<div class="card p-0 overflow-hidden">
+    <div class="flex border-b border-gray-200 dark:border-gray-700" id="device-tabs">
+        <button class="tab-btn px-6 py-3 text-sm font-medium border-b-2 border-blue-600 text-blue-600 dark:text-blue-400" data-tab="compliance">Compliance</button>
+        <button class="tab-btn px-6 py-3 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400" data-tab="policies">Policies</button>
+        <button class="tab-btn px-6 py-3 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400" data-tab="commands">Commands</button>
+        <button class="tab-btn px-6 py-3 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400" data-tab="platform">Platform Details</button>
+    </div>
+
+    <div class="tab-panel" id="tab-compliance">
+        {{template "compliance_tab" .}}
+    </div>
+
+    <div class="tab-panel hidden" id="tab-policies">
+        <table class="w-full text-sm">
+            <thead><tr class="table-header"><th class="px-6 py-2">Policy</th><th class="px-6 py-2">Platform</th><th class="px-6 py-2">Assigned Via</th></tr></thead>
+            <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+            {{range .AssignedPolicies}}
+            <tr>
+                <td class="px-6 py-2"><a href="/dashboard/policies/{{.ID}}" class="text-blue-600 dark:text-blue-400 hover:underline">{{.Name}}</a></td>
+                <td class="px-6 py-2 capitalize">{{.Platform}}</td>
+                <td class="px-6 py-2"><span class="badge badge-gray capitalize">{{.Via}}</span></td>
+            </tr>
+            {{else}}<tr><td colspan="3" class="px-6 py-4 text-center text-gray-500 dark:text-gray-400">No policies assigned</td></tr>{{end}}
+            </tbody>
+        </table>
+    </div>
+
+    <div class="tab-panel hidden" id="tab-commands">
+        <table class="w-full text-sm">
+            <thead><tr class="table-header"><th class="px-6 py-2">Command</th><th class="px-6 py-2">Status</th><th class="px-6 py-2">Created</th></tr></thead>
+            <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+            {{range .Commands}}
+            <tr>
+                <td class="px-6 py-2 font-medium">{{.CommandType}}</td>
+                <td class="px-6 py-2"><span class="badge badge-gray">{{.Status}}</span></td>
+                <td class="px-6 py-2 text-gray-500 dark:text-gray-400">{{timeAgo .CreatedAt}}</td>
+            </tr>
+            {{else}}<tr><td colspan="3" class="px-6 py-4 text-center text-gray-500 dark:text-gray-400">No commands</td></tr>{{end}}
+            </tbody>
+        </table>
+    </div>
+
+    <div class="tab-panel hidden" id="tab-platform">
+        {{if .PlatformDetails}}
+        <table class="w-full text-sm">
+            <thead><tr class="table-header"><th class="px-6 py-2">Category</th><th class="px-6 py-2">Property</th><th class="px-6 py-2">Value</th></tr></thead>
+            <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+            {{range .PlatformDetails}}{{$cat := .Category}}{{range .Items}}
+            <tr>
+                <td class="px-6 py-2 text-gray-500 dark:text-gray-400">{{$cat}}</td>
+                <td class="px-6 py-2 font-medium">{{.Label}}</td>
+                <td class="px-6 py-2">{{if eq .Type "bool"}}{{if .BoolVal}}<span class="text-green-600">✓ Enabled</span>{{else}}<span class="text-red-500">✗ Disabled</span>{{end}}{{else}}{{.Value}}{{end}}</td>
+            </tr>
+            {{end}}{{end}}
+            </tbody>
+        </table>
+        {{else}}
+        <p class="px-6 py-8 text-center text-gray-500 dark:text-gray-400">No platform data available. Data is populated when the device checks in.</p>
+        {{end}}
+    </div>
+</div>
+
+{{end}}
+
+{{define "compliance_tab"}}
+<table class="w-full text-sm">
+    <thead><tr class="table-header"><th class="px-6 py-2">Setting</th><th class="px-6 py-2">Policy</th><th class="px-6 py-2">Status</th></tr></thead>
+    <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+    {{range .Compliance}}
+    <tr>
+        <td class="px-6 py-2 font-medium">{{.Setting}}</td>
+        <td class="px-6 py-2 text-gray-600 dark:text-gray-400">{{.PolicyName}}</td>
+        <td class="px-6 py-2">
+            {{if eq .Status "pass"}}<span class="badge badge-green">Pass</span>
+            {{else if eq .Status "fail"}}<span class="badge badge-red">Fail</span>
+            {{else}}<span class="badge badge-yellow">Unknown</span>{{end}}
+        </td>
+    </tr>
+    {{else}}<tr><td colspan="3" class="px-6 py-4 text-center text-gray-500 dark:text-gray-400">No compliance data — click Re-evaluate</td></tr>{{end}}
+    </tbody>
+</table>
+{{end}}

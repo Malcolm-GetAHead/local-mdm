@@ -5,11 +5,11 @@
 
 ## Current State
 
+- **Sprint 5b**: ✅ COMPLETE, on branch `sprint-5b/eventbus` (not yet merged to main)
 - **Sprint 5f**: ✅ COMPLETE, on branch `sprint-5f/api-hardening` (not yet merged to main)
 - **Sprint 5e**: ✅ COMPLETE, merged to main
-- **Retrospective**: ✅ COMPLETE
-- **Next sprint**: **5b** (EventBus listener, compliance wiring), then 5d (dashboard)
-
+- **Sprint 5d**: 🟡 IN PROGRESS, on branch `sprint-5d/web-dashboard`
+- **Retrospective**: Pending (Sprint 5b)
 ---
 
 ## Working Style
@@ -58,12 +58,34 @@
 - **Don't overestimate effort on test coverage.** "Half a day" and "diminishing returns" turned into 5 minutes and +7% coverage. Before claiming something is expensive, actually look at the uncovered lines and count them. The owner will ask you to do it anyway, and you'll look bad when it's trivial.
 - **The owner wants honest, critical feedback — not softened positives reframed as criticism.** When asked "anything I could do differently?", give actual negatives. The owner will push back if you're being too nice. They act on real feedback.
 - **Establish a test baseline before starting work.** Run `make dev-test` before the first change to confirm the branch is green. The steering guide says to do this. If you skip it and something was already broken, you'll waste time debugging pre-existing failures mixed with your changes.
+- **Don't shim around test failures — fix the root cause.** The EventBus `if cfg.Database.Host != ""` guard was a shim to avoid a test hang. The real fix was a pre-flight connection check. When a test fails, write an isolated test that reproduces the failure, fix the underlying issue, then verify. The owner will catch shims.
+- **pq.Listener spawns an uncontrollable reconnect goroutine.** Never create a `pq.Listener` without first verifying the DSN works via `sql.Open` + `Ping`. Add `connect_timeout=5` to the DSN. Make `Shutdown()` safe when `Start()` was never called.
+- **Sprint plan effort estimates are consistently 3-5x too high.** Sprint 5b was estimated at 3-5 days, took <1 day. Before accepting estimates, look at the actual code and count the changes needed. The owner's roadmap depends on accurate estimates.
+- **The owner's casual questions surface major gaps.** "Do we capture BitLocker keys?" → recovery key escrow (not in roadmap). "Does this cover iOS?" → entire platform missing. "Any other MDM features?" → 12 new roadmap items. Take these questions as seriously as explicit requirements.
+- **The owner reviews your work by asking questions, not reading code.** They won't spot a bad implementation by reading Go — they'll spot it by asking "does this work when the database is down?" or "what happens in production with multiple instances?" Frame your implementation summaries in terms of failure modes and operational behavior, not code structure. If you shimmed something, they'll find it through questions, not code review.
+- **The owner has strong opinions about test realism.** Tests that use mock DBs when a real Docker PostgreSQL is available will get called out. Tests that skip on connection failure when the connection should work will get called out. The expectation is: if Docker is running, tests use real infrastructure. The `testutil.ConnectDB(t)` pattern exists for this reason. Don't create new test patterns that bypass it.
+- **UI work requires a fundamentally different approach than backend work.** The backend sprint plans had clear interfaces and testable outputs. UI work needs user workflows ("as an admin, I want to..."), not feature lists ("device list with pagination"). Build one page, show it, get feedback, then build the next. Don't mark 7 tasks complete at once without showing output.
+- **Run Playwright after every change, not at the end.** In Sprint 5d, the first Playwright run found 5 bugs that would have been caught incrementally. The Playwright suite IS the verification step for UI work — treat it like `go test -race` for backend work.
+- **The owner tests like a user, not like a developer.** They click every button, try every workflow, resize the window, check the audit log. They will find gaps you missed because you verified "does the page render" not "can I accomplish my goal." Before calling a page done, click through every action a user would take.
+- **Batch UI feedback requests.** The first 4 hours of Sprint 5d were one-issue-at-a-time ping-pong. When the owner gave a batched list of 30+ items, productivity tripled. If you're building UI, ask the owner to collect all feedback in one pass rather than reporting issues one at a time.
+- **CSP nonces break in non-obvious ways.** Go's `html/template` HTML-escapes `+` to `&#43;` in attributes, which breaks CSP nonce matching. Use `base64.RawURLEncoding` (no `+` or `/` characters) for nonces. Inline event handlers (`onclick`, `oninput`) are blocked by CSP even with nonces — only `<script>` tags get nonce support. Move all JS to nonce'd script blocks with `addEventListener`.
+- **Go map iteration order is random.** Any data from a Go map displayed in the UI will shuffle on every page load. Always sort before rendering.
+- **Docker containers don't auto-run migrations unless you add an entrypoint script.** The Dockerfile had `migrate` binary but never executed it. Migration 000011 wasn't applied, causing EventBus compliance auto-evaluation to silently fail. Always verify migrations are current.
+- **The owner's Keycloak setup uses `/etc/hosts` for hostname resolution.** Keycloak runs on port 8180 (same internal and external). Don't try to rewrite URLs between Docker-internal and browser-facing — align the ports instead.
+- **SVG text scales with the viewBox.** For consistent font sizing in charts, use HTML text outside the SVG and keep the SVG for shapes only.
+- **The owner expects compliance to show individual setting checks, not policy-level pass/fail.** "Require Encryption: Fail" is actionable. "Corporate Security Baseline: Non-Compliant" is not.
+- **The owner thinks across projects.** They'll reference patterns from other codebases (dev-deployer Playwright runner, infrastructure patterns from work). When they mention another project, look at it — they're telling you to use that approach, not just mentioning it casually. Ask for the path upfront if they don't provide it.
+- **The owner values completeness over speed.** They'd rather you take an extra 10 minutes to wire the `policy.unassigned` subscriber properly than ship a no-op with a comment saying "will evaluate on next check-in." The retro will catch incomplete work and you'll end up doing it anyway. Do it right the first time.
+- **When the owner says "lets fix all these items properly" they mean now, in this session.** Don't propose deferring to a future sprint. Don't ask "want me to fix this now or track it?" Just fix it. The only valid deferral is a genuine technical blocker (needs real hardware, needs a third-party API key).
+- **The owner's retro questions escalate.** "Is there anything else?" means "I suspect there's more — find it." They'll ask this multiple times until you say no. Each round should involve actual investigation (grep the codebase, check docs, think about edge cases), not just "I think we're good." The owner asked "is there anything else?" three times in Sprint 5b and each time there was more to find.
 
 ## Known Issues
 
-- **EventBus Go listener not built** — triggers exist (migration 000007), no listener. Tracked in Sprint 5b.
-- **Production CheckinHandler only extracts UDID** — The enriched handler (Serial, Name, Model, OS, Build, status=enrolled on TokenUpdate) exists only in `tests/e2e/mdmb_enrollment_test.go`. Must be ported to `internal/platform/macos/webhook.go` CheckinHandler. Tracked in Sprint 5b S5b-04.
-- **NewCAManager silently generates CAs** when file path is wrong — footgun that caused the Sprint 5e cert verification bug. Tracked in Sprint 5f (S5f-01) — make generation explicit via CLI command.
+- **Android SecurityPosture parsing deferred to F-01** — handleStatusReport persists webhook Data to platform_data but doesn't parse Google SecurityPosture (requires Google API client). TODO comment in code.
+- **CA manager failure is now fatal** (Sprint 5b) — server won't start if CA cert/key can't be loaded. All test configs must include valid Certificates config.
+- **pq.Listener spawns uncontrollable reconnect goroutine** — EventBus.Start() does a pre-flight sql.Open+Ping before creating the listener to avoid hangs. If you see EventBus connection issues, check the DSN has `connect_timeout`.
+- **F-07 expanded significantly in Sprint 5b** — 12 new features added (iOS, kiosk, lost mode, selective wipe, OS updates, inventory, zero-touch, alerting, self-service, app store, conditional access sync, SCIM). Review before planning next sprints.
+- **Recovery key escrow tracked in F-03** — gap analysis with 7 specific items (migration, repo, profile payloads, response parsing, API endpoint). Depends on F-01.
 
 ## Project-Specific Knowledge
 
@@ -71,7 +93,7 @@
 - **Secrets**: `secrets/` directory for dev (gitignored), AWS SSM for production. DEP tokens encrypted with pgcrypto in the database.
 - **Idempotency-Key**: PostgreSQL-backed middleware on all POST/PUT/PATCH. 24h TTL, hourly cleanup.
 - **Prometheus metrics**: separate internal port (127.0.0.1:9090), not the public API port.
-- **EventBus**: PostgreSQL triggers in place (migration 000007). Go-side LISTEN/NOTIFY listener not yet built — **Sprint 5b** owns this. Must use dedicated connection on Writer pool DSN (read replicas don't relay NOTIFY).
+- **EventBus**: PostgreSQL triggers in place (migration 000007 + 000011). Go-side pq.Listener built in Sprint 5b. Subscribers: compliance auto-evaluation on device/policy/group events, lifecycle cleanup on unenroll/wipe/delete. Must use Writer pool DSN (read replicas don't relay NOTIFY).
 - **Compliance engine**: real evaluation logic in Sprint 5 (security: password, encryption, firewall; restrictions: camera). Returns "unknown" when device has no `platform_data`. Auto-evaluation on check-in deferred to Sprint 5b (EventBus).
 - **Policy deployment**: assignments recorded, devices pick up on next check-in. No immediate push (intentional).
 - **Sprint 2 security review docs** contain false claims. Trust the code, not the review narratives.
@@ -93,6 +115,6 @@
 | 5c | ✅ Complete | Platform integration fixes (macOS/Windows/Android), SCEP, service tests |
 | 5e | ✅ Complete | NanoMDM cert verification fix (path bug), assert.ErrorIs migration, SCEP tests, coverage improvements |
 | 5f | ✅ Complete | API hardening, explicit CA generation, test DB helper consolidation |
-| 5b | 🔲 Not Started | EventBus listener, compliance wiring, load testing |
-| 5d | 🔲 Not Started | Web dashboard (HTMX) |
+| 5b | ✅ Complete | EventBus listener, compliance wiring, lifecycle hooks, k6 load tests |
+| 5d | 🟡 In Progress | Web dashboard (HTMX) |
 | 6 | 🔲 Not Started | macOS Platform SSO (Java/Swift) — requires Apple Developer account |

@@ -1,0 +1,17 @@
+{{define "sidebar"}}
+<div id="sidebar-backdrop" class="fixed inset-0 bg-black/50 z-30 hidden md:hidden"></div>
+<nav id="sidebar" class="fixed inset-y-0 left-0 w-64 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 z-40 transform -translate-x-full md:translate-x-0 transition-transform">
+    <div class="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center gap-2">
+        <img src="/static/favicon.svg" class="w-6 h-6" alt="">
+        <span class="font-bold text-lg">Local MDM</span>
+    </div>
+    <ul class="p-2 space-y-1">
+        <li><a href="/dashboard/" hx-get="/dashboard/" hx-target="#page-content" hx-swap="innerHTML" hx-push-url="true" class="block px-4 py-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 {{if eq .ActiveNav "dashboard"}}bg-gray-100 dark:bg-gray-700 font-medium{{end}}">Dashboard</a></li>
+        <li><a href="/dashboard/devices" hx-get="/dashboard/devices" hx-target="#page-content" hx-swap="innerHTML" hx-push-url="true" class="block px-4 py-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 {{if eq .ActiveNav "devices"}}bg-gray-100 dark:bg-gray-700 font-medium{{end}}">Devices</a></li>
+        <li><a href="/dashboard/policies" hx-get="/dashboard/policies" hx-target="#page-content" hx-swap="innerHTML" hx-push-url="true" class="block px-4 py-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 {{if eq .ActiveNav "policies"}}bg-gray-100 dark:bg-gray-700 font-medium{{end}}">Policies</a></li>
+        <li><a href="/dashboard/groups" hx-get="/dashboard/groups" hx-target="#page-content" hx-swap="innerHTML" hx-push-url="true" class="block px-4 py-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 {{if eq .ActiveNav "groups"}}bg-gray-100 dark:bg-gray-700 font-medium{{end}}">Groups</a></li>
+        <li><a href="/dashboard/compliance" hx-get="/dashboard/compliance" hx-target="#page-content" hx-swap="innerHTML" hx-push-url="true" class="block px-4 py-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 {{if eq .ActiveNav "compliance"}}bg-gray-100 dark:bg-gray-700 font-medium{{end}}">Compliance</a></li>
+        <li><a href="/dashboard/audit" hx-get="/dashboard/audit" hx-target="#page-content" hx-swap="innerHTML" hx-push-url="true" class="block px-4 py-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 {{if eq .ActiveNav "audit"}}bg-gray-100 dark:bg-gray-700 font-medium{{end}}">Audit Log</a></li>
+    </ul>
+</nav>
+{{end}}

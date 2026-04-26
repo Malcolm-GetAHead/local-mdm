@@ -1,0 +1,73 @@
+{{define "title"}}Dashboard — Local MDM{{end}}
+{{define "page_title"}}Dashboard{{end}}
+{{define "content"}}
+
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+    <div class="card">
+        <div class="text-sm text-gray-500 dark:text-gray-400">Total Devices</div>
+        <div class="text-3xl font-bold mt-1">{{.Stats.TotalDevices}}</div>
+    </div>
+    <div class="card">
+        <div class="text-sm text-gray-500 dark:text-gray-400">Enrolled</div>
+        <div class="text-3xl font-bold mt-1 text-green-600 dark:text-green-400">{{.Stats.Enrolled}}</div>
+    </div>
+    <div class="card">
+        <div class="text-sm text-gray-500 dark:text-gray-400">Non-Compliant</div>
+        <div class="text-3xl font-bold mt-1 text-red-600 dark:text-red-400">{{.Stats.NonCompliant}}</div>
+    </div>
+    <div class="card">
+        <div class="text-sm text-gray-500 dark:text-gray-400">Active Policies</div>
+        <div class="text-3xl font-bold mt-1">{{.Stats.ActivePolicies}}</div>
+    </div>
+</div>
+
+<div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+    {{range .Charts}}
+    <div class="card" data-chart>
+        <h2 class="text-lg font-semibold mb-4">{{.Title}}</h2>
+        <div class="flex items-center gap-4">
+            <div class="shrink-0">{{safeHTML .Pie}}</div>
+            <div class="space-y-2">
+                {{range $i, $s := .Legend}}
+                <div class="flex items-center gap-2 cursor-pointer transition-opacity" data-slice="{{$i}}">
+                    <svg width="12" height="12"><circle cx="6" cy="6" r="6" fill="{{$s.Color}}"/></svg>
+                    <span class="text-sm text-gray-700 dark:text-gray-300">{{$s.Label}} ({{$s.Value}})</span>
+                </div>
+                {{end}}
+            </div>
+        </div>
+    </div>
+    {{end}}
+</div>
+
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <div class="card">
+        <h2 class="text-lg font-semibold mb-4">Needs Attention</h2>
+        <div class="space-y-3">
+            {{range .NeedsAttention}}
+            <div class="flex items-center justify-between text-sm">
+                <a href="/dashboard/devices/{{.ID}}" class="text-blue-600 dark:text-blue-400 hover:underline">{{.Name}}</a>
+                <span class="badge {{if eq .Reason "non-compliant"}}badge-red{{else}}badge-yellow{{end}}">{{.Reason}}</span>
+            </div>
+            {{else}}
+            <p class="text-sm text-green-600 dark:text-green-400">All devices healthy ✓</p>
+            {{end}}
+        </div>
+    </div>
+    <div class="card">
+        <h2 class="text-lg font-semibold mb-4">Recent Activity</h2>
+        <div class="space-y-3">
+            {{range .RecentAudit}}
+            <div class="flex items-center justify-between text-sm">
+                <span>{{.Action}}</span>
+                <span class="text-gray-500 dark:text-gray-400">{{timeAgo .CreatedAt}}</span>
+            </div>
+            {{end}}
+            {{if not .RecentAudit}}
+            <p class="text-sm text-gray-500 dark:text-gray-400">No recent activity</p>
+            {{end}}
+        </div>
+    </div>
+</div>
+
+{{end}}

@@ -32,6 +32,9 @@ func (m *mockDeviceRepo) List(_ context.Context, eid uuid.UUID, limit, offset in
 	}
 	return out, len(out), nil
 }
+func (m *mockDeviceRepo) ListFiltered(_ context.Context, _ uuid.UUID, _, _, _, _, _ string, _, _ int) ([]*models.Device, int, error) {
+	return nil, 0, nil
+}
 func (m *mockDeviceRepo) Update(_ context.Context, d *models.Device) error {
 	m.devices[d.ID] = d
 	return nil
@@ -166,4 +169,15 @@ func TestDeviceService_Restart_WindowsRejected(t *testing.T) {
 	_, err := svc.Restart(context.Background(), d.ID)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "not supported")
+}
+
+func TestDeviceService_Unenroll(t *testing.T) {
+	dr := newMockDeviceRepo()
+	d := newTestDevice(models.PlatformMacOS)
+	dr.devices[d.ID] = d
+	svc := NewDeviceService(dr, &mockCmdRepo{}, &mockDispatcher{}, NewLifecycleService(testLogger()), testLogger())
+
+	result, err := svc.Unenroll(context.Background(), d.ID)
+	require.NoError(t, err)
+	assert.Equal(t, "unenrolled", result.Status)
 }

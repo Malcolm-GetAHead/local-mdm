@@ -9,9 +9,9 @@ import (
 	"net/http/httptest"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/malcolm-getahead/local-mdm/internal/config"
-	"github.com/malcolm-getahead/local-mdm/internal/db"
 	"github.com/malcolm-getahead/local-mdm/internal/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -54,20 +54,41 @@ func TestServerStartupFailsWithInvalidKeycloak(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Create a minimal mock database that satisfies the interface
-			// We don't need actual DB for this test - just testing auth initialization
-			mockDB := &db.DB{}
+			testDB := testutil.ConnectDB(t)
 
-			// Create config with invalid Keycloak URL
+			dbHost := "localhost"
+			if h := os.Getenv("DB_HOST"); h != "" {
+				dbHost = h
+			}
+			dbPass := "postgres"
+			if p := os.Getenv("DB_PASSWORD"); p != "" {
+				dbPass = p
+			}
+
 			cfg := &config.Config{
 				Server: config.ServerConfig{
-					Host: func() string { if h := os.Getenv("DB_HOST"); h != "" { return h }; return "localhost" }(),
+					Host: dbHost,
 					Port: 8080,
+				},
+				Database: config.DatabaseConfig{
+					Host:            dbHost,
+					Port:            5432,
+					User:            "postgres",
+					Password:        dbPass,
+					Database:        "localmdm",
+					SSLMode:         "disable",
+					MaxOpenConns:    2,
+					MaxIdleConns:    1,
+					ConnMaxLifetime: 5 * time.Minute,
 				},
 				Keycloak: config.KeycloakConfig{
 					URL:      tt.keycloakURL,
 					Realm:    "test",
 					ClientID: "test-client",
+				},
+				Certificates: config.CertificatesConfig{
+					CACertPath: "./certs/ca.crt",
+					CAKeyPath:  "./certs/ca.key",
 				},
 			}
 
@@ -76,7 +97,7 @@ func TestServerStartupFailsWithInvalidKeycloak(t *testing.T) {
 			}))
 
 			// Attempt to create server
-			server, err := New(cfg, mockDB, logger)
+			server, err := New(cfg, testDB, logger)
 
 			if tt.wantErr {
 				require.Error(t, err, "Expected server creation to fail")
@@ -189,10 +210,25 @@ func TestServerCreationWithValidKeycloak(t *testing.T) {
 			Host: func() string { if h := os.Getenv("DB_HOST"); h != "" { return h }; return "localhost" }(),
 			Port: 8080,
 		},
+		Database: config.DatabaseConfig{
+			Host:            func() string { if h := os.Getenv("DB_HOST"); h != "" { return h }; return "localhost" }(),
+			Port:            5432,
+			User:            "postgres",
+			Password:        func() string { if p := os.Getenv("DB_PASSWORD"); p != "" { return p }; return "postgres" }(),
+			Database:        "localmdm",
+			SSLMode:         "disable",
+			MaxOpenConns:    2,
+			MaxIdleConns:    1,
+			ConnMaxLifetime: 5 * time.Minute,
+		},
 		Keycloak: config.KeycloakConfig{
 			URL:      mockKeycloak.URL,
 			Realm:    "test",
 			ClientID: "test-client",
+		},
+		Certificates: config.CertificatesConfig{
+			CACertPath: "./certs/ca.crt",
+			CAKeyPath:  "./certs/ca.key",
 		},
 	}
 
@@ -234,10 +270,25 @@ func setupTestServer(t *testing.T) *Server {
 			Host: func() string { if h := os.Getenv("DB_HOST"); h != "" { return h }; return "localhost" }(),
 			Port: 8080,
 		},
+		Database: config.DatabaseConfig{
+			Host:            func() string { if h := os.Getenv("DB_HOST"); h != "" { return h }; return "localhost" }(),
+			Port:            5432,
+			User:            "postgres",
+			Password:        func() string { if p := os.Getenv("DB_PASSWORD"); p != "" { return p }; return "postgres" }(),
+			Database:        "localmdm",
+			SSLMode:         "disable",
+			MaxOpenConns:    2,
+			MaxIdleConns:    1,
+			ConnMaxLifetime: 5 * time.Minute,
+		},
 		Keycloak: config.KeycloakConfig{
 			URL:      mockKeycloak.URL,
 			Realm:    "test",
 			ClientID: "test-client",
+		},
+		Certificates: config.CertificatesConfig{
+			CACertPath: "./certs/ca.crt",
+			CAKeyPath:  "./certs/ca.key",
 		},
 	}
 

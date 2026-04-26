@@ -7,6 +7,7 @@ A quick guide to get the Local MDM server running locally and make your first AP
 - **Go 1.25+** — [download](https://go.dev/dl/)
 - **Docker & Docker Compose** — for PostgreSQL, Keycloak, NanoMDM, and Adminer
 - **golang-migrate** — install with `make install-tools`
+- **`/etc/hosts` entry** — add `127.0.0.1 keycloak` for dashboard Keycloak login
 
 ## Quick Start
 

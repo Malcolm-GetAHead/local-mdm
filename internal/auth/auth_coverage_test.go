@@ -24,7 +24,7 @@ func TestKeycloakRefreshToken(t *testing.T) {
 	kc := auth.NewKeycloakClient(
 		keycloakTestURL(),
 		"localmdm-api",
-		"localmdm-api-secret",
+		keycloakTestSecret(),
 	)
 
 	// Get a valid token pair first
@@ -46,7 +46,7 @@ func TestKeycloakRefreshToken_Invalid(t *testing.T) {
 	kc := auth.NewKeycloakClient(
 		keycloakTestURL(),
 		"localmdm-api",
-		"localmdm-api-secret",
+		keycloakTestSecret(),
 	)
 
 	_, err := kc.RefreshToken("invalid-refresh-token")
@@ -159,7 +159,7 @@ func TestNewOIDCValidator_WithDB(t *testing.T) {
 	}
 
 	// Validate a real token — exercises the cache Set path
-	kc := auth.NewKeycloakClient(keycloakTestURL(), "localmdm-api", "localmdm-api-secret")
+	kc := auth.NewKeycloakClient(keycloakTestURL(), "localmdm-api", keycloakTestSecret())
 	tokenResp, err := kc.Login("admin", "admin123")
 	require.NoError(t, err)
 
@@ -332,7 +332,7 @@ func TestMiddleware_RequireAuth_AuditLogging(t *testing.T) {
 
 	// Valid token → audit log with "auth.success"
 	al.events = nil
-	kc := auth.NewKeycloakClient(keycloakTestURL(), "localmdm-api", "localmdm-api-secret")
+	kc := auth.NewKeycloakClient(keycloakTestURL(), "localmdm-api", keycloakTestSecret())
 	tokenResp, err := kc.Login("admin", "admin123")
 	require.NoError(t, err)
 
@@ -400,7 +400,7 @@ func TestOIDCValidator_ValidateToken_CircuitOpenCacheFallback(t *testing.T) {
 	}
 
 	// Get a real token and validate it (populates cache)
-	kc := auth.NewKeycloakClient(keycloakTestURL(), "localmdm-api", "localmdm-api-secret")
+	kc := auth.NewKeycloakClient(keycloakTestURL(), "localmdm-api", keycloakTestSecret())
 	tokenResp, err := kc.Login("admin", "admin123")
 	require.NoError(t, err)
 

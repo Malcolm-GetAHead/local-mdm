@@ -1,0 +1,15 @@
+{{define "pagination"}}
+{{if gt .TotalPages 1}}
+<div class="mt-4 flex items-center justify-between">
+    <span class="text-sm text-gray-600 dark:text-gray-400">Page {{.CurrentPage}} of {{.TotalPages}} ({{.TotalItems}} items)</span>
+    <div class="flex gap-1">
+        {{range pages .TotalPages .CurrentPage}}
+        <a href="{{$.BaseURL}}page={{.}}{{$.QueryExtra}}"
+           hx-get="{{$.BaseURL}}page={{.}}{{$.QueryExtra}}"
+           hx-target="{{$.Target}}"
+           class="px-3 py-1 rounded text-sm {{if eq . $.CurrentPage}}bg-blue-600 text-white dark:bg-blue-500{{else}}bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300{{end}}">{{.}}</a>
+        {{end}}
+    </div>
+</div>
+{{end}}
+{{end}}

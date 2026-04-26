@@ -209,10 +209,11 @@ type AuditLogConfig struct {
 
 // KeycloakConfig holds Keycloak OIDC configuration
 type KeycloakConfig struct {
-	URL          string `yaml:"url"`
-	Realm        string `yaml:"realm"`
-	ClientID     string `yaml:"client_id"`
-	ClientSecret string `yaml:"client_secret"`
+	URL           string `yaml:"url"`
+	Realm         string `yaml:"realm"`
+	ClientID      string `yaml:"client_id"`
+	ClientSecret  string `yaml:"client_secret"`
+	SessionSecret string `yaml:"session_secret"` // HMAC key for dashboard sessions; falls back to ClientSecret
 }
 
 func (c KeycloakConfig) IssuerURL() string {
@@ -501,7 +502,7 @@ func (c *Config) validateSecrets() error {
 	if c.Keycloak.ClientSecret == "" {
 		return fmt.Errorf("CRITICAL: keycloak client_secret is required")
 	}
-	if c.Keycloak.ClientSecret == "localmdm-api-secret" {
+	if c.Keycloak.ClientSecret == "localmdm-api-secret" || c.Keycloak.ClientSecret == "REPLACE_WITH_ENV_VAR" {
 		return fmt.Errorf("CRITICAL: keycloak client_secret must be changed from default value")
 	}
 	if len(c.Keycloak.ClientSecret) < 16 {

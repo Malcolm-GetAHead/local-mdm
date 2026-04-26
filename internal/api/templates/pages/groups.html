@@ -1,0 +1,61 @@
+{{define "title"}}Groups — Local MDM{{end}}
+{{define "page_title"}}Groups{{end}}
+{{define "content"}}
+<div class="mb-6 flex justify-end">
+    <button id="toggle-create-form" class="btn-primary">Create Group</button>
+</div>
+
+<div id="create-group-form" class="card mb-6 hidden">
+    <h2 class="text-lg font-semibold mb-4">Create Group</h2>
+    <form method="POST" action="/dashboard/groups" class="flex gap-4 items-end">
+        {{csrfField .CSRFToken}}
+        <div class="flex-1">
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Name</label>
+            <input type="text" name="name" required class="input-field">
+        </div>
+        <div class="flex-1">
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Description</label>
+            <input type="text" name="description" class="input-field">
+        </div>
+        <button type="submit" class="btn-primary">Save Group</button>
+    </form>
+</div>
+
+<div id="group-table">
+    {{template "groups_table_body" .}}
+</div>
+
+{{end}}
+
+{{define "groups_table_body"}}
+<div class="card overflow-hidden p-0">
+    <table class="w-full">
+        <thead>
+            <tr class="table-header">
+                {{template "sort_header" dict "Label" "Name" "Field" "name" "Sort" $.Sort "Dir" $.Dir "URL" "/dashboard/groups?" "Target" "#group-table" "Extra" ""}}
+                <th class="px-6 py-3">Description</th>
+                <th class="px-6 py-3">Members</th>
+                <th class="px-6 py-3">Actions</th>
+            </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+            {{range .Groups}}
+            <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
+                <td class="px-6 py-4 text-sm font-medium">
+                    <a href="/dashboard/groups/{{.ID}}" class="text-blue-600 dark:text-blue-400 hover:underline">{{.Name}}</a>
+                </td>
+                <td class="px-6 py-4 text-sm text-gray-600 dark:text-gray-400">{{.Description}}</td>
+                <td class="px-6 py-4"><span class="badge badge-gray">{{.MemberCount}}</span></td>
+                <td class="px-6 py-4">
+                    <button hx-post="/dashboard/groups/{{.ID}}/delete" hx-confirm="Delete group '{{.Name}}'? Members will be removed."
+                            hx-target="closest tr" hx-swap="outerHTML"
+                            class="btn-danger text-xs px-2 py-1">Delete</button>
+                </td>
+            </tr>
+            {{else}}
+            <tr><td colspan="4" class="px-6 py-8 text-center text-gray-500 dark:text-gray-400">No groups found</td></tr>
+            {{end}}
+        </tbody>
+    </table>
+</div>
+{{end}}

@@ -1,0 +1,70 @@
+{{define "title"}}Devices — Local MDM{{end}}
+{{define "page_title"}}Devices{{end}}
+{{define "content"}}
+<div class="mb-6 flex flex-col md:flex-row gap-4 items-start md:items-center justify-between">
+    <div class="flex gap-2">
+        <select name="platform" hx-get="/dashboard/devices" hx-target="#device-table" hx-include="[name='q'],[name='status'],[name='sort'],[name='dir']"
+                class="input-field w-auto">
+            <option value="">All Platforms</option>
+            <option value="macos" {{if eq .Filter.Platform "macos"}}selected{{end}}>macOS</option>
+            <option value="windows" {{if eq .Filter.Platform "windows"}}selected{{end}}>Windows</option>
+            <option value="android" {{if eq .Filter.Platform "android"}}selected{{end}}>Android</option>
+        </select>
+        <select name="status" hx-get="/dashboard/devices" hx-target="#device-table" hx-include="[name='q'],[name='platform'],[name='sort'],[name='dir']"
+                class="input-field w-auto">
+            <option value="">All Statuses</option>
+            <option value="enrolled" {{if eq .Filter.Status "enrolled"}}selected{{end}}>Enrolled</option>
+            <option value="unenrolled" {{if eq .Filter.Status "unenrolled"}}selected{{end}}>Unenrolled</option>
+            <option value="wiped" {{if eq .Filter.Status "wiped"}}selected{{end}}>Wiped</option>
+        </select>
+        <input type="hidden" name="sort" value="{{.Filter.Sort}}">
+        <input type="hidden" name="dir" value="{{.Filter.Dir}}">
+    </div>
+    <input type="search" name="q" value="{{.Filter.Query}}" placeholder="Search devices..."
+           hx-get="/dashboard/devices" hx-trigger="keyup changed delay:500ms" hx-target="#device-table" hx-include="[name='platform'],[name='status'],[name='sort'],[name='dir']"
+           class="input-field w-full md:w-64">
+</div>
+
+<div id="device-table">
+    {{template "device_table_body" .}}
+</div>
+{{end}}
+
+{{define "device_table_body"}}
+<div class="card overflow-hidden p-0">
+    <table class="w-full">
+        <thead>
+            <tr class="table-header">
+                {{template "sort_header" dict "Label" "Name" "Field" "name" "Sort" $.Filter.Sort "Dir" $.Filter.Dir "URL" "/dashboard/devices?" "Target" "#device-table" "Extra" (printf "platform=%s&status=%s&q=%s" $.Filter.Platform $.Filter.Status $.Filter.Query)}}
+                {{template "sort_header" dict "Label" "Platform" "Field" "platform" "Sort" $.Filter.Sort "Dir" $.Filter.Dir "URL" "/dashboard/devices?" "Target" "#device-table" "Extra" (printf "platform=%s&status=%s&q=%s" $.Filter.Platform $.Filter.Status $.Filter.Query)}}
+                {{template "sort_header" dict "Label" "Model" "Field" "model" "Sort" $.Filter.Sort "Dir" $.Filter.Dir "URL" "/dashboard/devices?" "Target" "#device-table" "Extra" (printf "platform=%s&status=%s&q=%s" $.Filter.Platform $.Filter.Status $.Filter.Query)}}
+                {{template "sort_header" dict "Label" "OS" "Field" "os_version" "Sort" $.Filter.Sort "Dir" $.Filter.Dir "URL" "/dashboard/devices?" "Target" "#device-table" "Extra" (printf "platform=%s&status=%s&q=%s" $.Filter.Platform $.Filter.Status $.Filter.Query)}}
+                {{template "sort_header" dict "Label" "Status" "Field" "status" "Sort" $.Filter.Sort "Dir" $.Filter.Dir "URL" "/dashboard/devices?" "Target" "#device-table" "Extra" (printf "platform=%s&status=%s&q=%s" $.Filter.Platform $.Filter.Status $.Filter.Query)}}
+                {{template "sort_header" dict "Label" "Last Seen" "Field" "last_seen" "Sort" $.Filter.Sort "Dir" $.Filter.Dir "URL" "/dashboard/devices?" "Target" "#device-table" "Extra" (printf "platform=%s&status=%s&q=%s" $.Filter.Platform $.Filter.Status $.Filter.Query)}}
+            </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+            {{range .Devices}}
+            <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
+                <td class="px-6 py-4 text-sm font-medium">
+                    <a href="/dashboard/devices/{{.ID}}" class="text-blue-600 dark:text-blue-400 hover:underline">{{.Name}}</a>
+                </td>
+                <td class="px-6 py-4 text-sm capitalize">{{.Platform}}</td>
+                <td class="px-6 py-4 text-sm text-gray-600 dark:text-gray-400">{{.Model}}</td>
+                <td class="px-6 py-4 text-sm text-gray-600 dark:text-gray-400">{{.OSVersion}}</td>
+                <td class="px-6 py-4">
+                    {{if eq .Status "enrolled"}}<span class="badge badge-green">Enrolled</span>
+                    {{else if eq .Status "unenrolled"}}<span class="badge badge-gray">Unenrolled</span>
+                    {{else if eq .Status "wiped"}}<span class="badge badge-red">Wiped</span>
+                    {{else}}<span class="badge badge-yellow">{{.Status}}</span>{{end}}
+                </td>
+                <td class="px-6 py-4 text-sm text-gray-500 dark:text-gray-400">{{if .LastSeen}}{{timeAgo .LastSeen}}{{else}}Never{{end}}</td>
+            </tr>
+            {{else}}
+            <tr><td colspan="6" class="px-6 py-8 text-center text-gray-500 dark:text-gray-400">No devices found</td></tr>
+            {{end}}
+        </tbody>
+    </table>
+</div>
+{{template "pagination" dict "TotalPages" .TotalPages "CurrentPage" .CurrentPage "TotalItems" .TotalItems "BaseURL" "/dashboard/devices?" "QueryExtra" (printf "&platform=%s&status=%s&q=%s&sort=%s&dir=%s" .Filter.Platform .Filter.Status .Filter.Query .Filter.Sort .Filter.Dir) "Target" "#device-table"}}
+{{end}}

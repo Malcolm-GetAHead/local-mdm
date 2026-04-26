@@ -1,0 +1,12 @@
+{{define "sort_header"}}
+<th class="px-6 py-3 cursor-pointer select-none hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+    hx-get="{{.URL}}sort={{.Field}}&dir={{if and (eq .Sort .Field) (eq .Dir "asc")}}desc{{else}}asc{{end}}&{{.Extra}}"
+    hx-target="{{.Target}}">
+    <span class="flex items-center gap-1">
+        {{.Label}}
+        {{if eq .Sort .Field}}
+            {{if eq .Dir "asc"}}↑{{else}}↓{{end}}
+        {{end}}
+    </span>
+</th>
+{{end}}

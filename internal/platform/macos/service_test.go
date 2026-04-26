@@ -77,6 +77,10 @@ func (m *MockDeviceRepository) List(ctx context.Context, enterpriseID uuid.UUID,
 	return args.Get(0).([]*models.Device), args.Int(1), args.Error(2)
 }
 
+func (m *MockDeviceRepository) ListFiltered(_ context.Context, _ uuid.UUID, _, _, _, _, _ string, _, _ int) ([]*models.Device, int, error) {
+	return nil, 0, nil
+}
+
 func TestService_CreateDevice(t *testing.T) {
 	ctx := context.Background()
 	enterpriseID := uuid.New()
@@ -261,82 +265,6 @@ func BenchmarkGenerateEnrollmentProfile(b *testing.B) {
 }
 
 // --- Webhook Handler Tests ---
-
-func TestWebhookHandler_HandleWebhook(t *testing.T) {
-	deviceRepo := new(MockDeviceRepository)
-	svc := NewService(deviceRepo)
-	logger := slog.New(slog.NewTextHandler(bytes.NewBuffer(nil), &slog.HandlerOptions{Level: slog.LevelError}))
-	handler := NewWebhookHandler(svc, logger)
-
-	t.Run("handles Authenticate event", func(t *testing.T) {
-		event := WebhookEvent{
-			Topic:   "mdm",
-			EventID: "evt-1",
-			CheckinEvent: &CheckinEvent{
-				UDID:        "test-udid",
-				MessageType: "Authenticate",
-			},
-		}
-		body, _ := json.Marshal(event)
-		req := httptest.NewRequest("POST", "/webhook", bytes.NewReader(body))
-		w := httptest.NewRecorder()
-
-		handler.HandleWebhook(w, req)
-		assert.Equal(t, http.StatusOK, w.Code)
-	})
-
-	t.Run("handles TokenUpdate event", func(t *testing.T) {
-		event := WebhookEvent{
-			Topic:   "mdm",
-			EventID: "evt-2",
-			CheckinEvent: &CheckinEvent{
-				UDID:        "test-udid",
-				MessageType: "TokenUpdate",
-			},
-		}
-		body, _ := json.Marshal(event)
-		req := httptest.NewRequest("POST", "/webhook", bytes.NewReader(body))
-		w := httptest.NewRecorder()
-
-		handler.HandleWebhook(w, req)
-		assert.Equal(t, http.StatusOK, w.Code)
-	})
-
-	t.Run("handles CheckOut event", func(t *testing.T) {
-		event := WebhookEvent{
-			Topic:   "mdm",
-			EventID: "evt-3",
-			CheckinEvent: &CheckinEvent{
-				UDID:        "test-udid",
-				MessageType: "CheckOut",
-			},
-		}
-		body, _ := json.Marshal(event)
-		req := httptest.NewRequest("POST", "/webhook", bytes.NewReader(body))
-		w := httptest.NewRecorder()
-
-		handler.HandleWebhook(w, req)
-		assert.Equal(t, http.StatusOK, w.Code)
-	})
-
-	t.Run("handles nil checkin event", func(t *testing.T) {
-		event := WebhookEvent{Topic: "mdm", EventID: "evt-4"}
-		body, _ := json.Marshal(event)
-		req := httptest.NewRequest("POST", "/webhook", bytes.NewReader(body))
-		w := httptest.NewRecorder()
-
-		handler.HandleWebhook(w, req)
-		assert.Equal(t, http.StatusOK, w.Code)
-	})
-
-	t.Run("rejects invalid JSON", func(t *testing.T) {
-		req := httptest.NewRequest("POST", "/webhook", bytes.NewReader([]byte("not json")))
-		w := httptest.NewRecorder()
-
-		handler.HandleWebhook(w, req)
-		assert.Equal(t, http.StatusBadRequest, w.Code)
-	})
-}
 
 // --- NanoMDM Service Tests ---
 

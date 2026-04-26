@@ -93,7 +93,12 @@ func (s *Server) handleHealthReady(w http.ResponseWriter, r *http.Request) {
 	if !ready {
 		status = http.StatusServiceUnavailable
 	}
-	respondJSON(w, r, status, map[string]interface{}{"ready": ready, "checks": checks, "timestamp": time.Now()})
+
+	result := map[string]interface{}{"ready": ready, "checks": checks, "timestamp": time.Now()}
+	if s.eventBus != nil {
+		result["eventbus_retries_exhausted"] = s.eventBus.RetriesExhausted()
+	}
+	respondJSON(w, r, status, result)
 }
 
 // Version handler

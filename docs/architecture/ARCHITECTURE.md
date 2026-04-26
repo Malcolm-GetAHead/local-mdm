@@ -11,8 +11,8 @@ Local MDM follows a layered architecture with clear separation of concerns:
 ┌─────────────────────────────────────────────────────────┐
 │                    HTTP Layer (API)                      │
 │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  │
-│  │   REST API   │  │  Platform    │  │   Webhooks   │  │
-│  │  Endpoints   │  │  Endpoints   │  │              │  │
+│  │   REST API   │  │  Platform    │  │  Dashboard   │  │
+│  │  Endpoints   │  │  Endpoints   │  │  (HTML/HTMX) │  │
 │  └──────────────┘  └──────────────┘  └──────────────┘  │
 └─────────────────────────────────────────────────────────┘
                           │
@@ -221,6 +221,61 @@ Generates enterprise-scoped reports:
 - **Compliance summary**: aggregated compliance state across all devices and policies
 - **Enrollment report**: enrollment trends over a configurable time window (default 30 days), broken down by platform and day
 
+### EventBus (Sprint 5b)
+
+PostgreSQL `LISTEN`/`NOTIFY` event bus using `pq.Listener`. Decouples event producers (database triggers) from consumers (compliance evaluation, lifecycle cleanup).
+
+**Architecture**:
+- 10 PostgreSQL triggers fire on a single `mdm_events` channel with JSON payload `{type, id, device_id, table, op, extra}`
+- `pq.Listener` maintains a dedicated connection (not from the pool) with automatic reconnection and 30s keepalive pings
+- Pre-flight `sql.Open` + `Ping` before creating the listener prevents uncontrollable reconnect goroutines on bad DSN
+- Subscribers registered at startup, dispatched by event type. Fire-and-forget — errors logged, don't stop the bus
+- Multi-instance safe: PostgreSQL NOTIFY is fan-out (all server instances receive all events). Subscribers must be idempotent.
+
+**Subscribers**:
+- `device.enrolled` / `device.info_updated` → compliance auto-evaluation
+- `policy.updated` / `policy.assigned` / `policy.unassigned` → re-evaluate affected devices
+- `group.member_added` / `group.member_removed` → re-evaluate device compliance
+- `ComplianceCleanupHook` → clear compliance results on unenroll/wipe/delete
+
+**Data flow**: Device checks in → handler updates `platform_data` → PostgreSQL trigger fires `device.info_updated` → EventBus dispatches → compliance subscriber evaluates device → results written to `compliance_results` → dashboard shows live compliance state.
+
+## Web Dashboard (Sprint 5d)
+
+The dashboard is a server-rendered web UI using Go HTML templates, HTMX, and Tailwind CSS. No separate frontend build pipeline — CSS is compiled in the Dockerfile.
+
+### Stack
+- **Go `html/template`** with `embed.FS` — templates compiled into the binary
+- **HTMX v2.0.9** — partial page updates (table filters, member toggles, device actions)
+- **Tailwind CSS v4.2.4** — compiled via standalone CLI in Dockerfile
+- **CSP nonces** — URL-safe base64, all JS in external `app.js` (no inline scripts)
+
+### SPA-like Navigation
+Sidebar links use `hx-get` targeting `#page-content` (wraps header + content area). The server returns just the header+content fragment for HTMX requests (`HX-Target: page-content`), preserving the sidebar and `app.js`. Table filter HTMX requests (`HX-Target` is a table div) return only the table fragment.
+
+### Key Files
+```
+internal/api/
+├── web_handlers.go          # Dashboard home, device list/detail/actions
+├── web_handlers_pages.go    # Policy, group, compliance, audit handlers
+├── web_session.go           # OIDC login/callback, CSRF, HMAC session cookies
+├── web_templates.go         # Template engine, helper functions
+├── web_charts.go            # SVG pie chart generator
+├── web_policy_catalog.go    # Settings catalog for policy forms
+├── templates/
+│   ├── base.html            # Layout shell (sidebar, header, content wrapper)
+│   ├── partials/            # Reusable fragments (header, sidebar, pagination)
+│   └── pages/               # Page templates (dashboard, devices, policies, etc.)
+web/static/
+├── js/htmx.min.js           # Vendored HTMX
+├── js/app.js                # All page JS (event delegation, survives content swaps)
+├── css/output.css           # Compiled Tailwind
+└── favicon.svg
+```
+
+### Authentication
+Keycloak OIDC code flow → HMAC-SHA256 signed session cookie. CSRF protection on POST forms (HTMX requests exempt). Dedicated `session_secret` config key with fallback to Keycloak client secret.
+
 ## Data Flow
 
 ### Device Enrollment Flow
@@ -327,6 +382,12 @@ viewer (per enterprise)
   └─ View audit logs
 ```
 
+### Dashboard Security (Sprint 5d)
+- **Session**: HMAC-SHA256 signed cookies, 8-hour TTL, dedicated `session_secret` config key
+- **CSRF**: HMAC token on all POST forms, HTMX requests exempt (same-origin)
+- **CSP**: Nonces for external scripts (`app.js`, `htmx.min.js`), no `unsafe-inline`
+- **Auth**: Keycloak OIDC code flow, enterprise_id from JWT claim
+
 ## Database Design Principles
 
 ### Multi-Tenancy
@@ -411,7 +472,7 @@ GET /health
 
 ```
 Docker Compose (all services on Alpine Linux)
-├── localmdm        — Go API server (port 8080) or localmdm-dev (hot reload)
+├── localmdm        — Go API server + web dashboard (port 8080)
 ├── nanomdm         — Apple MDM protocol handler (port 9000)
 ├── postgres        — PostgreSQL 15 (databases: localmdm, keycloak, nanomdm)
 ├── keycloak        — OIDC identity provider (port 8180)
@@ -455,6 +516,14 @@ Load Balancer (TLS termination)
 - Middleware support
 - Well-documented
 - Battle-tested
+
+### Why HTMX + Go Templates (not React)?
+
+- No separate frontend build pipeline — CSS compiled in Dockerfile
+- Server-rendered HTML with progressive enhancement
+- HTMX handles partial updates (table filters, member toggles, SPA navigation)
+- Go `html/template` with `embed.FS` — templates compiled into binary
+- Tailwind CSS v4 standalone CLI — no Node.js in production
 
 ## External Dependencies
 
@@ -551,16 +620,22 @@ In production (ECS Fargate), NanoMDM runs as a separate ECS service behind the A
 - Policy application
 - Device commands
 
+### Browser Tests (Sprint 5d)
+
+- Playwright playbook DSL (`tests/browser/browser-playbook.md`)
+- 178 tests covering: login, navigation, CRUD workflows, tab switching, dark mode, mobile
+- Real Keycloak OIDC login (no cookie bypass)
+- Console error tracking (JS errors, HTTP 4xx/5xx fail the run)
+- Run: `make seed && make browser-test`
+
 ### Test Coverage Goals
 
 - Service layer: 80%+
 - Repository layer: 70%+
+- API layer: 48%+ (web handlers tested via Playwright + Go unit tests)
 - Overall: 70%+
 
 ---
 
-**Next Steps**:
-1. Sprint 5f: API hardening, explicit CA generation, test DB helper consolidation
-2. Sprint 5b: EventBus listener, compliance wiring, load testing
-3. Sprint 5d: Web dashboard (Go templates + HTMX + Tailwind CSS)
-4. Sprint 6: macOS Platform SSO (Java/Swift)
+**Current Sprint**: 5d (Web Dashboard) — complete
+**Next**: Sprint 6 (macOS Platform SSO — Java/Swift, requires Apple Developer account)
