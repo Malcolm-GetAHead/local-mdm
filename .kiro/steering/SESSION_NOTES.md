@@ -1,14 +1,14 @@
 # Session Notes — Working Preferences & Project Knowledge
 
-**Last Updated**: 2026-04-23  
+**Last Updated**: 2026-04-26  
 **Purpose**: Guidance for AI agents working on this codebase. Keep this file lean — patterns and conventions that apply to every session. One-shot implementation details belong in sprint docs, not here.
 
 ## Current State
 
-- **Sprint 5b**: ✅ COMPLETE, on branch `sprint-5b/eventbus` (not yet merged to main)
-- **Sprint 5f**: ✅ COMPLETE, on branch `sprint-5f/api-hardening` (not yet merged to main)
+- **Sprint 5d**: ✅ COMPLETE, merged to main (tagged v0.5.4-sprint5d)
+- **Sprint 5b**: ✅ COMPLETE, merged to main (via sprint-5d branch)
+- **Sprint 5f**: ✅ COMPLETE, merged to main (via sprint-5d branch)
 - **Sprint 5e**: ✅ COMPLETE, merged to main
-- **Sprint 5d**: 🟡 IN PROGRESS, on branch `sprint-5d/web-dashboard`
 - **Retrospective**: Pending (Sprint 5b)
 ---
 
@@ -116,5 +116,5 @@
 | 5e | ✅ Complete | NanoMDM cert verification fix (path bug), assert.ErrorIs migration, SCEP tests, coverage improvements |
 | 5f | ✅ Complete | API hardening, explicit CA generation, test DB helper consolidation |
 | 5b | ✅ Complete | EventBus listener, compliance wiring, lifecycle hooks, k6 load tests |
-| 5d | 🟡 In Progress | Web dashboard (HTMX) |
+| 5d | ✅ Complete | Web dashboard (HTMX), 196 Playwright tests |
 | 6 | 🔲 Not Started | macOS Platform SSO (Java/Swift) — requires Apple Developer account |

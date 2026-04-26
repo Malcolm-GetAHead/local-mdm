@@ -308,8 +308,8 @@ local-mdm/
 
 ## Current Phase
 
-**Sprint 5 complete** — Backend Polish, CLI, Observability & Performance. Service layer expansion (DeviceService, AppService, UserService, TokenService, ReportingService), user management API, API token system (`lmdm_` prefix), reporting endpoints with CSV export, SCEP server, readiness probe, audit log search, real compliance evaluation, and performance indexes. Ready for Sprint 5b (EventBus) or Sprint 5c (Platform Integration).
+**Sprint 5d complete** — Web Dashboard. Go templates + HTMX + Tailwind CSS dashboard with SPA-like navigation, device/policy/group/compliance management, 10 visual themes, 196 Playwright browser tests. EventBus retry queue, OIDC login, CSRF protection. Tagged `v0.5.4-sprint5d`.
 
-See [Sprint Planning](../planning/sprints/) for roadmap.
+**Next**: Sprint 6 (macOS Platform SSO — Java/Swift, requires Apple Developer account).
 
 ---

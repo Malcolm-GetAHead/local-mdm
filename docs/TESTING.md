@@ -225,26 +225,28 @@ Tests are defined in `tests/browser/browser-playbook.md` using a simple DSL:
 
 ## Current Coverage (Sprint 5d)
 
+> **Note**: Coverage numbers below are from Docker runs (`make dev-test`) where integration tests have access to PostgreSQL and Keycloak. Running locally without Docker shows lower numbers for packages with integration tests (repository, reporting, audit, certs, auth, macos).
+
 | Package | Coverage | Notes |
 |---------|----------|-------|
 | apperrors | 100.0% | |
 | models | 100.0% | |
 | validation | 96.6% | |
-| audit | 95.2% | |
 | config | 91.9% | |
-| auth | 90.6% | Critical path — target 90%+ |
-| repository | 86.0% | Integration tests need Docker PostgreSQL |
 | tracing | 86.7% | |
 | db | 82.4% | With integration tests |
-| macos | 79.8% | DEP storage integration tests |
-| certs | 78.4% | |
-| service | 77.3% | |
-| scep | 75.9% | |
+| auth | 78.0% | Keycloak integration tests |
 | windows | 69.7% | |
-| reporting | 67.9% | |
-| api | 41.4% | Was 67.8% pre-5d (new web handler code); 173 Playwright browser tests cover UI |
+| scep | 67.4% | |
 | metrics | 65.0% | |
-| android | 61.6% | |
+| service | 63.5% | EventBus, compliance, groups |
+| android | 57.1% | |
+| macos | 55.5% | DEP storage integration tests |
+| api | 48.1% | Web handlers tested via 196 Playwright browser tests |
+| certs | 28.6% | CA manager integration tests need Docker |
+| reporting | 17.0% | Integration tests need Docker PostgreSQL |
+| audit | 10.7% | Integration tests need Docker PostgreSQL |
+| repository | 7.9% | Integration tests need Docker PostgreSQL |
 
 ## Coverage Goals
 

@@ -130,6 +130,17 @@ Unified Control Plane (Go)
 - See [Sprint 5f Plan](docs/planning/sprints/sprint-5f-api-hardening/OVERVIEW.md)
 
 ✅ **Sprint 5b Complete** - 7/7 tasks done (EventBus & Compliance Wiring)
+
+✅ **Sprint 5d Complete** - Web Dashboard (Go templates + HTMX + Tailwind CSS)
+- SPA-like navigation with HTMX content swaps, 10 visual themes with dark mode
+- Device management: list with DB-level filtering, detail with Platform Details tab, lock/wipe/unenroll/delete
+- Policy management: CRUD with settings catalog, assign/unassign with pagination
+- Groups: CRUD, inline edit, member toggle with filter preservation
+- Compliance: per-setting pass/fail (keyed violations), card toggle filters
+- Audit log: expandable details, action/date filters
+- EventBus retry queue (migration 000013), dedicated session secret, CSRF protection
+- 196 Playwright browser tests, 17 web handler Go tests
+- See [Sprint 5d Plan](docs/planning/sprints/sprint-5d-web-dashboard/OVERVIEW.md)
 - EventBus LISTEN/NOTIFY listener using `pq.Listener` with pre-flight check, reconnect, keepalive
 - Migration 000011: 4 new triggers (platform_data, unassign, group membership) + `extra` context in payload
 - Compliance auto-evaluation wired to EventBus (7 subscribers: device/policy/group events)
