@@ -21,7 +21,7 @@
     <div class="flex min-h-screen">
         {{template "sidebar" .}}
         <main class="flex-1 md:ml-64">
-            <div id="page-content">
+            <div id="page-content" hx-boost="true" hx-target="#page-content" hx-swap="innerHTML" hx-push-url="true">
             {{template "header" .}}
             <div class="p-4 md:p-8">
                 {{block "content" .}}{{end}}

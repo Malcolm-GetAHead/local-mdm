@@ -14,7 +14,7 @@
         {{if .User}}
         <span class="text-sm text-gray-600 dark:text-gray-400">{{.User.Email}}</span>
         <span class="badge badge-blue">{{.User.Role}}</span>
-        <a href="/dashboard/logout" class="text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">Logout</a>
+        <a href="/dashboard/logout" hx-boost="false" class="text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">Logout</a>
         {{end}}
     </div>
 </header>
