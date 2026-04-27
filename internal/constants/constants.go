@@ -44,4 +44,8 @@ const (
 	
 	// DefaultPageSize is the default number of records per page
 	DefaultPageSize = 100
+
+	// MaxBatchSize is the maximum number of records to fetch in a single batch operation
+	// (e.g., compliance evaluation across all devices in a group/enterprise)
+	MaxBatchSize = 10000
 )

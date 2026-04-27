@@ -1225,7 +1225,7 @@ func securityHeadersMiddleware(next http.Handler) http.Handler {
 			// Generate nonce for HTMX inline styles
 			nonce := generateCSPNonce()
 			r = r.WithContext(context.WithValue(r.Context(), cspNonceKey, nonce))
-			w.Header().Set("Content-Security-Policy", fmt.Sprintf("default-src 'self'; script-src 'self' 'nonce-%s'; style-src 'self' 'nonce-%s'; connect-src 'self'", nonce, nonce))
+			w.Header().Set("Content-Security-Policy", fmt.Sprintf("default-src 'self'; script-src 'self' 'nonce-%s'; style-src 'self' 'nonce-%s'; img-src 'self' data:; connect-src 'self'", nonce, nonce))
 		} else {
 			w.Header().Set("Content-Security-Policy", "default-src 'self'")
 		}

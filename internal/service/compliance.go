@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
+	"github.com/malcolm-getahead/local-mdm/internal/constants"
 	"github.com/malcolm-getahead/local-mdm/internal/models"
 )
 
@@ -246,7 +247,7 @@ func (s *ComplianceService) EvaluateAllForPolicy(ctx context.Context, policyID u
 				s.logger.Error("compliance eval failed for device", "error", err, "device_id", a.TargetID)
 			}
 		case models.TargetTypeGroup:
-			devices, _, err := s.groupService.ListMembers(ctx, a.TargetID, 10000, 0)
+			devices, _, err := s.groupService.ListMembers(ctx, a.TargetID, constants.MaxBatchSize, 0)
 			if err != nil {
 				s.logger.Error("failed to list group members", "error", err, "group_id", a.TargetID)
 				continue
@@ -257,7 +258,7 @@ func (s *ComplianceService) EvaluateAllForPolicy(ctx context.Context, policyID u
 				}
 			}
 		case models.TargetTypeEnterprise:
-			devices, _, err := s.deviceRepo.List(ctx, a.TargetID, 10000, 0)
+			devices, _, err := s.deviceRepo.List(ctx, a.TargetID, constants.MaxBatchSize, 0)
 			if err != nil {
 				s.logger.Error("failed to list enterprise devices", "error", err, "enterprise_id", a.TargetID)
 				continue

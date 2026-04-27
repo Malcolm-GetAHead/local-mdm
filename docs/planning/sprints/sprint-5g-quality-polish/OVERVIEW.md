@@ -170,3 +170,34 @@ Update `server.go` wiring to pass repository implementations instead of `db.Writ
 ---
 
 *Created: 2026-04-27*
+
+---
+
+## Addendum: Blueprint Assessment Fixes
+
+A second external review (blueprint_assessment.md) was received and validated during this sprint session. 9 additional items were implemented:
+
+- **B-01**: Vendored swagger-ui-dist, removed unpkg.com CDN, tightened CSP (air-gap fix)
+- **B-03**: Fixed N+1 in compliance service `EvaluateDevice` using `ListByIDs` batch fetch
+- **B-04**: Rate limiter extracts client IP from `X-Forwarded-For` (ALB support)
+- **B-05**: EventBus retry max read from DB `max_retries` column instead of hardcoded `5`
+- **B-06**: Added `ListTemplates` repo method, fixed broken pagination in `handleListPolicyTemplates`
+- **B-07**: Replaced hardcoded `10000` with `constants.MaxBatchSize`
+- **B-09**: Escaped DSN values in both `DSN()` and `ReaderDSN()` methods
+- **B-10**: Replaced `fmt.Sprintf` JSON building with `json.Marshal` in EventBus audit log
+- **B-11**: Added `img-src 'self' data:` to dashboard and /docs CSP directives
+- **F-01**: Added SRI hash to HTMX script tag
+- **F-03**: Toast colors use theme `--accent` CSS variable instead of hardcoded Tailwind classes
+- **T-01**: Added `TestSecurityHeadersMiddleware` (7 subtests: common headers, dashboard CSP, docs CSP, HSTS, nonce uniqueness)
+- **T-04**: Added CSP violation detection to Playwright browser test runner
+
+Additional fixes from this session:
+- Test DB password defaults aligned with Docker Compose (`postgres-dev-password-1234`)
+- Coverage pipeline fixed: `-coverpkg` includes `cmd/server`, SIGTERM for flush, `os.Exit` removed from shutdown path
+- mdmb test assertions relaxed for fields the simulator doesn't populate
+- Swagger inline script moved to external `init.js` (CSP compliance)
+- Swagger-ui vendor files moved to Dockerfile build layer (pinned v5.18.2, removed from git)
+- Seed data expanded to 55 devices for pagination test coverage
+- Playwright error state tests (`run-error-tests.js`) with `page.route()` interception
+
+*Updated: 2026-04-27*
