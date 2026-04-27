@@ -9,6 +9,7 @@
 - **Sprint 5b**: ✅ COMPLETE, merged to main (via sprint-5d branch)
 - **Sprint 5f**: ✅ COMPLETE, merged to main (via sprint-5d branch)
 - **Sprint 5g**: ✅ COMPLETE, merged to main
+- **Sprint 5g addendum**: ✅ Blueprint assessment fixes merged (B-01 through B-10, F-03, T-04)
 - **Sprint 6**: 🔲 Not Started (Real device integration)
 - **Retrospective**: Pending (Sprint 5b)
 ---
@@ -88,6 +89,12 @@
 - **CSP nonces and HTMX body swaps are incompatible.** Inline `<script nonce="...">` blocks in swapped content won't execute because the CSP header nonce was set on the original page load. The fix: move ALL page JS to an external `app.js` using event delegation. This is a hard architectural constraint — don't try hx-boost or body swaps until all inline scripts are eliminated.
 - **The seed data `ON CONFLICT DO NOTHING` pattern silently loses data.** Soft-deleted rows (deleted_at set) still exist, so the INSERT doesn't fire. The seed must explicitly reset `deleted_at` for all seed rows AND use `DO UPDATE` for the enterprise. Every new seed table needs this treatment.
 - **Go map iteration order is random — sort before rendering.** This was a known lesson but it applies to the compliance engine too. `map[string]string` violations render in random order. Always `sort.Strings(configKeys)` before iterating.
+- **External code reviews need validation against the actual codebase.** Two rounds of external review were received. The first (antigravity) was 75% inaccurate — recommended Redis (explicitly removed in Sprint 4), Alpine.js (breaks CSP), Google Fonts (GDPR risk for air-gapped enterprise). The second (blueprint) was 75% accurate and found real bugs (Swagger CDN violating air-gap, N+1 in compliance service, rate limiter ignoring X-Forwarded-For, fmt.Sprintf building JSON). Always verify every claim with `grep` before accepting or rejecting.
+- **`go build -cover -coverpkg` must include the main package.** If `-coverpkg=./internal/...` excludes `cmd/server/`, the coverage runtime is never initialized and no coverage data is written on exit. Use `-coverpkg=./cmd/server/...,./internal/...`. This took 4 iterations to diagnose.
+- **Use SIGTERM not SIGINT for coverage-instrumented binaries.** SIGTERM is more reliable for triggering Go's coverage flush on shutdown.
+- **`runtime/coverage.WriteCountersDir` doesn't work with `-coverpkg` scoping on Go 1.26.** The API reports `covermode=<invalid>`. Don't use the explicit flush API — rely on Go's automatic atexit flush by ensuring `main()` returns cleanly (no `os.Exit` in shutdown path).
+- **Test DB password mismatch was hiding 5+ tests.** `testutil/db.go` defaulted to password `postgres`, Docker Compose uses `postgres-dev-password-1234`. Tests silently skipped via `t.Skipf`. The mdmb full enrollment test was hiding behind this — once the password was fixed, it ran but failed on assertions that mdmb doesn't populate (Model, OSVersion, build_version). Always check if "passing" tests are actually skipping.
+- **Sprint effort estimates for agent work are 10-25x too high.** Sprint 5g was estimated at 8.5 hours, took ~20 minutes. The blueprint assessment fixes (9 items) took ~15 minutes. Mechanical, well-scoped changes compress dramatically. Investigation and debugging (like the coverage flush issue) don't compress as much.
 
 ## Known Issues
 
