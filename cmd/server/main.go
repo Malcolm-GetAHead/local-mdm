@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
@@ -90,7 +91,7 @@ func main() {
 	// Start server in a goroutine
 	go func() {
 		logger.Info("Starting HTTP server", "address", fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.Port))
-		if err := server.Start(); err != nil {
+		if err := server.Start(); err != nil && err != http.ErrServerClosed {
 			logger.Error("Server failed to start", "error", err)
 			os.Exit(1)
 		}
@@ -109,7 +110,6 @@ func main() {
 
 	if err := server.Shutdown(ctx); err != nil {
 		logger.Error("Server forced to shutdown", "error", err)
-		os.Exit(1)
 	}
 
 	logger.Info("Server stopped gracefully")

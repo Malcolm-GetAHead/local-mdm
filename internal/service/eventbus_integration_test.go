@@ -19,7 +19,7 @@ func testDSN() string {
 	if h := os.Getenv("DB_HOST"); h != "" {
 		host = h
 	}
-	pass := "postgres"
+	pass := "postgres-dev-password-1234"
 	if p := os.Getenv("DB_PASSWORD"); p != "" {
 		pass = p
 	}

@@ -203,7 +203,7 @@ func (m *mockAuditLogger) Log(_ context.Context, event audit.Event) error {
 func getTestRawDB(t *testing.T) *sql.DB {
 	t.Helper()
 	dsn := fmt.Sprintf("host=%s port=5432 user=postgres password=%s dbname=localmdm sslmode=disable",
-		envOrDefault("DB_HOST", "localhost"), envOrDefault("DB_PASSWORD", "postgres"))
+		envOrDefault("DB_HOST", "localhost"), envOrDefault("DB_PASSWORD", "postgres-dev-password-1234"))
 	db, err := sql.Open("postgres", dsn)
 	if err != nil {
 		t.Skipf("skipping: %v", err)

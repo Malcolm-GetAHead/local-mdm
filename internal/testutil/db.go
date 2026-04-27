@@ -21,7 +21,7 @@ func ConnectDB(t testing.TB) *db.DB {
 		Host:            envOr("DB_HOST", "localhost"),
 		Port:            5432,
 		User:            "postgres",
-		Password:        envOr("DB_PASSWORD", "postgres"),
+		Password:        envOr("DB_PASSWORD", "postgres-dev-password-1234"),
 		Database:        "localmdm",
 		SSLMode:         "disable",
 		MaxOpenConns:    2,
@@ -43,7 +43,7 @@ func ConnectDB(t testing.TB) *db.DB {
 func ConnectRawDB(t testing.TB) *sql.DB {
 	t.Helper()
 	dsn := fmt.Sprintf("host=%s port=5432 user=postgres password=%s dbname=localmdm sslmode=disable",
-		envOr("DB_HOST", "localhost"), envOr("DB_PASSWORD", "postgres"))
+		envOr("DB_HOST", "localhost"), envOr("DB_PASSWORD", "postgres-dev-password-1234"))
 	d, err := sql.Open("postgres", dsn)
 	if err != nil {
 		t.Skipf("skipping: database unavailable: %v", err)
