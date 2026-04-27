@@ -10,7 +10,7 @@ SERVER_PID=""
 
 cleanup() {
     if [ -n "$SERVER_PID" ] && kill -0 "$SERVER_PID" 2>/dev/null; then
-        kill -INT "$SERVER_PID" 2>/dev/null
+        kill -TERM "$SERVER_PID" 2>/dev/null
         sleep 3
         kill -9 "$SERVER_PID" 2>/dev/null
     fi
@@ -22,7 +22,7 @@ rm -rf "$COVER_DIR"
 mkdir -p "$COVER_DIR/browser"
 
 echo "=== Building instrumented binary ==="
-go build -cover -coverpkg=./internal/... -o "$BINARY" ./cmd/server/ || exit 1
+go build -cover -covermode=atomic -coverpkg=./cmd/server/...,./internal/... -o "$BINARY" ./cmd/server/ || exit 1
 
 echo "=== Stopping Docker localmdm ==="
 docker compose stop localmdm > /dev/null 2>&1 || true
@@ -46,7 +46,7 @@ echo "=== Running Playwright ==="
 (cd tests/browser && npm install --silent 2>/dev/null && node run-playbook.js 2>&1 | tail -1)
 
 echo "=== Stopping server ==="
-kill -INT "$SERVER_PID" 2>/dev/null || true
+kill -TERM "$SERVER_PID" 2>/dev/null || true
 # Wait for graceful shutdown and coverage flush
 for i in $(seq 1 10); do
     if ! kill -0 "$SERVER_PID" 2>/dev/null; then break; fi
