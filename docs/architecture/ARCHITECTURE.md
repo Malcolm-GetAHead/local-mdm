@@ -659,4 +659,4 @@ In production (ECS Fargate), NanoMDM runs as a separate ECS service behind the A
 ---
 
 **Current Sprint**: 5d (Web Dashboard) — complete
-**Next**: Sprint 6 (macOS Platform SSO — Java/Swift, requires Apple Developer account)
+**Next**: Sprint 6 (Real device integration — Windows VM, macOS VM, Android)

@@ -310,6 +310,6 @@ local-mdm/
 
 **Sprint 5d complete** — Web Dashboard. Go templates + HTMX + Tailwind CSS dashboard with SPA-like navigation, device/policy/group/compliance management, 10 visual themes, 196 Playwright browser tests. EventBus retry queue, OIDC login, CSRF protection. Tagged `v0.5.4-sprint5d`.
 
-**Next**: Sprint 6 (macOS Platform SSO — Java/Swift, requires Apple Developer account).
+**Next**: Sprint 6 (Real device integration — Windows VM, macOS VM, Android).
 
 ---
