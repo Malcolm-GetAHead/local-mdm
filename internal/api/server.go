@@ -1220,7 +1220,7 @@ func securityHeadersMiddleware(next http.Handler) http.Handler {
 		
 		// Content Security Policy
 		if strings.HasPrefix(r.URL.Path, "/docs") {
-			w.Header().Set("Content-Security-Policy", "default-src 'self'; script-src 'self'; style-src 'self'")
+			w.Header().Set("Content-Security-Policy", "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:")
 		} else if strings.HasPrefix(r.URL.Path, "/dashboard") || strings.HasPrefix(r.URL.Path, "/static") {
 			// Generate nonce for HTMX inline styles
 			nonce := generateCSPNonce()

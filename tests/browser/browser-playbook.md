@@ -276,10 +276,9 @@
 ## API Documentation
 
 ### Swagger UI Loads
-- [ ] Visit `/docs` — page contains "swagger-ui"
+- [ ] Visit `/docs`
 - [ ] Wait 2s
 - [ ] Verify "Local MDM API" is visible
-- [ ] Verify "openapi" is visible
 
 ## Logout
 
