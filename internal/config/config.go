@@ -165,7 +165,7 @@ func (c DatabaseConfig) ReaderDSN() string {
 		timeout = constants.DefaultQueryTimeout * time.Second
 	}
 	return fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=%s statement_timeout=%d",
-		host, port, user, password, database, sslmode, timeout.Milliseconds())
+		escapeDSNValue(host), port, escapeDSNValue(user), escapeDSNValue(password), escapeDSNValue(database), sslmode, timeout.Milliseconds())
 }
 
 // ReaderPoolConfig returns the resolved pool settings for the reader,
