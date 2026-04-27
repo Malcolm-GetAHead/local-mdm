@@ -24,6 +24,7 @@ COPY --from=builder /go/bin/migrate /usr/local/bin/migrate
 COPY configs/ /app/configs/
 COPY migrations/ /app/migrations/
 COPY web/ /app/web/
+COPY docs/schemas/ /app/docs/schemas/
 COPY docker/entrypoint.sh /app/entrypoint.sh
 RUN /app/localmdm-cli certs init --cert /app/certs/ca.crt --key /app/certs/ca.key
 WORKDIR /app
