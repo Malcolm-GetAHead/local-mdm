@@ -78,3 +78,7 @@ tests/device-testing/.vm_config
 
 # Tailwind CSS standalone CLI binary (downloaded per-platform)
 tailwindcss
+
+# Swagger UI vendor files (downloaded in Dockerfile)
+web/static/vendor/swagger-ui/swagger-ui-bundle.js
+web/static/vendor/swagger-ui/swagger-ui.css

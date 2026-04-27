@@ -40,9 +40,6 @@ test-coverage: test ## Run tests with coverage report
 test-coverage-summary: test ## Show coverage summary
 	@go tool cover -func=coverage.out | grep total | awk '{print "Total coverage: " $$3}'
 
-test-coverage: test ## Run tests with coverage report
-	@go tool cover -html=coverage.out
-
 clean: ## Clean build artifacts
 	@echo "Cleaning..."
 	@rm -rf bin/
@@ -141,7 +138,7 @@ browser-test: ## Run Playwright browser tests against local stack
 
 seed: ## Seed database with development data
 	@echo "Seeding database..."
-	@PGPASSWORD=postgres psql -h localhost -U postgres -d localmdm -f migrations/seed_data.sql
+	@docker compose exec -T postgres psql -U postgres -d localmdm < migrations/seed_data.sql
 	@echo "✓ Seed data loaded"
 
 css: ## Compile Tailwind CSS (requires ./tailwindcss binary)

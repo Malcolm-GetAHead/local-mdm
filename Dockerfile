@@ -15,6 +15,10 @@ RUN ARCH=$(uname -m) && \
 RUN CGO_ENABLED=0 go build -o /localmdm ./cmd/server/
 RUN CGO_ENABLED=0 go build -o /localmdm-cli ./cmd/cli/
 RUN CGO_ENABLED=0 go install -tags 'postgres' github.com/golang-migrate/migrate/v4/cmd/migrate@latest
+# Download swagger-ui-dist v5.18.2 (pinned version)
+RUN mkdir -p /swagger-ui && \
+    curl -sL https://unpkg.com/swagger-ui-dist@5.18.2/swagger-ui-bundle.js -o /swagger-ui/swagger-ui-bundle.js && \
+    curl -sL https://unpkg.com/swagger-ui-dist@5.18.2/swagger-ui.css -o /swagger-ui/swagger-ui.css
 
 FROM alpine:3.19 AS prod
 RUN apk add --no-cache ca-certificates curl
@@ -24,6 +28,7 @@ COPY --from=builder /go/bin/migrate /usr/local/bin/migrate
 COPY configs/ /app/configs/
 COPY migrations/ /app/migrations/
 COPY web/ /app/web/
+COPY --from=builder /swagger-ui/ /app/web/static/vendor/swagger-ui/
 COPY docs/schemas/ /app/docs/schemas/
 COPY docker/entrypoint.sh /app/entrypoint.sh
 RUN /app/localmdm-cli certs init --cert /app/certs/ca.crt --key /app/certs/ca.key
