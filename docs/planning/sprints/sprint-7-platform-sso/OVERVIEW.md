@@ -1,4 +1,4 @@
-# Sprint 6: macOS Platform SSO with Keycloak
+# Sprint 7: macOS Platform SSO with Keycloak
 
 **Status**: 🔲 Not Started  
 **Duration**: 1-2 weeks  

@@ -8,7 +8,8 @@
 - **Sprint 5d**: ✅ COMPLETE, merged to main (tagged v0.5.4-sprint5d)
 - **Sprint 5b**: ✅ COMPLETE, merged to main (via sprint-5d branch)
 - **Sprint 5f**: ✅ COMPLETE, merged to main (via sprint-5d branch)
-- **Sprint 5e**: ✅ COMPLETE, merged to main
+- **Sprint 5g**: ✅ COMPLETE, merged to main
+- **Sprint 6**: 🔲 Not Started (Real device integration)
 - **Retrospective**: Pending (Sprint 5b)
 ---
 
@@ -107,7 +108,7 @@
 - **Policy deployment**: assignments recorded, devices pick up on next check-in. No immediate push (intentional).
 - **Sprint 2 security review docs** contain false claims. Trust the code, not the review narratives.
 - **Dashboard**: Go templates + HTMX + Tailwind CSS (Sprint 5d). Not React.
-- **macOS Platform SSO**: Sprint 6 (Java + Swift, separate from Go work).
+- **macOS Platform SSO**: Sprint 7 (Java + Swift, separate from Go work).
 
 ## Sprint Status
 
@@ -119,11 +120,13 @@
 | 3 | ✅ Complete | Commands, profiles, apps, CSPs, PPKG |
 | 4 | ✅ Complete | Policy system, compliance, groups, lifecycle, Redis removal |
 | 4b | ✅ Complete | Writer/Reader DB pools, repo constructor refactor |
-| 4c | 🔲 Not Started | macOS Platform SSO (Java/Swift) — renamed to Sprint 6 |
+| 4c | 🔲 Not Started | macOS Platform SSO (Java/Swift) — renamed to Sprint 7 |
 | 5 | ✅ Complete | Backend polish, CLI, observability, performance |
 | 5c | ✅ Complete | Platform integration fixes (macOS/Windows/Android), SCEP, service tests |
 | 5e | ✅ Complete | NanoMDM cert verification fix (path bug), assert.ErrorIs migration, SCEP tests, coverage improvements |
 | 5f | ✅ Complete | API hardening, explicit CA generation, test DB helper consolidation |
 | 5b | ✅ Complete | EventBus listener, compliance wiring, lifecycle hooks, k6 load tests |
 | 5d | ✅ Complete | Web dashboard (HTMX), 196 Playwright tests |
-| 6 | 🔲 Not Started | macOS Platform SSO (Java/Swift) — requires Apple Developer account |
+| 5g | ✅ Complete | Quality polish: N+1 fixes, loading indicator, empty states, error tests, interface refactor |
+| 6 | 🔲 Not Started | Real device integration (Windows VM, macOS VM, Android) |
+| 7 | 🔲 Not Started | macOS Platform SSO (Java/Swift) — requires Apple Developer account |
