@@ -273,6 +273,14 @@
 - [ ] Wait 0.5s
 - [ ] Verify table header row is visible
 
+## API Documentation
+
+### Swagger UI Loads
+- [ ] Visit `/docs` — page contains "swagger-ui"
+- [ ] Wait 2s
+- [ ] Verify "Local MDM API" is visible
+- [ ] Verify "openapi" is visible
+
 ## Logout
 
 ### Keycloak Logout
