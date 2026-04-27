@@ -8,6 +8,7 @@ import (
 	"github.com/malcolm-getahead/local-mdm/internal/apperrors"
 
 	"github.com/google/uuid"
+	"github.com/lib/pq"
 	"github.com/malcolm-getahead/local-mdm/internal/models"
 	"github.com/malcolm-getahead/local-mdm/internal/validation"
 )
@@ -20,6 +21,7 @@ type PolicyRepository interface {
 	List(ctx context.Context, enterpriseID uuid.UUID, limit, offset int) ([]*models.Policy, int, error)
 	Update(ctx context.Context, policy *models.Policy) error
 	Delete(ctx context.Context, id uuid.UUID) error
+	ListByIDs(ctx context.Context, ids []uuid.UUID) ([]*models.Policy, error)
 	AssignToDevice(ctx context.Context, deviceID, policyID uuid.UUID) error
 	UnassignFromDevice(ctx context.Context, deviceID, policyID uuid.UUID) error
 }
@@ -164,6 +166,31 @@ func (r *policyRepository) Delete(ctx context.Context, id uuid.UUID) error {
 	}
 	
 	return nil
+}
+
+func (r *policyRepository) ListByIDs(ctx context.Context, ids []uuid.UUID) ([]*models.Policy, error) {
+	if len(ids) == 0 {
+		return nil, nil
+	}
+	query := `SELECT id, enterprise_id, name, description, platform, policy_type, policy_config, is_active,
+		       created_at, updated_at, deleted_at
+		FROM policies WHERE id = ANY($1) AND deleted_at IS NULL`
+	rows, err := getReadExecutor(ctx, r.reader).QueryContext(ctx, query, pq.Array(ids))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var policies []*models.Policy
+	for rows.Next() {
+		p := &models.Policy{}
+		if err := rows.Scan(&p.ID, &p.EnterpriseID, &p.Name, &p.Description,
+			&p.Platform, &p.PolicyType, &p.PolicyConfig, &p.IsActive,
+			&p.CreatedAt, &p.UpdatedAt, &p.DeletedAt); err != nil {
+			return nil, err
+		}
+		policies = append(policies, p)
+	}
+	return policies, rows.Err()
 }
 
 func (r *policyRepository) AssignToDevice(ctx context.Context, deviceID, policyID uuid.UUID) error {

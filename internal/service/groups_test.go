@@ -95,6 +95,13 @@ func (m *mockGroupRepo) ListGroupsForDevice(_ context.Context, deviceID uuid.UUI
 	}
 	return result, nil
 }
+func (m *mockGroupRepo) CountMembersByGroupIDs(_ context.Context, ids []uuid.UUID) (map[uuid.UUID]int, error) {
+	result := make(map[uuid.UUID]int)
+	for _, id := range ids {
+		result[id] = len(m.members[id])
+	}
+	return result, nil
+}
 
 type mockAssignmentRepo struct {
 	assignments []*models.PolicyAssignment

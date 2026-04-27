@@ -4,7 +4,9 @@
   "scripts": {
     "playbook": "node run-playbook.js",
     "playbook:headed": "node run-playbook.js --headed",
-    "playbook:section": "node run-playbook.js --section"
+    "playbook:section": "node run-playbook.js --section",
+    "error-tests": "node run-error-tests.js",
+    "error-tests:headed": "node run-error-tests.js --headed"
   },
   "devDependencies": {
     "playwright": "1.52.0"

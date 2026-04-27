@@ -14,7 +14,7 @@ import (
 
 func TestDeviceInventory(t *testing.T) {
 	db := testutil.ConnectRawDB(t)
-	svc := NewService(db)
+	svc := NewService(NewSQLReportStore(db))
 
 	// Use a random enterprise ID — should return empty, not error
 	rows, err := svc.DeviceInventory(context.Background(), uuid.New(), "")
@@ -24,7 +24,7 @@ func TestDeviceInventory(t *testing.T) {
 
 func TestDeviceInventory_WithPlatformFilter(t *testing.T) {
 	db := testutil.ConnectRawDB(t)
-	svc := NewService(db)
+	svc := NewService(NewSQLReportStore(db))
 
 	rows, err := svc.DeviceInventory(context.Background(), uuid.New(), "windows")
 	require.NoError(t, err)
@@ -33,7 +33,7 @@ func TestDeviceInventory_WithPlatformFilter(t *testing.T) {
 
 func TestComplianceReport(t *testing.T) {
 	db := testutil.ConnectRawDB(t)
-	svc := NewService(db)
+	svc := NewService(NewSQLReportStore(db))
 
 	rows, err := svc.ComplianceReport(context.Background(), uuid.New())
 	require.NoError(t, err)
@@ -42,7 +42,7 @@ func TestComplianceReport(t *testing.T) {
 
 func TestEnrollmentReport(t *testing.T) {
 	db := testutil.ConnectRawDB(t)
-	svc := NewService(db)
+	svc := NewService(NewSQLReportStore(db))
 
 	rows, err := svc.EnrollmentReport(context.Background(), uuid.New(), 30)
 	require.NoError(t, err)
@@ -51,7 +51,7 @@ func TestEnrollmentReport(t *testing.T) {
 
 func TestEnrollmentReport_DefaultDays(t *testing.T) {
 	db := testutil.ConnectRawDB(t)
-	svc := NewService(db)
+	svc := NewService(NewSQLReportStore(db))
 
 	rows, err := svc.EnrollmentReport(context.Background(), uuid.New(), 0)
 	require.NoError(t, err)
@@ -75,7 +75,7 @@ func TestWriteJSON(t *testing.T) {
 
 func TestDeviceInventory_WithData(t *testing.T) {
 	db := testutil.ConnectRawDB(t)
-	svc := NewService(db)
+	svc := NewService(NewSQLReportStore(db))
 	ctx := context.Background()
 
 	entID := uuid.New()
@@ -109,7 +109,7 @@ func TestDeviceInventory_WithData(t *testing.T) {
 
 func TestComplianceReport_WithData(t *testing.T) {
 	db := testutil.ConnectRawDB(t)
-	svc := NewService(db)
+	svc := NewService(NewSQLReportStore(db))
 	ctx := context.Background()
 
 	entID := uuid.New()
@@ -181,7 +181,7 @@ func TestComplianceReport_WithData(t *testing.T) {
 
 func TestEnrollmentReport_WithData(t *testing.T) {
 	db := testutil.ConnectRawDB(t)
-	svc := NewService(db)
+	svc := NewService(NewSQLReportStore(db))
 	ctx := context.Background()
 
 	entID := uuid.New()

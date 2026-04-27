@@ -358,6 +358,20 @@ func (m *mockPolicyRepo) AssignToDevice(_ context.Context, deviceID, policyID uu
 	m.assignments[deviceID.String()+":"+policyID.String()] = true
 	return nil
 }
+func (m *mockPolicyRepo) ListByIDs(_ context.Context, ids []uuid.UUID) ([]*models.Policy, error) {
+	if m.listErr != nil {
+		return nil, m.listErr
+	}
+	var result []*models.Policy
+	for _, id := range ids {
+		for _, p := range m.policies {
+			if p.ID == id {
+				result = append(result, p)
+			}
+		}
+	}
+	return result, nil
+}
 func (m *mockPolicyRepo) UnassignFromDevice(_ context.Context, deviceID, policyID uuid.UUID) error {
 	if m.assignments != nil {
 		delete(m.assignments, deviceID.String()+":"+policyID.String())
@@ -1001,6 +1015,9 @@ func (m *mockGroupRepo) ListMembers(_ context.Context, _ uuid.UUID, _, _ int) ([
 }
 func (m *mockGroupRepo) ListGroupsForDevice(_ context.Context, _ uuid.UUID) ([]*models.DeviceGroup, error) {
 	return nil, nil
+}
+func (m *mockGroupRepo) CountMembersByGroupIDs(_ context.Context, ids []uuid.UUID) (map[uuid.UUID]int, error) {
+	return make(map[uuid.UUID]int), nil
 }
 
 type mockAssignmentRepo struct {

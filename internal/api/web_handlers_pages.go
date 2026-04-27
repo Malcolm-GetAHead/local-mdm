@@ -520,14 +520,18 @@ func (s *Server) handleWebGroups(w http.ResponseWriter, r *http.Request) {
 		Description string
 		MemberCount int
 	}
+	var groupIDs []uuid.UUID
+	for _, g := range groups {
+		groupIDs = append(groupIDs, g.ID)
+	}
+	memberCounts, _ := s.groupService.CountMembersByGroupIDs(ctx, groupIDs)
 	var rows []groupRow
 	for _, g := range groups {
-		_, total, _ := s.groupService.ListMembers(ctx, g.ID, 1, 0)
 		rows = append(rows, groupRow{
 			ID:          g.ID.String(),
 			Name:        g.Name,
 			Description: g.Description,
-			MemberCount: total,
+			MemberCount: memberCounts[g.ID],
 		})
 	}
 

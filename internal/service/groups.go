@@ -20,6 +20,7 @@ type GroupRepository interface {
 	RemoveMember(ctx context.Context, groupID, deviceID uuid.UUID) error
 	ListMembers(ctx context.Context, groupID uuid.UUID, limit, offset int) ([]*models.Device, int, error)
 	ListGroupsForDevice(ctx context.Context, deviceID uuid.UUID) ([]*models.DeviceGroup, error)
+	CountMembersByGroupIDs(ctx context.Context, ids []uuid.UUID) (map[uuid.UUID]int, error)
 }
 
 // PolicyAssignmentRepository is the interface for policy assignment data access.
@@ -138,4 +139,9 @@ func (s *GroupService) GetEffectivePolicies(ctx context.Context, deviceID, enter
 // GetDeviceGroups returns all groups a device belongs to.
 func (s *GroupService) GetDeviceGroups(ctx context.Context, deviceID uuid.UUID) ([]*models.DeviceGroup, error) {
 	return s.groupRepo.ListGroupsForDevice(ctx, deviceID)
+}
+
+// CountMembersByGroupIDs returns member counts for multiple groups in a single query.
+func (s *GroupService) CountMembersByGroupIDs(ctx context.Context, ids []uuid.UUID) (map[uuid.UUID]int, error) {
+	return s.groupRepo.CountMembersByGroupIDs(ctx, ids)
 }

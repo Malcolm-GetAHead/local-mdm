@@ -257,9 +257,19 @@ func (s *Server) handleWebDeviceDetail(w http.ResponseWriter, r *http.Request) {
 
 	// Assigned policies — all effective (direct + group + enterprise)
 	effectiveAssignments, _ := s.groupService.GetEffectivePolicies(ctx, id, device.EnterpriseID)
+	var policyIDs []uuid.UUID
+	for _, a := range effectiveAssignments {
+		policyIDs = append(policyIDs, a.PolicyID)
+	}
+	policiesByID := map[uuid.UUID]*models.Policy{}
+	if batchPolicies, err := s.policyRepo.ListByIDs(ctx, policyIDs); err == nil {
+		for _, p := range batchPolicies {
+			policiesByID[p.ID] = p
+		}
+	}
 	var assignedPolicies []map[string]interface{}
 	for _, a := range effectiveAssignments {
-		if p, err := s.policyRepo.GetByID(ctx, a.PolicyID); err == nil {
+		if p, ok := policiesByID[a.PolicyID]; ok {
 			assignedPolicies = append(assignedPolicies, map[string]interface{}{
 				"ID": p.ID, "Name": p.Name, "Platform": p.Platform, "Via": a.TargetType,
 			})
@@ -385,11 +395,27 @@ func (s *Server) handleWebDeviceEvaluate(w http.ResponseWriter, r *http.Request)
 }
 
 func buildComplianceRows(ctx context.Context, results []*models.ComplianceResult, s *Server) []map[string]interface{} {
+	// Batch-fetch all policies referenced by compliance results
+	policyIDSet := map[uuid.UUID]bool{}
+	for _, cr := range results {
+		policyIDSet[cr.PolicyID] = true
+	}
+	var policyIDs []uuid.UUID
+	for id := range policyIDSet {
+		policyIDs = append(policyIDs, id)
+	}
+	policiesByID := map[uuid.UUID]*models.Policy{}
+	if batchPolicies, err := s.policyRepo.ListByIDs(ctx, policyIDs); err == nil {
+		for _, p := range batchPolicies {
+			policiesByID[p.ID] = p
+		}
+	}
+
 	var rows []map[string]interface{}
 	for _, cr := range results {
 		policyName := ""
 		var configKeys []string
-		if p, err := s.policyRepo.GetByID(ctx, cr.PolicyID); err == nil {
+		if p, ok := policiesByID[cr.PolicyID]; ok {
 			policyName = p.Name
 			for k := range p.PolicyConfig {
 				configKeys = append(configKeys, k)

@@ -205,6 +205,16 @@
         }
     });
 
+    // ── HTMX loading bar ──
+    document.body.addEventListener('htmx:beforeRequest', function() {
+        var bar = document.getElementById('htmx-progress');
+        if (bar) bar.classList.add('htmx-request');
+    });
+    document.body.addEventListener('htmx:afterRequest', function() {
+        var bar = document.getElementById('htmx-progress');
+        if (bar) { bar.classList.remove('htmx-request'); bar.style.width = '100%'; bar.style.opacity = '1'; setTimeout(function(){ bar.style.width = '0'; bar.style.opacity = '0'; }, 200); }
+    });
+
     // ── Toast notifications ──
     function showToast(message, type) {
         var container = document.getElementById('toast-container');

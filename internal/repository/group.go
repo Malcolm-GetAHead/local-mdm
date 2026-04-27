@@ -8,6 +8,7 @@ import (
 	"github.com/malcolm-getahead/local-mdm/internal/apperrors"
 
 	"github.com/google/uuid"
+	"github.com/lib/pq"
 	"github.com/malcolm-getahead/local-mdm/internal/models"
 )
 
@@ -22,6 +23,7 @@ type GroupRepository interface {
 	RemoveMember(ctx context.Context, groupID, deviceID uuid.UUID) error
 	ListMembers(ctx context.Context, groupID uuid.UUID, limit, offset int) ([]*models.Device, int, error)
 	ListGroupsForDevice(ctx context.Context, deviceID uuid.UUID) ([]*models.DeviceGroup, error)
+	CountMembersByGroupIDs(ctx context.Context, ids []uuid.UUID) (map[uuid.UUID]int, error)
 }
 
 // PolicyAssignmentRepository provides data access for policy assignments.
@@ -209,6 +211,29 @@ func (r *groupRepository) ListGroupsForDevice(ctx context.Context, deviceID uuid
 		groups = append(groups, g)
 	}
 	return groups, rows.Err()
+}
+
+func (r *groupRepository) CountMembersByGroupIDs(ctx context.Context, ids []uuid.UUID) (map[uuid.UUID]int, error) {
+	result := make(map[uuid.UUID]int)
+	if len(ids) == 0 {
+		return result, nil
+	}
+	rows, err := getReadExecutor(ctx, r.reader).QueryContext(ctx,
+		`SELECT group_id, COUNT(*) FROM group_memberships WHERE group_id = ANY($1) GROUP BY group_id`,
+		pq.Array(ids))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var gid uuid.UUID
+		var count int
+		if err := rows.Scan(&gid, &count); err != nil {
+			return nil, err
+		}
+		result[gid] = count
+	}
+	return result, rows.Err()
 }
 
 // --- Policy Assignment Repository ---

@@ -32,7 +32,7 @@ func setupTestCerts(t *testing.T) (*certs.CAManager, *certs.CertificateService, 
 	database := testutil.ConnectDB(t)
 	
 	// Create certificate service
-	service := certs.NewCertificateService(ca, database.Writer)
+	service := certs.NewCertificateService(ca, certs.NewSQLCertStore(database.Writer))
 	
 	return ca, service, database
 }

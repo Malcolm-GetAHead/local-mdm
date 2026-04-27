@@ -137,7 +137,7 @@ load-test: ## Run k6 load tests against local stack
 	@echo "Results appended to tests/load/results_history.csv"
 
 browser-test: ## Run Playwright browser tests against local stack
-	@cd tests/browser && npm install --silent 2>/dev/null && node run-playbook.js
+	@cd tests/browser && npm install --silent 2>/dev/null && node run-playbook.js && node run-error-tests.js
 
 seed: ## Seed database with development data
 	@echo "Seeding database..."
@@ -163,5 +163,18 @@ install-tools: ## Install development tools
 	@echo "Installing development tools..."
 	@go install -tags 'postgres' github.com/golang-migrate/migrate/v4/cmd/migrate@latest
 	@go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+
+verify: ## Run full local verification: vet + lint + unit tests + integration tests + browser tests
+	@echo "=== Vet ==="
+	@go vet ./...
+	@echo "=== Lint ==="
+	@$(MAKE) lint
+	@echo "=== Unit Tests ==="
+	@$(MAKE) test-unit
+	@echo "=== Integration Tests (Docker) ==="
+	@$(MAKE) dev-test
+	@echo "=== Browser Tests ==="
+	@$(MAKE) browser-test
+	@echo "✅ All checks passed"
 
 .DEFAULT_GOAL := help

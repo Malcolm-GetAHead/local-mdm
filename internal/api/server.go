@@ -184,7 +184,7 @@ func New(cfg *config.Config, database *db.DB, logger *slog.Logger) (*Server, err
 		return nil, fmt.Errorf("failed to load CA certificate: %w", err)
 	}
 	s.caManager = caManager
-	s.certService = certs.NewCertificateService(caManager, database.Writer)
+	s.certService = certs.NewCertificateService(caManager, certs.NewSQLCertStore(database.Writer))
 	
 	// Create certificate expiration monitor if enabled
 	if cfg.Certificates.ExpirationMonitor.Enabled {
@@ -358,7 +358,7 @@ func New(cfg *config.Config, database *db.DB, logger *slog.Logger) (*Server, err
 		return nil, fmt.Errorf("failed to create token repository: %w", err)
 	}
 	s.tokenService = service.NewTokenService(tokenRepo, userRepo, logger)
-	s.reportService = reporting.NewService(database.Writer)
+	s.reportService = reporting.NewService(reporting.NewSQLReportStore(database.Writer))
 
 	// Wire API token auth into middleware
 	s.authMiddleware.SetTokenValidator(&tokenAuthAdapter{tokenService: s.tokenService})
