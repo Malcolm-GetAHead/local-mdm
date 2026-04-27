@@ -372,6 +372,26 @@ func (m *mockPolicyRepo) ListByIDs(_ context.Context, ids []uuid.UUID) ([]*model
 	}
 	return result, nil
 }
+func (m *mockPolicyRepo) ListTemplates(_ context.Context, _ uuid.UUID, limit, offset int) ([]*models.Policy, int, error) {
+	if m.listErr != nil {
+		return nil, 0, m.listErr
+	}
+	var templates []*models.Policy
+	for _, p := range m.policies {
+		if p.IsTemplate {
+			templates = append(templates, p)
+		}
+	}
+	total := len(templates)
+	end := offset + limit
+	if end > total {
+		end = total
+	}
+	if offset >= total {
+		return []*models.Policy{}, total, nil
+	}
+	return templates[offset:end], total, nil
+}
 func (m *mockPolicyRepo) UnassignFromDevice(_ context.Context, deviceID, policyID uuid.UUID) error {
 	if m.assignments != nil {
 		delete(m.assignments, deviceID.String()+":"+policyID.String())

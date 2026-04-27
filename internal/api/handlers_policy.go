@@ -373,23 +373,15 @@ func (s *Server) handleListPolicyTemplates(w http.ResponseWriter, r *http.Reques
 	}
 
 	limit, offset := parsePagination(r)
-	policies, _, err := s.policyRepo.List(r.Context(), user.EnterpriseID, limit, offset)
+	templates, total, err := s.policyRepo.ListTemplates(r.Context(), user.EnterpriseID, limit, offset)
 	if err != nil {
 		respondError(w, r, http.StatusInternalServerError, "internal_error", "Failed to list templates")
 		return
 	}
 
-	// Filter to templates only
-	var templates []*models.Policy
-	for _, p := range policies {
-		if p.IsTemplate {
-			templates = append(templates, p)
-		}
-	}
-
 	respondJSON(w, r, http.StatusOK, map[string]interface{}{
 		"templates": templates,
-		"total":     len(templates),
+		"total":     total,
 	})
 }
 

@@ -317,8 +317,12 @@ function parsePlaybook(mdPath) {
   // Track browser console errors and failed resource loads
   const consoleErrors = [];
   page.on("console", (msg) => {
+    const text = msg.text();
+    if (text.includes("Content Security Policy") || text.includes("CSP")) {
+      consoleErrors.push(`[CSP] ${text}`);
+      return;
+    }
     if (msg.type() === "error") {
-      const text = msg.text();
       if (text.includes("favicon") || text.includes("manifest")) return;
       // Skip generic "Failed to load resource" — we track those via response events
       if (text.includes("Failed to load resource")) return;

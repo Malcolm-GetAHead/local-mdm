@@ -59,6 +59,15 @@ func (m *mockPolicyRepo) Delete(_ context.Context, id uuid.UUID) error {
 	delete(m.policies, id)
 	return nil
 }
+func (m *mockPolicyRepo) ListByIDs(_ context.Context, ids []uuid.UUID) ([]*models.Policy, error) {
+	var result []*models.Policy
+	for _, id := range ids {
+		if p, ok := m.policies[id]; ok {
+			result = append(result, p)
+		}
+	}
+	return result, nil
+}
 
 type mockVersionRepo struct {
 	versions map[uuid.UUID][]*models.PolicyVersion

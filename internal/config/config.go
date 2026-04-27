@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/malcolm-getahead/local-mdm/internal/constants"
@@ -114,7 +115,15 @@ func (c DatabaseConfig) DSN() string {
 	}
 
 	return fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=%s statement_timeout=%d",
-		c.Host, c.Port, c.User, c.Password, c.Database, c.SSLMode, timeout.Milliseconds())
+		escapeDSNValue(c.Host), c.Port, escapeDSNValue(c.User), escapeDSNValue(c.Password), escapeDSNValue(c.Database), c.SSLMode, timeout.Milliseconds())
+}
+
+// escapeDSNValue wraps a DSN value in single quotes if it contains spaces or special characters.
+func escapeDSNValue(s string) string {
+	if strings.ContainsAny(s, " ='\\") {
+		return "'" + strings.ReplaceAll(s, "'", "\\'") + "'"
+	}
+	return s
 }
 
 // ReaderDSN returns the reader database connection string.

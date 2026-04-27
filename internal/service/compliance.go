@@ -50,10 +50,23 @@ func (s *ComplianceService) EvaluateDevice(ctx context.Context, deviceID, enterp
 	}
 
 	var results []*models.ComplianceResult
+	policyIDs := make([]uuid.UUID, 0, len(assignments))
 	for _, a := range assignments {
-		policy, err := s.policyRepo.GetByID(ctx, a.PolicyID)
-		if err != nil {
-			s.logger.Error("failed to get policy for compliance", "error", err, "policy_id", a.PolicyID)
+		policyIDs = append(policyIDs, a.PolicyID)
+	}
+	policies, err := s.policyRepo.ListByIDs(ctx, policyIDs)
+	if err != nil {
+		return nil, fmt.Errorf("failed to batch-fetch policies: %w", err)
+	}
+	policyMap := make(map[uuid.UUID]*models.Policy, len(policies))
+	for _, p := range policies {
+		policyMap[p.ID] = p
+	}
+
+	for _, a := range assignments {
+		policy, ok := policyMap[a.PolicyID]
+		if !ok {
+			s.logger.Error("policy not found for compliance", "policy_id", a.PolicyID)
 			continue
 		}
 		result := s.evaluatePolicy(device, policy)

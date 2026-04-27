@@ -219,9 +219,10 @@
     function showToast(message, type) {
         var container = document.getElementById('toast-container');
         if (!container) return;
-        var colors = type === 'error' ? 'bg-red-600' : 'bg-green-600';
         var toast = document.createElement('div');
-        toast.className = colors + ' text-white px-4 py-2 rounded-lg shadow-lg text-sm transition-opacity duration-300';
+        toast.className = 'px-4 py-2 rounded-lg shadow-lg text-sm transition-opacity duration-300';
+        toast.style.backgroundColor = type === 'error' ? '#dc2626' : 'rgb(var(--accent, 22 163 74))';
+        toast.style.color = '#fff';
         toast.textContent = message;
         container.appendChild(toast);
         setTimeout(function() { toast.style.opacity = '0'; }, 2500);

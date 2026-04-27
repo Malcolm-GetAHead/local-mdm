@@ -22,6 +22,7 @@ type PolicyRepository interface {
 	Update(ctx context.Context, policy *models.Policy) error
 	Delete(ctx context.Context, id uuid.UUID) error
 	ListByIDs(ctx context.Context, ids []uuid.UUID) ([]*models.Policy, error)
+	ListTemplates(ctx context.Context, enterpriseID uuid.UUID, limit, offset int) ([]*models.Policy, int, error)
 	AssignToDevice(ctx context.Context, deviceID, policyID uuid.UUID) error
 	UnassignFromDevice(ctx context.Context, deviceID, policyID uuid.UUID) error
 }
@@ -191,6 +192,42 @@ func (r *policyRepository) ListByIDs(ctx context.Context, ids []uuid.UUID) ([]*m
 		policies = append(policies, p)
 	}
 	return policies, rows.Err()
+}
+
+func (r *policyRepository) ListTemplates(ctx context.Context, enterpriseID uuid.UUID, limit, offset int) ([]*models.Policy, int, error) {
+	limit, offset, err := ValidatePagination(limit, offset)
+	if err != nil {
+		return nil, 0, fmt.Errorf("invalid pagination: %w", err)
+	}
+
+	countQuery := `SELECT COUNT(*) FROM policies WHERE enterprise_id = $1 AND is_template = true AND deleted_at IS NULL`
+	dataQuery := `
+		SELECT id, enterprise_id, name, description, platform, policy_type, policy_config, is_active,
+		       created_at, updated_at, deleted_at
+		FROM policies
+		WHERE enterprise_id = $1 AND is_template = true AND deleted_at IS NULL
+		ORDER BY created_at DESC
+		LIMIT $2 OFFSET $3`
+
+	scanFn := func(rows *sql.Rows) (*models.Policy, error) {
+		policy := &models.Policy{}
+		err := rows.Scan(
+			&policy.ID, &policy.EnterpriseID, &policy.Name, &policy.Description,
+			&policy.Platform, &policy.PolicyType, &policy.PolicyConfig, &policy.IsActive,
+			&policy.CreatedAt, &policy.UpdatedAt, &policy.DeletedAt,
+		)
+		return policy, err
+	}
+
+	return ExecutePaginatedQuery(
+		ctx,
+		getReadExecutor(ctx, r.reader),
+		countQuery,
+		[]interface{}{enterpriseID},
+		dataQuery,
+		[]interface{}{enterpriseID, limit, offset},
+		scanFn,
+	)
 }
 
 func (r *policyRepository) AssignToDevice(ctx context.Context, deviceID, policyID uuid.UUID) error {

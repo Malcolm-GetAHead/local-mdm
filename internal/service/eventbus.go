@@ -260,7 +260,7 @@ func (eb *EventBus) ProcessRetries(ctx context.Context) {
 		return
 	}
 	rows, err := eb.db.QueryContext(ctx,
-		`SELECT id, event_type, payload, retry_count FROM event_queue
+		`SELECT id, event_type, payload, retry_count, max_retries FROM event_queue
 		 WHERE completed_at IS NULL AND retry_count < max_retries AND next_retry_at <= NOW()
 		 ORDER BY next_retry_at LIMIT 10`)
 	if err != nil {
@@ -273,8 +273,9 @@ func (eb *EventBus) ProcessRetries(ctx context.Context) {
 		var id uuid.UUID
 		var eventType string
 		var payload []byte
+		var maxRetries int
 		var retryCount int
-		if err := rows.Scan(&id, &eventType, &payload, &retryCount); err != nil {
+		if err := rows.Scan(&id, &eventType, &payload, &retryCount, &maxRetries); err != nil {
 			continue
 		}
 
@@ -302,7 +303,7 @@ func (eb *EventBus) ProcessRetries(ctx context.Context) {
 			eb.logger.Info("eventbus: retry succeeded", "id", id, "type", eventType, "attempt", retryCount+1)
 		} else {
 			newCount := retryCount + 1
-			if newCount >= 5 { // max_retries
+			if newCount >= maxRetries {
 				eb.db.Exec(`UPDATE event_queue SET retry_count = $1, last_error = $2, completed_at = NOW() WHERE id = $3`,
 					newCount, "exhausted: "+lastErr, id)
 				eb.retriesExhausted.Add(1)
@@ -315,8 +316,9 @@ func (eb *EventBus) ProcessRetries(ctx context.Context) {
 						entID = eid
 					}
 				}
+				details, _ := json.Marshal(map[string]interface{}{"event_id": id.String(), "error": lastErr, "attempts": newCount})
 				eb.db.Exec(`INSERT INTO audit_logs (enterprise_id, action, resource_type, details) VALUES ($1, 'eventbus.retry_exhausted', $2, $3)`,
-					entID, eventType, fmt.Sprintf(`{"event_id": "%s", "error": "%s", "attempts": %d}`, id, lastErr, newCount))
+					entID, eventType, string(details))
 			} else {
 				backoff := time.Duration(1<<uint(newCount)) * 30 * time.Second
 				eb.db.Exec(`UPDATE event_queue SET retry_count = $1, last_error = $2, next_retry_at = NOW() + $3::interval WHERE id = $4`,

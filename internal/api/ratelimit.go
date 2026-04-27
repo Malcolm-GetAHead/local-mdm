@@ -3,6 +3,7 @@ package api
 import (
 	"container/list"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -153,8 +154,13 @@ func (rl *rateLimiter) cleanup() {
 func rateLimitMiddleware(limiter *rateLimiter) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			// Use IP address as key
+			// Use client IP — trust X-Forwarded-For from ALB
 			key := r.RemoteAddr
+			if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
+				if parts := strings.SplitN(xff, ",", 2); len(parts) > 0 {
+					key = strings.TrimSpace(parts[0])
+				}
+			}
 			
 			if !limiter.allow(key) {
 				http.Error(w, "Rate limit exceeded", http.StatusTooManyRequests)

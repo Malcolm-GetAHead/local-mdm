@@ -19,6 +19,7 @@ type PolicyRepository interface {
 	List(ctx context.Context, enterpriseID uuid.UUID, limit, offset int) ([]*models.Policy, int, error)
 	Update(ctx context.Context, policy *models.Policy) error
 	Delete(ctx context.Context, id uuid.UUID) error
+	ListByIDs(ctx context.Context, ids []uuid.UUID) ([]*models.Policy, error)
 }
 
 // PolicyVersionRepository stores policy version snapshots.

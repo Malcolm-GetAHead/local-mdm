@@ -394,13 +394,7 @@ func (s *Server) setupRoutes() {
 		http.ServeFile(w, r, "docs/schemas/openapi.yaml")
 	}).Methods("GET")
 	s.router.HandleFunc("/docs", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "text/html")
-		fmt.Fprint(w, `<!DOCTYPE html><html><head><title>Local MDM API</title>
-<link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@5/swagger-ui.css">
-</head><body><div id="swagger-ui"></div>
-<script src="https://unpkg.com/swagger-ui-dist@5/swagger-ui-bundle.js"></script>
-<script>SwaggerUIBundle({url:"/docs/openapi.yaml",dom_id:"#swagger-ui"})</script>
-</body></html>`)
+		http.ServeFile(w, r, "web/static/vendor/swagger-ui/index.html")
 	}).Methods("GET")
 
 	// API v1 routes
@@ -1226,7 +1220,7 @@ func securityHeadersMiddleware(next http.Handler) http.Handler {
 		
 		// Content Security Policy
 		if strings.HasPrefix(r.URL.Path, "/docs") {
-			w.Header().Set("Content-Security-Policy", "default-src 'self' https://unpkg.com; script-src 'self' 'unsafe-inline' https://unpkg.com; style-src 'self' 'unsafe-inline' https://unpkg.com")
+			w.Header().Set("Content-Security-Policy", "default-src 'self'; script-src 'self'; style-src 'self'")
 		} else if strings.HasPrefix(r.URL.Path, "/dashboard") || strings.HasPrefix(r.URL.Path, "/static") {
 			// Generate nonce for HTMX inline styles
 			nonce := generateCSPNonce()
