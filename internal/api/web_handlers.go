@@ -277,7 +277,7 @@ func (s *Server) handleWebDeviceDetail(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Extract installed profiles and apps from platform_data for tabs
-	var installedProfiles, installedApps []map[string]interface{}
+	var installedProfiles, installedApps, certificates, availableUpdates, activeExtensions []map[string]interface{}
 	if pd := device.PlatformData; pd != nil {
 		if profiles, ok := pd["installed_profiles"].([]interface{}); ok {
 			for _, p := range profiles {
@@ -290,6 +290,27 @@ func (s *Server) handleWebDeviceDetail(w http.ResponseWriter, r *http.Request) {
 			for _, a := range apps {
 				if am, ok := a.(map[string]interface{}); ok {
 					installedApps = append(installedApps, am)
+				}
+			}
+		}
+		if certs, ok := pd["certificates"].([]interface{}); ok {
+			for _, c := range certs {
+				if cm, ok := c.(map[string]interface{}); ok {
+					certificates = append(certificates, cm)
+				}
+			}
+		}
+		if updates, ok := pd["available_os_updates"].([]interface{}); ok {
+			for _, u := range updates {
+				if um, ok := u.(map[string]interface{}); ok {
+					availableUpdates = append(availableUpdates, um)
+				}
+			}
+		}
+		if exts, ok := pd["active_extensions"].([]interface{}); ok {
+			for _, e := range exts {
+				if em, ok := e.(map[string]interface{}); ok {
+					activeExtensions = append(activeExtensions, em)
 				}
 			}
 		}
@@ -306,6 +327,9 @@ func (s *Server) handleWebDeviceDetail(w http.ResponseWriter, r *http.Request) {
 		"PlatformDetails":  buildPlatformDetails(device.PlatformData),
 		"InstalledProfiles": installedProfiles,
 		"InstalledApps":     installedApps,
+		"Certificates":      certificates,
+		"AvailableUpdates":  availableUpdates,
+		"ActiveExtensions":  activeExtensions,
 	})
 }
 
@@ -566,7 +590,12 @@ func buildPlatformDetails(pd models.JSONB) []platformDetailGroup {
 	skipKeys := map[string]bool{
 		"installed_profiles": true, "installed_apps": true,
 		"installed_profiles_count": true, "installed_apps_count": true,
-		"secure_boot": true, // nested object, shown as individual fields below
+		"secure_boot": true,
+		"certificates": true, "certificates_count": true,
+		"managed_app_ids": true, "managed_apps_count": true,
+		"available_os_updates": true, "available_os_updates_count": true,
+		"os_update_status": true,
+		"active_extensions": true, "active_extensions_count": true,
 	}
 	groups := map[string][]platformDetailItem{}
 	for k, v := range pd {

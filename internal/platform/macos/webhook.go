@@ -336,6 +336,11 @@ type commandResultPlist struct {
 	QueryResponses           map[string]interface{}   `plist:"QueryResponses"`
 	ProfileList              []map[string]interface{} `plist:"ProfileList"`
 	InstalledApplicationList []map[string]interface{} `plist:"InstalledApplicationList"`
+	ManagedApplicationList   []map[string]interface{} `plist:"ManagedApplicationList"`
+	CertificateList          []map[string]interface{} `plist:"CertificateList"`
+	AvailableOSUpdates       []map[string]interface{} `plist:"AvailableOSUpdates"`
+	OSUpdateStatus           []map[string]interface{} `plist:"OSUpdateStatus"`
+	ActiveNSExtensions       []map[string]interface{} `plist:"ActiveNSExtensions"`
 }
 
 func (h *CheckinHandler) processCommandResult(ctx context.Context, udid, rawPayload string) {
@@ -500,6 +505,92 @@ func (h *CheckinHandler) processCommandResult(ctx context.Context, udid, rawPayl
 		h.logger.Info("app list processed", "udid", udid, "count", len(apps))
 	}
 
+	// ManagedApplicationList — mark managed apps
+	if result.ManagedApplicationList != nil {
+		managedIDs := map[string]bool{}
+		for _, a := range result.ManagedApplicationList {
+			if id, ok := a["Identifier"].(string); ok {
+				managedIDs[id] = true
+			}
+		}
+		device.PlatformData["managed_app_ids"] = managedIDs
+		device.PlatformData["managed_apps_count"] = len(managedIDs)
+		// Also update existing app list with managed flag
+		if apps, ok := device.PlatformData["installed_apps"].([]interface{}); ok {
+			for _, a := range apps {
+				if am, ok := a.(map[string]interface{}); ok {
+					if id, ok := am["identifier"].(string); ok {
+						am["managed"] = managedIDs[id]
+					}
+				}
+			}
+		}
+		updated = true
+		h.logger.Info("managed app list processed", "udid", udid, "count", len(managedIDs))
+	}
+
+	// CertificateList — store cert details (without raw data)
+	if result.CertificateList != nil {
+		certs := make([]map[string]interface{}, 0, len(result.CertificateList))
+		for _, c := range result.CertificateList {
+			cert := map[string]interface{}{
+				"common_name": c["CommonName"],
+				"is_identity": c["IsIdentity"],
+			}
+			certs = append(certs, cert)
+		}
+		device.PlatformData["certificates"] = certs
+		device.PlatformData["certificates_count"] = len(certs)
+		updated = true
+		h.logger.Info("certificate list processed", "udid", udid, "count", len(certs))
+	}
+
+	// AvailableOSUpdates
+	if result.AvailableOSUpdates != nil {
+		updates := make([]map[string]interface{}, 0, len(result.AvailableOSUpdates))
+		for _, u := range result.AvailableOSUpdates {
+			update := map[string]interface{}{
+				"product_name":    u["ProductName"],
+				"version":         u["Version"],
+				"build":           u["Build"],
+				"download_size":   u["DownloadSize"],
+				"install_size":    u["InstallSize"],
+				"is_critical":     u["IsCritical"],
+				"restart_required": u["RestartRequired"],
+				"human_readable_name": u["HumanReadableName"],
+			}
+			updates = append(updates, update)
+		}
+		device.PlatformData["available_os_updates"] = updates
+		device.PlatformData["available_os_updates_count"] = len(updates)
+		updated = true
+		h.logger.Info("available OS updates processed", "udid", udid, "count", len(updates))
+	}
+
+	// OSUpdateStatus
+	if result.OSUpdateStatus != nil {
+		device.PlatformData["os_update_status"] = result.OSUpdateStatus
+		updated = true
+	}
+
+	// ActiveNSExtensions
+	if result.ActiveNSExtensions != nil {
+		extensions := make([]map[string]interface{}, 0, len(result.ActiveNSExtensions))
+		for _, e := range result.ActiveNSExtensions {
+			ext := map[string]interface{}{
+				"display_name":    e["DisplayName"],
+				"extension_point": e["ExtensionPoint"],
+				"identifier":      e["Identifier"],
+				"container_name":  e["ContainerDisplayName"],
+			}
+			extensions = append(extensions, ext)
+		}
+		device.PlatformData["active_extensions"] = extensions
+		device.PlatformData["active_extensions_count"] = len(extensions)
+		updated = true
+		h.logger.Info("active extensions processed", "udid", udid, "count", len(extensions))
+	}
+
 	if updated {
 		if err := h.service.UpdateDevice(ctx, device); err != nil {
 			h.logger.Error("failed to update device with command results", "error", err, "udid", udid)
@@ -541,6 +632,11 @@ func (h *CheckinHandler) maybeAutoQueue(ctx context.Context, udid string) {
 		{"DeviceInformation", "device_info", `<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd"><plist version="1.0"><dict><key>CommandUUID</key><string>auto-dev-%s</string><key>Command</key><dict><key>RequestType</key><string>DeviceInformation</string><key>Queries</key><array><string>DeviceName</string><string>OSVersion</string><string>BuildVersion</string><string>ModelName</string><string>Model</string><string>SerialNumber</string><string>WiFiMAC</string><string>DeviceCapacity</string><string>AvailableDeviceCapacity</string><string>IsSupervised</string><string>HostName</string></array></dict></dict></plist>`},
 		{"ProfileList", "device_info", `<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd"><plist version="1.0"><dict><key>CommandUUID</key><string>auto-prof-%s</string><key>Command</key><dict><key>RequestType</key><string>ProfileList</string></dict></dict></plist>`},
 		{"InstalledApplicationList", "device_info", `<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd"><plist version="1.0"><dict><key>CommandUUID</key><string>auto-apps-%s</string><key>Command</key><dict><key>RequestType</key><string>InstalledApplicationList</string></dict></dict></plist>`},
+		{"CertificateList", "device_info", `<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd"><plist version="1.0"><dict><key>CommandUUID</key><string>auto-certs-%s</string><key>Command</key><dict><key>RequestType</key><string>CertificateList</string></dict></dict></plist>`},
+		{"ManagedApplicationList", "device_info", `<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd"><plist version="1.0"><dict><key>CommandUUID</key><string>auto-mgdapps-%s</string><key>Command</key><dict><key>RequestType</key><string>ManagedApplicationList</string></dict></dict></plist>`},
+		{"AvailableOSUpdates", "device_info", `<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd"><plist version="1.0"><dict><key>CommandUUID</key><string>auto-updates-%s</string><key>Command</key><dict><key>RequestType</key><string>AvailableOSUpdates</string></dict></dict></plist>`},
+		{"OSUpdateStatus", "device_info", `<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd"><plist version="1.0"><dict><key>CommandUUID</key><string>auto-updstatus-%s</string><key>Command</key><dict><key>RequestType</key><string>OSUpdateStatus</string></dict></dict></plist>`},
+		{"ActiveNSExtensions", "device_info", `<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd"><plist version="1.0"><dict><key>CommandUUID</key><string>auto-ext-%s</string><key>Command</key><dict><key>RequestType</key><string>ActiveNSExtensions</string></dict></dict></plist>`},
 	}
 
 	now := time.Now()
