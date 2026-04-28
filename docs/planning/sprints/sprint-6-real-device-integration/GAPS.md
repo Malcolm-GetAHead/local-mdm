@@ -172,3 +172,6 @@
 3. Try `EnrollmentVersion` values of `3.0` and `4.0`
 4. The PPKG approach is the most promising — the ICD-built package triggered real enrollment behavior. Try restoring VM from template and installing a fresh PPKG before any other enrollment attempts
 5. DNS setup: `enterpriseenrollment.localmdm.local` → `192.168.1.229` is in the VM's hosts file. Server cert has this hostname as a SAN.
+
+**Key finding from Fleet DM source code analysis:**
+Fleet DM (open-source MDM that supports non-Azure enrollment) does NOT use the Windows Settings UI for enrollment. They install an agent (fleetd/orbit) via MSI first, and the agent calls `RegisterDeviceWithManagement` from within its own process context — avoiding the COM threading issue we hit. Their discovery response uses `EnrollmentVersion: 4.0` and does NOT include `AuthenticationServiceUrl`. They have a separate STS auth endpoint that returns HTML with a JavaScript auto-POST for the token exchange. The Windows Settings UI "Enroll only in device management" flow appears to genuinely require Azure AD validation on Windows 11 — Fleet works around this entirely by using their agent for enrollment.

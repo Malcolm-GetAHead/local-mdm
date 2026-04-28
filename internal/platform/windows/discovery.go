@@ -74,7 +74,7 @@ func GenerateDiscoverResponse(enrollmentURL, policyURL, relatesToMessageID strin
     <DiscoverResponse xmlns="%s">
       <DiscoverResult>
         <AuthPolicy>OnPremise</AuthPolicy>
-        <EnrollmentVersion>5.0</EnrollmentVersion>
+        <EnrollmentVersion>4.0</EnrollmentVersion>
         <AuthenticationServiceUrl>%s</AuthenticationServiceUrl>
         <EnrollmentPolicyServiceUrl>%s</EnrollmentPolicyServiceUrl>
         <EnrollmentServiceUrl>%s</EnrollmentServiceUrl>
