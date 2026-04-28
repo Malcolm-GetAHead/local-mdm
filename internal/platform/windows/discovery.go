@@ -75,12 +75,13 @@ func GenerateDiscoverResponse(enrollmentURL, policyURL, relatesToMessageID strin
       <DiscoverResult>
         <AuthPolicy>OnPremise</AuthPolicy>
         <EnrollmentVersion>5.0</EnrollmentVersion>
+        <AuthenticationServiceUrl>%s</AuthenticationServiceUrl>
         <EnrollmentPolicyServiceUrl>%s</EnrollmentPolicyServiceUrl>
         <EnrollmentServiceUrl>%s</EnrollmentServiceUrl>
       </DiscoverResult>
     </DiscoverResponse>
   </s:Body>
-</s:Envelope>`, DiscoverRespAction, relatesToMessageID, DiscoveryNS, policyURL, enrollmentURL)
+</s:Envelope>`, DiscoverRespAction, relatesToMessageID, DiscoveryNS, enrollmentURL, policyURL, enrollmentURL)
 
 	return []byte(resp), nil
 }
