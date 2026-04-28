@@ -382,16 +382,20 @@ internal/
 
 docs/planning/
 ├── sprints/              - Sprint plans and task breakdowns
+│   ├── sprint-1-foundation/
+│   ├── sprint-2-platform-core/
+│   ├── sprint-2a-gap-closure/
 │   ├── sprint-3-platform-features/
 │   ├── sprint-4-policy-and-identity/
 │   ├── sprint-4b-db-pools/
 │   ├── sprint-5-ui-and-polish/
-│   └── sprint-5b-eventbus/
-│   └── sprint-5c-platform-integration/
-│   └── sprint-5d-web-dashboard/
-│   └── sprint-5e-cert-verification/
-│   └── sprint-5f-api-hardening/
-│   └── sprint-5g-quality-polish/
+│   ├── sprint-5b-eventbus/
+│   ├── sprint-5c-platform-integration/
+│   ├── sprint-5d-web-dashboard/
+│   ├── sprint-5e-cert-verification/
+│   ├── sprint-5f-api-hardening/
+│   ├── sprint-5g-quality-polish/
+│   ├── sprint-6-real-device-integration/
 │   └── sprint-7-platform-sso/
 └── future/               - Future enhancements (F-01 to F-08)
 ```

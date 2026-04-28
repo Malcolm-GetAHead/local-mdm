@@ -148,10 +148,6 @@ func TestOIDCValidator_ValidateToken_Malformed(t *testing.T) {
 }
 
 func TestNewOIDCValidator_WithDB(t *testing.T) {
-	if os.Getenv("DB_HOST") == "" && os.Getenv("KEYCLOAK_URL") == "" {
-		t.Skip("skipping: need both DB and Keycloak")
-	}
-
 	db := getTestRawDB(t)
 	validator, err := auth.NewOIDCValidator(keycloakTestURL(), "localmdm-api", db, 5, 30*time.Second, 5*time.Minute, nil)
 	if err != nil {
@@ -386,10 +382,6 @@ func TestOIDCValidator_HealthCheck_Unreachable(t *testing.T) {
 }
 
 func TestOIDCValidator_ValidateToken_CircuitOpenCacheFallback(t *testing.T) {
-	if os.Getenv("DB_HOST") == "" && os.Getenv("KEYCLOAK_URL") == "" {
-		t.Skip("skipping: need both DB and Keycloak")
-	}
-
 	db := getTestRawDB(t)
 	logger := logging.New(config.LoggingConfig{Level: "error", Format: "json"})
 
@@ -419,10 +411,6 @@ func TestOIDCValidator_ValidateToken_CircuitOpenCacheFallback(t *testing.T) {
 }
 
 func TestOIDCValidator_ValidateToken_CircuitOpenNoCacheMiss(t *testing.T) {
-	if os.Getenv("KEYCLOAK_URL") == "" {
-		t.Skip("skipping: need Keycloak")
-	}
-
 	// Validator WITHOUT cache, low failure threshold
 	logger := logging.New(config.LoggingConfig{Level: "error", Format: "json"})
 	validator, err := auth.NewOIDCValidator(keycloakTestURL(), "localmdm-api", nil, 1, 10*time.Second, 5*time.Minute, logger)

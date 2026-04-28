@@ -192,7 +192,7 @@ The dashboard UI is tested with Playwright via a markdown-based playbook DSL.
 ### Running Browser Tests
 ```bash
 make seed          # Reset test data (run before each test)
-make browser-test  # Run all 113 Playwright tests headless
+make browser-test  # Run all 199 Playwright tests headless
 ```
 
 For visual debugging:
@@ -223,7 +223,23 @@ Tests are defined in `tests/browser/browser-playbook.md` using a simple DSL:
 - Seed data enterprise_id differs from Keycloak user — tests create their own data
 - Run `make seed` before each test run to clean up mutations from previous runs
 
-## Current Coverage (Sprint 5d)
+## Error State Tests
+
+A separate Playwright test suite (`tests/browser/run-error-tests.js`) validates UI behavior when backend services are unavailable or return errors. These tests verify that error pages, fallback messages, and retry prompts render correctly.
+
+```bash
+cd tests/browser && node run-error-tests.js
+```
+
+## Combined Coverage
+
+The `make coverage-combined` target merges Go unit/integration coverage with Playwright-driven coverage (collected via `-cover` instrumented binary) into a single report. This gives a realistic picture of total code exercised across both test layers.
+
+```bash
+make coverage-combined  # Outputs combined HTML report
+```
+
+## Current Coverage (Sprint 5g)
 
 > **Note**: Coverage numbers below are from Docker runs (`make dev-test`) where integration tests have access to PostgreSQL and Keycloak. Running locally without Docker shows lower numbers for packages with integration tests (repository, reporting, audit, certs, auth, macos).
 
@@ -242,7 +258,7 @@ Tests are defined in `tests/browser/browser-playbook.md` using a simple DSL:
 | service | 63.5% | EventBus, compliance, groups |
 | android | 57.1% | |
 | macos | 55.5% | DEP storage integration tests |
-| api | 48.1% | Web handlers tested via 196 Playwright browser tests |
+| api | 59.1% | Web handlers tested via 199 Playwright browser tests |
 | certs | 28.6% | CA manager integration tests need Docker |
 | reporting | 17.0% | Integration tests need Docker PostgreSQL |
 | audit | 10.7% | Integration tests need Docker PostgreSQL |

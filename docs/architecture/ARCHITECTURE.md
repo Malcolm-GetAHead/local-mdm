@@ -644,7 +644,7 @@ In production (ECS Fargate), NanoMDM runs as a separate ECS service behind the A
 ### Browser Tests (Sprint 5d)
 
 - Playwright playbook DSL (`tests/browser/browser-playbook.md`)
-- 178 tests covering: login, navigation, CRUD workflows, tab switching, dark mode, mobile
+- 199 tests covering: login, navigation, CRUD workflows, tab switching, dark mode, mobile
 - Real Keycloak OIDC login (no cookie bypass)
 - Console error tracking (JS errors, HTTP 4xx/5xx fail the run)
 - Run: `make seed && make browser-test`

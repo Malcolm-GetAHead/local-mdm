@@ -10,7 +10,7 @@ Create the following files:
 
 ```bash
 # Database password
-echo "postgres" > secrets/db_password
+echo "postgres-dev-password-1234" > secrets/db_password
 
 # JWT secret (generate random 256-bit key)
 openssl rand -base64 32 > secrets/jwt_secret
@@ -68,7 +68,7 @@ See `docs/deployment/SECRETS.md` for production setup.
 Secrets can also be provided via environment variables (takes precedence):
 
 ```bash
-export DB_PASSWORD="postgres"
+export DB_PASSWORD="postgres-dev-password-1234"
 export JWT_SECRET="your-secret-key"
 export KEYCLOAK_CLIENT_SECRET="your-client-secret"
 ```

@@ -4,7 +4,7 @@
 BINARY_NAME=local-mdm
 MAIN_PATH=./cmd/server
 MIGRATION_DIR=./migrations
-DB_URL?=postgres://postgres:postgres@localhost:5432/localmdm?sslmode=disable
+DB_URL?=postgres://postgres:postgres-dev-password-1234@localhost:5432/localmdm?sslmode=disable
 
 help: ## Show this help message
 	@echo 'Usage: make [target]'

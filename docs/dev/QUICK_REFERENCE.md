@@ -32,8 +32,14 @@ make run            # Start server
 | `make docker-up` | Start infrastructure services |
 | `make docker-down` | Stop all containers |
 | `make seed` | Reset seed data (run before browser tests) |
-| `make browser-test` | Run Playwright browser tests (113 tests) |
+| `make browser-test` | Run Playwright browser tests (199+ tests) |
 | `make css` | Compile Tailwind CSS (requires ./tailwindcss binary) |
+| `make css-watch` | Watch and recompile Tailwind CSS on changes |
+| `make verify` | Run full verification (vet, test, lint) |
+| `make load-test` | Run k6 load tests |
+| `make coverage-combined` | Generate combined Go + Playwright coverage report |
+| `make prod-up` | Start production containers |
+| `make prod-down` | Stop production containers |
 | `make migrate-create NAME=xxx` | Create new migration |
 | `go vet ./...` | Static analysis (can run on host) |
 
@@ -308,7 +314,7 @@ local-mdm/
 
 ## Current Phase
 
-**Sprint 5d complete** — Web Dashboard. Go templates + HTMX + Tailwind CSS dashboard with SPA-like navigation, device/policy/group/compliance management, 10 visual themes, 196 Playwright browser tests. EventBus retry queue, OIDC login, CSRF protection. Tagged `v0.5.4-sprint5d`.
+**Sprint 5g complete** — Quality Polish. N+1 query fixes, loading indicators, empty states, error state tests, interface refactoring, blueprint assessment fixes. 199 Playwright browser tests. Tagged `v0.5.4-sprint5d`.
 
 **Next**: Sprint 6 (Real device integration — Windows VM, macOS VM, Android).
 

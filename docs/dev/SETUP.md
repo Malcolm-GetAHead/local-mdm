@@ -8,6 +8,7 @@ This guide will help you set up the Local MDM development environment.
 - **PostgreSQL**: 15 or higher
 - **Docker & Docker Compose**: For local development (optional but recommended)
 - **golang-migrate**: For database migrations
+- **`/etc/hosts` entry**: Add `127.0.0.1 keycloak` to `/etc/hosts` — required for dashboard login (Keycloak OIDC redirect)
 
 ## Quick Start
 
@@ -38,6 +39,7 @@ make docker-up
 This starts:
 - PostgreSQL on port 5432
 - Keycloak (OIDC IdP) on port 8180
+- NanoMDM (Apple MDM protocol handler) on port 9000
 - Adminer (database UI) on port 8081
 
 Or install PostgreSQL locally:
@@ -71,7 +73,15 @@ make migrate-up
 
 This creates all necessary database tables.
 
-### 6. Start the Server
+### 6. Seed Development Data
+
+```bash
+make seed
+```
+
+This loads sample enterprises, devices, policies, and groups for development.
+
+### 7. Start the Server
 
 ```bash
 make run
@@ -79,7 +89,9 @@ make run
 
 The server will start on `http://localhost:8080`
 
-### 7. Verify Installation
+The **web dashboard** is available at http://localhost:8080 — log in with your Keycloak credentials (requires the `/etc/hosts` entry from Prerequisites).
+
+### 8. Verify Installation
 
 ```bash
 curl http://localhost:8080/health
@@ -172,7 +184,7 @@ export ENVIRONMENT=development
 export DB_HOST=localhost
 export DB_PORT=5432
 export DB_USER=postgres
-export DB_PASSWORD=postgres
+export DB_PASSWORD=postgres-dev-password-1234
 export DB_NAME=localmdm
 export JWT_SECRET=your-secret-key
 export KEYCLOAK_CLIENT_SECRET=your-keycloak-secret
@@ -186,7 +198,7 @@ export DB_READER_PORT=5432
 
 Default connection string (used by Makefile for migrations):
 ```
-postgres://postgres:postgres@localhost:5432/localmdm?sslmode=disable
+postgres://postgres:postgres-dev-password-1234@localhost:5432/localmdm?sslmode=disable
 ```
 
 **Note**: The Go application reads database config from `configs/config.yaml` and environment variables (`DB_HOST`, `DB_PORT`, etc.), not from `DB_URL`. The `DB_URL` variable is only used by the Makefile for running migrations.
@@ -284,7 +296,7 @@ make deps
    - System: PostgreSQL
    - Server: postgres
    - Username: postgres
-   - Password: postgres
+   - Password: postgres-dev-password-1234
    - Database: localmdm
 
 ### Using psql (CLI)

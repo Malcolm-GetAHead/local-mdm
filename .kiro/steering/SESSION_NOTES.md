@@ -133,7 +133,7 @@
 | 5e | ✅ Complete | NanoMDM cert verification fix (path bug), assert.ErrorIs migration, SCEP tests, coverage improvements |
 | 5f | ✅ Complete | API hardening, explicit CA generation, test DB helper consolidation |
 | 5b | ✅ Complete | EventBus listener, compliance wiring, lifecycle hooks, k6 load tests |
-| 5d | ✅ Complete | Web dashboard (HTMX), 196 Playwright tests |
+| 5d | ✅ Complete | Web dashboard (HTMX), 199 Playwright tests |
 | 5g | ✅ Complete | Quality polish: N+1 fixes, loading indicator, empty states, error tests, interface refactor |
 | 6 | 🔲 Not Started | Real device integration (Windows VM, macOS VM, Android) |
 | 7 | 🔲 Not Started | macOS Platform SSO (Java/Swift) — requires Apple Developer account |
