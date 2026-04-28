@@ -364,11 +364,8 @@ func (h *CheckinHandler) processCommandResult(ctx context.Context, udid, rawPayl
 		if fw, ok := si["FirewallSettings"].(map[string]interface{}); ok {
 			if enabled, ok := fw["FirewallEnabled"]; ok {
 				device.PlatformData["firewall_enabled"] = enabled
-				device.PlatformData["FirewallEnabled"] = enabled
 			} else {
-				// Firewall is on if FirewallSettings exists with apps
 				device.PlatformData["firewall_enabled"] = true
-				device.PlatformData["FirewallEnabled"] = true
 			}
 			updated = true
 		}

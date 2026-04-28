@@ -514,32 +514,65 @@ type platformDetailGroup struct {
 
 var platformKeyCategories = map[string]string{
 	"serial": "Hardware", "architecture": "Hardware", "storage_total_gb": "Hardware",
-	"storage_free_gb": "Hardware", "product_name": "Hardware",
+	"storage_free_gb": "Hardware", "product_name": "Hardware", "chip": "Hardware",
+	"storage_capacity_gb": "Hardware", "storage_available_gb": "Hardware",
+	"hardware_encryption_caps": "Hardware",
 	"hostname": "Network", "ip_address": "Network", "mac_address": "Network",
+	"wifi_mac": "Network", "bluetooth_mac": "Network",
 	"FileVaultEnabled": "Security", "firewall_enabled": "Security", "password_present": "Security",
 	"password_length": "Security", "bitlocker_enabled": "Security", "bitlocker_status": "Security",
-	"encryption_enabled": "Security", "supervised": "Security",
-	"build_version": "Operating System", "topic": "MDM", "push_magic": "MDM",
-	"has_token": "MDM", "mdm_enrolled": "MDM",
+	"encryption_enabled": "Security", "is_supervised": "Security",
+	"authenticated_root_volume": "Security", "activation_lock_manageable": "Security",
+	"external_boot_level": "Security",
+	"build_version": "Operating System",
+	"topic": "MDM", "push_magic": "MDM", "has_token": "MDM", "mdm_enrolled": "MDM",
+	// Windows-specific
+	"manufacturer": "Hardware", "model": "Hardware", "dev_id": "Hardware",
+	"device_name": "Hardware", "processor_arch": "Hardware",
+	"total_ram": "Hardware", "total_storage": "Hardware",
+	"firmware_version": "Hardware", "hardware_version": "Hardware",
+	"software_version": "Operating System", "os_platform": "Operating System",
+	"FirewallEnabled": "Security",
 }
 
 var platformKeyLabels = map[string]string{
 	"serial": "Serial Number", "architecture": "Architecture", "storage_total_gb": "Total Storage (GB)",
-	"storage_free_gb": "Free Storage (GB)", "product_name": "Product Name",
+	"storage_free_gb": "Free Storage (GB)", "product_name": "Product Name", "chip": "Chip",
+	"storage_capacity_gb": "Storage Capacity (GB)", "storage_available_gb": "Storage Available (GB)",
+	"hardware_encryption_caps": "Hardware Encryption",
 	"hostname": "Hostname", "ip_address": "IP Address", "mac_address": "MAC Address",
+	"wifi_mac": "WiFi MAC", "bluetooth_mac": "Bluetooth MAC",
 	"FileVaultEnabled": "FileVault", "firewall_enabled": "Firewall", "password_present": "Password Set",
 	"password_length": "Password Length", "bitlocker_enabled": "BitLocker", "bitlocker_status": "BitLocker Status",
-	"encryption_enabled": "Encryption", "supervised": "Supervised",
+	"encryption_enabled": "Encryption", "is_supervised": "Supervised",
+	"authenticated_root_volume": "Authenticated Root Volume", "activation_lock_manageable": "Activation Lock Manageable",
+	"external_boot_level": "External Boot Level",
 	"build_version": "Build Version", "topic": "Push Topic", "push_magic": "Push Magic",
 	"has_token": "Has Token", "mdm_enrolled": "MDM Enrolled",
+	// Windows-specific
+	"manufacturer": "Manufacturer", "model": "Model", "dev_id": "Device ID",
+	"device_name": "Device Name", "processor_arch": "Processor Architecture",
+	"total_ram": "Total RAM", "total_storage": "Total Storage",
+	"firmware_version": "Firmware Version", "hardware_version": "Hardware Version",
+	"software_version": "Software Version", "os_platform": "OS Platform",
+	"FirewallEnabled": "Firewall",
 }
 
 func buildPlatformDetails(pd models.JSONB) []platformDetailGroup {
 	if len(pd) == 0 {
 		return nil
 	}
+	// Skip large array/object fields that have their own tabs
+	skipKeys := map[string]bool{
+		"installed_profiles": true, "installed_apps": true,
+		"installed_profiles_count": true, "installed_apps_count": true,
+		"secure_boot": true, // nested object, shown as individual fields below
+	}
 	groups := map[string][]platformDetailItem{}
 	for k, v := range pd {
+		if skipKeys[k] {
+			continue
+		}
 		cat := platformKeyCategories[k]
 		if cat == "" {
 			cat = "Other"
