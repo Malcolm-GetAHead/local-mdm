@@ -61,6 +61,12 @@ func (c *CommandSender) SendCommand(ctx context.Context, udid string, commandPli
 
 	respBody, _ := io.ReadAll(resp.Body)
 	if resp.StatusCode != http.StatusOK {
+		// NanoMDM returns 500 with push_error when APNs is not configured,
+		// but the command is still queued. Check if command_uuid is present.
+		var result EnqueueResponse
+		if json.Unmarshal(respBody, &result) == nil && result.CommandUUID != "" {
+			return &result, nil
+		}
 		return nil, fmt.Errorf("NanoMDM returned status %d: %s", resp.StatusCode, string(respBody))
 	}
 
