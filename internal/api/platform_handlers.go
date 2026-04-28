@@ -200,10 +200,55 @@ func (s *Server) handleWindowsEnrollmentService(w http.ResponseWriter, r *http.R
 
 	deviceID := uuid.New()
 
+	// Use hardware DeviceID from AdditionalContext if available, otherwise use our UUID
+	storedDeviceID := deviceID.String()
+	if hwDeviceID != "" {
+		storedDeviceID = hwDeviceID
+	}
+
+	// Determine enterprise ID
+	enterpriseID := uuid.Nil
+	if eidStr := mux.Vars(r)["enterprise_id"]; eidStr != "" {
+		if eid, err := uuid.Parse(eidStr); err == nil {
+			enterpriseID = eid
+		}
+	}
+	if enterpriseID == uuid.Nil {
+		enterprises, _, _ := s.enterpriseRepo.List(r.Context(), 1, 0)
+		if len(enterprises) > 0 {
+			enterpriseID = enterprises[0].ID
+		}
+	}
+
+	// Create device record BEFORE signing CSR (certificates table has FK to devices)
+	if enterpriseID != uuid.Nil {
+		device := &models.Device{
+			BaseModel:    models.BaseModel{ID: deviceID},
+			EnterpriseID: enterpriseID,
+			Platform:     models.PlatformWindows,
+			DeviceID:     storedDeviceID,
+			Name:         deviceName,
+			OSVersion:    osVersion,
+			Status:       models.DeviceStatusEnrolled,
+			PlatformData: models.JSONB{},
+		}
+		if err := s.deviceRepo.Create(r.Context(), device); err != nil {
+			s.logger.Error("failed to create windows device record", "error", err, "device_id", deviceID)
+			respondError(w, r, http.StatusInternalServerError, "device_creation_failed", "Failed to create device record")
+			return
+		}
+		s.logger.Info("windows device record created",
+			"device_id", deviceID,
+			"hw_device_id", storedDeviceID,
+			"enterprise_id", enterpriseID,
+			"device_name", deviceName,
+		)
+	}
+
 	// PEM-encode the DER CSR for the certificate service
 	csrPEM := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE REQUEST", Bytes: csrData})
 
-	// Sign the CSR
+	// Sign the CSR (stores cert in DB with FK to device)
 	validity := 365 * 24 * time.Hour
 	certPEM, err := s.certService.SignDeviceCSR(r.Context(), deviceID, csrPEM, validity)
 	if err != nil {
@@ -251,50 +296,6 @@ func (s *Server) handleWindowsEnrollmentService(w http.ResponseWriter, r *http.R
 		s.logger.Error("failed to generate enrollment response", "error", err)
 		respondError(w, r, http.StatusInternalServerError, "generation_failed", "Failed to generate enrollment response")
 		return
-	}
-
-	// Use hardware DeviceID from AdditionalContext if available, otherwise use our UUID
-	storedDeviceID := deviceID.String()
-	if hwDeviceID != "" {
-		storedDeviceID = hwDeviceID
-	}
-
-	// Create device record
-	enterpriseID := uuid.Nil
-	if eidStr := mux.Vars(r)["enterprise_id"]; eidStr != "" {
-		if eid, err := uuid.Parse(eidStr); err == nil {
-			enterpriseID = eid
-		}
-	}
-	// If no enterprise_id in URL, use a default (first enterprise)
-	if enterpriseID == uuid.Nil {
-		enterprises, _, _ := s.enterpriseRepo.List(r.Context(), 1, 0)
-		if len(enterprises) > 0 {
-			enterpriseID = enterprises[0].ID
-		}
-	}
-
-	if enterpriseID != uuid.Nil {
-		device := &models.Device{
-			BaseModel:    models.BaseModel{ID: deviceID},
-			EnterpriseID: enterpriseID,
-			Platform:     models.PlatformWindows,
-			DeviceID:     storedDeviceID,
-			Name:         deviceName,
-			OSVersion:    osVersion,
-			Status:       models.DeviceStatusEnrolled,
-			PlatformData: models.JSONB{},
-		}
-		if err := s.deviceRepo.Create(r.Context(), device); err != nil {
-			s.logger.Error("failed to create windows device record", "error", err, "device_id", deviceID)
-		} else {
-			s.logger.Info("windows device record created",
-				"device_id", deviceID,
-				"hw_device_id", storedDeviceID,
-				"enterprise_id", enterpriseID,
-				"device_name", deviceName,
-			)
-		}
 	}
 
 	s.logAudit(r, "enrollment.windows.complete", "device", deviceID, map[string]interface{}{
