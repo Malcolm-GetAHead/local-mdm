@@ -115,3 +115,39 @@
 ---
 
 *This document is the output of the Sprint 6 retrospective, 2026-04-28.*
+
+---
+
+## Session Handoff Context
+
+### VM Infrastructure
+- **macOS VM**: `ssh testuser@192.168.64.4` — macOS 26.2, UTM, enrolled in MDM, checking in on reboot. Password: `testuser`. FileVault enabled.
+- **Windows VM**: `ssh testuser@192.168.65.2` — Windows 11 Pro ARM64 Build 26200, UTM. Password: `testuser`. CA cert trusted. Hosts entry: `192.168.1.229 enterpriseenrollment.localmdm.local`. NOT enrolled (native enrollment blocked).
+- **MDM Server**: `http://192.168.1.229:8080` (HTTP) / `https://192.168.1.229:8443` (HTTPS via nginx)
+- **VM templates**: `LocalMDM-macOS-Template`, `LocalMDM-Windows-Template` — clean snapshots for reset via `restore_vms.sh`
+- **Start VMs**: `utmctl start "LocalMDM-macOS-Test"` / `utmctl start "LocalMDM-Windows-Test"`
+
+### Docker Stack
+- `localmdm` — Go server on port 8080, CA certs mounted from `./internal/api/certs/`
+- `nanomdm` — Apple MDM protocol handler on port 9000, CA cert mounted from same dir
+- `nginx-tls` — TLS proxy on ports 443 and 8443, server cert signed by our CA
+- `keycloak` — OIDC on port 8180, admin/admin. **v23 — should upgrade to latest (noted, not done)**
+- `postgres` — port 5432, password `postgres-dev-password-1234`
+
+### Config Notes
+- `configs/config.docker.yaml` has `nanomdm_url: "http://192.168.1.229:9000"` — host-specific, needs env var override for portability
+- CA certs persist in `./internal/api/certs/` via Docker volume mount — do NOT delete these or all enrolled devices lose trust
+- NanoMDM database schema is in `docker/postgres/init-nanomdm-schema.sh` — includes `enrollment_queue` and `cert_auth_associations` tables added this sprint
+
+### macOS Device State
+- UDID: `35B9DA82-0B4D-51C3-8E6A-6694FCA3B75D`
+- Serial: `ZL9QG3C3RR`
+- Enterprise: Acme Corp (`00000000-0000-0000-0000-000000000001`)
+- Auto-queues 8 commands on check-in: SecurityInfo, DeviceInformation (35 queries), ProfileList, InstalledApplicationList, CertificateList, ManagedApplicationList, AvailableOSUpdates, OSUpdateStatus
+- Reboot VM to trigger check-in (no APNs push)
+- FileVault: enabled, Firewall: disabled
+
+### Windows Enrollment Status
+- Server protocol verified: Discovery, Policy, Enrollment, OMA-DM all work over HTTPS
+- Native enrollment blocked: `RegisterDeviceWithManagement` COM error, Settings UI requires Azure AD, PPKG format invalid
+- Next approach: research valid .ppkg format (needs DPP metadata folder + catalog file) or set up Azure AD
