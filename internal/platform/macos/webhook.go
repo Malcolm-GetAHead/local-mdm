@@ -156,26 +156,33 @@ func (h *CheckinHandler) handleCheckin(ctx context.Context, messageType, udid st
 			return
 		}
 		// Parse the raw plist to extract device info
+		h.logger.Debug("authenticate raw payload", "payload_len", len(ce.RawPayload), "payload_prefix", ce.RawPayload[:min(200, len(ce.RawPayload))])
 		var auth authenticatePlist
+		serial := ""
+		name := ""
+		model := ""
+		osVersion := ""
+		buildVersion := ""
+		topic := ""
 		if _, err := plist.Unmarshal([]byte(ce.RawPayload), &auth); err != nil {
-			h.logger.Error("failed to parse Authenticate plist", "error", err)
-			return
+			h.logger.Warn("failed to parse Authenticate plist, creating device with UDID only", "error", err, "payload_len", len(ce.RawPayload))
+		} else {
+			serial = auth.SerialNumber
+			name = auth.DeviceName
+			model = auth.ModelName
+			if model == "" {
+				model = auth.ProductName
+			}
+			if model == "" {
+				model = auth.Model
+			}
+			osVersion = auth.OSVersion
+			buildVersion = auth.BuildVersion
+			topic = auth.Topic
 		}
 
-		// Use a default enterprise ID — in production this would come from DEP or enrollment URL
+		// Use a default enterprise ID
 		enterpriseID, _ := uuid.Parse("00000000-0000-0000-0000-000000000001")
-
-		serial := auth.SerialNumber
-		name := auth.DeviceName
-		model := auth.ModelName
-		if model == "" {
-			model = auth.ProductName
-		}
-		if model == "" {
-			model = auth.Model
-		}
-		osVersion := auth.OSVersion
-		buildVersion := auth.BuildVersion
 
 		// Try to update existing device, or create new one
 		device, err := h.service.GetDeviceByUDID(ctx, udid)
@@ -197,7 +204,7 @@ func (h *CheckinHandler) handleCheckin(ctx context.Context, messageType, udid st
 			device.PlatformData = models.JSONB{}
 		}
 		device.PlatformData["build_version"] = buildVersion
-		device.PlatformData["topic"] = auth.Topic
+		device.PlatformData["topic"] = topic
 
 		if err := h.service.UpdateDevice(ctx, device); err != nil {
 			h.logger.Error("failed to update device on authenticate", "error", err, "udid", udid)
