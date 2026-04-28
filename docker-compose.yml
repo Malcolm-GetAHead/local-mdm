@@ -145,6 +145,19 @@ services:
       - test
     command: ["go", "test", "-race", "-p", "4", "-count=1", "./..."]
 
+  nginx-tls:
+    image: nginx:alpine
+    container_name: localmdm-nginx
+    ports:
+      - "8443:443"
+    volumes:
+      - ./docker/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./internal/api/certs/server.crt:/etc/nginx/certs/server.crt:ro
+      - ./internal/api/certs/server.key:/etc/nginx/certs/server.key:ro
+    depends_on:
+      localmdm:
+        condition: service_healthy
+
   adminer:
     image: adminer:latest
     container_name: localmdm-adminer

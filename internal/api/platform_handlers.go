@@ -128,9 +128,9 @@ func (s *Server) handleWindowsDiscoveryService(w http.ResponseWriter, r *http.Re
 		"message_id", messageID,
 	)
 
-	// Use HTTP scheme since we're not doing TLS termination in dev
+	// Detect scheme from TLS or reverse proxy header
 	scheme := "http"
-	if r.TLS != nil {
+	if r.TLS != nil || r.Header.Get("X-Forwarded-Proto") == "https" {
 		scheme = "https"
 	}
 	serverURL := fmt.Sprintf("%s://%s", scheme, r.Host)
@@ -285,7 +285,7 @@ func (s *Server) handleWindowsEnrollmentService(w http.ResponseWriter, r *http.R
 
 	// Build management URL — full path to the OMA-DM endpoint
 	scheme := "http"
-	if r.TLS != nil {
+	if r.TLS != nil || r.Header.Get("X-Forwarded-Proto") == "https" {
 		scheme = "https"
 	}
 	managementURL := fmt.Sprintf("%s://%s/ManagementServer/MDM.svc", scheme, r.Host)
