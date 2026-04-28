@@ -341,6 +341,7 @@ type commandResultPlist struct {
 	AvailableOSUpdates       []map[string]interface{} `plist:"AvailableOSUpdates"`
 	OSUpdateStatus           []map[string]interface{} `plist:"OSUpdateStatus"`
 	ActiveNSExtensions       []map[string]interface{} `plist:"ActiveNSExtensions"`
+	UserList                 []map[string]interface{} `plist:"Users"`
 }
 
 func (h *CheckinHandler) processCommandResult(ctx context.Context, udid, rawPayload string) {
@@ -459,7 +460,100 @@ func (h *CheckinHandler) processCommandResult(ctx context.Context, udid, rawPayl
 			device.PlatformData["hostname"] = v
 			updated = true
 		}
+		// Network
+		if v, ok := qr["EthernetMACs"]; ok {
+			device.PlatformData["ethernet_mac"] = v
+			updated = true
+		}
+		if v, ok := qr["LocalHostName"].(string); ok {
+			device.PlatformData["local_hostname"] = v
+			updated = true
+		}
+		// Security
+		if v, ok := qr["IsActivationLockEnabled"]; ok {
+			device.PlatformData["activation_lock_enabled"] = v
+			updated = true
+		}
+		if v, ok := qr["IsDeviceLocatorServiceEnabled"]; ok {
+			device.PlatformData["find_my_mac_enabled"] = v
+			updated = true
+		}
+		// Backup
+		if v, ok := qr["IsCloudBackupEnabled"]; ok {
+			device.PlatformData["icloud_backup_enabled"] = v
+			updated = true
+		}
+		if v, ok := qr["LastCloudBackupDate"].(string); ok {
+			device.PlatformData["last_icloud_backup"] = v
+			updated = true
+		}
+		// General
+		if v, ok := qr["TimeZone"].(string); ok {
+			device.PlatformData["timezone"] = v
+			updated = true
+		}
+		if v, ok := qr["ProductName"].(string); ok {
+			device.PlatformData["product_name"] = v
+			updated = true
+		}
+		if v, ok := qr["HasBattery"]; ok {
+			device.PlatformData["has_battery"] = v
+			updated = true
+		}
+		// Update settings
+		if v, ok := qr["AutomaticCheckEnabled"]; ok {
+			device.PlatformData["auto_update_check"] = v
+			updated = true
+		}
+		if v, ok := qr["AutomaticOSInstallationEnabled"]; ok {
+			device.PlatformData["auto_os_install"] = v
+			updated = true
+		}
+		if v, ok := qr["AutomaticSecurityUpdatesEnabled"]; ok {
+			device.PlatformData["auto_security_updates"] = v
+			updated = true
+		}
+		if v, ok := qr["AutomaticAppInstallationEnabled"]; ok {
+			device.PlatformData["auto_app_install"] = v
+			updated = true
+		}
+		if v, ok := qr["BackgroundDownloadEnabled"]; ok {
+			device.PlatformData["background_download"] = v
+			updated = true
+		}
+		if v, ok := qr["PreviousScanDate"].(string); ok {
+			device.PlatformData["last_update_scan"] = v
+			updated = true
+		}
+		// Privacy
+		if v, ok := qr["DiagnosticSubmissionEnabled"]; ok {
+			device.PlatformData["diagnostics_enabled"] = v
+			updated = true
+		}
+		if v, ok := qr["AppAnalyticsEnabled"]; ok {
+			device.PlatformData["app_analytics_enabled"] = v
+			updated = true
+		}
 		h.logger.Info("device info processed", "udid", udid, "device_name", device.Name, "os_version", device.OSVersion)
+	}
+
+	// UserList
+	if result.UserList != nil {
+		users := make([]map[string]interface{}, 0, len(result.UserList))
+		for _, u := range result.UserList {
+			user := map[string]interface{}{
+				"username":  u["UserName"],
+				"full_name": u["FullName"],
+				"uid":       u["UID"],
+				"is_admin":  u["IsAdmin"],
+				"has_secure_token": u["HasSecureToken"],
+			}
+			users = append(users, user)
+		}
+		device.PlatformData["local_users"] = users
+		device.PlatformData["local_users_count"] = len(users)
+		updated = true
+		h.logger.Info("user list processed", "udid", udid, "count", len(users))
 	}
 
 	// ProfileList — store details
@@ -629,13 +723,14 @@ func (h *CheckinHandler) maybeAutoQueue(ctx context.Context, udid string) {
 
 	commands := []autoCmd{
 		{"SecurityInfo", "security_info", `<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd"><plist version="1.0"><dict><key>CommandUUID</key><string>%s</string><key>Command</key><dict><key>RequestType</key><string>SecurityInfo</string></dict></dict></plist>`},
-		{"DeviceInformation", "device_info", `<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd"><plist version="1.0"><dict><key>CommandUUID</key><string>%s</string><key>Command</key><dict><key>RequestType</key><string>DeviceInformation</string><key>Queries</key><array><string>DeviceName</string><string>OSVersion</string><string>BuildVersion</string><string>ModelName</string><string>Model</string><string>SerialNumber</string><string>WiFiMAC</string><string>DeviceCapacity</string><string>AvailableDeviceCapacity</string><string>IsSupervised</string><string>HostName</string></array></dict></dict></plist>`},
+		{"DeviceInformation", "device_info", `<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd"><plist version="1.0"><dict><key>CommandUUID</key><string>%s</string><key>Command</key><dict><key>RequestType</key><string>DeviceInformation</string><key>Queries</key><array><string>DeviceName</string><string>OSVersion</string><string>BuildVersion</string><string>ModelName</string><string>Model</string><string>ProductName</string><string>SerialNumber</string><string>UDID</string><string>WiFiMAC</string><string>BluetoothMAC</string><string>EthernetMACs</string><string>DeviceCapacity</string><string>AvailableDeviceCapacity</string><string>BatteryLevel</string><string>HasBattery</string><string>IsSupervised</string><string>IsActivationLockEnabled</string><string>IsCloudBackupEnabled</string><string>LastCloudBackupDate</string><string>IsDeviceLocatorServiceEnabled</string><string>HostName</string><string>LocalHostName</string><string>TimeZone</string><string>Languages</string><string>AutomaticCheckEnabled</string><string>AutomaticOSInstallationEnabled</string><string>AutomaticSecurityUpdatesEnabled</string><string>AutomaticAppInstallationEnabled</string><string>BackgroundDownloadEnabled</string><string>PreviousScanDate</string><string>PreviousScanResult</string><string>DiagnosticSubmissionEnabled</string><string>AppAnalyticsEnabled</string><string>IsMultiUser</string><string>MaximumResidentUsers</string><string>OrganizationInfo</string></array></dict></dict></plist>`},
 		{"ProfileList", "profile_list", `<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd"><plist version="1.0"><dict><key>CommandUUID</key><string>%s</string><key>Command</key><dict><key>RequestType</key><string>ProfileList</string></dict></dict></plist>`},
 		{"InstalledApplicationList", "app_list", `<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd"><plist version="1.0"><dict><key>CommandUUID</key><string>%s</string><key>Command</key><dict><key>RequestType</key><string>InstalledApplicationList</string></dict></dict></plist>`},
 		{"CertificateList", "certificate_list", `<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd"><plist version="1.0"><dict><key>CommandUUID</key><string>%s</string><key>Command</key><dict><key>RequestType</key><string>CertificateList</string></dict></dict></plist>`},
 		{"ManagedApplicationList", "managed_app_list", `<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd"><plist version="1.0"><dict><key>CommandUUID</key><string>%s</string><key>Command</key><dict><key>RequestType</key><string>ManagedApplicationList</string></dict></dict></plist>`},
 		{"AvailableOSUpdates", "os_updates", `<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd"><plist version="1.0"><dict><key>CommandUUID</key><string>%s</string><key>Command</key><dict><key>RequestType</key><string>AvailableOSUpdates</string></dict></dict></plist>`},
 		{"OSUpdateStatus", "os_update_status", `<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd"><plist version="1.0"><dict><key>CommandUUID</key><string>%s</string><key>Command</key><dict><key>RequestType</key><string>OSUpdateStatus</string></dict></dict></plist>`},
+		{"UserList", "user_list", `<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd"><plist version="1.0"><dict><key>CommandUUID</key><string>%s</string><key>Command</key><dict><key>RequestType</key><string>UserList</string></dict></dict></plist>`},
 	}
 
 	now := time.Now()
