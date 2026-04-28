@@ -82,3 +82,6 @@ tailwindcss
 # Swagger UI vendor files (downloaded in Dockerfile)
 web/static/vendor/swagger-ui/swagger-ui-bundle.js
 web/static/vendor/swagger-ui/swagger-ui.css
+
+# Python virtual environment
+venv/
