@@ -129,13 +129,15 @@ services:
       DB_PASSWORD: postgres-dev-password-1234
       DB_NAME: localmdm
       NANOMDM_URL: "http://nanomdm:9000"
-      KEYCLOAK_URL: "http://keycloak:8080"
+      KEYCLOAK_URL: "http://keycloak:8180"
     volumes:
       - .:/src
       - go_mod_cache:/go/pkg/mod
       - go_build_cache:/root/.cache/go-build
     depends_on:
       postgres:
+        condition: service_healthy
+      keycloak:
         condition: service_healthy
     profiles:
       - test
