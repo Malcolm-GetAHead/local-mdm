@@ -290,6 +290,148 @@ func (h *CheckinHandler) handleAcknowledge(ctx context.Context, ae *AcknowledgeE
 	if err := h.nanomdm.HandleCommand(ctx, udid, cmdUUID, ae.Status); err != nil {
 		h.logger.Error("nanomdm command handling failed", "error", err, "udid", udid)
 	}
+
+	// Parse command results and update device platform_data
+	if ae.Status == "Acknowledged" && udid != "" && ae.RawPayload != "" {
+		h.processCommandResult(ctx, udid, ae.RawPayload)
+	}
+}
+
+// commandResultPlist is a generic plist response from MDM commands
+type commandResultPlist struct {
+	CommandUUID    string                 `plist:"CommandUUID"`
+	Status         string                 `plist:"Status"`
+	SecurityInfo   map[string]interface{} `plist:"SecurityInfo"`
+	QueryResponses map[string]interface{} `plist:"QueryResponses"`
+	ProfileList    []interface{}          `plist:"ProfileList"`
+}
+
+func (h *CheckinHandler) processCommandResult(ctx context.Context, udid, rawPayload string) {
+	device, err := h.service.GetDeviceByUDID(ctx, udid)
+	if err != nil {
+		return
+	}
+	if device.PlatformData == nil {
+		device.PlatformData = models.JSONB{}
+	}
+
+	var result commandResultPlist
+	if _, err := plist.Unmarshal([]byte(rawPayload), &result); err != nil {
+		h.logger.Warn("failed to parse command result plist", "error", err)
+		return
+	}
+
+	updated := false
+
+	// SecurityInfo — compliance-relevant data
+	if result.SecurityInfo != nil {
+		si := result.SecurityInfo
+		if v, ok := si["FDE_Enabled"]; ok {
+			device.PlatformData["FileVaultEnabled"] = v
+			device.PlatformData["encryption_enabled"] = v
+			updated = true
+		}
+		if fw, ok := si["FirewallSettings"].(map[string]interface{}); ok {
+			if enabled, ok := fw["FirewallEnabled"]; ok {
+				device.PlatformData["firewall_enabled"] = enabled
+				device.PlatformData["FirewallEnabled"] = enabled
+			} else {
+				// Firewall is on if FirewallSettings exists with apps
+				device.PlatformData["firewall_enabled"] = true
+				device.PlatformData["FirewallEnabled"] = true
+			}
+			updated = true
+		}
+		if v, ok := si["AuthenticatedRootVolumeEnabled"]; ok {
+			device.PlatformData["authenticated_root_volume"] = v
+			updated = true
+		}
+		if v, ok := si["IsActivationLockManageable"]; ok {
+			device.PlatformData["activation_lock_manageable"] = v
+			updated = true
+		}
+		if v, ok := si["ExternalBootLevel"]; ok {
+			device.PlatformData["external_boot_level"] = v
+			updated = true
+		}
+		if v, ok := si["SecureBoot"]; ok {
+			device.PlatformData["secure_boot"] = v
+			updated = true
+		}
+		h.logger.Info("security info processed", "udid", udid,
+			"filevault", device.PlatformData["FileVaultEnabled"],
+			"firewall", device.PlatformData["firewall_enabled"])
+	}
+
+	// DeviceInformation QueryResponses
+	if result.QueryResponses != nil {
+		qr := result.QueryResponses
+		if v, ok := qr["DeviceName"].(string); ok && v != "" {
+			device.Name = v
+			updated = true
+		}
+		if v, ok := qr["OSVersion"].(string); ok && v != "" {
+			device.OSVersion = v
+			updated = true
+		}
+		if v, ok := qr["BuildVersion"].(string); ok && v != "" {
+			device.PlatformData["build_version"] = v
+			updated = true
+		}
+		if v, ok := qr["ModelName"].(string); ok && v != "" {
+			device.Model = v
+			updated = true
+		}
+		if v, ok := qr["SerialNumber"].(string); ok && v != "" {
+			device.SerialNumber = v
+			updated = true
+		}
+		if v, ok := qr["WiFiMAC"].(string); ok {
+			device.PlatformData["wifi_mac"] = v
+			updated = true
+		}
+		if v, ok := qr["BluetoothMAC"].(string); ok {
+			device.PlatformData["bluetooth_mac"] = v
+			updated = true
+		}
+		if v, ok := qr["IsSupervised"]; ok {
+			device.PlatformData["is_supervised"] = v
+			updated = true
+		}
+		if v, ok := qr["DeviceCapacity"]; ok {
+			device.PlatformData["storage_capacity_gb"] = v
+			updated = true
+		}
+		if v, ok := qr["AvailableDeviceCapacity"]; ok {
+			device.PlatformData["storage_available_gb"] = v
+			updated = true
+		}
+		if v, ok := qr["BatteryLevel"]; ok {
+			device.PlatformData["battery_level"] = v
+			updated = true
+		}
+		if v, ok := qr["HardwareEncryptionCaps"]; ok {
+			device.PlatformData["hardware_encryption_caps"] = v
+			updated = true
+		}
+		if v, ok := qr["HostName"].(string); ok {
+			device.PlatformData["hostname"] = v
+			updated = true
+		}
+		h.logger.Info("device info processed", "udid", udid, "device_name", device.Name, "os_version", device.OSVersion)
+	}
+
+	// ProfileList — store count
+	if result.ProfileList != nil {
+		device.PlatformData["installed_profiles_count"] = len(result.ProfileList)
+		updated = true
+	}
+
+	if updated {
+		if err := h.service.UpdateDevice(ctx, device); err != nil {
+			h.logger.Error("failed to update device with command results", "error", err, "udid", udid)
+		}
+	}
 }
 
 func parseUUID(s string) ([16]byte, error) {
