@@ -1,123 +1,125 @@
 #!/bin/bash
-# One-time VM setup guide for automated testing with VMware Fusion
-# Run this after creating VMs in VMware Fusion
+# One-time VM setup guide for automated testing with UTM
+# Run this after creating VMs in UTM
 
 set -e
 
-echo "=== Local MDM VM Setup Guide (VMware Fusion) ==="
-echo ""
-echo "This script will guide you through setting up VMs for automated testing."
-echo "You only need to do this ONCE."
+echo "=== Local MDM VM Setup Guide (UTM) ==="
 echo ""
 
-# Check if VMware Fusion is installed
-if [ ! -d "/Applications/VMware Fusion.app" ]; then
-    echo "✗ VMware Fusion not found"
+# Check if UTM is installed
+if ! command -v utmctl &> /dev/null; then
+    echo "✗ UTM not found"
     echo ""
-    echo "Install VMware Fusion Pro (FREE for personal use):"
-    echo "  brew install --cask vmware-fusion"
-    echo "  OR download from: https://support.broadcom.com/group/ecx/productdownloads?subfamily=VMware+Fusion"
+    echo "Install UTM:"
+    echo "  brew install --cask utm"
     echo ""
     exit 1
 fi
 
-echo "✓ VMware Fusion installed"
+echo "✓ UTM installed ($(utmctl --version 2>/dev/null || echo 'version unknown'))"
 echo ""
-
-# Check if VMs exist
-echo "Step 1: Verify VMs are created in VMware Fusion"
-echo "----------------------------------------"
-echo "Required VMs:"
-echo "  - LocalMDM-macOS-Test (macOS 26)"
-echo "  - LocalMDM-Windows-Test (Windows 11 ARM)"
-echo ""
-read -p "Have you created both VMs in VMware Fusion? (y/n) " -n 1 -r
-echo
-if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-    echo "Please create VMs first using VMware Fusion GUI, then run this script again."
-    exit 1
-fi
 
 # Get host IP
 HOST_IP=$(ifconfig | grep "inet " | grep -v 127.0.0.1 | awk '{print $2}' | head -1)
-echo ""
-echo "Step 2: Network Configuration"
-echo "----------------------------------------"
 echo "Your Mac's IP address: $HOST_IP"
 echo "VMs will access MDM server at: http://$HOST_IP:8080"
 echo ""
 
-# Find VM paths
-MACOS_VM=$(find ~/Virtual\ Machines.localized -name "LocalMDM-macOS-Test.vmx" 2>/dev/null | head -1)
-WINDOWS_VM=$(find ~/Virtual\ Machines.localized -name "LocalMDM-Windows-Test.vmx" 2>/dev/null | head -1)
+CONFIG_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+CONFIG_FILE="$CONFIG_DIR/.vm_config"
 
-if [ -z "$MACOS_VM" ]; then
-    echo "⚠ macOS VM not found in ~/Virtual Machines.localized/"
-    read -p "Enter full path to LocalMDM-macOS-Test.vmx: " MACOS_VM
+# List existing UTM VMs
+echo "Existing UTM VMs:"
+utmctl list 2>/dev/null || echo "  (none)"
+echo ""
+
+echo "=== Step 1: Create VMs in UTM ==="
+echo "----------------------------------------"
+echo ""
+echo "If you haven't created the VMs yet:"
+echo ""
+echo "  macOS VM:"
+echo "    1. UTM → Create New VM → Virtualize → macOS"
+echo "    2. Select IPSW: tests/device-testing/images/macos-26.ipsw"
+echo "    3. Settings: 2 CPU cores, 4 GB RAM, 30 GB disk"
+echo "    4. Name it: LocalMDM-macOS-Test"
+echo ""
+echo "  Windows VM:"
+echo "    1. UTM → Create New VM → Virtualize → Windows"
+echo "    2. Select ISO: tests/device-testing/images/Win11_25H2_English_Arm64.iso"
+echo "    3. Check 'Install drivers and SPICE tools'"
+echo "    4. Settings: 2 CPU cores, 4 GB RAM, 40 GB disk"
+echo "    5. Name it: LocalMDM-Windows-Test"
+echo ""
+read -p "Have you created both VMs and completed OS installation? (y/n) " -n 1 -r
+echo
+if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+    echo "Please create VMs first, then run this script again."
+    exit 1
 fi
-
-if [ -z "$WINDOWS_VM" ]; then
-    echo "⚠ Windows VM not found in ~/Virtual Machines.localized/"
-    read -p "Enter full path to LocalMDM-Windows-Test.vmx: " WINDOWS_VM
-fi
-
-echo "macOS VM: $MACOS_VM" > tests/device-testing/.vm_config
-echo "Windows VM: $WINDOWS_VM" >> tests/device-testing/.vm_config
 
 # macOS VM setup
 echo ""
-echo "Step 3: macOS VM Setup"
+echo "=== Step 2: macOS VM Setup ==="
 echo "----------------------------------------"
-echo "Start the macOS VM in VMware Fusion, then:"
+echo "In the macOS VM, open Terminal and run:"
 echo ""
-echo "1. Complete macOS setup (create user: testuser, password: test1234)"
-echo "2. Open Terminal in VM and run:"
+echo "  # Enable SSH"
+echo "  sudo systemsetup -setremotelogin on"
 echo ""
-echo "   # Enable SSH"
-echo "   sudo systemsetup -setremotelogin on"
-echo ""
-echo "3. Get VM's IP address:"
-echo "   ifconfig | grep 'inet '"
+echo "  # Get IP address"
+echo "  ifconfig | grep 'inet '"
 echo ""
 read -p "Enter macOS VM IP address: " MACOS_IP
-echo "macOS VM IP: $MACOS_IP" >> tests/device-testing/.vm_config
 
-# Test SSH connection
-echo ""
-echo "Testing SSH connection to macOS VM..."
-if ssh -o ConnectTimeout=5 -o StrictHostKeyChecking=no testuser@$MACOS_IP "echo 'SSH works'" 2>/dev/null; then
-    echo "✓ SSH connection successful"
+echo "Testing SSH connection..."
+if ssh -o ConnectTimeout=5 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null testuser@$MACOS_IP "echo 'SSH OK'" 2>/dev/null; then
+    echo "✓ macOS SSH connection successful"
 else
-    echo "✗ SSH connection failed. Please verify:"
-    echo "  - VM is running"
-    echo "  - SSH is enabled"
-    echo "  - IP address is correct"
-    exit 1
+    echo "⚠ SSH connection failed — verify SSH is enabled and IP is correct"
+    echo "  Continuing anyway (you can fix this later)"
 fi
 
 # Windows VM setup
 echo ""
-echo "Step 4: Windows VM Setup"
+echo "=== Step 3: Windows VM Setup ==="
 echo "----------------------------------------"
-echo "Start the Windows VM in VMware Fusion, then:"
+echo "In the Windows VM, open PowerShell as Administrator and run:"
 echo ""
-echo "1. Complete Windows setup (create user: testuser, password: Test1234!)"
-echo "2. Open PowerShell as Administrator and run:"
+echo "  # Enable WinRM for remote management"
+echo "  Enable-PSRemoting -Force"
+echo "  Set-Item WSMan:\\localhost\\Service\\AllowUnencrypted -Value \$true"
+echo "  Set-Item WSMan:\\localhost\\Client\\TrustedHosts -Value '*' -Force"
 echo ""
-echo "   # Enable WinRM"
-echo "   Enable-PSRemoting -Force"
-echo "   Set-Item WSMan:\localhost\Client\TrustedHosts -Value '$HOST_IP' -Force"
+echo "  # Enable OpenSSH Server (optional, for SSH access)"
+echo "  Add-WindowsCapability -Online -Name OpenSSH.Server~~~~0.0.1.0"
+echo "  Start-Service sshd"
+echo "  Set-Service -Name sshd -StartupType Automatic"
 echo ""
-echo "3. Get VM's IP address:"
-echo "   ipconfig"
+echo "  # Get IP address"
+echo "  ipconfig"
 echo ""
 read -p "Enter Windows VM IP address: " WINDOWS_IP
-echo "Windows VM IP: $WINDOWS_IP" >> tests/device-testing/.vm_config
+
+# Save config
+cat > "$CONFIG_FILE" << EOF
+# VM Configuration (generated by setup_vms.sh)
+MACOS_VM_NAME=LocalMDM-macOS-Test
+WINDOWS_VM_NAME=LocalMDM-Windows-Test
+MACOS_IP=$MACOS_IP
+WINDOWS_IP=$WINDOWS_IP
+HOST_IP=$HOST_IP
+EOF
+
+echo ""
+echo "✓ Configuration saved to: $CONFIG_FILE"
 
 # Create SSH config
 echo ""
-echo "Step 5: Creating SSH config"
+echo "=== Step 4: SSH Config ==="
 echo "----------------------------------------"
+mkdir -p ~/.ssh
 cat > ~/.ssh/config.localmdm << EOF
 Host localmdm-macos
     HostName $MACOS_IP
@@ -134,44 +136,26 @@ EOF
 
 echo "✓ SSH config created at ~/.ssh/config.localmdm"
 echo ""
-echo "Add this to your ~/.ssh/config:"
+echo "Add to your ~/.ssh/config:"
 echo "  Include ~/.ssh/config.localmdm"
-echo ""
-
-# Create snapshots
-echo "Step 6: Create VM Snapshots"
-echo "----------------------------------------"
-echo "Creating snapshots via vmrun..."
-echo ""
-
-if vmrun snapshot "$MACOS_VM" ready-for-testing 2>/dev/null; then
-    echo "✓ macOS VM snapshot created"
-else
-    echo "⚠ Failed to create macOS snapshot via CLI"
-    echo "  Create manually: VM → Snapshots → Take Snapshot → 'ready-for-testing'"
-fi
-
-if vmrun snapshot "$WINDOWS_VM" ready-for-testing 2>/dev/null; then
-    echo "✓ Windows VM snapshot created"
-else
-    echo "⚠ Failed to create Windows snapshot via CLI"
-    echo "  Create manually: VM → Snapshots → Take Snapshot → 'ready-for-testing'"
-fi
 
 # Summary
 echo ""
 echo "=== Setup Complete! ==="
 echo "----------------------------------------"
-echo "Configuration saved to: tests/device-testing/.vm_config"
-echo ""
-echo "Next steps:"
-echo "1. Start Local MDM server: make run"
-echo "2. Run tests: ./tests/device-testing/scripts/run_all_tests.sh"
 echo ""
 echo "VM Access:"
 echo "  macOS:   ssh localmdm-macos"
-echo "  Windows: ssh localmdm-windows (if SSH installed)"
+echo "  Windows: ssh localmdm-windows (if OpenSSH installed)"
+echo "           or use WinRM from test scripts"
 echo ""
-echo "To restore VMs to clean state:"
-echo "  vmrun revertToSnapshot \"$MACOS_VM\" ready-for-testing"
-echo "  vmrun revertToSnapshot \"$WINDOWS_VM\" ready-for-testing"
+echo "MDM Server: http://$HOST_IP:8080"
+echo ""
+echo "Next steps:"
+echo "  1. Start Docker stack:  make docker-up && sleep 45 && make migrate-up && make seed"
+echo "  2. Start MDM server:    make run"
+echo "  3. Run tests:           ./scripts/run_all_tests.sh"
+echo ""
+echo "To reset VMs to clean state:"
+echo "  ./scripts/restore_vms.sh"
+echo "  (Uses UTM clone from template — see restore_vms.sh for details)"

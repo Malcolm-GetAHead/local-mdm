@@ -13,15 +13,14 @@ This framework provides automated testing for:
 
 ### One-Time Setup (You Do This Once)
 
-1. **Install VMware Fusion Pro** (FREE for personal use):
+1. **Install UTM** (free, native macOS VM manager):
    ```bash
-   brew install --cask vmware-fusion
-   # Or download from: https://support.broadcom.com/group/ecx/productdownloads?subfamily=VMware+Fusion
+   brew install --cask utm
    ```
 
-2. **Create VMs in VMware Fusion**:
-   - macOS VM: "LocalMDM-macOS-Test" (8GB RAM, 60GB storage)
-   - Windows VM: "LocalMDM-Windows-Test" (8GB RAM, 60GB storage)
+2. **Create VMs in UTM**:
+   - macOS VM: "LocalMDM-macOS-Test" from `images/macos-26.ipsw` (2 cores, 4GB RAM, 30GB disk)
+   - Windows VM: "LocalMDM-Windows-Test" from `images/Win11_25H2_English_Arm64.iso` (2 cores, 4GB RAM, 40GB disk)
 
 3. **Configure VMs for remote access**:
    ```bash
@@ -30,7 +29,7 @@ This framework provides automated testing for:
    This script will guide you through:
    - Enabling SSH on macOS VM
    - Enabling WinRM on Windows VM
-   - Creating VM snapshots via `vmrun`
+   - Recording VM IP addresses
 
 3. **Install Python dependencies**:
    ```bash
@@ -119,17 +118,11 @@ open results/report_<timestamp>.html
 
 After tests, restore VMs to clean state:
 
-**Via CLI** (recommended):
 ```bash
-# Restore macOS VM
-vmrun revertToSnapshot ~/Virtual\ Machines.localized/LocalMDM-macOS-Test.vmwarevm/LocalMDM-macOS-Test.vmx ready-for-testing
-
-# Restore Windows VM
-vmrun revertToSnapshot ~/Virtual\ Machines.localized/LocalMDM-Windows-Test.vmwarevm/LocalMDM-Windows-Test.vmx ready-for-testing
+./scripts/restore_vms.sh
 ```
 
-**Via GUI**:
-- VMware Fusion → Virtual Machine → Snapshots → Restore "ready-for-testing"
+This deletes test VMs and re-clones from templates. See [QUICKSTART.md](QUICKSTART.md) for template setup.
 
 ## CI/CD Integration
 

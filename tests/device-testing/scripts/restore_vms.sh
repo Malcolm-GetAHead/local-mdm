@@ -1,5 +1,7 @@
 #!/bin/bash
 # Restore VMs to clean state before testing
+# UTM doesn't support snapshots — we use clone + delete pattern
+# or APFS instant clone (cp -c) on the .utm bundle
 
 set -e
 
@@ -11,39 +13,54 @@ if [ ! -f "$CONFIG_FILE" ]; then
     exit 1
 fi
 
-# Load VM paths
-MACOS_VM=$(grep "macOS VM:" "$CONFIG_FILE" | cut -d' ' -f3-)
-WINDOWS_VM=$(grep "Windows VM:" "$CONFIG_FILE" | cut -d' ' -f3-)
+source "$CONFIG_FILE"
 
 echo "=== Restoring VMs to Clean State ==="
 echo ""
 
 # Stop VMs if running
 echo "Stopping VMs..."
-vmrun stop "$MACOS_VM" soft 2>/dev/null || true
-vmrun stop "$WINDOWS_VM" soft 2>/dev/null || true
-sleep 5
+utmctl stop "$MACOS_VM_NAME" 2>/dev/null || true
+utmctl stop "$WINDOWS_VM_NAME" 2>/dev/null || true
+sleep 3
 
-# Restore snapshots
-echo "Restoring macOS VM..."
-if vmrun revertToSnapshot "$MACOS_VM" ready-for-testing; then
-    echo "✓ macOS VM restored"
-else
-    echo "✗ Failed to restore macOS VM"
+# UTM stores VMs in ~/Library/Containers/com.utmapp.UTM/Data/Documents/
+# or ~/Library/Group Containers/WDNLXAD4W8/Library/Containers/com.utmapp.UTM/Data/Documents/
+UTM_DIR="$HOME/Library/Containers/com.utmapp.UTM/Data/Documents"
+if [ ! -d "$UTM_DIR" ]; then
+    UTM_DIR=$(find "$HOME/Library" -name "*.utm" -path "*/UTM/*" -maxdepth 6 2>/dev/null | head -1 | xargs dirname)
+fi
+
+if [ -z "$UTM_DIR" ] || [ ! -d "$UTM_DIR" ]; then
+    echo "✗ Cannot find UTM VM directory"
+    echo "  Manually delete test VMs in UTM and clone from templates"
     exit 1
 fi
 
-echo "Restoring Windows VM..."
-if vmrun revertToSnapshot "$WINDOWS_VM" ready-for-testing; then
-    echo "✓ Windows VM restored"
-else
-    echo "✗ Failed to restore Windows VM"
-    exit 1
-fi
+echo "UTM directory: $UTM_DIR"
+
+# For each VM: delete the test clone, re-clone from template
+for VM_NAME in "$MACOS_VM_NAME" "$WINDOWS_VM_NAME"; do
+    TEMPLATE="${VM_NAME}-Template"
+    
+    if utmctl list 2>/dev/null | grep -q "$TEMPLATE"; then
+        echo "Deleting $VM_NAME..."
+        utmctl delete "$VM_NAME" 2>/dev/null || true
+        sleep 1
+        
+        echo "Cloning from $TEMPLATE..."
+        utmctl clone "$TEMPLATE" --name "$VM_NAME" 2>/dev/null
+        echo "✓ $VM_NAME restored from template"
+    else
+        echo "⚠ Template '$TEMPLATE' not found — skipping $VM_NAME"
+        echo "  To create a template: in UTM, right-click the configured VM → Clone"
+        echo "  Rename the original to '${VM_NAME}-Template' and the clone to '$VM_NAME'"
+    fi
+done
 
 echo ""
-echo "✓ VMs restored to clean state"
+echo "✓ VMs restored"
 echo ""
-echo "Start VMs with:"
-echo "  vmrun start \"$MACOS_VM\" nogui"
-echo "  vmrun start \"$WINDOWS_VM\" nogui"
+echo "Start VMs:"
+echo "  utmctl start \"$MACOS_VM_NAME\""
+echo "  utmctl start \"$WINDOWS_VM_NAME\""

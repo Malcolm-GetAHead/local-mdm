@@ -5,8 +5,8 @@
 ### Step 1: One-Time VM Setup (30 minutes)
 
 ```bash
-# Install VMware Fusion Pro (FREE for personal use)
-brew install --cask vmware-fusion
+# Install UTM (free, native macOS VM manager)
+brew install --cask utm
 
 # Run the setup wizard
 cd tests/device-testing
@@ -14,97 +14,46 @@ cd tests/device-testing
 ```
 
 This will guide you through:
+- ✅ Creating macOS VM (from IPSW) and Windows VM (from ISO) in UTM
 - ✅ Enabling SSH on macOS VM
-- ✅ Enabling WinRM on Windows VM  
-- ✅ Creating VM snapshots via vmrun
-- ✅ Testing connectivity
+- ✅ Enabling WinRM on Windows VM
+- ✅ Recording VM IP addresses
 
 ### Step 2: Install Dependencies (2 minutes)
 
 ```bash
-# Install Python packages
 pip3 install -r requirements.txt
-
-# Verify installation
-python3 -c "import requests, qrcode; print('✓ Dependencies OK')"
+python3 -c "import requests; print('✓ Dependencies OK')"
 ```
 
 ### Step 3: Run Tests! (5 minutes)
 
 ```bash
 # Start MDM server (in another terminal)
-make run
+make docker-up && sleep 45 && make migrate-up && make seed && make run
 
 # Run all tests
 ./scripts/run_all_tests.sh
 
 # Or run specific platform
 ./scripts/run_all_tests.sh macos
+./scripts/run_all_tests.sh windows
 ./scripts/run_all_tests.sh android
-```
-
-## 📊 View Results
-
-```bash
-# Open HTML report
-open results/report_*.html
-
-# View screenshots
-open results/screenshots/
-
-# Check logs
-cat results/test_run_*.log
 ```
 
 ## 🔄 After Testing
 
 Restore VMs to clean state:
 ```bash
-# Via CLI
-vmrun revertToSnapshot ~/Virtual\ Machines.localized/LocalMDM-macOS-Test.vmwarevm/LocalMDM-macOS-Test.vmx ready-for-testing
-
-# Or via GUI
-# VMware Fusion → VM → Snapshots → Restore "ready-for-testing"
+./scripts/restore_vms.sh
 ```
 
-## ❓ Troubleshooting
-
-**MDM server not running?**
-```bash
-make run
-curl http://localhost:8080/health
-```
-
-**Can't connect to macOS VM?**
-```bash
-ssh localmdm-macos
-# If fails, re-run: ./scripts/setup_vms.sh
-```
-
-**Android emulator not starting?**
-```bash
-emulator -list-avds
-emulator -avd LocalMDM-Test
-```
+This deletes the test VMs and re-clones from templates. To set up templates:
+1. Configure a VM fully (OS installed, SSH/WinRM enabled)
+2. In UTM, right-click the VM → Clone
+3. Rename the original to `LocalMDM-macOS-Test-Template` (or Windows equivalent)
+4. Use the clone as `LocalMDM-macOS-Test` for testing
 
 ## 📚 Full Documentation
 
 See [README.md](README.md) for complete documentation.
-
-## ✅ What Gets Tested
-
-- ✅ Device enrollment (all platforms)
-- ✅ Profile/policy installation
-- ✅ MDM commands (lock, wipe)
-- ✅ Device inventory reporting
-- ✅ Certificate issuance
-- ✅ Compliance checking
-
-## 🎯 Next Steps
-
-1. Run tests regularly during development
-2. Add tests to CI/CD pipeline
-3. Create additional test scenarios
-4. Test with real devices (optional)
-
-**Happy Testing! 🚀**
