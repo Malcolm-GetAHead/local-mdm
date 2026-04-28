@@ -2,7 +2,13 @@ package windows
 
 import (
 	"context"
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/x509"
+	"crypto/x509/pkix"
+	"math/big"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/malcolm-getahead/local-mdm/internal/models"
@@ -112,36 +118,64 @@ func TestService_CreateDevice(t *testing.T) {
 }
 
 func TestParseDiscoverRequest(t *testing.T) {
-	t.Run("valid request", func(t *testing.T) {
+	t.Run("valid SOAP envelope request", func(t *testing.T) {
+		xml := `<?xml version="1.0"?>
+<s:Envelope xmlns:a="http://www.w3.org/2005/08/addressing"
+   xmlns:s="http://www.w3.org/2003/05/soap-envelope">
+  <s:Header>
+    <a:Action s:mustUnderstand="1">http://schemas.microsoft.com/windows/management/2012/01/enrollment/IDiscoveryService/Discover</a:Action>
+    <a:MessageID>urn:uuid:748132ec-a575-4329-b01b-6171a9cf8478</a:MessageID>
+    <a:To s:mustUnderstand="1">https://mdm.example.com/EnrollmentServer/Discovery.svc</a:To>
+  </s:Header>
+  <s:Body>
+    <Discover xmlns="http://schemas.microsoft.com/windows/management/2012/01/enrollment/">
+      <request xmlns:i="http://www.w3.org/2001/XMLSchema-instance">
+        <EmailAddress>user@example.com</EmailAddress>
+        <RequestVersion>5.0</RequestVersion>
+        <DeviceType>WindowsPC</DeviceType>
+        <ApplicationVersion>10.0.19041</ApplicationVersion>
+        <OSEdition>Professional</OSEdition>
+      </request>
+    </Discover>
+  </s:Body>
+</s:Envelope>`
+
+		req, messageID, err := ParseDiscoverRequest([]byte(xml))
+		require.NoError(t, err)
+		assert.NotNil(t, req)
+		assert.Equal(t, "user@example.com", req.Request.EmailAddress)
+		assert.Equal(t, "5.0", req.Request.RequestVersion)
+		assert.Equal(t, "WindowsPC", req.Request.DeviceType)
+		assert.Equal(t, "urn:uuid:748132ec-a575-4329-b01b-6171a9cf8478", messageID)
+	})
+
+	t.Run("bare XML fallback", func(t *testing.T) {
 		xml := `<?xml version="1.0" encoding="UTF-8"?>
 <Discover>
   <request>
     <EmailAddress>user@example.com</EmailAddress>
     <RequestVersion>5.0</RequestVersion>
     <DeviceType>WindowsPC</DeviceType>
-    <ApplicationVersion>10.0.19041</ApplicationVersion>
-    <OSEdition>Professional</OSEdition>
   </request>
 </Discover>`
-		
-		req, err := ParseDiscoverRequest([]byte(xml))
+
+		req, messageID, err := ParseDiscoverRequest([]byte(xml))
 		require.NoError(t, err)
 		assert.NotNil(t, req)
 		assert.Equal(t, "user@example.com", req.Request.EmailAddress)
-		assert.Equal(t, "5.0", req.Request.RequestVersion)
-		assert.Equal(t, "WindowsPC", req.Request.DeviceType)
+		assert.Empty(t, messageID)
 	})
 
 	t.Run("invalid XML", func(t *testing.T) {
 		xml := `<invalid>xml`
-		
-		req, err := ParseDiscoverRequest([]byte(xml))
+
+		req, _, err := ParseDiscoverRequest([]byte(xml))
 		require.Error(t, err)
 		assert.Nil(t, req)
 	})
 
 	t.Run("empty request", func(t *testing.T) {
-		req, err := ParseDiscoverRequest([]byte{})
+		req, _, err := ParseDiscoverRequest([]byte{})
 		require.Error(t, err)
 		assert.Nil(t, req)
 	})
@@ -150,65 +184,92 @@ func TestParseDiscoverRequest(t *testing.T) {
 func TestGenerateDiscoverResponse(t *testing.T) {
 	enrollmentURL := "https://mdm.example.com/EnrollmentServer/Enrollment.svc"
 	policyURL := "https://mdm.example.com/EnrollmentServer/Policy.svc"
+	messageID := "urn:uuid:748132ec-a575-4329-b01b-6171a9cf8478"
 
 	t.Run("success", func(t *testing.T) {
-		resp, err := GenerateDiscoverResponse(enrollmentURL, policyURL)
+		resp, err := GenerateDiscoverResponse(enrollmentURL, policyURL, messageID)
 		require.NoError(t, err)
 		assert.NotNil(t, resp)
-		
+
 		respStr := string(resp)
-		assert.Contains(t, respStr, "<?xml version=\"1.0\"")
 		assert.Contains(t, respStr, "DiscoverResponse")
 		assert.Contains(t, respStr, enrollmentURL)
 		assert.Contains(t, respStr, policyURL)
 		assert.Contains(t, respStr, "OnPremise")
 		assert.Contains(t, respStr, "5.0")
+		assert.Contains(t, respStr, "RelatesTo")
+		assert.Contains(t, respStr, messageID)
+		assert.Contains(t, respStr, "s:Envelope")
 	})
 
 	t.Run("empty URLs", func(t *testing.T) {
-		resp, err := GenerateDiscoverResponse("", "")
+		resp, err := GenerateDiscoverResponse("", "", "")
 		require.NoError(t, err)
 		assert.NotNil(t, resp)
 	})
 }
 
 func TestGenerateProvisioningXML(t *testing.T) {
-	serverURL := "https://mdm.example.com/omadm"
-	certThumbprint := "1234567890ABCDEF"
-
 	t.Run("success", func(t *testing.T) {
-		xml := GenerateProvisioningXML(serverURL, certThumbprint)
+		// Create test CA and device certs
+		caKey, _ := rsa.GenerateKey(rand.Reader, 2048)
+		caTemplate := &x509.Certificate{
+			SerialNumber:          big.NewInt(1),
+			Subject:               pkix.Name{CommonName: "Test CA"},
+			NotBefore:             time.Now(),
+			NotAfter:              time.Now().Add(time.Hour),
+			IsCA:                  true,
+			BasicConstraintsValid: true,
+		}
+		caDER, _ := x509.CreateCertificate(rand.Reader, caTemplate, caTemplate, &caKey.PublicKey, caKey)
+		caCert, _ := x509.ParseCertificate(caDER)
+
+		devKey, _ := rsa.GenerateKey(rand.Reader, 2048)
+		devTemplate := &x509.Certificate{
+			SerialNumber: big.NewInt(2),
+			Subject:      pkix.Name{CommonName: "MDMDeviceCert"},
+			NotBefore:    time.Now(),
+			NotAfter:     time.Now().Add(time.Hour),
+		}
+		devDER, _ := x509.CreateCertificate(rand.Reader, devTemplate, caCert, &devKey.PublicKey, caKey)
+		devCert, _ := x509.ParseCertificate(devDER)
+
+		xml := GenerateProvisioningXML("https://mdm.example.com/ManagementServer/MDM.svc", caCert, devCert)
 		assert.NotEmpty(t, xml)
-		assert.Contains(t, xml, "<?xml version=\"1.0\"")
 		assert.Contains(t, xml, "wap-provisioningdoc")
-		assert.Contains(t, xml, serverURL)
-		assert.Contains(t, xml, certThumbprint)
+		assert.Contains(t, xml, "https://mdm.example.com/ManagementServer/MDM.svc")
 		assert.Contains(t, xml, "LocalMDM")
 		assert.Contains(t, xml, "DMClient")
-	})
-
-	t.Run("empty parameters", func(t *testing.T) {
-		xml := GenerateProvisioningXML("", "")
-		assert.NotEmpty(t, xml)
-		// Should still generate valid XML structure
-		assert.Contains(t, xml, "wap-provisioningdoc")
+		assert.Contains(t, xml, "EncodedCertificate")
+		assert.Contains(t, xml, "CertificateStore")
+		assert.Contains(t, xml, "WSTEP")
+		assert.Contains(t, xml, "Renew")
 	})
 }
 
 func BenchmarkParseDiscoverRequest(b *testing.B) {
-	xml := `<?xml version="1.0" encoding="UTF-8"?>
-<Discover>
-  <request>
-    <EmailAddress>user@example.com</EmailAddress>
-    <RequestVersion>5.0</RequestVersion>
-    <DeviceType>WindowsPC</DeviceType>
-  </request>
-</Discover>`
-	
+	xml := `<?xml version="1.0"?>
+<s:Envelope xmlns:a="http://www.w3.org/2005/08/addressing"
+   xmlns:s="http://www.w3.org/2003/05/soap-envelope">
+  <s:Header>
+    <a:Action s:mustUnderstand="1">http://schemas.microsoft.com/windows/management/2012/01/enrollment/IDiscoveryService/Discover</a:Action>
+    <a:MessageID>urn:uuid:748132ec-a575-4329-b01b-6171a9cf8478</a:MessageID>
+  </s:Header>
+  <s:Body>
+    <Discover xmlns="http://schemas.microsoft.com/windows/management/2012/01/enrollment/">
+      <request>
+        <EmailAddress>user@example.com</EmailAddress>
+        <RequestVersion>5.0</RequestVersion>
+        <DeviceType>WindowsPC</DeviceType>
+      </request>
+    </Discover>
+  </s:Body>
+</s:Envelope>`
+
 	data := []byte(xml)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_, err := ParseDiscoverRequest(data)
+		_, _, err := ParseDiscoverRequest(data)
 		if err != nil {
 			b.Fatal(err)
 		}
@@ -218,10 +279,11 @@ func BenchmarkParseDiscoverRequest(b *testing.B) {
 func BenchmarkGenerateDiscoverResponse(b *testing.B) {
 	enrollmentURL := "https://mdm.example.com/EnrollmentServer/Enrollment.svc"
 	policyURL := "https://mdm.example.com/EnrollmentServer/Policy.svc"
+	messageID := "urn:uuid:748132ec-a575-4329-b01b-6171a9cf8478"
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_, err := GenerateDiscoverResponse(enrollmentURL, policyURL)
+		_, err := GenerateDiscoverResponse(enrollmentURL, policyURL, messageID)
 		if err != nil {
 			b.Fatal(err)
 		}

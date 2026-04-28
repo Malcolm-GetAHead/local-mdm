@@ -250,11 +250,13 @@ func (h *ManagementHandler) deliverPendingCommands(ctx context.Context, deviceID
 func (h *ManagementHandler) findDeviceByDeviceID(ctx context.Context, deviceID string) (*models.Device, error) {
 	// Try parsing as UUID first (our internal device ID)
 	if id, err := uuid.Parse(deviceID); err == nil {
-		return h.deviceRepo.GetByID(ctx, id)
+		device, err := h.deviceRepo.GetByID(ctx, id)
+		if err == nil {
+			return device, nil
+		}
 	}
-	// Otherwise it's an OMA-DM device URI — not directly queryable yet
-	// For now, return not found
-	return nil, fmt.Errorf("device not found: %s", deviceID)
+	// Look up by platform-specific device ID (hardware DeviceID from enrollment)
+	return h.deviceRepo.GetByPlatformID(ctx, models.PlatformWindows, deviceID)
 }
 
 // buildProfileCSPCommands converts a profile type + data into CSP commands.
