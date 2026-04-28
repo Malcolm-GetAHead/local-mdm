@@ -4,9 +4,11 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -81,19 +83,23 @@ type LifecycleNotifier interface {
 
 // CheckinHandler handles MDM check-in requests
 type CheckinHandler struct {
-	nanomdm   *NanoMDMService
-	service   *Service
-	lifecycle LifecycleNotifier
-	logger    *slog.Logger
+	nanomdm       *NanoMDMService
+	service       *Service
+	lifecycle     LifecycleNotifier
+	logger        *slog.Logger
+	// Auto-query cooldown: track last auto-queue time per UDID to prevent storm cycles
+	lastAutoQuery map[string]time.Time
+	autoQueryMu   sync.Mutex
 }
 
 // NewCheckinHandler creates a new check-in handler
 func NewCheckinHandler(nanomdm *NanoMDMService, service *Service, lifecycle LifecycleNotifier, logger *slog.Logger) *CheckinHandler {
 	return &CheckinHandler{
-		nanomdm:   nanomdm,
-		service:   service,
-		lifecycle: lifecycle,
-		logger:    logger,
+		nanomdm:       nanomdm,
+		service:       service,
+		lifecycle:     lifecycle,
+		logger:        logger,
+		lastAutoQuery: make(map[string]time.Time),
 	}
 }
 
@@ -136,6 +142,12 @@ func (h *CheckinHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	if event.AcknowledgeEvent != nil {
 		h.handleAcknowledge(r.Context(), event.AcknowledgeEvent)
+	}
+
+	// Auto-queue device info commands on Idle (no pending commands)
+	// Only if we haven't auto-queued for this device recently (15min cooldown)
+	if event.AcknowledgeEvent != nil && event.AcknowledgeEvent.Status == "Idle" && udid != "" {
+		h.maybeAutoQueue(r.Context(), udid)
 	}
 
 	// Update last_seen on any event with a UDID
@@ -448,6 +460,55 @@ func (h *CheckinHandler) processCommandResult(ctx context.Context, udid, rawPayl
 		if err := h.service.UpdateDevice(ctx, device); err != nil {
 			h.logger.Error("failed to update device with command results", "error", err, "udid", udid)
 		}
+	}
+}
+
+// autoQueryCooldown is the minimum time between auto-queued info commands per device.
+// Prevents storm cycles: device checks in → auto-queue → APNs push → device checks in → ...
+const autoQueryCooldown = 15 * time.Minute
+
+// maybeAutoQueue enqueues SecurityInfo + DeviceInformation if the cooldown has elapsed.
+func (h *CheckinHandler) maybeAutoQueue(ctx context.Context, udid string) {
+	h.autoQueryMu.Lock()
+	last, ok := h.lastAutoQuery[udid]
+	if ok && time.Since(last) < autoQueryCooldown {
+		h.autoQueryMu.Unlock()
+		return
+	}
+	h.lastAutoQuery[udid] = time.Now()
+	h.autoQueryMu.Unlock()
+
+	h.logger.Info("auto-queuing device info commands", "udid", udid)
+
+	// SecurityInfo
+	secCmd := fmt.Sprintf(`<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+<key>CommandUUID</key><string>auto-sec-%s</string>
+<key>Command</key><dict><key>RequestType</key><string>SecurityInfo</string></dict>
+</dict></plist>`, uuid.New().String())
+
+	if _, err := h.nanomdm.SendCommand(ctx, udid, []byte(secCmd)); err != nil {
+		h.logger.Error("failed to auto-queue SecurityInfo", "error", err, "udid", udid)
+	}
+
+	// DeviceInformation
+	devCmd := fmt.Sprintf(`<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+<key>CommandUUID</key><string>auto-dev-%s</string>
+<key>Command</key><dict>
+<key>RequestType</key><string>DeviceInformation</string>
+<key>Queries</key><array>
+<string>DeviceName</string><string>OSVersion</string><string>BuildVersion</string>
+<string>ModelName</string><string>Model</string><string>SerialNumber</string>
+<string>WiFiMAC</string><string>DeviceCapacity</string><string>AvailableDeviceCapacity</string>
+<string>IsSupervised</string><string>HostName</string>
+</array></dict>
+</dict></plist>`, uuid.New().String())
+
+	if _, err := h.nanomdm.SendCommand(ctx, udid, []byte(devCmd)); err != nil {
+		h.logger.Error("failed to auto-queue DeviceInformation", "error", err, "udid", udid)
 	}
 }
 
