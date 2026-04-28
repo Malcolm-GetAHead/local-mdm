@@ -150,4 +150,4 @@
 ### Windows Enrollment Status
 - Server protocol verified: Discovery, Policy, Enrollment, OMA-DM all work over HTTPS
 - Native enrollment blocked: `RegisterDeviceWithManagement` COM error, Settings UI requires Azure AD, PPKG format invalid
-- Next approach: research valid .ppkg format (needs DPP metadata folder + catalog file) or set up Azure AD
+- **PPKG findings**: A ZIP containing only `Customizations.xml` returns `0x80070057 E_INVALIDARG`. The correct CSP path for bulk enrollment is `Provisioning/Enrollments/{UPN}/DiscoveryServiceFullURL` (confirmed from Microsoft docs). The XML content is correct but the package format needs additional metadata files that Windows ICD generates. `provtool.exe` and `Install-ProvisioningPackage` cmdlet both fail. Next step: install Windows ADK on the VM and use `icd.exe` CLI to build a valid .ppkg from our Customizations.xml.
