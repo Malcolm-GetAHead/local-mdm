@@ -71,6 +71,8 @@
         <button class="tab-btn px-6 py-3 text-sm font-medium border-b-2 border-blue-600 text-blue-600 dark:text-blue-400" data-tab="compliance">Compliance</button>
         <button class="tab-btn px-6 py-3 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400" data-tab="policies">Policies</button>
         <button class="tab-btn px-6 py-3 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400" data-tab="commands">Commands</button>
+        <button class="tab-btn px-6 py-3 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400" data-tab="profiles">Profiles</button>
+        <button class="tab-btn px-6 py-3 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400" data-tab="apps">Applications</button>
         <button class="tab-btn px-6 py-3 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400" data-tab="platform">Platform Details</button>
     </div>
 
@@ -104,6 +106,38 @@
                 <td class="px-6 py-2 text-gray-500 dark:text-gray-400">{{timeAgo .CreatedAt}}</td>
             </tr>
             {{else}}<tr><td colspan="3" class="px-6 py-4 text-center text-gray-500 dark:text-gray-400">No commands</td></tr>{{end}}
+            </tbody>
+        </table>
+    </div>
+
+    <div class="tab-panel hidden" id="tab-profiles">
+        <table class="w-full text-sm">
+            <thead><tr class="table-header"><th class="px-6 py-2">Profile Name</th><th class="px-6 py-2">Identifier</th><th class="px-6 py-2">Organization</th><th class="px-6 py-2">Managed</th></tr></thead>
+            <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+            {{range .InstalledProfiles}}
+            <tr>
+                <td class="px-6 py-2 font-medium">{{index . "name"}}</td>
+                <td class="px-6 py-2 font-mono text-xs text-gray-500 dark:text-gray-400">{{index . "identifier"}}</td>
+                <td class="px-6 py-2">{{index . "organization"}}</td>
+                <td class="px-6 py-2">{{if index . "is_managed"}}<span class="text-green-600">✓</span>{{else}}<span class="text-gray-400">—</span>{{end}}</td>
+            </tr>
+            {{else}}<tr><td colspan="4" class="px-6 py-4 text-center text-gray-500 dark:text-gray-400">No profile data — data is collected on device check-in</td></tr>{{end}}
+            </tbody>
+        </table>
+    </div>
+
+    <div class="tab-panel hidden" id="tab-apps">
+        <table class="w-full text-sm">
+            <thead><tr class="table-header"><th class="px-6 py-2">Application</th><th class="px-6 py-2">Bundle ID</th><th class="px-6 py-2">Version</th><th class="px-6 py-2">Size</th></tr></thead>
+            <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+            {{range .InstalledApps}}
+            <tr>
+                <td class="px-6 py-2 font-medium">{{index . "name"}}</td>
+                <td class="px-6 py-2 font-mono text-xs text-gray-500 dark:text-gray-400">{{index . "identifier"}}</td>
+                <td class="px-6 py-2">{{index . "version"}}</td>
+                <td class="px-6 py-2 text-gray-500 dark:text-gray-400">{{formatBytes (index . "bundle_size")}}</td>
+            </tr>
+            {{else}}<tr><td colspan="4" class="px-6 py-4 text-center text-gray-500 dark:text-gray-400">No application data — data is collected on device check-in</td></tr>{{end}}
             </tbody>
         </table>
     </div>

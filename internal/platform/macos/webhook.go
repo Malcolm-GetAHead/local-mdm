@@ -321,11 +321,12 @@ func (h *CheckinHandler) handleAcknowledge(ctx context.Context, ae *AcknowledgeE
 
 // commandResultPlist is a generic plist response from MDM commands
 type commandResultPlist struct {
-	CommandUUID    string                 `plist:"CommandUUID"`
-	Status         string                 `plist:"Status"`
-	SecurityInfo   map[string]interface{} `plist:"SecurityInfo"`
-	QueryResponses map[string]interface{} `plist:"QueryResponses"`
-	ProfileList    []interface{}          `plist:"ProfileList"`
+	CommandUUID              string                   `plist:"CommandUUID"`
+	Status                   string                   `plist:"Status"`
+	SecurityInfo             map[string]interface{}   `plist:"SecurityInfo"`
+	QueryResponses           map[string]interface{}   `plist:"QueryResponses"`
+	ProfileList              []map[string]interface{} `plist:"ProfileList"`
+	InstalledApplicationList []map[string]interface{} `plist:"InstalledApplicationList"`
 }
 
 func (h *CheckinHandler) processCommandResult(ctx context.Context, udid, rawPayload string) {
@@ -450,10 +451,47 @@ func (h *CheckinHandler) processCommandResult(ctx context.Context, udid, rawPayl
 		h.logger.Info("device info processed", "udid", udid, "device_name", device.Name, "os_version", device.OSVersion)
 	}
 
-	// ProfileList — store count
+	// ProfileList — store details
 	if result.ProfileList != nil {
-		device.PlatformData["installed_profiles_count"] = len(result.ProfileList)
+		profiles := make([]map[string]interface{}, 0, len(result.ProfileList))
+		for _, p := range result.ProfileList {
+			profile := map[string]interface{}{
+				"name":         p["PayloadDisplayName"],
+				"identifier":   p["PayloadIdentifier"],
+				"organization": p["PayloadOrganization"],
+				"uuid":         p["PayloadUUID"],
+				"is_managed":   p["IsManaged"],
+			}
+			// Count sub-payloads
+			if content, ok := p["PayloadContent"].([]interface{}); ok {
+				profile["payload_count"] = len(content)
+			}
+			profiles = append(profiles, profile)
+		}
+		device.PlatformData["installed_profiles"] = profiles
+		device.PlatformData["installed_profiles_count"] = len(profiles)
 		updated = true
+		h.logger.Info("profile list processed", "udid", udid, "count", len(profiles))
+	}
+
+	// InstalledApplicationList — store details
+	if result.InstalledApplicationList != nil {
+		apps := make([]map[string]interface{}, 0, len(result.InstalledApplicationList))
+		for _, a := range result.InstalledApplicationList {
+			app := map[string]interface{}{
+				"name":       a["Name"],
+				"identifier": a["Identifier"],
+				"version":    a["ShortVersion"],
+			}
+			if size, ok := a["BundleSize"]; ok {
+				app["bundle_size"] = size
+			}
+			apps = append(apps, app)
+		}
+		device.PlatformData["installed_apps"] = apps
+		device.PlatformData["installed_apps_count"] = len(apps)
+		updated = true
+		h.logger.Info("app list processed", "udid", udid, "count", len(apps))
 	}
 
 	if updated {
@@ -509,6 +547,30 @@ func (h *CheckinHandler) maybeAutoQueue(ctx context.Context, udid string) {
 
 	if _, err := h.nanomdm.SendCommand(ctx, udid, []byte(devCmd)); err != nil {
 		h.logger.Error("failed to auto-queue DeviceInformation", "error", err, "udid", udid)
+	}
+
+	// ProfileList
+	profCmd := fmt.Sprintf(`<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+<key>CommandUUID</key><string>auto-prof-%s</string>
+<key>Command</key><dict><key>RequestType</key><string>ProfileList</string></dict>
+</dict></plist>`, uuid.New().String())
+
+	if _, err := h.nanomdm.SendCommand(ctx, udid, []byte(profCmd)); err != nil {
+		h.logger.Error("failed to auto-queue ProfileList", "error", err, "udid", udid)
+	}
+
+	// InstalledApplicationList
+	appCmd := fmt.Sprintf(`<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+<key>CommandUUID</key><string>auto-apps-%s</string>
+<key>Command</key><dict><key>RequestType</key><string>InstalledApplicationList</string></dict>
+</dict></plist>`, uuid.New().String())
+
+	if _, err := h.nanomdm.SendCommand(ctx, udid, []byte(appCmd)); err != nil {
+		h.logger.Error("failed to auto-queue InstalledApplicationList", "error", err, "udid", udid)
 	}
 }
 

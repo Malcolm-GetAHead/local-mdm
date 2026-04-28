@@ -276,6 +276,25 @@ func (s *Server) handleWebDeviceDetail(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// Extract installed profiles and apps from platform_data for tabs
+	var installedProfiles, installedApps []map[string]interface{}
+	if pd := device.PlatformData; pd != nil {
+		if profiles, ok := pd["installed_profiles"].([]interface{}); ok {
+			for _, p := range profiles {
+				if pm, ok := p.(map[string]interface{}); ok {
+					installedProfiles = append(installedProfiles, pm)
+				}
+			}
+		}
+		if apps, ok := pd["installed_apps"].([]interface{}); ok {
+			for _, a := range apps {
+				if am, ok := a.(map[string]interface{}); ok {
+					installedApps = append(installedApps, am)
+				}
+			}
+		}
+	}
+
 	s.renderPage(w, r, "device_detail", map[string]interface{}{
 		"ActiveNav":        "devices",
 		"Device":           device,
@@ -285,6 +304,8 @@ func (s *Server) handleWebDeviceDetail(w http.ResponseWriter, r *http.Request) {
 		"Commands":         commands,
 		"AssignedPolicies": assignedPolicies,
 		"PlatformDetails":  buildPlatformDetails(device.PlatformData),
+		"InstalledProfiles": installedProfiles,
+		"InstalledApps":     installedApps,
 	})
 }
 
