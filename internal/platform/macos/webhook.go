@@ -336,7 +336,7 @@ type commandResultPlist struct {
 	QueryResponses           map[string]interface{}   `plist:"QueryResponses"`
 	ProfileList              []map[string]interface{} `plist:"ProfileList"`
 	InstalledApplicationList []map[string]interface{} `plist:"InstalledApplicationList"`
-	ManagedApplicationList   []map[string]interface{} `plist:"ManagedApplicationList"`
+	ManagedApplicationList   map[string]interface{}   `plist:"ManagedApplicationList"`
 	CertificateList          []map[string]interface{} `plist:"CertificateList"`
 	AvailableOSUpdates       []map[string]interface{} `plist:"AvailableOSUpdates"`
 	OSUpdateStatus           []map[string]interface{} `plist:"OSUpdateStatus"`
@@ -599,13 +599,11 @@ func (h *CheckinHandler) processCommandResult(ctx context.Context, udid, rawPayl
 		h.logger.Info("app list processed", "udid", udid, "count", len(apps))
 	}
 
-	// ManagedApplicationList — mark managed apps
-	if result.ManagedApplicationList != nil {
+	// ManagedApplicationList — mark managed apps (dict keyed by bundle ID)
+	if result.ManagedApplicationList != nil && len(result.ManagedApplicationList) > 0 {
 		managedIDs := map[string]bool{}
-		for _, a := range result.ManagedApplicationList {
-			if id, ok := a["Identifier"].(string); ok {
-				managedIDs[id] = true
-			}
+		for bundleID := range result.ManagedApplicationList {
+			managedIDs[bundleID] = true
 		}
 		device.PlatformData["managed_app_ids"] = managedIDs
 		device.PlatformData["managed_apps_count"] = len(managedIDs)
