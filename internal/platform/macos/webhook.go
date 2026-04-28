@@ -137,6 +137,15 @@ func (h *CheckinHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		h.handleAcknowledge(r.Context(), event.AcknowledgeEvent)
 	}
 
+	// Update last_seen on any event with a UDID
+	if udid != "" {
+		if device, err := h.service.GetDeviceByUDID(r.Context(), udid); err == nil {
+			now := time.Now()
+			device.LastSeen = &now
+			_ = h.service.UpdateDevice(r.Context(), device)
+		}
+	}
+
 	w.WriteHeader(http.StatusOK)
 }
 
