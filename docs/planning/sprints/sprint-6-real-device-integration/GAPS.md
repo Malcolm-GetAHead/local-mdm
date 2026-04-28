@@ -149,5 +149,26 @@
 
 ### Windows Enrollment Status
 - Server protocol verified: Discovery, Policy, Enrollment, OMA-DM all work over HTTPS
-- Native enrollment blocked: `RegisterDeviceWithManagement` COM error, Settings UI requires Azure AD, PPKG format invalid
-- **PPKG findings**: A ZIP containing only `Customizations.xml` returns `0x80070057 E_INVALIDARG`. The correct CSP path for bulk enrollment is `Provisioning/Enrollments/{UPN}/DiscoveryServiceFullURL` (confirmed from Microsoft docs). The XML content is correct but the package format needs additional metadata files that Windows ICD generates. `provtool.exe` and `Install-ProvisioningPackage` cmdlet both fail. Next step: install Windows ADK on the VM and use `icd.exe` CLI to build a valid .ppkg from our Customizations.xml.
+- Native enrollment blocked through multiple approaches, each with different findings:
+
+**Approach 1: Settings UI "Connect"** — Azure AD validates email domain against Microsoft identity platform before proceeding to MDM. Dead end without Azure AD.
+
+**Approach 2: `ms-device-enrollment:?mode=mdm`** — Same Azure AD validation. Same dead end.
+
+**Approach 3: `RegisterDeviceWithManagement` API** — COM threading error `0x80010106` from every context (SSH, interactive PowerShell, compiled C# with `[STAThread]`, scheduled task). This API is only callable from the Windows enrollment UI process itself.
+
+**Approach 4: Hand-built .ppkg (ZIP + Customizations.xml)** — Error `0x80070057 E_INVALIDARG`. A ZIP containing only Customizations.xml is not a valid PPKG format.
+
+**Approach 5: Windows ICD-built .ppkg** — Installed Windows ADK, used Windows Configuration Designer to build a proper PPKG with `Workplace/Enrollments` settings (AuthPolicy=OnPremise, DiscoveryServiceFullURL, Secret). First install partially succeeded (triggered discovery requests to server). Second install failed with `0x800700b7` (already exists). **Key finding: installing the PPKG revealed the "Enroll only in device management" option in Settings that wasn't visible before.**
+
+**Approach 6: "Enroll only in device management" (revealed by PPKG)** — This is the correct MDM-only enrollment path. Auto-discovery finds `enterpriseenrollment.localmdm.local`, discovery request reaches server and returns 200. But Windows does not proceed to Policy/Enrollment step. The discovery response format may need adjustment — possible issues:
+  - `EnrollmentVersion` might need to be `3.0` or `4.0` instead of `5.0`
+  - Response may need `AuthenticationServiceUrl` to be a different URL than the enrollment URL
+  - Windows may be doing additional validation on the response XML schema
+
+**Next steps for Windows enrollment:**
+1. Install Fiddler or Wireshark on the Windows VM to capture the actual TLS-decrypted traffic and see exactly what Windows receives and rejects
+2. Compare our discovery response byte-for-byte with a known working MDM server response (e.g., from Intune documentation)
+3. Try `EnrollmentVersion` values of `3.0` and `4.0`
+4. The PPKG approach is the most promising — the ICD-built package triggered real enrollment behavior. Try restoring VM from template and installing a fresh PPKG before any other enrollment attempts
+5. DNS setup: `enterpriseenrollment.localmdm.local` → `192.168.1.229` is in the VM's hosts file. Server cert has this hostname as a SAN.
