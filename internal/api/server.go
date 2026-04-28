@@ -758,7 +758,7 @@ func (s *Server) setupRoutes() {
 	api.Handle("/dep/{name}/devices", s.authMiddleware.RequireAuth(
 		http.HandlerFunc(s.handleDEPDevices),
 	)).Methods("GET")
-	checkinHandler := macos.NewCheckinHandler(s.nanomdmService, s.macosService, s.lifecycleService, s.logger)
+	checkinHandler := macos.NewCheckinHandler(s.nanomdmService, s.macosService, s.cmdRepo, s.lifecycleService, s.logger)
 	commandHandler := macos.NewCommandHandler(s.nanomdmService, s.logger)
 	s.router.Handle("/mdm", commandHandler).Methods("PUT")
 	s.router.Handle("/checkin", checkinHandler).Methods("PUT")

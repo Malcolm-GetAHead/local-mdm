@@ -303,7 +303,7 @@ func TestCheckinHandler_ServeHTTP(t *testing.T) {
 	deviceRepo.On("Update", mock.Anything, mock.Anything).Return(nil)
 	service := NewService(deviceRepo)
 	logger := slog.New(slog.NewTextHandler(bytes.NewBuffer(nil), &slog.HandlerOptions{Level: slog.LevelError}))
-	handler := NewCheckinHandler(svc, service, nil, logger)
+	handler := NewCheckinHandler(svc, service, nil, nil, logger)
 
 	udidStr := "test"
 	event := WebhookEvent{Topic: "mdm.Authenticate", CheckinEvent: &CheckinEvent{UDID: &udidStr, RawPayload: `<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd"><plist version="1.0"><dict><key>MessageType</key><string>Authenticate</string><key>UDID</key><string>test</string></dict></plist>`}}

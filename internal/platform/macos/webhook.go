@@ -13,6 +13,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/malcolm-getahead/local-mdm/internal/models"
+	"github.com/malcolm-getahead/local-mdm/internal/repository"
 	"howett.net/plist"
 )
 
@@ -85,6 +86,7 @@ type LifecycleNotifier interface {
 type CheckinHandler struct {
 	nanomdm       *NanoMDMService
 	service       *Service
+	cmdRepo       repository.CommandRepository
 	lifecycle     LifecycleNotifier
 	logger        *slog.Logger
 	// Auto-query cooldown: track last auto-queue time per UDID to prevent storm cycles
@@ -93,10 +95,11 @@ type CheckinHandler struct {
 }
 
 // NewCheckinHandler creates a new check-in handler
-func NewCheckinHandler(nanomdm *NanoMDMService, service *Service, lifecycle LifecycleNotifier, logger *slog.Logger) *CheckinHandler {
+func NewCheckinHandler(nanomdm *NanoMDMService, service *Service, cmdRepo repository.CommandRepository, lifecycle LifecycleNotifier, logger *slog.Logger) *CheckinHandler {
 	return &CheckinHandler{
 		nanomdm:       nanomdm,
 		service:       service,
+		cmdRepo:       cmdRepo,
 		lifecycle:     lifecycle,
 		logger:        logger,
 		lastAutoQuery: make(map[string]time.Time),
@@ -316,6 +319,12 @@ func (h *CheckinHandler) handleAcknowledge(ctx context.Context, ae *AcknowledgeE
 	if ae.Status == "Acknowledged" && udid != "" && ae.RawPayload != "" {
 		h.logger.Debug("raw acknowledge payload", "len", len(ae.RawPayload), "prefix", ae.RawPayload[:min(300, len(ae.RawPayload))])
 		h.processCommandResult(ctx, udid, ae.RawPayload)
+		// Mark command as completed in Local MDM
+		if cmdUUID != "" && h.cmdRepo != nil {
+			if cmdID, err := uuid.Parse(cmdUUID); err == nil {
+				_ = h.cmdRepo.MarkCompleted(ctx, cmdID)
+			}
+		}
 	}
 }
 
@@ -513,61 +522,52 @@ func (h *CheckinHandler) maybeAutoQueue(ctx context.Context, udid string) {
 	h.lastAutoQuery[udid] = time.Now()
 	h.autoQueryMu.Unlock()
 
+	// Look up the device to get its ID and enterprise ID for command records
+	device, err := h.service.GetDeviceByUDID(ctx, udid)
+	if err != nil {
+		return
+	}
+
 	h.logger.Info("auto-queuing device info commands", "udid", udid)
 
-	// SecurityInfo
-	secCmd := fmt.Sprintf(`<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0"><dict>
-<key>CommandUUID</key><string>auto-sec-%s</string>
-<key>Command</key><dict><key>RequestType</key><string>SecurityInfo</string></dict>
-</dict></plist>`, uuid.New().String())
-
-	if _, err := h.nanomdm.SendCommand(ctx, udid, []byte(secCmd)); err != nil {
-		h.logger.Error("failed to auto-queue SecurityInfo", "error", err, "udid", udid)
+	type autoCmd struct {
+		name    string
+		cmdType string
+		plist   string
 	}
 
-	// DeviceInformation
-	devCmd := fmt.Sprintf(`<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0"><dict>
-<key>CommandUUID</key><string>auto-dev-%s</string>
-<key>Command</key><dict>
-<key>RequestType</key><string>DeviceInformation</string>
-<key>Queries</key><array>
-<string>DeviceName</string><string>OSVersion</string><string>BuildVersion</string>
-<string>ModelName</string><string>Model</string><string>SerialNumber</string>
-<string>WiFiMAC</string><string>DeviceCapacity</string><string>AvailableDeviceCapacity</string>
-<string>IsSupervised</string><string>HostName</string>
-</array></dict>
-</dict></plist>`, uuid.New().String())
-
-	if _, err := h.nanomdm.SendCommand(ctx, udid, []byte(devCmd)); err != nil {
-		h.logger.Error("failed to auto-queue DeviceInformation", "error", err, "udid", udid)
+	commands := []autoCmd{
+		{"SecurityInfo", "device_info", `<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd"><plist version="1.0"><dict><key>CommandUUID</key><string>auto-sec-%s</string><key>Command</key><dict><key>RequestType</key><string>SecurityInfo</string></dict></dict></plist>`},
+		{"DeviceInformation", "device_info", `<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd"><plist version="1.0"><dict><key>CommandUUID</key><string>auto-dev-%s</string><key>Command</key><dict><key>RequestType</key><string>DeviceInformation</string><key>Queries</key><array><string>DeviceName</string><string>OSVersion</string><string>BuildVersion</string><string>ModelName</string><string>Model</string><string>SerialNumber</string><string>WiFiMAC</string><string>DeviceCapacity</string><string>AvailableDeviceCapacity</string><string>IsSupervised</string><string>HostName</string></array></dict></dict></plist>`},
+		{"ProfileList", "device_info", `<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd"><plist version="1.0"><dict><key>CommandUUID</key><string>auto-prof-%s</string><key>Command</key><dict><key>RequestType</key><string>ProfileList</string></dict></dict></plist>`},
+		{"InstalledApplicationList", "device_info", `<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd"><plist version="1.0"><dict><key>CommandUUID</key><string>auto-apps-%s</string><key>Command</key><dict><key>RequestType</key><string>InstalledApplicationList</string></dict></dict></plist>`},
 	}
 
-	// ProfileList
-	profCmd := fmt.Sprintf(`<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0"><dict>
-<key>CommandUUID</key><string>auto-prof-%s</string>
-<key>Command</key><dict><key>RequestType</key><string>ProfileList</string></dict>
-</dict></plist>`, uuid.New().String())
+	now := time.Now()
+	for _, cmd := range commands {
+		cmdUUID := uuid.New()
+		plistData := fmt.Sprintf(cmd.plist, cmdUUID.String())
 
-	if _, err := h.nanomdm.SendCommand(ctx, udid, []byte(profCmd)); err != nil {
-		h.logger.Error("failed to auto-queue ProfileList", "error", err, "udid", udid)
-	}
+		// Create command record in Local MDM
+		if h.cmdRepo != nil {
+			dbCmd := &models.DeviceCommand{
+				BaseModel:    models.BaseModel{ID: cmdUUID},
+				DeviceID:     device.ID,
+				EnterpriseID: &device.EnterpriseID,
+				CommandType:  cmd.cmdType,
+				CommandData:  models.JSONB{"request_type": cmd.name, "auto_queued": true},
+				Status:       "sent",
+				SentAt:       &now,
+			}
+			if err := h.cmdRepo.Create(ctx, dbCmd); err != nil {
+				h.logger.Error("failed to create command record", "error", err, "command", cmd.name)
+			}
+		}
 
-	// InstalledApplicationList
-	appCmd := fmt.Sprintf(`<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0"><dict>
-<key>CommandUUID</key><string>auto-apps-%s</string>
-<key>Command</key><dict><key>RequestType</key><string>InstalledApplicationList</string></dict>
-</dict></plist>`, uuid.New().String())
-
-	if _, err := h.nanomdm.SendCommand(ctx, udid, []byte(appCmd)); err != nil {
-		h.logger.Error("failed to auto-queue InstalledApplicationList", "error", err, "udid", udid)
+		// Send to NanoMDM
+		if _, err := h.nanomdm.SendCommand(ctx, udid, []byte(plistData)); err != nil {
+			h.logger.Error("failed to auto-queue command", "error", err, "command", cmd.name, "udid", udid)
+		}
 	}
 }
 

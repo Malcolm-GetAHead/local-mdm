@@ -35,8 +35,7 @@ func testMacOSService(t *testing.T) *Service {
 func strPtr(s string) *string { return &s }
 
 func TestCheckinHandler_Authenticate(t *testing.T) {
-	h := NewCheckinHandler(testNanoMDMService(t), testMacOSService(t), nil,
-		slog.New(slog.NewTextHandler(&bytes.Buffer{}, nil)))
+	h := NewCheckinHandler(testNanoMDMService(t), testMacOSService(t), nil, nil, slog.New(slog.NewTextHandler(&bytes.Buffer{}, nil)))
 
 	udidStr := "AAAA-BBBB-CCCC"
 	event := WebhookEvent{
@@ -57,8 +56,7 @@ func TestCheckinHandler_Authenticate(t *testing.T) {
 }
 
 func TestCheckinHandler_TokenUpdate(t *testing.T) {
-	h := NewCheckinHandler(testNanoMDMService(t), testMacOSService(t), nil,
-		slog.New(slog.NewTextHandler(&bytes.Buffer{}, nil)))
+	h := NewCheckinHandler(testNanoMDMService(t), testMacOSService(t), nil, nil, slog.New(slog.NewTextHandler(&bytes.Buffer{}, nil)))
 
 	udidStr2 := "AAAA-BBBB-CCCC"
 	event := WebhookEvent{
@@ -78,8 +76,7 @@ func TestCheckinHandler_TokenUpdate(t *testing.T) {
 }
 
 func TestCheckinHandler_InvalidJSON(t *testing.T) {
-	h := NewCheckinHandler(testNanoMDMService(t), testMacOSService(t), nil,
-		slog.New(slog.NewTextHandler(&bytes.Buffer{}, nil)))
+	h := NewCheckinHandler(testNanoMDMService(t), testMacOSService(t), nil, nil, slog.New(slog.NewTextHandler(&bytes.Buffer{}, nil)))
 
 	req := httptest.NewRequest("PUT", "/checkin", bytes.NewReader([]byte("not json")))
 	w := httptest.NewRecorder()
@@ -90,8 +87,7 @@ func TestCheckinHandler_InvalidJSON(t *testing.T) {
 }
 
 func TestCheckinHandler_NoCheckinEvent(t *testing.T) {
-	h := NewCheckinHandler(testNanoMDMService(t), testMacOSService(t), nil,
-		slog.New(slog.NewTextHandler(&bytes.Buffer{}, nil)))
+	h := NewCheckinHandler(testNanoMDMService(t), testMacOSService(t), nil, nil, slog.New(slog.NewTextHandler(&bytes.Buffer{}, nil)))
 
 	event := WebhookEvent{Topic: "mdm.Connect"}
 	body, _ := json.Marshal(event)
