@@ -10,7 +10,7 @@
 - **Sprint 5f**: ✅ COMPLETE, merged to main (via sprint-5d branch)
 - **Sprint 5g**: ✅ COMPLETE, merged to main
 - **Sprint 5g addendum**: ✅ Blueprint assessment fixes merged (B-01 through B-10, F-03, T-04)
-- **Sprint 6**: 🔲 Not Started (Real device integration)
+- **Sprint 6**: 🟡 In Progress — macOS fully enrolled with real data pipeline, Windows protocol verified but native enrollment blocked by Azure AD requirement
 - **Retrospective**: Pending (Sprint 5b)
 ---
 
@@ -135,5 +135,5 @@
 | 5b | ✅ Complete | EventBus listener, compliance wiring, lifecycle hooks, k6 load tests |
 | 5d | ✅ Complete | Web dashboard (HTMX), 199 Playwright tests |
 | 5g | ✅ Complete | Quality polish: N+1 fixes, loading indicator, empty states, error tests, interface refactor |
-| 6 | 🔲 Not Started | Real device integration (Windows VM, macOS VM, Android) |
+| 6 | 🟡 In Progress | macOS enrolled with full data pipeline (9 auto-queued commands), Windows protocol verified (SOAP/OMA-DM), native Win enrollment blocked by Azure AD |
 | 7 | 🔲 Not Started | macOS Platform SSO (Java/Swift) — requires Apple Developer account |
