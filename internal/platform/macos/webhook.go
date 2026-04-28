@@ -5,27 +5,72 @@ import (
 	"encoding/json"
 	"log/slog"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/malcolm-getahead/local-mdm/internal/models"
+	"howett.net/plist"
 )
 
-// WebhookEvent represents a NanoMDM webhook event
+// WebhookEvent matches NanoMDM v0.9.0 webhook JSON format (EventJson)
 type WebhookEvent struct {
-	Topic        string          `json:"topic"`
-	EventID      string          `json:"event_id"`
-	EventAt      time.Time       `json:"event_at"`
-	CheckinEvent *CheckinEvent   `json:"checkin_event,omitempty"`
+	Topic            string            `json:"topic"`
+	EventID          *string           `json:"event_id,omitempty"`
+	CreatedAt        time.Time         `json:"created_at"`
+	CheckinEvent     *CheckinEvent     `json:"checkin_event,omitempty"`
+	AcknowledgeEvent *AcknowledgeEvent `json:"acknowledge_event,omitempty"`
 }
 
-// CheckinEvent represents device check-in data
+// CheckinEvent matches NanoMDM's checkin webhook payload
 type CheckinEvent struct {
-	UDID         string                 `json:"udid"`
-	EnrollmentID string                 `json:"enrollment_id,omitempty"`
-	MessageType  string                 `json:"message_type"`
-	Topic        string                 `json:"topic,omitempty"`
-	Params       map[string]interface{} `json:"params,omitempty"`
+	UDID             *string           `json:"udid,omitempty"`
+	EnrollmentID     *string           `json:"enrollment_id,omitempty"`
+	IDs              *EnrollmentIDs    `json:"ids,omitempty"`
+	RawPayload       string            `json:"raw_payload"`
+	TokenUpdateTally *int              `json:"token_update_tally,omitempty"`
+	URLParams        map[string]string `json:"url_params,omitempty"`
+}
+
+// AcknowledgeEvent matches NanoMDM's command result webhook payload
+type AcknowledgeEvent struct {
+	UDID         *string           `json:"udid,omitempty"`
+	EnrollmentID *string           `json:"enrollment_id,omitempty"`
+	IDs          *EnrollmentIDs    `json:"ids,omitempty"`
+	CommandUUID  *string           `json:"command_uuid,omitempty"`
+	Status       string            `json:"status"`
+	RawPayload   string            `json:"raw_payload"`
+	URLParams    map[string]string `json:"url_params,omitempty"`
+}
+
+// EnrollmentIDs from NanoMDM
+type EnrollmentIDs struct {
+	ID       string  `json:"id"`
+	ParentID *string `json:"parent_id,omitempty"`
+	Type     string  `json:"type"`
+}
+
+// authenticatePlist represents the Authenticate check-in plist from Apple devices
+type authenticatePlist struct {
+	MessageType  string `plist:"MessageType"`
+	UDID         string `plist:"UDID"`
+	Topic        string `plist:"Topic"`
+	SerialNumber string `plist:"SerialNumber"`
+	Model        string `plist:"Model"`
+	ModelName    string `plist:"ModelName"`
+	ProductName  string `plist:"ProductName"`
+	OSVersion    string `plist:"OSVersion"`
+	BuildVersion string `plist:"BuildVersion"`
+	DeviceName   string `plist:"DeviceName"`
+}
+
+// tokenUpdatePlist represents the TokenUpdate check-in plist
+type tokenUpdatePlist struct {
+	MessageType string `plist:"MessageType"`
+	UDID        string `plist:"UDID"`
+	Topic       string `plist:"Topic"`
+	PushMagic   string `plist:"PushMagic"`
+	Token       []byte `plist:"Token"`
 }
 
 // LifecycleNotifier is called on device lifecycle events.
@@ -60,133 +105,175 @@ func (h *CheckinHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if event.CheckinEvent == nil {
-		w.WriteHeader(http.StatusOK)
-		return
+	// Extract message type from topic (e.g. "mdm.Authenticate" -> "Authenticate")
+	messageType := ""
+	if idx := strings.LastIndex(event.Topic, "."); idx >= 0 {
+		messageType = event.Topic[idx+1:]
 	}
 
-	ce := event.CheckinEvent
-	h.logger.Info("mdm checkin",
-		"message_type", ce.MessageType,
-		"udid", ce.UDID,
+	// Get UDID from checkin event or acknowledge event
+	udid := ""
+	if event.CheckinEvent != nil && event.CheckinEvent.UDID != nil {
+		udid = string(*event.CheckinEvent.UDID)
+	}
+	if event.AcknowledgeEvent != nil && event.AcknowledgeEvent.UDID != nil {
+		udid = string(*event.AcknowledgeEvent.UDID)
+	}
+
+	h.logger.Info("mdm webhook",
+		"topic", event.Topic,
+		"message_type", messageType,
+		"udid", udid,
 	)
 
-	if err := h.nanomdm.HandleCheckin(r.Context(), ce.UDID, ce.MessageType); err != nil {
-		h.logger.Error("nanomdm checkin failed", "error", err, "udid", ce.UDID)
+	if event.CheckinEvent != nil {
+		if err := h.nanomdm.HandleCheckin(r.Context(), udid, messageType); err != nil {
+			h.logger.Error("nanomdm checkin failed", "error", err, "udid", udid)
+		}
+		h.handleCheckin(r.Context(), messageType, udid, event.CheckinEvent)
 	}
 
-	ctx := r.Context()
+	if event.AcknowledgeEvent != nil {
+		h.handleAcknowledge(r.Context(), event.AcknowledgeEvent)
+	}
 
-	switch ce.MessageType {
+	w.WriteHeader(http.StatusOK)
+}
+
+func (h *CheckinHandler) handleCheckin(ctx context.Context, messageType, udid string, ce *CheckinEvent) {
+	switch messageType {
 	case "Authenticate":
-		if ce.UDID == "" {
-			break
+		if udid == "" {
+			return
 		}
-		// Extract enterprise_id from params
-		enterpriseID, ok := ce.Params["enterprise_id"].(string)
-		if !ok || enterpriseID == "" {
-			break
+		// Parse the raw plist to extract device info
+		var auth authenticatePlist
+		if _, err := plist.Unmarshal([]byte(ce.RawPayload), &auth); err != nil {
+			h.logger.Error("failed to parse Authenticate plist", "error", err)
+			return
 		}
-		eid, err := parseUUID(enterpriseID)
+
+		// Use a default enterprise ID — in production this would come from DEP or enrollment URL
+		enterpriseID, _ := uuid.Parse("00000000-0000-0000-0000-000000000001")
+
+		serial := auth.SerialNumber
+		name := auth.DeviceName
+		model := auth.ModelName
+		if model == "" {
+			model = auth.ProductName
+		}
+		if model == "" {
+			model = auth.Model
+		}
+		osVersion := auth.OSVersion
+		buildVersion := auth.BuildVersion
+
+		// Try to update existing device, or create new one
+		device, err := h.service.GetDeviceByUDID(ctx, udid)
 		if err != nil {
-			break
-		}
-
-		// Extract device info from params (NanoMDM forwards plist fields)
-		serial, _ := ce.Params["serial_number"].(string)
-		name, _ := ce.Params["device_name"].(string)
-		model, _ := ce.Params["product_name"].(string)
-		if model == "" {
-			model, _ = ce.Params["model_name"].(string)
-		}
-		if model == "" {
-			model, _ = ce.Params["model"].(string)
-		}
-		osVersion, _ := ce.Params["os_version"].(string)
-		buildVersion, _ := ce.Params["build_version"].(string)
-		topic, _ := ce.Params["topic"].(string)
-
-		device := &models.Device{
-			BaseModel:    models.BaseModel{ID: uuid.New()},
-			EnterpriseID: eid,
-			Platform:     models.PlatformMacOS,
-			DeviceID:     ce.UDID,
-			SerialNumber: serial,
-			Name:         name,
-			Model:        model,
-			OSVersion:    osVersion,
-			Status:       models.DeviceStatusPending,
-			PlatformData: models.JSONB{
-				"build_version": buildVersion,
-				"topic":         topic,
-			},
-		}
-		if err := h.service.UpdateDevice(ctx, device); err != nil {
-			// Device doesn't exist yet — create it, then update with full info
-			newDevice, createErr := h.service.CreateDevice(ctx, eid, ce.UDID, serial)
+			// Device doesn't exist — create it
+			newDevice, createErr := h.service.CreateDevice(ctx, enterpriseID, udid, serial)
 			if createErr != nil {
-				h.logger.Error("failed to create device on authenticate", "error", createErr, "udid", ce.UDID)
-			} else {
-				// Apply the additional fields that CreateDevice doesn't set
-				newDevice.Name = name
-				newDevice.Model = model
-				newDevice.OSVersion = osVersion
-				newDevice.PlatformData = device.PlatformData
-				if updateErr := h.service.UpdateDevice(ctx, newDevice); updateErr != nil {
-					h.logger.Error("failed to update new device info", "error", updateErr, "udid", ce.UDID)
-				}
+				h.logger.Error("failed to create device on authenticate", "error", createErr, "udid", udid)
+				return
 			}
+			device = newDevice
 		}
+
+		device.Name = name
+		device.Model = model
+		device.OSVersion = osVersion
+		device.SerialNumber = serial
+		if device.PlatformData == nil {
+			device.PlatformData = models.JSONB{}
+		}
+		device.PlatformData["build_version"] = buildVersion
+		device.PlatformData["topic"] = auth.Topic
+
+		if err := h.service.UpdateDevice(ctx, device); err != nil {
+			h.logger.Error("failed to update device on authenticate", "error", err, "udid", udid)
+		}
+
 		h.logger.Info("device authenticated",
-			"udid", ce.UDID,
+			"udid", udid,
 			"serial", serial,
 			"model", model,
 			"os_version", osVersion,
 		)
 
 	case "TokenUpdate":
-		if ce.UDID == "" {
-			break
+		if udid == "" {
+			return
 		}
-		device, err := h.service.GetDeviceByUDID(ctx, ce.UDID)
+		// Skip user-channel TokenUpdates
+		if ce.IDs != nil && ce.IDs.Type == "User" {
+			return
+		}
+
+		device, err := h.service.GetDeviceByUDID(ctx, udid)
 		if err != nil {
-			h.logger.Warn("device not found for token update", "udid", ce.UDID, "error", err)
-			break
+			h.logger.Warn("device not found for token update", "udid", udid, "error", err)
+			return
 		}
+
+		// Parse TokenUpdate plist for push_magic
+		var tu tokenUpdatePlist
+		if _, err := plist.Unmarshal([]byte(ce.RawPayload), &tu); err == nil {
+			if device.PlatformData == nil {
+				device.PlatformData = models.JSONB{}
+			}
+			if tu.PushMagic != "" {
+				device.PlatformData["push_magic"] = tu.PushMagic
+			}
+			device.PlatformData["has_token"] = true
+		}
+
 		device.Status = models.DeviceStatusEnrolled
-		if device.PlatformData == nil {
-			device.PlatformData = models.JSONB{}
-		}
-		if pm, ok := ce.Params["push_magic"].(string); ok {
-			device.PlatformData["push_magic"] = pm
-		}
-		device.PlatformData["has_token"] = true
 		if err := h.service.UpdateDevice(ctx, device); err != nil {
-			h.logger.Error("failed to update device on token update", "error", err, "udid", ce.UDID)
+			h.logger.Error("failed to update device on token update", "error", err, "udid", udid)
 		} else {
-			h.logger.Info("device enrolled", "udid", ce.UDID, "device_id", device.ID)
+			h.logger.Info("device enrolled", "udid", udid, "device_id", device.ID)
 		}
 
 	case "CheckOut":
-		if ce.UDID == "" {
-			break
+		if udid == "" {
+			return
 		}
-		device, err := h.service.GetDeviceByUDID(ctx, ce.UDID)
+		device, err := h.service.GetDeviceByUDID(ctx, udid)
 		if err != nil {
-			h.logger.Warn("device not found for checkout", "udid", ce.UDID, "error", err)
-			break
+			h.logger.Warn("device not found for checkout", "udid", udid, "error", err)
+			return
 		}
 		device.Status = models.DeviceStatusUnenrolled
 		if err := h.service.UpdateDevice(ctx, device); err != nil {
-			h.logger.Error("failed to update device status on checkout", "error", err, "udid", ce.UDID)
+			h.logger.Error("failed to update device status on checkout", "error", err, "udid", udid)
 		}
 		if h.lifecycle != nil {
 			h.lifecycle.OnUnenroll(ctx, device)
 		}
-		h.logger.Info("device unenrolled via checkout", "udid", ce.UDID, "device_id", device.ID)
+		h.logger.Info("device unenrolled via checkout", "udid", udid, "device_id", device.ID)
+	}
+}
+
+func (h *CheckinHandler) handleAcknowledge(ctx context.Context, ae *AcknowledgeEvent) {
+	udid := ""
+	if ae.UDID != nil {
+		udid = string(*ae.UDID)
+	}
+	cmdUUID := ""
+	if ae.CommandUUID != nil {
+		cmdUUID = *ae.CommandUUID
 	}
 
-	w.WriteHeader(http.StatusOK)
+	h.logger.Info("mdm command result",
+		"udid", udid,
+		"command_uuid", cmdUUID,
+		"status", ae.Status,
+	)
+
+	if err := h.nanomdm.HandleCommand(ctx, udid, cmdUUID, ae.Status); err != nil {
+		h.logger.Error("nanomdm command handling failed", "error", err, "udid", udid)
+	}
 }
 
 func parseUUID(s string) ([16]byte, error) {
@@ -194,7 +281,7 @@ func parseUUID(s string) ([16]byte, error) {
 	return id, err
 }
 
-// CommandHandler handles MDM command requests
+// CommandHandler handles direct MDM command requests (NanoMDM proxy)
 type CommandHandler struct {
 	nanomdm *NanoMDMService
 	logger  *slog.Logger
@@ -202,51 +289,10 @@ type CommandHandler struct {
 
 // NewCommandHandler creates a new command handler
 func NewCommandHandler(nanomdm *NanoMDMService, logger *slog.Logger) *CommandHandler {
-	return &CommandHandler{
-		nanomdm: nanomdm,
-		logger:  logger,
-	}
+	return &CommandHandler{nanomdm: nanomdm, logger: logger}
 }
 
-// CommandEvent represents a NanoMDM command result webhook event
-type CommandEvent struct {
-	UDID        string `json:"udid"`
-	CommandUUID string `json:"command_uuid"`
-	Status      string `json:"status"`
-	RawPayload  string `json:"raw_payload,omitempty"`
-}
-
-// CommandWebhookEvent wraps a command result from NanoMDM
-type CommandWebhookEvent struct {
-	Topic        string        `json:"topic"`
-	EventID      string        `json:"event_id"`
-	CommandEvent *CommandEvent `json:"command_event,omitempty"`
-}
-
-// ServeHTTP handles MDM command HTTP requests (NanoMDM webhook JSON format)
+// ServeHTTP proxies MDM command requests
 func (h *CommandHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	var event CommandWebhookEvent
-	if err := json.NewDecoder(r.Body).Decode(&event); err != nil {
-		h.logger.Error("failed to decode command webhook", "error", err)
-		http.Error(w, "invalid request", http.StatusBadRequest)
-		return
-	}
-
-	if event.CommandEvent == nil {
-		w.WriteHeader(http.StatusOK)
-		return
-	}
-
-	ce := event.CommandEvent
-	h.logger.Info("mdm command result",
-		"udid", ce.UDID,
-		"command_uuid", ce.CommandUUID,
-		"status", ce.Status,
-	)
-
-	if err := h.nanomdm.HandleCommand(r.Context(), ce.UDID, ce.CommandUUID, ce.Status); err != nil {
-		h.logger.Error("nanomdm command handling failed", "error", err, "udid", ce.UDID)
-	}
-
 	w.WriteHeader(http.StatusOK)
 }

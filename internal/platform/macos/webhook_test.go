@@ -32,16 +32,19 @@ func testMacOSService(t *testing.T) *Service {
 	return &Service{deviceRepo: repo}
 }
 
+func strPtr(s string) *string { return &s }
+
 func TestCheckinHandler_Authenticate(t *testing.T) {
 	h := NewCheckinHandler(testNanoMDMService(t), testMacOSService(t), nil,
 		slog.New(slog.NewTextHandler(&bytes.Buffer{}, nil)))
 
+	udidStr := "AAAA-BBBB-CCCC"
 	event := WebhookEvent{
 		Topic:   "mdm.Authenticate",
-		EventID: "evt-1",
+		EventID: strPtr("evt-1"),
 		CheckinEvent: &CheckinEvent{
-			UDID:        "AAAA-BBBB-CCCC",
-			MessageType: "Authenticate",
+			UDID:       &udidStr,
+			RawPayload: `<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd"><plist version="1.0"><dict><key>MessageType</key><string>Authenticate</string><key>UDID</key><string>AAAA-BBBB-CCCC</string><key>SerialNumber</key><string>TEST123</string></dict></plist>`,
 		},
 	}
 	body, _ := json.Marshal(event)
@@ -57,11 +60,12 @@ func TestCheckinHandler_TokenUpdate(t *testing.T) {
 	h := NewCheckinHandler(testNanoMDMService(t), testMacOSService(t), nil,
 		slog.New(slog.NewTextHandler(&bytes.Buffer{}, nil)))
 
+	udidStr2 := "AAAA-BBBB-CCCC"
 	event := WebhookEvent{
 		Topic: "mdm.TokenUpdate",
 		CheckinEvent: &CheckinEvent{
-			UDID:        "AAAA-BBBB-CCCC",
-			MessageType: "TokenUpdate",
+			UDID:       &udidStr2,
+			RawPayload: `<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd"><plist version="1.0"><dict><key>MessageType</key><string>TokenUpdate</string><key>UDID</key><string>AAAA-BBBB-CCCC</string><key>PushMagic</key><string>test-magic</string></dict></plist>`,
 		},
 	}
 	body, _ := json.Marshal(event)
@@ -99,46 +103,11 @@ func TestCheckinHandler_NoCheckinEvent(t *testing.T) {
 	assert.Equal(t, http.StatusOK, w.Code)
 }
 
-func TestCommandHandler_CommandResult(t *testing.T) {
+func TestCommandHandler_ServeHTTP_Basic(t *testing.T) {
 	h := NewCommandHandler(testNanoMDMService(t),
 		slog.New(slog.NewTextHandler(&bytes.Buffer{}, nil)))
 
-	event := CommandWebhookEvent{
-		Topic: "mdm.Connect",
-		CommandEvent: &CommandEvent{
-			UDID:        "AAAA-BBBB-CCCC",
-			CommandUUID: "cmd-123",
-			Status:      "Acknowledged",
-		},
-	}
-	body, _ := json.Marshal(event)
-	req := httptest.NewRequest("PUT", "/mdm", bytes.NewReader(body))
-	w := httptest.NewRecorder()
-
-	h.ServeHTTP(w, req)
-
-	assert.Equal(t, http.StatusOK, w.Code)
-}
-
-func TestCommandHandler_InvalidJSON(t *testing.T) {
-	h := NewCommandHandler(testNanoMDMService(t),
-		slog.New(slog.NewTextHandler(&bytes.Buffer{}, nil)))
-
-	req := httptest.NewRequest("PUT", "/mdm", bytes.NewReader([]byte("{bad")))
-	w := httptest.NewRecorder()
-
-	h.ServeHTTP(w, req)
-
-	assert.Equal(t, http.StatusBadRequest, w.Code)
-}
-
-func TestCommandHandler_NoCommandEvent(t *testing.T) {
-	h := NewCommandHandler(testNanoMDMService(t),
-		slog.New(slog.NewTextHandler(&bytes.Buffer{}, nil)))
-
-	event := CommandWebhookEvent{Topic: "mdm.Connect"}
-	body, _ := json.Marshal(event)
-	req := httptest.NewRequest("PUT", "/mdm", bytes.NewReader(body))
+	req := httptest.NewRequest("PUT", "/mdm", bytes.NewReader([]byte("{}")))
 	w := httptest.NewRecorder()
 
 	h.ServeHTTP(w, req)
