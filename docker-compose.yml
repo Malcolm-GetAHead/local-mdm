@@ -92,6 +92,8 @@ services:
       interval: 10s
       timeout: 5s
       retries: 10
+    volumes:
+      - ./internal/api/certs:/app/certs
 
   # === Dev mode: hot reload with source mounted ===
   localmdm-dev:
