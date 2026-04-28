@@ -2,6 +2,7 @@ package macos
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"log/slog"
 	"net/http"
@@ -164,7 +165,11 @@ func (h *CheckinHandler) handleCheckin(ctx context.Context, messageType, udid st
 		osVersion := ""
 		buildVersion := ""
 		topic := ""
-		if _, err := plist.Unmarshal([]byte(ce.RawPayload), &auth); err != nil {
+		decoded, decErr := base64.StdEncoding.DecodeString(ce.RawPayload)
+		if decErr != nil {
+			decoded = []byte(ce.RawPayload) // fallback to raw
+		}
+		if _, err := plist.Unmarshal(decoded, &auth); err != nil {
 			h.logger.Warn("failed to parse Authenticate plist, creating device with UDID only", "error", err, "payload_len", len(ce.RawPayload))
 		} else {
 			serial = auth.SerialNumber
@@ -234,7 +239,11 @@ func (h *CheckinHandler) handleCheckin(ctx context.Context, messageType, udid st
 
 		// Parse TokenUpdate plist for push_magic
 		var tu tokenUpdatePlist
-		if _, err := plist.Unmarshal([]byte(ce.RawPayload), &tu); err == nil {
+		tuDecoded, tuDecErr := base64.StdEncoding.DecodeString(ce.RawPayload)
+		if tuDecErr != nil {
+			tuDecoded = []byte(ce.RawPayload)
+		}
+		if _, err := plist.Unmarshal(tuDecoded, &tu); err == nil {
 			if device.PlatformData == nil {
 				device.PlatformData = models.JSONB{}
 			}
@@ -293,6 +302,7 @@ func (h *CheckinHandler) handleAcknowledge(ctx context.Context, ae *AcknowledgeE
 
 	// Parse command results and update device platform_data
 	if ae.Status == "Acknowledged" && udid != "" && ae.RawPayload != "" {
+		h.logger.Debug("raw acknowledge payload", "len", len(ae.RawPayload), "prefix", ae.RawPayload[:min(300, len(ae.RawPayload))])
 		h.processCommandResult(ctx, udid, ae.RawPayload)
 	}
 }
@@ -315,8 +325,15 @@ func (h *CheckinHandler) processCommandResult(ctx context.Context, udid, rawPayl
 		device.PlatformData = models.JSONB{}
 	}
 
+	// raw_payload is base64-encoded by NanoMDM
+	decoded, err := base64.StdEncoding.DecodeString(rawPayload)
+	if err != nil {
+		h.logger.Warn("failed to base64-decode raw_payload", "error", err)
+		return
+	}
+
 	var result commandResultPlist
-	if _, err := plist.Unmarshal([]byte(rawPayload), &result); err != nil {
+	if _, err := plist.Unmarshal(decoded, &result); err != nil {
 		h.logger.Warn("failed to parse command result plist", "error", err)
 		return
 	}
