@@ -139,14 +139,12 @@ func TestBuildRemoveApplicationCommand(t *testing.T) {
 func TestCommandSender_SendCommand(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			assert.Equal(t, "/v1/enqueue", r.URL.Path)
-			assert.Equal(t, "application/json", r.Header.Get("Content-Type"))
-			assert.Equal(t, "Bearer test-key", r.Header.Get("Authorization"))
-
-			var req EnqueueRequest
-			err := json.NewDecoder(r.Body).Decode(&req)
-			require.NoError(t, err)
-			assert.Equal(t, []string{"test-udid"}, req.UDIDs)
+			assert.Equal(t, "/v1/enqueue/test-udid", r.URL.Path)
+			assert.Equal(t, "application/xml", r.Header.Get("Content-Type"))
+			user, pass, ok := r.BasicAuth()
+			assert.True(t, ok)
+			assert.Equal(t, "nanomdm", user)
+			assert.Equal(t, "test-key", pass)
 
 			w.WriteHeader(http.StatusOK)
 			json.NewEncoder(w).Encode(EnqueueResponse{
@@ -178,7 +176,8 @@ func TestCommandSender_SendCommand(t *testing.T) {
 
 	t.Run("no api key", func(t *testing.T) {
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			assert.Empty(t, r.Header.Get("Authorization"))
+			_, _, ok := r.BasicAuth()
+			assert.False(t, ok)
 			w.WriteHeader(http.StatusOK)
 			json.NewEncoder(w).Encode(EnqueueResponse{CommandUUID: "cmd-456"})
 		}))

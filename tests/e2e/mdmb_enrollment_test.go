@@ -73,7 +73,7 @@ func TestE2E_Mdmb_FullEnrollment(t *testing.T) {
 	macosService := macos.NewService(deviceRepo)
 	lifecycleSvc := service.NewLifecycleService(logger)
 	nanomdmSvc := macos.NewNanoMDMService(nanomdmURL, "localmdm-nanomdm-api-key", cmdRepo, deviceRepo, logger)
-	checkinHandler := macos.NewCheckinHandler(nanomdmSvc, macosService, lifecycleSvc, logger)
+	checkinHandler := macos.NewCheckinHandler(nanomdmSvc, macosService, nil, lifecycleSvc, logger)
 
 	// Start on port 8080 — matches NanoMDM's NANOMDM_WEBHOOK_URL
 	mux := http.NewServeMux()
