@@ -636,7 +636,6 @@ func (h *CheckinHandler) maybeAutoQueue(ctx context.Context, udid string) {
 		{"ManagedApplicationList", "managed_app_list", `<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd"><plist version="1.0"><dict><key>CommandUUID</key><string>%s</string><key>Command</key><dict><key>RequestType</key><string>ManagedApplicationList</string></dict></dict></plist>`},
 		{"AvailableOSUpdates", "os_updates", `<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd"><plist version="1.0"><dict><key>CommandUUID</key><string>%s</string><key>Command</key><dict><key>RequestType</key><string>AvailableOSUpdates</string></dict></dict></plist>`},
 		{"OSUpdateStatus", "os_update_status", `<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd"><plist version="1.0"><dict><key>CommandUUID</key><string>%s</string><key>Command</key><dict><key>RequestType</key><string>OSUpdateStatus</string></dict></dict></plist>`},
-		{"ActiveNSExtensions", "extensions", `<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd"><plist version="1.0"><dict><key>CommandUUID</key><string>%s</string><key>Command</key><dict><key>RequestType</key><string>ActiveNSExtensions</string></dict></dict></plist>`},
 	}
 
 	now := time.Now()
