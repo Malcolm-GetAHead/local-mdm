@@ -55,7 +55,10 @@ func (s *Server) handleMacOSEnrollmentProfile(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	serverURL := fmt.Sprintf("https://%s", r.Host)
+	serverURL := fmt.Sprintf("http://%s", r.Host)
+	if r.TLS != nil {
+		serverURL = fmt.Sprintf("https://%s", r.Host)
+	}
 	scepURL := serverURL + "/scep"
 	topic := s.config.MacOS.PushTopic
 	orgName := "Local MDM"

@@ -122,9 +122,19 @@ func (h *CheckinHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			},
 		}
 		if err := h.service.UpdateDevice(ctx, device); err != nil {
-			// Device doesn't exist yet — create it
-			if _, err := h.service.CreateDevice(ctx, eid, ce.UDID, serial); err != nil {
-				h.logger.Error("failed to create device on authenticate", "error", err, "udid", ce.UDID)
+			// Device doesn't exist yet — create it, then update with full info
+			newDevice, createErr := h.service.CreateDevice(ctx, eid, ce.UDID, serial)
+			if createErr != nil {
+				h.logger.Error("failed to create device on authenticate", "error", createErr, "udid", ce.UDID)
+			} else {
+				// Apply the additional fields that CreateDevice doesn't set
+				newDevice.Name = name
+				newDevice.Model = model
+				newDevice.OSVersion = osVersion
+				newDevice.PlatformData = device.PlatformData
+				if updateErr := h.service.UpdateDevice(ctx, newDevice); updateErr != nil {
+					h.logger.Error("failed to update new device info", "error", updateErr, "udid", ce.UDID)
+				}
 			}
 		}
 		h.logger.Info("device authenticated",
