@@ -50,10 +50,10 @@ In `internal/certs/ca.go`, `SignRawCSR` uses a hardcoded `CN=MDMDeviceCert` subj
 
 Update the existing `TestSignRawCSR_FallbackSubject` test and add a new test that verifies subject preservation when the CSR has a valid (but non-PrintableString) subject.
 
-### Task 4: CRL endpoint configuration
+### Task 4: CRL endpoint configuration and error logging
 In `internal/api/server.go`, the CRL is served from a hardcoded path `certs/ca.crl`. Make it derive from the CA cert path config (`cfg.Certificates.CACertPath`) — use the same directory. If the CA cert is at `internal/api/certs/ca.crt`, serve the CRL from `internal/api/certs/ca.crl`.
 
-This is a small change in the route handler setup.
+Also in `internal/certs/ca.go` `NewCAManager`, the `GenerateCRL()` error is silently swallowed (`_ = manager.GenerateCRL()`). Log a warning (not fatal) when CRL auto-generation fails — this helps diagnose cert issues without breaking startup.
 
 ### Task 5: Remaining documentation
 Most documentation was fixed in S6-13. Remaining items:
