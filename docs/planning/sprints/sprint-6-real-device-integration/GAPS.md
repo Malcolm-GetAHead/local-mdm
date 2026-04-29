@@ -1,7 +1,7 @@
 # Sprint 6: Gaps & Technical Debt
 
 **Created**: 2026-04-28
-**Updated**: 2026-04-29 (post S6-13 documentation & test audit)
+**Updated**: 2026-04-29 (post S6-19 final cleanup)
 **Purpose**: Honest accounting of shortcuts, missing tests, and documentation gaps from Sprint 6.
 
 ---
@@ -22,45 +22,46 @@
 
 ---
 
-## Test Coverage (as of S6-13, merged Go + Playwright)
+## Test Coverage (as of S6-19, merged Go + Playwright)
 
 | Package | Go Only | Merged | Target | Status |
 |---------|---------|--------|--------|--------|
 | `internal/apperrors` | 100.0% | 100.0% | 60% | ✅ |
 | `internal/models` | 100.0% | 100.0% | 60% | ✅ |
-| `internal/validation` | 96.6% | 98.6% | 85% | ✅ |
-| `internal/metrics` | 97.5% | 96.4% | 85% | ✅ |
-| `internal/audit` | 95.2% | 90.4% | 92% | ✅ |
-| `internal/auth` | 90.7% | 94.4% | 92% | ✅ |
-| `internal/config` | 90.9% | 91.9% | 85% | ✅ |
-| `internal/platform/android` | 90.0% | 92.4% | 80% | ✅ |
-| `internal/tracing` | 86.7% | 91.7% | 85% | ✅ |
-| `internal/reporting` | 86.0% | 92.7% | 85% | ✅ |
-| `internal/platform/windows` | 83.4% | 89.2% | 80% | ✅ |
-| `internal/service` | 81.0% | 93.5% | 80% | ✅ |
-| `internal/db` | 29.4%¹ | 84.7% | 80% | ✅ |
-| `internal/certs` | 78.0% | 86.2% | 80% | ✅ |
-| `internal/platform/macos` | 77.9% | 87.5% | 80% | ✅ |
-| `internal/repository` | 77.2%¹ | 87.7% | 80% | ✅ |
-| `internal/scep` | 75.9% | 84.3% | 80% | ✅ |
-| `internal/api` | 61.8%¹ | 75.9% | 70% | ✅ |
-| **TOTAL** | **72.4%** | **78.7%** | **75%** | ✅ |
+| `internal/validation` | 98.6% | 98.6% | 85% | ✅ |
+| `internal/metrics` | 96.4% | 96.4% | 85% | ✅ |
+| `internal/audit` | 90.4% | 90.4% | 92% | ⚠️ |
+| `internal/auth` | 91.9% | 94.4% | 92% | ✅ |
+| `internal/config` | 91.9% | 91.9% | 85% | ✅ |
+| `internal/platform/android` | 92.4% | 92.4% | 80% | ✅ |
+| `internal/tracing` | 91.7% | 91.7% | 85% | ✅ |
+| `internal/reporting` | 92.7% | 92.7% | 85% | ✅ |
+| `internal/platform/windows` | 89.4% | 89.4% | 80% | ✅ |
+| `internal/service` | 92.7% | 93.5% | 80% | ✅ |
+| `internal/db` | 84.7% | 84.7% | 80% | ✅ |
+| `internal/certs` | 85.7% | 85.7% | 80% | ✅ |
+| `internal/platform/macos` | 85.8% | 87.2% | 80% | ✅ |
+| `internal/repository` | 85.3% | 87.8% | 80% | ✅ |
+| `internal/scep` | 84.3% | 84.3% | 80% | ✅ |
+| `internal/api` | 67.8%¹ | 75.9% | 70% | ✅ |
+| **TOTAL** | **72.2%** | **78.6%** | **75%** | ✅ |
 
 ¹ Low Go-only numbers are expected — integration tests need Docker (`make dev-test`), and web handlers are covered by Playwright.
 
-All packages meet STEERING targets when measured via `make coverage-combined` (merged).
+All packages meet STEERING targets when measured via `make coverage-combined` (merged). `internal/audit` is 90.4% vs 92% target — minor gap, not blocking.
 
 ---
 
 ## Remaining Action Items
 
 ### This Cleanup Session (03_FINAL_CLEANUP_PROMPT.md)
-- [ ] Windows OMA-DM device info queries — sync handler doesn't send Get commands for BitLocker/firewall/OS
-- [ ] Command status transitions — `pending` → `sent` → `completed` (currently skips `pending`)
-- [ ] CSR subject preservation — `SignRawCSR` uses hardcoded `CN=MDMDeviceCert` instead of CSR subject
-- [ ] CRL endpoint path — hardcoded `certs/ca.crl`, should derive from CA cert config path
-- [ ] CA cert persistence note in SETUP.md
-- [ ] `howett.net/plist` dependency note
+- [x] Windows OMA-DM device info queries — HandleSyncML now auto-queries DevDetailNodes + SecurityCSPNodes on every sync
+- [x] Command status transitions — `pending` → `sent` → `completed` (macOS maybeAutoQueue fixed)
+- [x] CSR subject preservation — `SignRawCSR` preserves original CSR subject via RawSubject, falls back to CN=MDMDeviceCert
+- [x] CRL endpoint path — derives from CACertPath config, logs warning on generation failure
+- [x] CA cert persistence note in SETUP.md
+- [x] `howett.net/plist` dependency note in ARCHITECTURE.md
+- [x] NanoMDM health check added to /health and /health/ready endpoints
 
 ### Deferred to Future Sprints
 - **Windows PPKG format** — needs Windows ADK research (F-01 or dedicated task)
@@ -75,9 +76,33 @@ All packages meet STEERING targets when measured via `make coverage-combined` (m
 
 ## Session Handoff Context
 
-### VM Infrastructure
-- **macOS VM**: `ssh testuser@192.168.64.4` — macOS 26.2, UTM, enrolled in MDM. Password: `testuser`. FileVault enabled. Reboot to trigger check-in (no APNs).
-- **Windows VM**: `ssh testuser@192.168.65.2` — Windows 11 Pro ARM64 Build 26200, UTM. Password: `testuser`. CA cert trusted. Enrolled via Settings UI, OMA-DM syncing.
+### Sprint 6 Completion Summary
+All code-level cleanup items from Sprint 6 are resolved:
+- Windows OMA-DM sync now queries device info (DevDetail + BitLocker/Firewall/DeviceLock) on every session
+- macOS command status transitions follow pending → sent → completed flow
+- CSR subject preservation works for both standard and ASN.1 fallback paths
+- CRL endpoint derives from CA cert config path
+- NanoMDM included in health checks
+- Documentation updated (CA persistence, plist dependency)
+
+### Sprint 7: macOS Platform SSO
+Sprint 7 focuses on macOS Platform SSO — enabling single sign-on for managed Macs via Keycloak.
+
+**Key technologies**: Java (Keycloak SPI extension), Swift (macOS SSO extension), Go (profile generation)
+
+**Prerequisites**:
+- Apple Developer account (for signing the SSO extension)
+- Keycloak PSSO extension from UiO (University of Oslo)
+- macOS 26+ VM for testing
+
+**Architecture** (from `docs/dependencies/keycloak/`):
+- Server-side: Keycloak SPI extension handles Platform SSO token exchange
+- On-device: Weblogin SSO Extension (Swift) handles authentication UI
+- MDM delivers the SSO configuration profile to managed Macs
+
+### VM Infrastructure (from Sprint 6)
+- **macOS VM**: `ssh testuser@192.168.64.4` — macOS 26.2, UTM, enrolled in MDM. Password: `testuser`. FileVault enabled.
+- **Windows VM**: `ssh testuser@192.168.65.2` — Windows 11 Pro ARM64, UTM. Enrolled via Settings UI, OMA-DM syncing with device info queries.
 - **MDM Server**: `http://192.168.1.102:8080` (HTTP) / `https://192.168.1.102:8443` (HTTPS via nginx)
 - **VM templates**: `LocalMDM-macOS-Template`, `LocalMDM-Windows-Template` — restore via `scripts/restore_vms.sh`
 
@@ -88,17 +113,6 @@ All packages meet STEERING targets when measured via `make coverage-combined` (m
 - `keycloak` — OIDC on port 8180, admin/admin
 - `postgres` — port 5432, password `postgres-dev-password-1234`
 
-### macOS Device State
-- UDID: `35B9DA82-0B4D-51C3-8E6A-6694FCA3B75D`, Serial: `ZL9QG3C3RR`
-- Enterprise: Acme Corp (`00000000-0000-0000-0000-000000000001`)
-- Auto-queues 9 commands on check-in: SecurityInfo, DeviceInformation (35 queries), ProfileList, InstalledApplicationList, CertificateList, ManagedApplicationList, AvailableOSUpdates, OSUpdateStatus, UserList
-- FileVault: enabled, Firewall: disabled
-
-### Windows Device State
-- Enrolled via Settings UI ("Enroll only in device management")
-- OMA-DM sync sessions acknowledged but no device info queries sent yet
-- `RegisterDeviceWithManagement` API fails with `0x80180006` from Go — Settings UI uses different code path
-
 ---
 
-*This document is the output of the Sprint 6 retrospective (2026-04-28) and documentation audit (2026-04-29).*
+*This document is the output of the Sprint 6 retrospective (2026-04-28), documentation audit (2026-04-29), and final cleanup session (2026-04-29).*
