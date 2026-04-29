@@ -4,6 +4,16 @@ Sprint-by-sprint development history for Local MDM. For current status, see [REA
 
 ---
 
+## Sprint 6 (continued) — Cleanup & Test Coverage
+- XML marshaling refactor: discovery response uses struct-based `xml.Marshal` instead of `fmt.Sprintf` template (prevents namespace/formatting bugs)
+- Unique `ActivityId` generated per discovery request (`uuid.New()`)
+- `HandleSyncML` returns device ID alongside response, eliminating double XML parse in OMA-DM sync handler
+- Windows enrollment enterprise ID fallback uses `default_enterprise_id` config before hardcoded UUID
+- Unit tests for Windows enrollment fixes: namespace validation, EnrollmentVersion 4.0, no AuthenticationServiceUrl, Content-Length, CSR fallback with `SignRawCSR`, enterprise ID extraction from email, duplicate device upsert, `ExtractDeviceIDFromSyncML`
+- Integration tests for macOS webhook flow: Authenticate (device created with plist fields), TokenUpdate (status enrolled, push_magic stored), Acknowledge with SecurityInfo (FileVault/firewall in platform_data)
+- nginx-tls added to `make prod-up` target (HTTPS on port 8443)
+- Coverage: `internal/platform/windows` 69.4%, `internal/platform/macos` 77.9% (up from 54.1%)
+
 ## Sprint 6 — Real Device Integration
 - macOS VM enrolled with full data pipeline: Authenticate → TokenUpdate → auto-queue 9 commands (SecurityInfo, DeviceInformation, ProfileList, InstalledApplicationList, CertificateList, ManagedApplicationList, AvailableOSUpdates, OSUpdateStatus, UserList)
 - NanoMDM webhook handler parses base64-encoded plist responses into `platform_data` JSONB (35+ device fields, security info, profiles, apps, certs, users, OS updates)
