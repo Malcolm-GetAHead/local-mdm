@@ -62,7 +62,10 @@ Most documentation was fixed in S6-13. Remaining items:
 
 2. **`howett.net/plist` dependency** — Note in `docs/architecture/ARCHITECTURE.md` dependencies section if one exists.
 
-### Task 6: Final verification and GAPS.md
+### Task 6: Add NanoMDM to health check
+The `/health` endpoint checks database and Keycloak but not NanoMDM. Add a NanoMDM connectivity check (HTTP GET to `nanomdm_url` + `/version`) to the health and readiness endpoints. It should appear in the `checks` map alongside `database` and `keycloak`. If NanoMDM is unreachable, report it as unhealthy but don't fail the overall health check (it's an external dependency — macOS enrollment degrades but the server still functions).
+
+### Task 7: Final verification and GAPS.md
 1. Run `make dev-test` — all 19 packages must pass
 2. Run `make coverage-combined` and report the merged coverage table
 3. Update GAPS.md — tick off everything completed, note what's deferred to future sprints
