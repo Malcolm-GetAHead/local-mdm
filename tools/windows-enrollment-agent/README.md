@@ -13,7 +13,7 @@ Windows 11 devices enroll via the native Settings UI — no agent required.
 
 2. Add a hosts entry for auto-discovery:
    ```cmd
-   echo 192.168.1.229 enterpriseenrollment.localmdm.local >> C:\Windows\System32\drivers\etc\hosts
+   echo 192.168.1.102 enterpriseenrollment.localmdm.local >> C:\Windows\System32\drivers\etc\hosts
    ```
 
 ### Enrollment steps

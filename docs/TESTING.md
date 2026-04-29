@@ -301,7 +301,7 @@ Windows 11 devices enroll via Settings UI — no agent or Azure AD required.
 
 **Prerequisites on Windows VM:**
 1. Import CA cert: `certutil -addstore Root ca.crt`
-2. Add hosts entry: `echo 192.168.1.229 enterpriseenrollment.localmdm.local >> C:\Windows\System32\drivers\etc\hosts`
+2. Add hosts entry: `echo 192.168.1.102 enterpriseenrollment.localmdm.local >> C:\Windows\System32\drivers\etc\hosts`
 
 **Enrollment:** Settings → Accounts → Access work or school → "Enroll only in device management" → `admin@localmdm.local` → any credentials
 

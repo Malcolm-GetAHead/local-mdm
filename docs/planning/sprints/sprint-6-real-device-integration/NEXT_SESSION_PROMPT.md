@@ -35,6 +35,8 @@ Results should update `platform_data` JSONB, triggering compliance re-evaluation
 - [ ] Replace hand-rolled ASN.1 CSR parser with proper verification (or lenient x509 fork)
 - [ ] Fix empty state SVG centering (rebuild Tailwind CSS)
 - [ ] Make CRL endpoint path configurable
+- [ ] Add periodic cleanup of stale pending devices (>7 days in `pending` status)
+- [ ] Add "Pending Enrollments (N)" button on devices dashboard tab — clicking it shows a filtered view of devices with `status = 'pending'`, with device_id, platform, serial, and created_at. Currently pending devices are invisible in the main device list.
 
 ### Completed Since This Prompt Was Written
 - [x] Integration tests for full webhook flow — done (S6-07)
@@ -49,7 +51,7 @@ Results should update `platform_data` JSONB, triggering compliance re-evaluation
 ### VM Access
 - Windows VM: `ssh testuser@192.168.65.2` (password: testuser)
 - macOS VM: `ssh testuser@192.168.64.4` (password: testuser)
-- MDM server: `http://192.168.1.229:8080` / `https://192.168.1.229:8443`
+- MDM server: `http://192.168.1.102:8080` / `https://192.168.1.102:8443`
 
 ### Key Lesson: `make dev-test` Destroys Real Device Data
 Tests share the same database. Run tests BEFORE enrolling real devices, or use a separate test database.

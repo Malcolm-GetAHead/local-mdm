@@ -12,8 +12,8 @@ import (
 
 func TestChallengeManager_GenerateChallenge(t *testing.T) {
 	db := testutil.ConnectRawDB(t)
-	t.Cleanup(func() { db.Exec("DELETE FROM scep_challenges") })
-	db.Exec("DELETE FROM scep_challenges")
+	t.Cleanup(func() { db.Exec("DELETE FROM scep_challenges WHERE device_id LIKE 'device%'") })
+	db.Exec("DELETE FROM scep_challenges WHERE device_id LIKE 'device%'")
 	cm := NewChallengeManager(db)
 
 	t.Run("generates unique challenges", func(t *testing.T) {
@@ -35,8 +35,8 @@ func TestChallengeManager_GenerateChallenge(t *testing.T) {
 
 func TestChallengeManager_ValidateChallenge(t *testing.T) {
 	db := testutil.ConnectRawDB(t)
-	t.Cleanup(func() { db.Exec("DELETE FROM scep_challenges") })
-	db.Exec("DELETE FROM scep_challenges")
+	t.Cleanup(func() { db.Exec("DELETE FROM scep_challenges WHERE device_id LIKE 'device%'") })
+	db.Exec("DELETE FROM scep_challenges WHERE device_id LIKE 'device%'")
 	cm := NewChallengeManager(db)
 
 	t.Run("validates unused challenge", func(t *testing.T) {
@@ -79,8 +79,8 @@ func TestChallengeManager_ValidateChallenge(t *testing.T) {
 
 func TestChallengeManager_CleanupExpired(t *testing.T) {
 	db := testutil.ConnectRawDB(t)
-	t.Cleanup(func() { db.Exec("DELETE FROM scep_challenges") })
-	db.Exec("DELETE FROM scep_challenges")
+	t.Cleanup(func() { db.Exec("DELETE FROM scep_challenges WHERE device_id LIKE 'device%'") })
+	db.Exec("DELETE FROM scep_challenges WHERE device_id LIKE 'device%'")
 	cm := NewChallengeManager(db)
 
 	// Insert expired challenge directly

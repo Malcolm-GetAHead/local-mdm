@@ -13,7 +13,7 @@ Step-by-step guide for creating macOS and Windows VMs to test Local MDM enrollme
 
 ```
 ┌─────────────────────────────────────────────────────┐
-│  macOS Host (e.g. 192.168.1.229)                    │
+│  macOS Host (e.g. 192.168.1.102)                    │
 │                                                     │
 │  ┌──────────────┐  ┌──────────┐  ┌──────────────┐  │
 │  │ localmdm     │  │ nanomdm  │  │ nginx-tls    │  │

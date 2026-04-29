@@ -17,11 +17,13 @@ import (
 func connectAndCleanDB(t testing.TB) *db.DB {
 	t.Helper()
 	database := testutil.ConnectDB(t)
-	_, err := database.Writer.Exec("DELETE FROM certificates")
+	// Clean only test-created data (enterprises with "Test Enterprise" name),
+	// preserving real enrolled devices and Acme Corp.
+	_, err := database.Writer.Exec("DELETE FROM certificates WHERE device_id IN (SELECT id FROM devices WHERE enterprise_id IN (SELECT id FROM enterprises WHERE name = 'Test Enterprise'))")
 	if err != nil {
 		t.Fatalf("Failed to clean certificates: %v", err)
 	}
-	_, err = database.Writer.Exec("DELETE FROM devices")
+	_, err = database.Writer.Exec("DELETE FROM devices WHERE enterprise_id IN (SELECT id FROM enterprises WHERE name = 'Test Enterprise')")
 	if err != nil {
 		t.Fatalf("Failed to clean devices: %v", err)
 	}

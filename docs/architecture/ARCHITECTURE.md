@@ -664,7 +664,7 @@ In production (ECS Fargate), NanoMDM runs as a separate ECS service behind the A
 
 ### nginx TLS Proxy
 
-nginx reverse proxy terminates TLS on ports 443/8443, forwarding to the Go server on port 8080. The server cert is signed by the project CA and includes SANs for `192.168.1.229` and `enterpriseenrollment.localmdm.local`. CA certs persist via Docker volume mount (`./internal/api/certs:/app/certs`) — without this mount, every `docker compose build` regenerates the CA and breaks all enrolled devices.
+nginx reverse proxy terminates TLS on ports 443/8443, forwarding to the Go server on port 8080. The server cert is signed by the project CA and includes SANs for `192.168.1.102` and `enterpriseenrollment.localmdm.local`. CA certs persist via Docker volume mount (`./internal/api/certs:/app/certs`) — without this mount, every `docker compose build` regenerates the CA and breaks all enrolled devices.
 
 ```
 Device (HTTPS) → nginx:443 → localmdm:8080 (HTTP)

@@ -17,7 +17,7 @@ var (
 )
 
 func main() {
-	url := "https://192.168.1.229:8443/EnrollmentServer/Discovery.svc"
+	url := "https://192.168.1.102:8443/EnrollmentServer/Discovery.svc"
 	if len(os.Args) > 1 {
 		url = os.Args[1]
 	}
