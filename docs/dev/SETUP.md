@@ -103,10 +103,15 @@ Expected response:
   "data": {
     "status": "healthy",
     "version": "1.0.0",
-    "database": "connected"
+    "checks": {
+      "database": "healthy",
+      "keycloak": "healthy"
+    },
+    "timestamp": "2026-02-05T10:30:00Z"
   },
   "meta": {
-    "timestamp": "2026-02-05T10:30:00Z"
+    "timestamp": "2026-02-05T10:30:00Z",
+    "request_id": "..."
   }
 }
 ```
@@ -143,7 +148,10 @@ make migrate-force VERSION=1
 ### Testing
 
 ```bash
-# Run all tests
+# Run all tests in Docker (canonical — runs all 19 packages with race detector)
+make dev-test
+
+# Run tests on host (skips integration tests that need Docker)
 make test
 
 # Run tests with coverage
@@ -216,14 +224,12 @@ No additional setup required for development. For production:
 
 ### macOS MDM
 
-Requires APNs certificate from Apple:
+macOS device management is handled by NanoMDM (included in Docker Compose). No additional setup required for development — NanoMDM handles the Apple MDM protocol and sends webhooks to Local MDM.
 
-1. Enroll in Apple Developer Program
-2. Create MDM CSR
-3. Upload to Apple Push Certificates Portal
-4. Download APNs certificate (.p12)
-5. Place in `certs/apns.p12`
-6. Update config with certificate path and password
+For real device enrollment (beyond the mdmb simulator):
+1. Devices must be able to reach the server (use host IP, not localhost)
+2. Install the enrollment profile via Safari: `http://<host-ip>:8080/enrollment/macos/profile`
+3. APNs push certificate is a future requirement (F-01) — without it, devices only sync on reboot/manual check-in
 
 ### Android MDM
 
@@ -233,7 +239,7 @@ Requires Google Cloud project:
 2. Enable Android Management API
 3. Create service account
 4. Download service account JSON
-5. Place in `configs/android-service-account.json`
+5. Place in `secrets/google-service-account.json`
 6. Update config with project ID
 
 ## Troubleshooting
@@ -319,7 +325,7 @@ SELECT * FROM devices;
 1. Review [API Documentation](../schemas/API.md)
 2. Check [Database Schema](../schemas/DATABASE.md)
 3. Read [Architecture](../architecture/ARCHITECTURE.md)
-4. Follow [Progress](../tasks/PROGRESS.md) for implementation status
+4. Follow [Progress](../planning/PROGRESS.md) for implementation status
 
 ## Common Make Commands
 
@@ -336,14 +342,14 @@ make dev           # Start full dev environment
 
 ## Production Deployment
 
-See [DEPLOYMENT.md](DEPLOYMENT.md) for production deployment guide (coming soon).
+See [DEPLOYMENT.md](../user/DEPLOYMENT.md) for production deployment guide.
 
 ## Getting Help
 
-- Check [PROGRESS.md](PROGRESS.md) for known issues
-- Review logs in `logs/app.log`
+- Check [PROGRESS.md](../planning/PROGRESS.md) for known issues
+- Review logs via `docker compose logs localmdm` or server stdout
 - Enable debug logging in `config.yaml`
 
 ---
 
-**Last Updated**: 2026-04-21
+**Last Updated**: 2026-04-29

@@ -11,19 +11,17 @@ A quick guide to get the Local MDM server running locally and make your first AP
 
 ## Quick Start
 
-### 1. Start Services
+### 1. Start Infrastructure
 
 ```bash
-docker compose up -d
+make docker-up
 ```
 
-This starts:
+This starts the infrastructure services only (not the application):
 - **PostgreSQL 15** on port 5432 (databases: `localmdm`, `keycloak`, `nanomdm`)
 - **Keycloak 23** on port 8180 (OIDC identity provider)
 - **NanoMDM v0.9.0** on port 9000 (Apple MDM protocol handler, webhooks to Local MDM)
-- **Local MDM** on port 8080 (API server, built from source)
 - **Adminer** on port 8081 (database UI)
-- **Metrics** on port 9090 (Prometheus)
 
 Wait for all services to be healthy (~60 seconds for Keycloak):
 
@@ -31,6 +29,8 @@ Wait for all services to be healthy (~60 seconds for Keycloak):
 docker compose logs -f keycloak
 # Wait until you see: "Listening on: http://0.0.0.0:8080"
 ```
+
+> **Alternative**: Use `make dev` to start everything (infrastructure + application with hot reload) in Docker. If you use `make dev`, skip Steps 2-5 — the dev container handles migrations and starts the server automatically.
 
 ### 2. Run Migrations
 

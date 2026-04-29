@@ -3,7 +3,7 @@
 **Priority**: High  
 **Effort**: 3-4 days  
 **Score Impact**: +0.30 points  
-**Status**: Deferred for future discussion
+**Status**: Partially complete (Sprint 6 delivered macOS full pipeline + Windows enrollment)
 
 ---
 
@@ -216,21 +216,17 @@ Without real device testing:
 
 ---
 
-## Deferred from Sprint 5b: SecurityInfo Response Parsing
+## Deferred from Sprint 5b: SecurityInfo Response Parsing — ✅ COMPLETED (Sprint 6)
 
 *Added: Sprint 5b retro (2026-04-24)*
+*Completed: Sprint 6 (2026-04-28)*
 
-The macOS `CommandHandler` receives command results from NanoMDM but doesn't parse `SecurityInfo` responses. When a `SecurityInfo` command is sent to a real device, the response contains:
-
+The macOS `CheckinHandler` now parses SecurityInfo responses in `processCommandResult()`. Fields extracted:
 - `FDE_Enabled` → `FileVaultEnabled` in platform_data
 - `FirewallEnabled` → `firewall_enabled` in platform_data
 - `IsPasscodePresent` → `password_present` in platform_data
 
-These fields feed directly into the compliance engine's security policy checks. Without parsing them, compliance evaluation for macOS devices relies on whatever the device reports during check-in (which doesn't include security state).
-
-**What exists**: `BuildSecurityInfoCommand()` can build the command. `CommandHandler.ServeHTTP()` receives results. Compliance engine checks `FileVaultEnabled`, `firewall_enabled`, `password_present`.
-
-**What's needed**: Parse the SecurityInfo plist response in `CommandHandler`, extract the fields above, update the device's `platform_data`. This requires a real macOS device (or mdmb with SecurityInfo support) to test the response format.
+These feed directly into the compliance engine's security policy checks. Auto-queued on every device check-in as part of the 9-command auto-queue pipeline.
 
 ---
 

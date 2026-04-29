@@ -9,7 +9,10 @@ All HTTP responses include security headers:
 - **X-Content-Type-Options: nosniff** - Prevents MIME type sniffing
 - **X-Frame-Options: DENY** - Prevents clickjacking
 - **X-XSS-Protection: 1; mode=block** - XSS protection
-- **Content-Security-Policy: default-src 'self'** - Restricts resource loading
+- **Content-Security-Policy** - Restricts resource loading (tiered by route):
+  - API routes: `default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:`
+  - Dashboard routes: `default-src 'self'; script-src 'self' 'nonce-{n}'; style-src 'self' 'nonce-{n}'; img-src 'self' data:; connect-src 'self'` (per-request nonce)
+  - Fallback: `default-src 'self'`
 - **Referrer-Policy: strict-origin-when-cross-origin** - Controls referrer information
 - **Strict-Transport-Security** - HSTS (when TLS enabled)
 

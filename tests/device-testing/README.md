@@ -279,5 +279,5 @@ Common functions available in test scripts:
 For issues or questions:
 1. Check logs in `results/`
 2. Check screenshots in `results/screenshots/`
-3. Review [DEVICE_TESTING_TOOLING.md](../future/DEVICE_TESTING_TOOLING.md)
+3. Review [DEVICE_TESTING_TOOLING.md](../../docs/planning/future/DEVICE_TESTING_TOOLING.md)
 4. Check VM connectivity with `./scripts/setup_vms.sh`

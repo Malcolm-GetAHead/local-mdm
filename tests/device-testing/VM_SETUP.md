@@ -86,10 +86,10 @@ sudo security add-trusted-cert -d -r trustRoot \
 
 ### What Happens After Enrollment
 
-On each check-in (reboot or manual trigger), the server auto-queues 8 commands:
+On each check-in (reboot or manual trigger), the server auto-queues 9 commands:
 - SecurityInfo, DeviceInformation (35 queries), ProfileList
 - InstalledApplicationList, CertificateList, ManagedApplicationList
-- AvailableOSUpdates, OSUpdateStatus
+- AvailableOSUpdates, OSUpdateStatus, UserList
 
 Results populate `platform_data` and drive compliance evaluation. Without APNs, the server cannot push commands — reboot the VM to trigger a check-in.
 

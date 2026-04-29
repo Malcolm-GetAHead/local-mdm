@@ -1,6 +1,6 @@
 # Local MDM - Quick Reference
 
-**Last Updated**: 2026-04-20
+**Last Updated**: 2026-04-29
 
 ## Project Location
 ```
@@ -48,9 +48,11 @@ make run            # Start server
 | Service | URL |
 |---------|-----|
 | Dashboard | http://localhost:8080/dashboard/ |
+| Dashboard (HTTPS) | https://localhost:8443/dashboard/ |
 | API Server | http://localhost:8080 |
 | Health Check | http://localhost:8080/health |
 | Version | http://localhost:8080/version |
+| CRL Distribution | http://localhost:8080/crl/ca.crl |
 | Keycloak | http://localhost:8180 (requires `/etc/hosts` entry for `keycloak`) |
 | Prometheus Metrics | http://127.0.0.1:9090/metrics (internal only) |
 | Adminer (DB UI) | http://localhost:8081 |
@@ -289,6 +291,7 @@ local-mdm/
 | `token_cache` | PostgreSQL-backed token cache |
 | `idempotency_keys` | Idempotency-Key response cache |
 | `scep_challenges` | SCEP one-time-use enrollment challenges |
+| `event_queue` | EventBus event queue (LISTEN/NOTIFY) |
 
 ## Development Workflow
 
@@ -314,8 +317,8 @@ local-mdm/
 
 ## Current Phase
 
-**Sprint 5g complete** — Quality Polish. N+1 query fixes, loading indicators, empty states, error state tests, interface refactoring, blueprint assessment fixes. 199 Playwright browser tests. Tagged `v0.5.4-sprint5d`.
+**Sprint 6 complete** — Real Device Integration. macOS full data pipeline (9 auto-queued commands, 35+ device fields), Windows enrolled via Settings UI, OMA-DM sync, enterprise assignment, nginx TLS proxy with CRL distribution.
 
-**Next**: Sprint 6 (Real device integration — Windows VM, macOS VM, Android).
+**Next**: Sprint 7 (macOS Platform SSO — Java/Swift, requires Apple Developer account).
 
 ---
