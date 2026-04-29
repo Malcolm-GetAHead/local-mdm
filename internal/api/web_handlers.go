@@ -657,26 +657,30 @@ var platformValueTranslations = map[string]map[string]string{
 }
 
 // bitlockerStatusBits maps DeviceEncryptionStatus bitmask bits to descriptions.
-// Value 0 = compliant (encrypted and protection active). Non-zero is a bitmask.
-// Labels verified against real Windows 11 VM testing (2026-04-29):
-//   FullyEncrypted+ProtectionOn → 0, Suspended/Decrypted/Decrypting → 2
+// Value 0 = compliant. Non-zero is a bitmask per BitLocker CSP docs:
+// https://learn.microsoft.com/en-us/windows/client-management/mdm/bitlocker-csp#statusdeviceencryptionstatus
+//
+// Verified against real Windows 11 ARM64 VM (2026-04-29):
+//   FullyEncrypted + ProtectionOn  → 0
+//   Suspended / Decrypting / Decrypted → 2 (bit 1)
+//   EncryptionInProgress → 0
 var bitlockerStatusBits = []string{
-	"User consent needed to encrypt",       // bit 0 (value 1)
-	"Protection off or suspended",           // bit 1 (value 2) — verified: suspended, decrypted, and decrypting all report this
-	"OS volume not encrypted",               // bit 2 (value 4)
-	"TPM-only protector required",           // bit 3 (value 8)
-	"TPM+PIN required",                      // bit 4 (value 16)
-	"TPM+startup key required",              // bit 5 (value 32)
-	"TPM+PIN+startup key required",          // bit 6 (value 64)
-	"TPM required but not present",          // bit 7 (value 128)
-	"Recovery key backup failed",            // bit 8 (value 256)
-	"Fixed drive not encrypted",             // bit 9 (value 512)
-	"Fixed drive encryption issue",          // bit 10 (value 1024)
-	"Admin sign-in required to encrypt",     // bit 11 (value 2048)
-	"WinRE not configured",                  // bit 12 (value 4096)
-	"TPM not available",                     // bit 13 (value 8192)
-	"TPM not ready",                         // bit 14 (value 16384)
-	"Network unavailable for key backup",    // bit 15 (value 32768)
+	"User consent needed",                   // bit 0  — user must launch BitLocker wizard
+	"Protection off or suspended",           // bit 1  — MS: "encryption method doesn't match policy"; real-world: any state where protection is not active
+	"OS volume unprotected",                 // bit 2  — OS drive has no BitLocker protection
+	"TPM-only protector required",           // bit 3  — policy requires TPM-only but not configured
+	"TPM+PIN required",                      // bit 4  — policy requires TPM+PIN
+	"TPM+startup key required",              // bit 5  — policy requires TPM+startup key
+	"TPM+PIN+startup key required",          // bit 6  — policy requires all three
+	"TPM required but not present",          // bit 7  — policy requires TPM protector, TPM not used
+	"Recovery key backup failed",            // bit 8  — recovery key couldn't be backed up
+	"Fixed drive unprotected",               // bit 9  — fixed data drive not encrypted
+	"Fixed drive encryption method mismatch", // bit 10 — fixed drive method doesn't match policy
+	"Admin sign-in required",                // bit 11 — need admin or AllowStandardUserEncryption=1
+	"WinRE not configured",                  // bit 12 — Windows Recovery Environment missing
+	"TPM not available",                     // bit 13 — no TPM, disabled in registry, or removable drive
+	"TPM not ready",                         // bit 14 — TPM present but needs initialization
+	"Network unavailable for key backup",    // bit 15 — can't back up recovery key to network
 }
 
 func decodeBitLockerStatus(val string) string {
