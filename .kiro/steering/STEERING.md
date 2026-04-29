@@ -273,11 +273,14 @@ func TestDeviceRepository_Create(t *testing.T) {
 ```
 
 ### Test Coverage Requirements
-- **Critical paths**: 90%+ (auth, transactions, security)
+
+Measured via `make coverage-combined` (merged Go + Playwright coverage):
+
+- **Critical paths**: 92%+ (auth, audit, transactions, security)
 - **Repositories**: 80%+
-- **Handlers**: 70%+
-- **Utilities**: 60%+
-- **Overall**: Maintain or improve current coverage
+- **Handlers**: 70%+ (merged — Go-only undercounts `api` because Playwright covers web handlers)
+- **Utilities**: 85%+
+- **Overall**: 75%+
 
 ### Race Condition Testing
 ```bash
