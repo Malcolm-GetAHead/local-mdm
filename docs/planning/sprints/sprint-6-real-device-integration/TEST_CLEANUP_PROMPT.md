@@ -13,6 +13,11 @@ Read `.kiro/steering/STEERING.md` and `.kiro/steering/SESSION_NOTES.md` for proj
    ```sql
    docker compose exec postgres psql -U postgres -d localmdm -c "SELECT count(*) FROM enterprises WHERE id != '00000000-0000-0000-0000-000000000001';"
    ```
+3. Audit all test files for broad writes that could affect real data:
+   ```bash
+   grep -rn '"DELETE FROM\|"UPDATE \|"INSERT INTO' --include="*_test.go" . | grep -v "WHERE.*\$\|WHERE.*id\|WHERE.*enterprise_id\|WHERE.*device_id\|WHERE.*action"
+   ```
+   Any unscoped DELETE/UPDATE/INSERT that touches shared tables (devices, enterprises, certificates, policies) without filtering by a test-specific ID is a risk. Scope them or convert to use the test enterprise helper.
 
 ## The Pattern
 
