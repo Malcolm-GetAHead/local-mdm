@@ -15,6 +15,7 @@ import (
 	"github.com/malcolm-getahead/local-mdm/internal/models"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 )
 
 func testNanoMDMService(t *testing.T) *NanoMDMService {
@@ -551,6 +552,183 @@ func TestMaybeAutoQueue_Cooldown(t *testing.T) {
 	// Third call after cooldown should queue again
 	h.maybeAutoQueue(ctx, udid)
 	cmdRepo.AssertNumberOfCalls(t, "Create", 9)
+}
+
+// --- Integration-style webhook flow tests ---
+// These verify the full data flow through the HTTP handler, checking that
+// device records are created/updated with the correct fields from plist payloads.
+
+func TestWebhookFlow_Authenticate_CreatesDevice(t *testing.T) {
+	// Simulate: NanoMDM sends Authenticate webhook → device created with name/serial/model
+	udid := "FLOW-AUTH-UDID"
+	var updatedDevice *models.Device
+
+	repo := &MockDeviceRepository{}
+	// First call: device not found (new enrollment)
+	repo.On("GetByPlatformID", mock.Anything, "macos", udid).Return(nil, assert.AnError).Once()
+	// Create succeeds
+	repo.On("Create", mock.Anything, mock.AnythingOfType("*models.Device")).Return(nil)
+	// After create, return a device for subsequent lookups (last_seen update)
+	repo.On("GetByPlatformID", mock.Anything, "macos", udid).Return(&models.Device{
+		BaseModel: models.BaseModel{ID: uuid.New()},
+		DeviceID:  udid,
+		Platform:  "macos",
+	}, nil)
+	// Capture the device passed to Update (this is where the plist fields land)
+	repo.On("Update", mock.Anything, mock.MatchedBy(func(d *models.Device) bool {
+		if d.DeviceID == udid && d.Name != "" {
+			updatedDevice = d
+		}
+		return true
+	})).Return(nil)
+
+	svc := &Service{deviceRepo: repo}
+	logger := slog.New(slog.NewTextHandler(&bytes.Buffer{}, &slog.HandlerOptions{Level: slog.LevelError}))
+	h := NewCheckinHandler(testNanoMDMService(t), svc, nil, nil, logger)
+
+	// Authenticate plist with full device info
+	plistPayload := `<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+	<key>MessageType</key><string>Authenticate</string>
+	<key>UDID</key><string>FLOW-AUTH-UDID</string>
+	<key>SerialNumber</key><string>ZL9QG3C3RR</string>
+	<key>DeviceName</key><string>Malcolm's MacBook Pro</string>
+	<key>ModelName</key><string>MacBook Pro</string>
+	<key>OSVersion</key><string>26.2</string>
+	<key>BuildVersion</key><string>25F79</string>
+	<key>Topic</key><string>com.apple.mgmt.External.test</string>
+</dict></plist>`
+
+	event := WebhookEvent{
+		Topic: "mdm.Authenticate",
+		CheckinEvent: &CheckinEvent{
+			UDID:       &udid,
+			RawPayload: plistPayload,
+		},
+	}
+	body, _ := json.Marshal(event)
+	req := httptest.NewRequest("PUT", "/checkin", bytes.NewReader(body))
+	w := httptest.NewRecorder()
+
+	h.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusOK, w.Code)
+
+	// Verify device was created and updated with plist data
+	require.NotNil(t, updatedDevice)
+	assert.Equal(t, udid, updatedDevice.DeviceID)
+	assert.Equal(t, "ZL9QG3C3RR", updatedDevice.SerialNumber)
+	assert.Equal(t, "Malcolm's MacBook Pro", updatedDevice.Name)
+	assert.Equal(t, "MacBook Pro", updatedDevice.Model)
+	assert.Equal(t, "26.2", updatedDevice.OSVersion)
+	assert.Equal(t, "25F79", updatedDevice.PlatformData["build_version"])
+	assert.Equal(t, "com.apple.mgmt.External.test", updatedDevice.PlatformData["topic"])
+}
+
+func TestWebhookFlow_TokenUpdate_SetsEnrolled(t *testing.T) {
+	// Simulate: NanoMDM sends TokenUpdate webhook → device status set to enrolled, push_magic stored
+	udid := "FLOW-TOKEN-UDID"
+	device := &models.Device{
+		BaseModel:    models.BaseModel{ID: uuid.New()},
+		DeviceID:     udid,
+		Platform:     "macos",
+		Status:       models.DeviceStatusPending,
+		PlatformData: models.JSONB{},
+	}
+
+	repo := &MockDeviceRepository{}
+	repo.On("GetByPlatformID", mock.Anything, "macos", udid).Return(device, nil)
+	repo.On("Update", mock.Anything, mock.Anything).Return(nil)
+
+	svc := &Service{deviceRepo: repo}
+	logger := slog.New(slog.NewTextHandler(&bytes.Buffer{}, &slog.HandlerOptions{Level: slog.LevelError}))
+	h := NewCheckinHandler(testNanoMDMService(t), svc, nil, nil, logger)
+
+	plistPayload := `<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+	<key>MessageType</key><string>TokenUpdate</string>
+	<key>UDID</key><string>FLOW-TOKEN-UDID</string>
+	<key>PushMagic</key><string>AAAA-BBBB-CCCC-DDDD</string>
+	<key>Token</key><data>dGVzdC10b2tlbg==</data>
+</dict></plist>`
+
+	event := WebhookEvent{
+		Topic: "mdm.TokenUpdate",
+		CheckinEvent: &CheckinEvent{
+			UDID:       &udid,
+			RawPayload: plistPayload,
+		},
+	}
+	body, _ := json.Marshal(event)
+	req := httptest.NewRequest("PUT", "/checkin", bytes.NewReader(body))
+	w := httptest.NewRecorder()
+
+	h.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusOK, w.Code)
+
+	// Verify device status and push_magic
+	assert.Equal(t, models.DeviceStatusEnrolled, device.Status)
+	assert.Equal(t, "AAAA-BBBB-CCCC-DDDD", device.PlatformData["push_magic"])
+	assert.Equal(t, true, device.PlatformData["has_token"])
+}
+
+func TestWebhookFlow_Acknowledge_SecurityInfo(t *testing.T) {
+	// Simulate: NanoMDM sends Acknowledge with SecurityInfo → platform_data updated
+	udid := "FLOW-ACK-UDID"
+	device := &models.Device{
+		BaseModel:    models.BaseModel{ID: uuid.New()},
+		DeviceID:     udid,
+		Platform:     "macos",
+		Status:       models.DeviceStatusEnrolled,
+		PlatformData: models.JSONB{},
+	}
+
+	repo := &MockDeviceRepository{}
+	repo.On("GetByPlatformID", mock.Anything, "macos", udid).Return(device, nil)
+	repo.On("Update", mock.Anything, mock.Anything).Return(nil)
+
+	cmdRepo := &MockCommandRepository{}
+	cmdRepo.On("MarkCompleted", mock.Anything, mock.Anything).Return(nil)
+
+	svc := &Service{deviceRepo: repo}
+	logger := slog.New(slog.NewTextHandler(&bytes.Buffer{}, &slog.HandlerOptions{Level: slog.LevelError}))
+	h := NewCheckinHandler(testNanoMDMService(t), svc, cmdRepo, nil, logger)
+
+	secInfoPlist := b64Plist(`<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+	<key>CommandUUID</key><string>cmd-sec-flow</string>
+	<key>Status</key><string>Acknowledged</string>
+	<key>SecurityInfo</key><dict>
+		<key>FDE_Enabled</key><true/>
+		<key>FirewallSettings</key><dict>
+			<key>FirewallEnabled</key><true/>
+		</dict>
+	</dict>
+</dict></plist>`)
+
+	cmdUUID := "cmd-sec-flow"
+	event := WebhookEvent{
+		Topic: "mdm.Acknowledge",
+		AcknowledgeEvent: &AcknowledgeEvent{
+			UDID:        &udid,
+			CommandUUID: &cmdUUID,
+			Status:      "Acknowledged",
+			RawPayload:  secInfoPlist,
+		},
+	}
+	body, _ := json.Marshal(event)
+	req := httptest.NewRequest("PUT", "/checkin", bytes.NewReader(body))
+	w := httptest.NewRecorder()
+
+	h.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusOK, w.Code)
+
+	// Verify platform_data was updated with SecurityInfo
+	assert.Equal(t, true, device.PlatformData["FileVaultEnabled"])
+	assert.Equal(t, true, device.PlatformData["encryption_enabled"])
+	assert.Equal(t, true, device.PlatformData["firewall_enabled"])
 }
 
 func TestMaybeAutoQueue_DifferentDevices(t *testing.T) {
