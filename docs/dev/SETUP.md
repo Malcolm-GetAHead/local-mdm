@@ -181,6 +181,17 @@ make docker-down
 make docker-logs
 ```
 
+### CA Certificate Persistence
+
+The project CA certificate and key live in `./internal/api/certs/`. This directory is volume-mounted into the `localmdm` and `nanomdm` containers via `docker-compose.yml`.
+
+**Important**: If you rebuild containers without this volume mount, a new CA is generated and all previously enrolled devices lose trust. They will need to be re-enrolled.
+
+To verify the mount is in place:
+```bash
+docker compose config | grep -A2 "certs"
+```
+
 ## Configuration
 
 ### Environment Variables

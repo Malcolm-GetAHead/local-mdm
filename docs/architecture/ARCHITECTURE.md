@@ -557,6 +557,7 @@ Local MDM integrates with several micromdm projects for Apple device management.
 | [SCEP](../dependencies/scep/) | `internal/certs` | Certificate enrollment for device identity certificates |
 | [NanoLIB](../dependencies/nanolib/) | transitive | Shared utilities used by NanoMDM and NanoDEP |
 | [Keycloak](../dependencies/keycloak/) | `internal/auth` + macOS profiles | OIDC IdP for admin auth + macOS Platform SSO via UiO extensions |
+| [howett.net/plist](https://github.com/DHowett/go-plist) | `internal/platform/macos` | Apple plist parsing for MDM check-in payloads and command results |
 
 ### Integration Architecture
 
