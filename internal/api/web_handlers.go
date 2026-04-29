@@ -651,15 +651,50 @@ var platformKeyLabels = map[string]string{
 
 // platformValueTranslations maps raw CSP numeric values to human-readable text.
 var platformValueTranslations = map[string]map[string]string{
-	"bitlocker_status": {
-		"0":  "Encrypted (Compliant)",
-		"4":  "OS volume unprotected",
-		"6":  "OS unprotected, no TPM protector",
-		"14": "OS unprotected, no TPM protector, encryption method mismatch",
-	},
 	"processor_arch": {
 		"0": "x86", "5": "ARM", "9": "x64 (AMD64)", "12": "ARM64",
 	},
+}
+
+// bitlockerStatusBits maps DeviceEncryptionStatus bitmask bits to descriptions.
+// Value 0 = compliant. Non-zero is a bitmask of these error flags.
+var bitlockerStatusBits = []string{
+	"User consent needed",           // bit 0
+	"Encryption method mismatch",    // bit 1
+	"OS volume unprotected",         // bit 2
+	"TPM-only protector not used",   // bit 3
+	"TPM+PIN not used",              // bit 4
+	"TPM+startup key not used",      // bit 5
+	"TPM+PIN+key not used",          // bit 6
+	"TPM not used",                  // bit 7
+	"Recovery key backup failed",    // bit 8
+	"Fixed drive unprotected",       // bit 9
+	"Fixed drive method mismatch",   // bit 10
+	"Admin sign-in required",        // bit 11
+	"WinRE not configured",          // bit 12
+	"TPM not available",             // bit 13
+	"TPM not ready",                 // bit 14
+	"Network unavailable for backup", // bit 15
+}
+
+func decodeBitLockerStatus(val string) string {
+	if val == "0" {
+		return "Encrypted (Compliant)"
+	}
+	n, err := strconv.Atoi(val)
+	if err != nil {
+		return val
+	}
+	var issues []string
+	for i, desc := range bitlockerStatusBits {
+		if n&(1<<i) != 0 {
+			issues = append(issues, desc)
+		}
+	}
+	if len(issues) == 0 {
+		return "Non-compliant (code " + val + ")"
+	}
+	return strings.Join(issues, "; ")
 }
 
 func buildPlatformDetails(pd models.JSONB) []platformDetailGroup {
@@ -703,7 +738,9 @@ func buildPlatformDetails(pd models.JSONB) []platformDetailGroup {
 			item.Value = fmt.Sprintf("%v", v)
 		}
 		// Translate raw numeric CSP values to human-readable text
-		if translated, ok := platformValueTranslations[k][item.Value]; ok {
+		if k == "bitlocker_status" {
+			item.Value = decodeBitLockerStatus(item.Value)
+		} else if translated, ok := platformValueTranslations[k][item.Value]; ok {
 			item.Value = translated
 		}
 		groups[cat] = append(groups[cat], item)
