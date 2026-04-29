@@ -37,6 +37,8 @@ Results should update `platform_data` JSONB, triggering compliance re-evaluation
 - [ ] Make CRL endpoint path configurable
 - [ ] Add periodic cleanup of stale pending devices (>7 days in `pending` status)
 - [ ] Add "Pending Enrollments (N)" button on devices dashboard tab — clicking it shows a filtered view of devices with `status = 'pending'`, with device_id, platform, serial, and created_at. Currently pending devices are invisible in the main device list.
+- [ ] Log a warning (not fatal) when CRL auto-generation fails in `NewCAManager` — currently the error is silently swallowed (`_ = manager.GenerateCRL()`)
+- [ ] Verify `regenerate_vm_uuid.sh` works against an actual UTM clone — script was written from plist inspection but never executed
 
 ### Completed Since This Prompt Was Written
 - [x] Integration tests for full webhook flow — done (S6-07)
