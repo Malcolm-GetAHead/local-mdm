@@ -10,7 +10,7 @@
 - **Sprint 5f**: ✅ COMPLETE, merged to main (via sprint-5d branch)
 - **Sprint 5g**: ✅ COMPLETE, merged to main
 - **Sprint 5g addendum**: ✅ Blueprint assessment fixes merged (B-01 through B-10, F-03, T-04)
-- **Sprint 6**: 🔲 Not Started (Real device integration)
+- **Sprint 6**: 🟡 In Progress — macOS fully enrolled with real data pipeline, Windows protocol verified but native enrollment blocked by Azure AD requirement
 - **Retrospective**: Pending (Sprint 5b)
 ---
 
@@ -56,6 +56,15 @@
 - **When the owner asks "does that also cover X?" they already suspect it doesn't.** The CA env var support covered Local MDM but not NanoMDM (separate binary, file-based CA loading). The owner caught this immediately. Always think about the full system — all services, not just the Go code.
 - **Independent sprint tasks can run in parallel via subagents.** Mechanical tasks (assert.ErrorIs migration, SCEP test coverage) don't depend on investigation tasks. Use subagents for parallel implementation when tasks touch different files with no shared state.
 - **Don't run the retro autonomously.** "Ready for retro?" is a status check, not a go signal. The owner drives each section with explicit prompts. Wait for them.
+- **When the owner reports a UI bug, ask for the dev tools output.** The owner has the technical depth to inspect CSS. "What does the computed style show?" saves 5 iterations of blind fixes. The SVG centering issue was Tailwind preflight `display:block` — visible in dev tools on the first inspection.
+- **Scope expansion without test checkpoints creates debt.** When the owner says "add X too" repeatedly, the right response is "let me write tests for what we have first, then add X." In Sprint 6, 8 new webhook parsing functions shipped with 0% test coverage because we kept adding features without pausing to test.
+- **Restore VMs from template at the start of device testing.** Stale enrollment state from previous sessions causes confusing failures. Always start clean.
+- **NanoMDM's webhook format is NOT what you'd guess from the struct names.** The `raw_payload` is base64-encoded, `message_type` comes from the `topic` field (e.g., `mdm.Authenticate`), and `ManagedApplicationList` is a dict keyed by bundle ID, not an array. Always check the NanoMDM source at `/tmp/nanomdm-schema/service/webhook/` for the actual format.
+- **Container rebuilds regenerate the CA unless certs are volume-mounted.** The Dockerfile runs `localmdm-cli certs init` at build time. Without the `./internal/api/certs:/app/certs` mount, every `docker compose build` creates a new CA, breaking all enrolled devices and NanoMDM cert verification. This was the single most time-consuming bug in Sprint 6.
+- **Windows 11 native MDM enrollment requires Azure AD.** The Settings UI "Access work or school" flow validates the email domain against Microsoft's identity platform before proceeding to MDM. `RegisterDeviceWithManagement` API has a COM threading requirement that blocks it from any programmatic context. The only non-Azure paths are: valid .ppkg provisioning package, or Group Policy auto-enrollment for domain-joined machines.
+- **The owner notices UI issues in real-time and reports them immediately.** This is valuable feedback but causes context switching. Batch UI fixes: acknowledge the issue, add it to a list, finish the current task, then fix UI issues together. Don't interrupt a data pipeline implementation to fix SVG sizing.
+- **macOS `profiles install` was removed in macOS 26.** Profile installation requires the GUI (System Settings → Privacy & Security → Profiles). The `open` command doesn't work via SSH. Plan for GUI interaction when testing macOS enrollment.
+- **Apple MDM commands only return fields the device supports.** A VM won't return iCloud backup, Find My Mac, diagnostics, or auto-update settings. Don't assume missing fields are bugs — test on real hardware for the full field set.
 - **When the owner prescribes a technical approach, validate it against the codebase before agreeing.** The owner thinks in infrastructure ("we have real Keycloak, use it") but may not know which test patterns can access it. If a suggestion doesn't fit the code structure, explain why and propose the alternative — don't just silently do something different.
 - **Don't overestimate effort on test coverage.** "Half a day" and "diminishing returns" turned into 5 minutes and +7% coverage. Before claiming something is expensive, actually look at the uncovered lines and count them. The owner will ask you to do it anyway, and you'll look bad when it's trivial.
 - **The owner wants honest, critical feedback — not softened positives reframed as criticism.** When asked "anything I could do differently?", give actual negatives. The owner will push back if you're being too nice. They act on real feedback.
@@ -103,6 +112,8 @@
 - **pq.Listener spawns uncontrollable reconnect goroutine** — EventBus.Start() does a pre-flight sql.Open+Ping before creating the listener to avoid hangs. If you see EventBus connection issues, check the DSN has `connect_timeout`.
 - **F-07 expanded significantly in Sprint 5b** — 12 new features added (iOS, kiosk, lost mode, selective wipe, OS updates, inventory, zero-touch, alerting, self-service, app store, conditional access sync, SCIM). Review before planning next sprints.
 - **Recovery key escrow tracked in F-03** — gap analysis with 7 specific items (migration, repo, profile payloads, response parsing, API endpoint). Depends on F-01.
+- **NanoMDM config uses host IP** — `configs/config.docker.yaml` has `nanomdm_url: "http://192.168.1.229:9000"` which is host-specific. The enrollment profile uses this URL (must be reachable from VMs), but the server-to-NanoMDM API calls also use it (works from inside Docker via host networking). Needs env var override for portability.
+- **macOS webhook enterprise ID is hardcoded** — Authenticate handler uses `00000000-0000-0000-0000-000000000001`. Multi-tenant requires passing enterprise ID through the enrollment flow.
 
 ## Project-Specific Knowledge
 
@@ -135,5 +146,5 @@
 | 5b | ✅ Complete | EventBus listener, compliance wiring, lifecycle hooks, k6 load tests |
 | 5d | ✅ Complete | Web dashboard (HTMX), 199 Playwright tests |
 | 5g | ✅ Complete | Quality polish: N+1 fixes, loading indicator, empty states, error tests, interface refactor |
-| 6 | 🔲 Not Started | Real device integration (Windows VM, macOS VM, Android) |
+| 6 | 🟡 In Progress | macOS enrolled with full data pipeline (9 auto-queued commands), Windows protocol verified (SOAP/OMA-DM), native Win enrollment blocked by Azure AD |
 | 7 | 🔲 Not Started | macOS Platform SSO (Java/Swift) — requires Apple Developer account |

@@ -39,6 +39,42 @@
 - Shared Device / Kiosk Mode (Sprint 5b audit — single-app lock for retail/healthcare/warehouse)
 - Conditional Access Compliance Sync (Sprint 5b audit — push compliance to Azure AD/Google for cloud app blocking)
 - SCIM User Provisioning (Sprint 5b audit — auto-sync users from Keycloak/IdP)
+- Enrollment Token System (Sprint 6 — secure enrollment with expiring invite codes)
+
+### Enrollment Token System (Sprint 6 finding)
+
+**Problem**: Currently, anyone who knows the MDM server hostname and email format can enroll a device. The enterprise ID is either hardcoded or derived from the email address. No access control on enrollment.
+
+**Solution**: Enrollment invite tokens — short-lived, limited-use codes that authorize device enrollment to a specific enterprise.
+
+**Schema**:
+```sql
+CREATE TABLE enrollment_tokens (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    enterprise_id UUID NOT NULL REFERENCES enterprises(id),
+    token VARCHAR(64) NOT NULL UNIQUE,  -- random token, used as email local part
+    description TEXT,                    -- "IT onboarding batch 2026-05"
+    max_uses INTEGER,                    -- NULL = unlimited
+    uses_remaining INTEGER,
+    expires_at TIMESTAMPTZ NOT NULL,
+    created_by UUID REFERENCES users(id),
+    created_at TIMESTAMPTZ DEFAULT now()
+);
+```
+
+**Flow**:
+1. Admin creates enrollment token via dashboard/API: `POST /api/v1/enrollment-tokens` → returns `{token: "abc123", email: "abc123@localmdm.local"}`
+2. Admin gives the email address to the user enrolling the device
+3. User enters `abc123@localmdm.local` in Windows Settings / macOS enrollment
+4. Server extracts `abc123` from email, looks up `enrollment_tokens`, validates expiry and remaining uses
+5. Device enrolled under the token's enterprise, uses_remaining decremented
+6. Expired/exhausted tokens rejected with a clear error
+
+**Dashboard UI**:
+- Enrollment Tokens page: create, list, revoke, copy email address
+- Shows: token, enterprise, uses remaining, expires, created by
+
+**Effort**: ~1 day (migration, repo, API endpoint, enrollment handler lookup, dashboard page)
 
 ### Impact
 Without advanced features:

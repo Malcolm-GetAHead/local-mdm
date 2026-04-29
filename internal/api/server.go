@@ -758,7 +758,12 @@ func (s *Server) setupRoutes() {
 	api.Handle("/dep/{name}/devices", s.authMiddleware.RequireAuth(
 		http.HandlerFunc(s.handleDEPDevices),
 	)).Methods("GET")
-	checkinHandler := macos.NewCheckinHandler(s.nanomdmService, s.macosService, s.lifecycleService, s.logger)
+	checkinHandler := macos.NewCheckinHandler(s.nanomdmService, s.macosService, s.cmdRepo, s.lifecycleService, s.logger)
+	if s.config.MacOS.DefaultEnterpriseID != "" {
+		if eid, err := uuid.Parse(s.config.MacOS.DefaultEnterpriseID); err == nil {
+			checkinHandler.SetDefaultEnterpriseID(eid)
+		}
+	}
 	commandHandler := macos.NewCommandHandler(s.nanomdmService, s.logger)
 	s.router.Handle("/mdm", commandHandler).Methods("PUT")
 	s.router.Handle("/checkin", checkinHandler).Methods("PUT")
@@ -798,6 +803,12 @@ func (s *Server) setupRoutes() {
 	// Static files
 	s.router.PathPrefix("/static/").Handler(http.StripPrefix("/static/", http.FileServer(http.Dir("web/static"))))
 
+	// CRL distribution point for Windows TLS validation
+	s.router.HandleFunc("/crl/ca.crl", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/pkix-crl")
+		http.ServeFile(w, r, "certs/ca.crl")
+	}).Methods("GET")
+
 	// Root redirect
 	s.router.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/dashboard/", http.StatusFound)
@@ -817,6 +828,7 @@ func (s *Server) setupRoutes() {
 	dash.HandleFunc("/devices/{id}/lock", s.handleWebDeviceLock).Methods("POST")
 	dash.HandleFunc("/devices/{id}/wipe", s.handleWebDeviceWipe).Methods("POST")
 	dash.HandleFunc("/devices/{id}/unenroll", s.handleWebDeviceUnenroll).Methods("POST")
+	dash.HandleFunc("/devices/{id}/checkin", s.handleWebDeviceCheckin).Methods("POST")
 	dash.HandleFunc("/devices/{id}/evaluate", s.handleWebDeviceEvaluate).Methods("POST")
 	dash.HandleFunc("/devices/{id}/delete", s.handleWebDeviceDelete).Methods("POST")
 	dash.HandleFunc("/policies", s.handleWebPolicyList).Methods("GET")

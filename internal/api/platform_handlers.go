@@ -7,10 +7,12 @@ import (
 	"crypto/x509"
 	"encoding/hex"
 	"encoding/pem"
+	"encoding/xml"
 	"errors"
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -54,7 +56,10 @@ func (s *Server) handleMacOSEnrollmentProfile(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	serverURL := fmt.Sprintf("https://%s", r.Host)
+	serverURL := fmt.Sprintf("http://%s", r.Host)
+	if r.TLS != nil {
+		serverURL = fmt.Sprintf("https://%s", r.Host)
+	}
 	scepURL := serverURL + "/scep"
 	topic := s.config.MacOS.PushTopic
 	orgName := "Local MDM"
@@ -94,7 +99,7 @@ func (s *Server) handleMacOSEnrollmentProfile(w http.ResponseWriter, r *http.Req
 	w.Write(profile)
 }
 
-// Windows discovery service
+// Windows discovery service — handles MS-MDE2 SOAP discovery
 func (s *Server) handleWindowsDiscoveryService(w http.ResponseWriter, r *http.Request) {
 	body, err := io.ReadAll(io.LimitReader(r.Body, 1<<20))
 	if err != nil {
@@ -104,13 +109,15 @@ func (s *Server) handleWindowsDiscoveryService(w http.ResponseWriter, r *http.Re
 	}
 
 	if len(body) == 0 {
-		respondError(w, r, http.StatusBadRequest, "empty_body", "Request body is empty")
+		// Windows first sends a GET to check the endpoint exists, then POST with SOAP
+		w.Header().Set("Content-Type", "application/soap+xml; charset=utf-8")
+		w.WriteHeader(http.StatusOK)
 		return
 	}
 
-	req, err := windows.ParseDiscoverRequest(body)
+	req, messageID, err := windows.ParseDiscoverRequest(body)
 	if err != nil {
-		s.logger.Error("failed to parse discovery request", "error", err)
+		s.logger.Error("failed to parse discovery request", "error", err, "body", string(body))
 		respondError(w, r, http.StatusBadRequest, "parse_failed", "Invalid discovery request")
 		return
 	}
@@ -118,10 +125,16 @@ func (s *Server) handleWindowsDiscoveryService(w http.ResponseWriter, r *http.Re
 	s.logger.Info("windows discovery request",
 		"email", req.Request.EmailAddress,
 		"device_type", req.Request.DeviceType,
+		"request_version", req.Request.RequestVersion,
+		"message_id", messageID,
 	)
 
-	serverURL := fmt.Sprintf("https://%s", r.Host)
-	// Include enterprise_id in enrollment URL if present in discovery URL
+	// Detect scheme from TLS or reverse proxy header
+	scheme := "http"
+	if r.TLS != nil || r.Header.Get("X-Forwarded-Proto") == "https" {
+		scheme = "https"
+	}
+	serverURL := fmt.Sprintf("%s://%s", scheme, r.Host)
 	enterpriseID := mux.Vars(r)["enterprise_id"]
 	enrollmentURL := serverURL + "/EnrollmentServer/Enrollment.svc"
 	if enterpriseID != "" {
@@ -129,7 +142,7 @@ func (s *Server) handleWindowsDiscoveryService(w http.ResponseWriter, r *http.Re
 	}
 	policyURL := serverURL + "/EnrollmentServer/Policy.svc"
 
-	resp, err := windows.GenerateDiscoverResponse(enrollmentURL, policyURL)
+	resp, err := windows.GenerateDiscoverResponse(enrollmentURL, policyURL, messageID)
 	if err != nil {
 		s.logger.Error("failed to generate discovery response", "error", err)
 		respondError(w, r, http.StatusInternalServerError, "generation_failed", "Failed to generate response")
@@ -137,6 +150,7 @@ func (s *Server) handleWindowsDiscoveryService(w http.ResponseWriter, r *http.Re
 	}
 
 	w.Header().Set("Content-Type", "application/soap+xml; charset=utf-8")
+	w.Header().Set("Content-Length", fmt.Sprintf("%d", len(resp)))
 	w.WriteHeader(http.StatusOK)
 	w.Write(resp)
 }
@@ -158,10 +172,13 @@ func (s *Server) handleWindowsEnrollmentService(w http.ResponseWriter, r *http.R
 
 	env, err := windows.ParseEnrollmentRequest(body)
 	if err != nil {
-		s.logger.Error("failed to parse enrollment request", "error", err)
+		s.logger.Error("failed to parse enrollment request", "error", err, "body_len", len(body))
 		respondError(w, r, http.StatusBadRequest, "parse_failed", "Invalid enrollment request")
 		return
 	}
+
+	// Extract the client's MessageID for RelatesTo in response
+	relatesToMessageID := env.Header.MessageID
 
 	csrData, err := windows.ExtractCSR(env)
 	if err != nil {
@@ -175,13 +192,83 @@ func (s *Server) handleWindowsEnrollmentService(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	// Create a pending device record
+	// Extract device info from AdditionalContext
+	additionalCtx := windows.ExtractAdditionalContext(env)
+	hwDeviceID := ""
+	deviceName := ""
+	osVersion := ""
+	if additionalCtx != nil {
+		hwDeviceID = additionalCtx.GetContextValue("DeviceID")
+		deviceName = additionalCtx.GetContextValue("DeviceName")
+		osVersion = additionalCtx.GetContextValue("OSVersion")
+	}
+
 	deviceID := uuid.New()
+
+	// Use hardware DeviceID from AdditionalContext if available, otherwise use our UUID
+	storedDeviceID := deviceID.String()
+	if hwDeviceID != "" {
+		storedDeviceID = hwDeviceID
+	}
+
+	// Determine enterprise ID from URL path, email username (UUID), or fallback
+	enterpriseID := uuid.Nil
+	if eidStr := mux.Vars(r)["enterprise_id"]; eidStr != "" {
+		if eid, err := uuid.Parse(eidStr); err == nil {
+			enterpriseID = eid
+		}
+	}
+	if enterpriseID == uuid.Nil && env.Header.Security != nil && env.Header.Security.UsernameToken != nil {
+		username := env.Header.Security.UsernameToken.Username
+		if atIdx := strings.Index(username, "@"); atIdx > 0 {
+			if eid, err := uuid.Parse(username[:atIdx]); err == nil {
+				enterpriseID = eid
+			}
+		}
+	}
+	if enterpriseID == uuid.Nil {
+		enterpriseID = uuid.MustParse("00000000-0000-0000-0000-000000000001") // default
+	}
+
+	// Create device record BEFORE signing CSR (certificates table has FK to devices)
+	if enterpriseID != uuid.Nil {
+		// Try to find existing device first (re-enrollment)
+		existing, _ := s.deviceRepo.GetByPlatformID(r.Context(), models.PlatformWindows, storedDeviceID)
+		if existing != nil {
+			deviceID = existing.ID
+			existing.Name = deviceName
+			existing.OSVersion = osVersion
+			existing.Status = models.DeviceStatusEnrolled
+			_ = s.deviceRepo.Update(r.Context(), existing)
+		} else {
+			device := &models.Device{
+				BaseModel:    models.BaseModel{ID: deviceID},
+				EnterpriseID: enterpriseID,
+				Platform:     models.PlatformWindows,
+				DeviceID:     storedDeviceID,
+				Name:         deviceName,
+				OSVersion:    osVersion,
+				Status:       models.DeviceStatusEnrolled,
+				PlatformData: models.JSONB{},
+			}
+			if err := s.deviceRepo.Create(r.Context(), device); err != nil {
+				s.logger.Error("failed to create windows device record", "error", err, "device_id", deviceID)
+				respondError(w, r, http.StatusInternalServerError, "device_creation_failed", "Failed to create device record")
+				return
+			}
+		}
+		s.logger.Info("windows device record created",
+			"device_id", deviceID,
+			"hw_device_id", storedDeviceID,
+			"enterprise_id", enterpriseID,
+			"device_name", deviceName,
+		)
+	}
 
 	// PEM-encode the DER CSR for the certificate service
 	csrPEM := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE REQUEST", Bytes: csrData})
 
-	// Sign the CSR
+	// Sign the CSR (stores cert in DB with FK to device)
 	validity := 365 * 24 * time.Hour
 	certPEM, err := s.certService.SignDeviceCSR(r.Context(), deviceID, csrPEM, validity)
 	if err != nil {
@@ -190,7 +277,7 @@ func (s *Server) handleWindowsEnrollmentService(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	// Parse the signed cert to get thumbprint for provisioning XML
+	// Parse the signed cert
 	block, _ := decodePEMBlock(certPEM)
 	if block == nil {
 		s.logger.Error("failed to decode signed certificate PEM")
@@ -198,47 +285,43 @@ func (s *Server) handleWindowsEnrollmentService(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	cert, err := x509.ParseCertificate(block)
+	deviceCert, err := x509.ParseCertificate(block)
 	if err != nil {
 		s.logger.Error("failed to parse signed certificate", "error", err)
 		respondError(w, r, http.StatusInternalServerError, "internal_error", "Failed to process certificate")
 		return
 	}
 
-	// Generate provisioning XML and enrollment response
-	serverURL := fmt.Sprintf("https://%s", r.Host)
-	thumbprint := fmt.Sprintf("%X", sha256.Sum256(cert.Raw))
-	provisioningXML := windows.GenerateProvisioningXML(serverURL, thumbprint)
+	// Get CA certificate for provisioning XML
+	caCert, err := s.certService.GetCACertificate()
+	if err != nil {
+		s.logger.Error("failed to get CA certificate", "error", err)
+		respondError(w, r, http.StatusInternalServerError, "internal_error", "Failed to get CA certificate")
+		return
+	}
 
-	resp, err := windows.GenerateEnrollmentResponse(cert, provisioningXML)
+	// Build management URL — full path to the OMA-DM endpoint
+	scheme := "http"
+	if r.TLS != nil || r.Header.Get("X-Forwarded-Proto") == "https" {
+		scheme = "https"
+	}
+	managementURL := fmt.Sprintf("%s://%s/ManagementServer/MDM.svc", scheme, r.Host)
+
+	// Generate provisioning XML with CA cert, device cert, and management URL
+	provisioningXML := windows.GenerateProvisioningXML(managementURL, caCert, deviceCert)
+
+	// Generate SOAP response with provisioning XML as the BinarySecurityToken
+	resp, err := windows.GenerateEnrollmentResponse(provisioningXML, relatesToMessageID)
 	if err != nil {
 		s.logger.Error("failed to generate enrollment response", "error", err)
 		respondError(w, r, http.StatusInternalServerError, "generation_failed", "Failed to generate enrollment response")
 		return
 	}
 
-	// Create device record (enterprise_id from URL path)
-	if eidStr := mux.Vars(r)["enterprise_id"]; eidStr != "" {
-		if enterpriseID, err := uuid.Parse(eidStr); err == nil {
-			device := &models.Device{
-				BaseModel:    models.BaseModel{ID: deviceID},
-				EnterpriseID: enterpriseID,
-				Platform:     models.PlatformWindows,
-				DeviceID:     deviceID.String(),
-				Status:       models.DeviceStatusEnrolled,
-				PlatformData: models.JSONB{},
-			}
-			if err := s.deviceRepo.Create(r.Context(), device); err != nil {
-				s.logger.Error("failed to create windows device record", "error", err, "device_id", deviceID)
-			} else {
-				s.logger.Info("windows device record created", "device_id", deviceID, "enterprise_id", enterpriseID)
-			}
-		}
-	}
-
 	s.logAudit(r, "enrollment.windows.complete", "device", deviceID, map[string]interface{}{
-		"platform":    models.PlatformWindows,
-		"cert_serial": cert.SerialNumber.String(),
+		"platform":      models.PlatformWindows,
+		"cert_serial":   deviceCert.SerialNumber.String(),
+		"hw_device_id":  storedDeviceID,
 	})
 	if s.metrics != nil {
 		s.metrics.EnrollmentsTotal.WithLabelValues(models.PlatformWindows, "complete").Inc()
@@ -247,38 +330,56 @@ func (s *Server) handleWindowsEnrollmentService(w http.ResponseWriter, r *http.R
 
 	s.logger.Info("windows enrollment complete",
 		"device_id", deviceID,
-		"cert_serial", cert.SerialNumber,
+		"hw_device_id", storedDeviceID,
+		"cert_serial", deviceCert.SerialNumber,
 	)
 
 	w.Header().Set("Content-Type", "application/soap+xml; charset=utf-8")
+	w.Header().Set("Content-Length", fmt.Sprintf("%d", len(resp)))
 	w.WriteHeader(http.StatusOK)
 	w.Write(resp)
 }
 
-// Windows policy service
+// Windows policy service — returns enrollment policy per MS-XCEP
 func (s *Server) handleWindowsPolicyService(w http.ResponseWriter, r *http.Request) {
-	policy := `<?xml version="1.0" encoding="UTF-8"?>
-<s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope">
-  <s:Body>
+	// Read body to extract MessageID for RelatesTo header
+	body, _ := io.ReadAll(io.LimitReader(r.Body, 1<<20))
+	messageID := ""
+	if len(body) > 0 {
+		// Quick extract of MessageID from SOAP header
+		var env struct {
+			Header struct {
+				MessageID string `xml:"http://www.w3.org/2005/08/addressing MessageID"`
+			} `xml:"Header"`
+		}
+		if xml.Unmarshal(body, &env) == nil {
+			messageID = env.Header.MessageID
+		}
+	}
+
+	policy := fmt.Sprintf(`<?xml version="1.0" encoding="UTF-8"?>
+<s:Envelope
+   xmlns:u="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-utility-1.0.xsd"
+   xmlns:s="http://www.w3.org/2003/05/soap-envelope"
+   xmlns:a="http://www.w3.org/2005/08/addressing">
+  <s:Header>
+    <a:Action s:mustUnderstand="1">http://schemas.microsoft.com/windows/pki/2009/01/enrollmentpolicy/IPolicy/GetPoliciesResponse</a:Action>
+    <a:RelatesTo>%s</a:RelatesTo>
+  </s:Header>
+  <s:Body xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+     xmlns:xsd="http://www.w3.org/2001/XMLSchema">
     <GetPoliciesResponse xmlns="http://schemas.microsoft.com/windows/pki/2009/01/enrollmentpolicy">
       <response>
-        <policyID>LocalMDM</policyID>
-        <policyFriendlyName>LocalMDM Enrollment Policy</policyFriendlyName>
-        <nextUpdateHours>12</nextUpdateHours>
-        <policiesNotChanged>false</policiesNotChanged>
+        <policyID/>
+        <policyFriendlyName xsi:nil="true"/>
+        <nextUpdateHours xsi:nil="true"/>
+        <policiesNotChanged xsi:nil="true"/>
         <policies>
           <policy>
             <policyOIDReference>0</policyOIDReference>
-            <cAs>
-              <cA>
-                <uris>
-                  <uri>https://` + r.Host + `/EnrollmentServer/Enrollment.svc</uri>
-                </uris>
-                <certificate></certificate>
-              </cA>
-            </cAs>
+            <cAs xsi:nil="true"/>
             <attributes>
-              <commonName>LocalMDM</commonName>
+              <commonName>LocalMDMEnrollment</commonName>
               <policySchema>3</policySchema>
               <certificateValidity>
                 <validityPeriodSeconds>31536000</validityPeriodSeconds>
@@ -290,23 +391,44 @@ func (s *Server) handleWindowsPolicyService(w http.ResponseWriter, r *http.Reque
               </permission>
               <privateKeyAttributes>
                 <minimalKeyLength>2048</minimalKeyLength>
-                <keySpec>1</keySpec>
-                <keyUsageProperty>160</keyUsageProperty>
-                <permissions>1</permissions>
-                <algorithmOIDReference>0</algorithmOIDReference>
-                <cryptoProviders>
-                  <provider>Microsoft Software Key Storage Provider</provider>
-                </cryptoProviders>
+                <keySpec xsi:nil="true"/>
+                <keyUsageProperty xsi:nil="true"/>
+                <permissions xsi:nil="true"/>
+                <algorithmOIDReference xsi:nil="true"/>
+                <cryptoProviders xsi:nil="true"/>
               </privateKeyAttributes>
+              <revision>
+                <majorRevision>101</majorRevision>
+                <minorRevision>0</minorRevision>
+              </revision>
+              <supersededPolicies xsi:nil="true"/>
+              <privateKeyFlags xsi:nil="true"/>
+              <subjectNameFlags xsi:nil="true"/>
+              <enrollmentFlags xsi:nil="true"/>
+              <generalFlags xsi:nil="true"/>
+              <hashAlgorithmOIDReference>0</hashAlgorithmOIDReference>
+              <rARequirements xsi:nil="true"/>
+              <keyArchivalAttributes xsi:nil="true"/>
+              <extensions xsi:nil="true"/>
             </attributes>
           </policy>
         </policies>
       </response>
+      <cAs xsi:nil="true"/>
+      <oIDs>
+        <oID>
+          <value>1.3.14.3.2.29</value>
+          <group>1</group>
+          <oIDReferenceID>0</oIDReferenceID>
+          <defaultName>szOID_OIWSEC_sha1RSASign</defaultName>
+        </oID>
+      </oIDs>
     </GetPoliciesResponse>
   </s:Body>
-</s:Envelope>`
+</s:Envelope>`, messageID)
 
 	w.Header().Set("Content-Type", "application/soap+xml; charset=utf-8")
+	w.Header().Set("Content-Length", fmt.Sprintf("%d", len(policy)))
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte(policy))
 }
@@ -542,6 +664,15 @@ func (s *Server) handleWindowsManagementSync(w http.ResponseWriter, r *http.Requ
 		s.logger.Error("failed to handle OMA-DM sync", "error", err)
 		http.Error(w, "Failed to process sync", http.StatusInternalServerError)
 		return
+	}
+
+	// Update last_seen for the syncing device
+	if deviceID := windows.ExtractDeviceIDFromSyncML(body); deviceID != "" {
+		if device, err := s.deviceRepo.GetByPlatformID(r.Context(), models.PlatformWindows, deviceID); err == nil {
+			now := time.Now()
+			device.LastSeen = &now
+			_ = s.deviceRepo.Update(r.Context(), device)
+		}
 	}
 
 	w.Header().Set("Content-Type", "application/vnd.syncml.dm+xml")

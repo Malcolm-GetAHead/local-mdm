@@ -118,6 +118,31 @@ var templateFuncs = template.FuncMap{
 	},
 	"printf": fmt.Sprintf,
 	"add": func(a, b int) int { return a + b },
+	"formatBytes": func(v interface{}) string {
+		var bytes float64
+		switch b := v.(type) {
+		case float64:
+			bytes = b
+		case int:
+			bytes = float64(b)
+		case int64:
+			bytes = float64(b)
+		case uint64:
+			bytes = float64(b)
+		default:
+			return "—"
+		}
+		switch {
+		case bytes >= 1<<30:
+			return fmt.Sprintf("%.1f GB", bytes/float64(1<<30))
+		case bytes >= 1<<20:
+			return fmt.Sprintf("%.1f MB", bytes/float64(1<<20))
+		case bytes >= 1<<10:
+			return fmt.Sprintf("%.1f KB", bytes/float64(1<<10))
+		default:
+			return fmt.Sprintf("%.0f B", bytes)
+		}
+	},
 	"sub": func(a, b int) int { return a - b },
 	"safeHTML": func(s string) template.HTML { return template.HTML(s) },
 	"csrfField": func(token interface{}) template.HTML {

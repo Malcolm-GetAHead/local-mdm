@@ -7,6 +7,8 @@
         {{if eq .Device.Status "enrolled"}}
         {{if or (eq .UserRole "admin") (eq .UserRole "operator") (eq .UserRole "super_admin")}}
         <span id="device-actions" class="flex gap-2">
+            <button hx-post="/dashboard/devices/{{.Device.ID}}/checkin" hx-target="#device-actions" hx-swap="innerHTML"
+                    class="btn-secondary text-xs">Force Check-in</button>
             <button hx-post="/dashboard/devices/{{.Device.ID}}/lock" hx-target="#device-actions" hx-swap="innerHTML"
                     hx-confirm="Lock this device?" class="btn-secondary text-xs">Lock</button>
             <button hx-post="/dashboard/devices/{{.Device.ID}}/unenroll" hx-target="#device-actions" hx-swap="innerHTML"
@@ -71,6 +73,12 @@
         <button class="tab-btn px-6 py-3 text-sm font-medium border-b-2 border-blue-600 text-blue-600 dark:text-blue-400" data-tab="compliance">Compliance</button>
         <button class="tab-btn px-6 py-3 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400" data-tab="policies">Policies</button>
         <button class="tab-btn px-6 py-3 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400" data-tab="commands">Commands</button>
+        <button class="tab-btn px-6 py-3 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400" data-tab="profiles">Profiles</button>
+        <button class="tab-btn px-6 py-3 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400" data-tab="apps">Applications</button>
+        <button class="tab-btn px-6 py-3 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400" data-tab="certs">Certificates</button>
+        <button class="tab-btn px-6 py-3 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400" data-tab="updates">Updates</button>
+        <button class="tab-btn px-6 py-3 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400" data-tab="users">Users</button>
+        <button class="tab-btn px-6 py-3 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400" data-tab="extensions">Extensions</button>
         <button class="tab-btn px-6 py-3 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400" data-tab="platform">Platform Details</button>
     </div>
 
@@ -104,6 +112,104 @@
                 <td class="px-6 py-2 text-gray-500 dark:text-gray-400">{{timeAgo .CreatedAt}}</td>
             </tr>
             {{else}}<tr><td colspan="3" class="px-6 py-4 text-center text-gray-500 dark:text-gray-400">No commands</td></tr>{{end}}
+            </tbody>
+        </table>
+    </div>
+
+    <div class="tab-panel hidden" id="tab-profiles">
+        <table class="w-full text-sm">
+            <thead><tr class="table-header"><th class="px-6 py-2">Profile Name</th><th class="px-6 py-2">Identifier</th><th class="px-6 py-2">Organization</th><th class="px-6 py-2">Managed</th></tr></thead>
+            <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+            {{range .InstalledProfiles}}
+            <tr>
+                <td class="px-6 py-2 font-medium">{{index . "name"}}</td>
+                <td class="px-6 py-2 font-mono text-xs text-gray-500 dark:text-gray-400">{{index . "identifier"}}</td>
+                <td class="px-6 py-2">{{index . "organization"}}</td>
+                <td class="px-6 py-2">{{if index . "is_managed"}}<span class="text-green-600">✓</span>{{else}}<span class="text-gray-400">—</span>{{end}}</td>
+            </tr>
+            {{else}}<tr><td colspan="4" class="px-6 py-4 text-center text-gray-500 dark:text-gray-400">No profile data — data is collected on device check-in</td></tr>{{end}}
+            </tbody>
+        </table>
+    </div>
+
+    <div class="tab-panel hidden" id="tab-apps">
+        <table class="w-full text-sm">
+            <thead><tr class="table-header"><th class="px-6 py-2">Application</th><th class="px-6 py-2">Bundle ID</th><th class="px-6 py-2">Version</th><th class="px-6 py-2">Size</th><th class="px-6 py-2">Managed</th></tr></thead>
+            <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+            {{range .InstalledApps}}
+            <tr>
+                <td class="px-6 py-2 font-medium">{{index . "name"}}</td>
+                <td class="px-6 py-2 font-mono text-xs text-gray-500 dark:text-gray-400">{{index . "identifier"}}</td>
+                <td class="px-6 py-2">{{index . "version"}}</td>
+                <td class="px-6 py-2 text-gray-500 dark:text-gray-400">{{formatBytes (index . "bundle_size")}}</td>
+                <td class="px-6 py-2">{{if index . "managed"}}<span class="text-green-600">✓ MDM</span>{{else}}<span class="text-gray-400">—</span>{{end}}</td>
+            </tr>
+            {{else}}<tr><td colspan="5" class="px-6 py-4 text-center text-gray-500 dark:text-gray-400">No application data — data is collected on device check-in</td></tr>{{end}}
+            </tbody>
+        </table>
+    </div>
+
+    <div class="tab-panel hidden" id="tab-certs">
+        <table class="w-full text-sm">
+            <thead><tr class="table-header"><th class="px-6 py-2">Common Name</th><th class="px-6 py-2">Identity</th></tr></thead>
+            <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+            {{range .Certificates}}
+            <tr>
+                <td class="px-6 py-2 font-medium">{{index . "common_name"}}</td>
+                <td class="px-6 py-2">{{if index . "is_identity"}}<span class="text-green-600">✓ Identity</span>{{else}}<span class="text-gray-400">Certificate</span>{{end}}</td>
+            </tr>
+            {{else}}<tr><td colspan="2" class="px-6 py-4 text-center text-gray-500 dark:text-gray-400">No certificate data — data is collected on device check-in</td></tr>{{end}}
+            </tbody>
+        </table>
+    </div>
+
+    <div class="tab-panel hidden" id="tab-updates">
+        <table class="w-full text-sm">
+            <thead><tr class="table-header"><th class="px-6 py-2">Update</th><th class="px-6 py-2">Version</th><th class="px-6 py-2">Build</th><th class="px-6 py-2">Size</th><th class="px-6 py-2">Critical</th><th class="px-6 py-2">Restart</th></tr></thead>
+            <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+            {{range .AvailableUpdates}}
+            <tr>
+                <td class="px-6 py-2 font-medium">{{if index . "human_readable_name"}}{{index . "human_readable_name"}}{{else}}{{index . "product_name"}}{{end}}</td>
+                <td class="px-6 py-2">{{index . "version"}}</td>
+                <td class="px-6 py-2 font-mono text-xs">{{index . "build"}}</td>
+                <td class="px-6 py-2 text-gray-500 dark:text-gray-400">{{formatBytes (index . "download_size")}}</td>
+                <td class="px-6 py-2">{{if index . "is_critical"}}<span class="badge badge-red">Critical</span>{{else}}<span class="text-gray-400">—</span>{{end}}</td>
+                <td class="px-6 py-2">{{if index . "restart_required"}}<span class="text-yellow-600">Yes</span>{{else}}No{{end}}</td>
+            </tr>
+            {{else}}<tr><td colspan="6" class="px-6 py-4 text-center text-gray-500 dark:text-gray-400">No pending updates — device is up to date or data not yet collected</td></tr>{{end}}
+            </tbody>
+        </table>
+    </div>
+
+    <div class="tab-panel hidden" id="tab-users">
+        <table class="w-full text-sm">
+            <thead><tr class="table-header"><th class="px-6 py-2">Username</th><th class="px-6 py-2">Full Name</th><th class="px-6 py-2">UID</th><th class="px-6 py-2">Admin</th><th class="px-6 py-2">Secure Token</th></tr></thead>
+            <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+            {{range .LocalUsers}}
+            <tr>
+                <td class="px-6 py-2 font-medium">{{index . "username"}}</td>
+                <td class="px-6 py-2">{{index . "full_name"}}</td>
+                <td class="px-6 py-2 font-mono text-xs text-gray-500 dark:text-gray-400">{{index . "uid"}}</td>
+                <td class="px-6 py-2">{{if index . "is_admin"}}<span class="text-yellow-600">✓ Admin</span>{{else}}<span class="text-gray-400">Standard</span>{{end}}</td>
+                <td class="px-6 py-2">{{if index . "has_secure_token"}}<span class="text-green-600">✓</span>{{else}}<span class="text-gray-400">—</span>{{end}}</td>
+            </tr>
+            {{else}}<tr><td colspan="5" class="px-6 py-4 text-center text-gray-500 dark:text-gray-400">No user data — data is collected on device check-in</td></tr>{{end}}
+            </tbody>
+        </table>
+    </div>
+
+    <div class="tab-panel hidden" id="tab-extensions">
+        <table class="w-full text-sm">
+            <thead><tr class="table-header"><th class="px-6 py-2">Extension</th><th class="px-6 py-2">Type</th><th class="px-6 py-2">Bundle ID</th><th class="px-6 py-2">Container App</th></tr></thead>
+            <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+            {{range .ActiveExtensions}}
+            <tr>
+                <td class="px-6 py-2 font-medium">{{index . "display_name"}}</td>
+                <td class="px-6 py-2">{{index . "extension_point"}}</td>
+                <td class="px-6 py-2 font-mono text-xs text-gray-500 dark:text-gray-400">{{index . "identifier"}}</td>
+                <td class="px-6 py-2">{{index . "container_name"}}</td>
+            </tr>
+            {{else}}<tr><td colspan="4" class="px-6 py-4 text-center text-gray-500 dark:text-gray-400">No extension data — data is collected on device check-in</td></tr>{{end}}
             </tbody>
         </table>
     </div>

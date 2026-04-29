@@ -147,9 +147,28 @@ Each protocol fix discovered during testing should be committed individually wit
 
 | Platform | Enrolled | Syncs Data | Policy Applied | Compliance Evaluated |
 |----------|----------|------------|----------------|---------------------|
-| Windows  | ☐        | ☐          | ☐              | ☐                   |
-| macOS    | ☐        | ☐          | ☐ (check-in only, no APNs) | ☐        |
-| Android  | ☐        | ☐          | ☐              | ☐                   |
+| Windows  | ⚠️ Protocol verified (SOAP), native enrollment blocked by Azure AD requirement on Win11 | ⚠️ OMA-DM sync verified via SOAP | ☐ | ☐ |
+| macOS    | ✅ Real device via SCEP + NanoMDM | ✅ 9 auto-queued commands, full data pipeline | ✅ Check-in only (no APNs push) | ✅ Real FileVault/Firewall evaluation |
+| Android  | ☐ Not attempted (requires Google Cloud project) | ☐ | ☐ | ☐ |
+
+### What was actually delivered (beyond original plan)
+
+- **macOS full data pipeline**: SecurityInfo, DeviceInformation (35 queries), ProfileList, InstalledApplicationList, CertificateList, ManagedApplicationList, AvailableOSUpdates, OSUpdateStatus, UserList — all auto-queued on check-in with 15min cooldown
+- **Dashboard tabs**: Compliance, Policies, Commands, Profiles, Applications, Certificates, Updates, Users, Extensions, Platform Details — all populated from real device data
+- **Compliance against real data**: FileVault enabled → encryption pass, Firewall disabled → firewall fail
+- **Command tracking**: Auto-queued commands show in Commands tab with sent → completed status
+- **Force Check-in button**: Ready for APNs (shows friendly error without push cert)
+- **Persistent CA**: Mounted from host, survives container rebuilds
+- **nginx TLS proxy**: Port 443/8443 with CA-signed cert for Windows HTTPS requirement
+- **NanoMDM v0.9.0 webhook integration**: Full plist parsing with base64 decode
+- **Windows protocol fixes**: SOAP envelope wrapping, RSTRC wrapper, provisioning XML with certs, device ID mapping
+
+### Windows enrollment blockers (for future sprint)
+
+1. `RegisterDeviceWithManagement` API has COM threading requirement — fails with `0x80010106` from any programmatic context
+2. Windows 11 Settings UI "Access work or school" requires Azure AD identity validation before MDM enrollment
+3. PPKG format requires Windows ADK tooling (`icd.exe`) to produce valid packages — our ZIP-based generator is incomplete
+4. Server-side protocol is fully verified and correct — the blocker is entirely device-side
 
 ---
 

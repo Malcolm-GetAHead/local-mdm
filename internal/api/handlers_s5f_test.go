@@ -802,12 +802,12 @@ func TestHandleAndroidEnrollmentToken(t *testing.T) {
 }
 
 func TestHandleWindowsDiscoveryService(t *testing.T) {
-	t.Run("rejects empty body", func(t *testing.T) {
+	t.Run("returns 200 for empty body (GET probe)", func(t *testing.T) {
 		ts := newTestServer(t)
-		ts.server.router.HandleFunc("/EnrollmentServer/Discovery.svc", ts.server.handleWindowsDiscoveryService).Methods("POST")
+		ts.server.router.HandleFunc("/EnrollmentServer/Discovery.svc", ts.server.handleWindowsDiscoveryService).Methods("GET", "POST")
 
 		req := httptest.NewRequest("POST", "/EnrollmentServer/Discovery.svc", nil)
 		w := ts.do(req)
-		assert.Equal(t, http.StatusBadRequest, w.Code)
+		assert.Equal(t, http.StatusOK, w.Code)
 	})
 }

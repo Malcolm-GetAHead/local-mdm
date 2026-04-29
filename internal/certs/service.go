@@ -44,7 +44,19 @@ func (s *CertificateService) SignDeviceCSR(ctx context.Context, deviceID uuid.UU
 
 	csr, err := x509.ParseCertificateRequest(block.Bytes)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse CSR: %w", err)
+		// Windows CSRs may contain non-PrintableString characters that Go's
+		// strict ASN.1 parser rejects. Fall back to signing with a generic subject.
+		cert, signErr := s.ca.SignRawCSR(block.Bytes, validity)
+		if signErr != nil {
+			return nil, fmt.Errorf("failed to parse CSR: %w (fallback also failed: %v)", err, signErr)
+		}
+		certPEM := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: cert.Raw})
+		if storeErr := s.store.StoreCertificate(ctx, uuid.New(), deviceID, "device",
+			cert.Subject.CommonName, cert.SerialNumber.String(), string(certPEM),
+			cert.NotBefore, cert.NotAfter); storeErr != nil {
+			return nil, fmt.Errorf("failed to store certificate: %w", storeErr)
+		}
+		return certPEM, nil
 	}
 
 	// Sign certificate

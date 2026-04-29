@@ -5,6 +5,7 @@ import (
 	"crypto/rsa"
 	"crypto/x509"
 	"crypto/x509/pkix"
+	"encoding/asn1"
 	"encoding/pem"
 	"fmt"
 	"math/big"
@@ -134,7 +135,7 @@ func (m *CAManager) generateCA() error {
 		},
 		NotBefore:             time.Now(),
 		NotAfter:              time.Now().AddDate(10, 0, 0), // 10 years
-		KeyUsage:              x509.KeyUsageCertSign | x509.KeyUsageCRLSign,
+		KeyUsage:              x509.KeyUsageCertSign | x509.KeyUsageCRLSign | x509.KeyUsageDigitalSignature | x509.KeyUsageKeyEncipherment,
 		BasicConstraintsValid: true,
 		IsCA:                  true,
 		MaxPathLen:            1,
@@ -265,6 +266,87 @@ func (m *CAManager) SignCSR(csr *x509.CertificateRequest, validity time.Duration
 	}
 	
 	return cert, nil
+}
+
+// SignRawCSR signs a DER-encoded CSR without parsing the subject (for Windows
+// CSRs that contain non-PrintableString characters Go's parser rejects).
+func (m *CAManager) SignRawCSR(csrDER []byte, validity time.Duration) (*x509.Certificate, error) {
+	// Extract public key from raw CSR using crypto/x509 low-level parsing
+	// We parse just enough to get the public key
+	csr, err := parseCSRPublicKey(csrDER)
+	if err != nil {
+		return nil, fmt.Errorf("extract public key from CSR: %w", err)
+	}
+
+	serialNumber, err := rand.Int(rand.Reader, new(big.Int).Lsh(big.NewInt(1), 128))
+	if err != nil {
+		return nil, err
+	}
+
+	template := &x509.Certificate{
+		SerialNumber:          serialNumber,
+		Subject:               pkix.Name{CommonName: "MDMDeviceCert"},
+		NotBefore:             time.Now(),
+		NotAfter:              time.Now().Add(validity),
+		KeyUsage:              x509.KeyUsageDigitalSignature | x509.KeyUsageKeyEncipherment,
+		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
+		BasicConstraintsValid: true,
+	}
+
+	certDER, err := x509.CreateCertificate(rand.Reader, template, m.caCert, csr, m.caKey)
+	if err != nil {
+		return nil, err
+	}
+	return x509.ParseCertificate(certDER)
+}
+
+// parseCSRPublicKey extracts the public key from a DER-encoded CSR
+// using encoding/asn1 directly, bypassing Go's strict subject parsing.
+func parseCSRPublicKey(csrDER []byte) (interface{}, error) {
+	// Try standard parsing first (works for most CSRs)
+	csr, err := x509.ParseCertificateRequest(csrDER)
+	if err == nil {
+		return csr.PublicKey, nil
+	}
+	// Fallback: parse the SubjectPublicKeyInfo from the raw ASN.1
+	// CSR structure: SEQUENCE { CertificationRequestInfo, SignatureAlgorithm, Signature }
+	// CertificationRequestInfo: SEQUENCE { Version, Subject, SubjectPublicKeyInfo, ... }
+	var raw asn1.RawValue
+	rest, err := asn1.Unmarshal(csrDER, &raw)
+	if err != nil || len(rest) > 0 {
+		return nil, fmt.Errorf("unmarshal CSR outer: %w", err)
+	}
+	// Parse inner SEQUENCE (CertificationRequestInfo)
+	var inner asn1.RawValue
+	rest2, err := asn1.Unmarshal(raw.Bytes, &inner)
+	if err != nil {
+		return nil, fmt.Errorf("unmarshal CertReqInfo: %w", err)
+	}
+	_ = rest2
+	// Skip version
+	var version asn1.RawValue
+	remaining, err := asn1.Unmarshal(inner.Bytes, &version)
+	if err != nil {
+		return nil, fmt.Errorf("unmarshal version: %w", err)
+	}
+	// Skip subject (this is what Go's parser chokes on)
+	var subject asn1.RawValue
+	remaining, err = asn1.Unmarshal(remaining, &subject)
+	if err != nil {
+		return nil, fmt.Errorf("unmarshal subject: %w", err)
+	}
+	// Parse SubjectPublicKeyInfo
+	var spki asn1.RawValue
+	_, err = asn1.Unmarshal(remaining, &spki)
+	if err != nil {
+		return nil, fmt.Errorf("unmarshal SPKI: %w", err)
+	}
+	// Re-parse as x509 public key
+	pub, err := x509.ParsePKIXPublicKey(spki.FullBytes)
+	if err != nil {
+		return nil, fmt.Errorf("parse public key: %w", err)
+	}
+	return pub, nil
 }
 
 func (m *CAManager) SignCSRPEM(csrPEM []byte, validity time.Duration) ([]byte, error) {

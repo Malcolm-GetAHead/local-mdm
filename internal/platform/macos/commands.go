@@ -43,23 +43,14 @@ type EnqueueResponse struct {
 
 // SendCommand enqueues a raw plist command to a device via NanoMDM.
 func (c *CommandSender) SendCommand(ctx context.Context, udid string, commandPlist []byte) (*EnqueueResponse, error) {
-	reqBody := EnqueueRequest{
-		UDIDs:      []string{udid},
-		CommandRaw: commandPlist,
-	}
-	body, err := json.Marshal(reqBody)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal enqueue request: %w", err)
-	}
-
-	url := fmt.Sprintf("%s/v1/enqueue", c.nanomdmURL)
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(body))
+	url := fmt.Sprintf("%s/v1/enqueue/%s", c.nanomdmURL, udid)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(commandPlist))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
-	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Content-Type", "application/xml")
 	if c.apiKey != "" {
-		req.Header.Set("Authorization", "Bearer "+c.apiKey)
+		req.SetBasicAuth("nanomdm", c.apiKey)
 	}
 
 	resp, err := c.client.Do(req)
@@ -70,6 +61,12 @@ func (c *CommandSender) SendCommand(ctx context.Context, udid string, commandPli
 
 	respBody, _ := io.ReadAll(resp.Body)
 	if resp.StatusCode != http.StatusOK {
+		// NanoMDM returns 500 with push_error when APNs is not configured,
+		// but the command is still queued. Check if command_uuid is present.
+		var result EnqueueResponse
+		if json.Unmarshal(respBody, &result) == nil && result.CommandUUID != "" {
+			return &result, nil
+		}
 		return nil, fmt.Errorf("NanoMDM returned status %d: %s", resp.StatusCode, string(respBody))
 	}
 

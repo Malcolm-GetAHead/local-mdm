@@ -8,6 +8,7 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/json"
+	"fmt"
 	"log/slog"
 	"math/big"
 	"net/http"
@@ -297,11 +298,15 @@ func TestNanoMDMService(t *testing.T) {
 func TestCheckinHandler_ServeHTTP(t *testing.T) {
 	svc := NewNanoMDMService("", "", nil, nil, slog.Default())
 	deviceRepo := new(MockDeviceRepository)
+	deviceRepo.On("GetByPlatformID", mock.Anything, "macos", "test").Return(nil, fmt.Errorf("not found"))
+	deviceRepo.On("Create", mock.Anything, mock.Anything).Return(nil)
+	deviceRepo.On("Update", mock.Anything, mock.Anything).Return(nil)
 	service := NewService(deviceRepo)
 	logger := slog.New(slog.NewTextHandler(bytes.NewBuffer(nil), &slog.HandlerOptions{Level: slog.LevelError}))
-	handler := NewCheckinHandler(svc, service, nil, logger)
+	handler := NewCheckinHandler(svc, service, nil, nil, logger)
 
-	event := WebhookEvent{Topic: "mdm.Authenticate", CheckinEvent: &CheckinEvent{UDID: "test", MessageType: "Authenticate"}}
+	udidStr := "test"
+	event := WebhookEvent{Topic: "mdm.Authenticate", CheckinEvent: &CheckinEvent{UDID: &udidStr, RawPayload: `<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd"><plist version="1.0"><dict><key>MessageType</key><string>Authenticate</string><key>UDID</key><string>test</string></dict></plist>`}}
 	body, _ := json.Marshal(event)
 	req := httptest.NewRequest("PUT", "/checkin", bytes.NewReader(body))
 	w := httptest.NewRecorder()
@@ -315,9 +320,7 @@ func TestCommandHandler_ServeHTTP(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(bytes.NewBuffer(nil), &slog.HandlerOptions{Level: slog.LevelError}))
 	handler := NewCommandHandler(svc, logger)
 
-	event := CommandWebhookEvent{Topic: "mdm.Connect", CommandEvent: &CommandEvent{UDID: "test", CommandUUID: "cmd-1", Status: "Acknowledged"}}
-	body, _ := json.Marshal(event)
-	req := httptest.NewRequest("PUT", "/mdm", bytes.NewReader(body))
+	req := httptest.NewRequest("PUT", "/mdm", bytes.NewReader([]byte("{}")))
 	w := httptest.NewRecorder()
 
 	handler.ServeHTTP(w, req)

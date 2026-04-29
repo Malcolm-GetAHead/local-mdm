@@ -98,6 +98,29 @@ CREATE TABLE IF NOT EXISTS push_certs (
     PRIMARY KEY (topic)
 );
 
+CREATE TABLE IF NOT EXISTS enrollment_queue (
+    id VARCHAR(255) NOT NULL,
+    command_uuid VARCHAR(127) NOT NULL,
+    active BOOLEAN NOT NULL DEFAULT TRUE,
+    priority SMALLINT NOT NULL DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id, command_uuid),
+    FOREIGN KEY (id) REFERENCES enrollments (id) ON DELETE CASCADE ON UPDATE CASCADE,
+    FOREIGN KEY (command_uuid) REFERENCES commands (command_uuid) ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS cert_auth_associations (
+    id VARCHAR(255) NOT NULL,
+    sha256 CHAR(64) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id, sha256)
+);
+
+CREATE INDEX IF NOT EXISTS idx_cert_auth_sha256 ON cert_auth_associations (sha256);
+CREATE INDEX IF NOT EXISTS idx_status ON command_results (status);
+
 EOSQL
 
 echo "NanoMDM schema initialized."

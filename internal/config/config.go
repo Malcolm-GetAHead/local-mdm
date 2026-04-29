@@ -260,14 +260,15 @@ type WindowsConfig struct {
 
 // MacOSConfig holds macOS MDM configuration
 type MacOSConfig struct {
-	APNSCertPath       string        `yaml:"apns_cert_path"`
-	APNSPassword       string        `yaml:"apns_password"`
-	PushTopic          string        `yaml:"push_topic"`
-	EnrollmentURL      string        `yaml:"enrollment_url"`
-	NanoMDMURL         string        `yaml:"nanomdm_url"`
-	NanoMDMAPIKey      string        `yaml:"nanomdm_api_key"`
-	DEPEncryptionKey   string        `yaml:"dep_encryption_key"`
-	DEPSyncInterval    time.Duration `yaml:"dep_sync_interval"`
+	APNSCertPath        string        `yaml:"apns_cert_path"`
+	APNSPassword        string        `yaml:"apns_password"`
+	PushTopic           string        `yaml:"push_topic"`
+	EnrollmentURL       string        `yaml:"enrollment_url"`
+	NanoMDMURL          string        `yaml:"nanomdm_url"`
+	NanoMDMAPIKey       string        `yaml:"nanomdm_api_key"`
+	DEPEncryptionKey    string        `yaml:"dep_encryption_key"`
+	DEPSyncInterval     time.Duration `yaml:"dep_sync_interval"`
+	DefaultEnterpriseID string        `yaml:"default_enterprise_id"`
 }
 
 // AndroidConfig holds Android MDM configuration
@@ -365,6 +366,9 @@ func (c *Config) overrideFromEnv() {
 	}
 	if keyPEM := os.Getenv("CA_KEY_PEM"); keyPEM != "" {
 		c.Certificates.CAKeyPEM = keyPEM
+	}
+	if nanomdmURL := os.Getenv("NANOMDM_URL"); nanomdmURL != "" {
+		c.MacOS.NanoMDMURL = nanomdmURL
 	}
 }
 

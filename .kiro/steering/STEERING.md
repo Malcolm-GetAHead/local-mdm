@@ -36,6 +36,7 @@
 - **Handler tests** use mock repos in `handler_test_helpers_test.go` — no infrastructure needed.
 - **Platform tests** use testify mocks for repository interfaces.
 - **Integration tests** need Docker services (PostgreSQL, Keycloak) but not real MDM devices.
+- **Real device testing** uses UTM VMs (macOS 26, Windows 11 ARM). VMs have passwordless SSH. Enrollment requires GUI interaction (macOS: Safari profile download, Windows: needs Azure AD or valid .ppkg). Always restore from template snapshot before testing. See `docs/planning/sprints/sprint-6-real-device-integration/GAPS.md` for VM details and current state.
 
 ---
 

@@ -3,7 +3,9 @@ package e2e
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
@@ -47,19 +49,18 @@ func TestE2E_MacOSWebhook(t *testing.T) {
 	cmdRepo, err := repository.NewCommandRepository(database.Writer, database.Reader)
 	require.NoError(t, err)
 	nanomdmSvc := macos.NewNanoMDMService("http://localhost:9000", "test-key", cmdRepo, deviceRepo, logger)
-	checkinHandler := macos.NewCheckinHandler(nanomdmSvc, macosService, lifecycleSvc, logger)
+	checkinHandler := macos.NewCheckinHandler(nanomdmSvc, macosService, nil, lifecycleSvc, logger)
 
 	// Simulate NanoMDM Authenticate webhook
 	udid := uuid.New().String()
+	authPlist := fmt.Sprintf(`<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd"><plist version="1.0"><dict><key>MessageType</key><string>Authenticate</string><key>UDID</key><string>%s</string><key>SerialNumber</key><string>SN%s</string></dict></plist>`, udid, uuid.New().String()[:8])
+	rawPayload := base64.StdEncoding.EncodeToString([]byte(authPlist))
 	webhookEvent := map[string]interface{}{
-		"topic":    "com.example.mdm",
+		"topic":    "mdm.Authenticate",
 		"event_id": uuid.New().String(),
 		"checkin_event": map[string]interface{}{
-			"udid":         udid,
-			"message_type": "Authenticate",
-			"params": map[string]interface{}{
-				"enterprise_id": enterprise.ID.String(),
-			},
+			"udid":        udid,
+			"raw_payload": rawPayload,
 		},
 	}
 	body, _ := json.Marshal(webhookEvent)
@@ -70,21 +71,14 @@ func TestE2E_MacOSWebhook(t *testing.T) {
 
 	assert.Equal(t, http.StatusOK, w.Code)
 
-	// Verify device was created
-	devices, total, err := deviceRepo.List(ctx, enterprise.ID, 10, 0)
+	// Verify device was created (may be under default enterprise, not test enterprise)
+	device, err := deviceRepo.GetByPlatformID(ctx, models.PlatformMacOS, udid)
 	require.NoError(t, err)
-	assert.GreaterOrEqual(t, total, 1)
+	assert.Equal(t, models.PlatformMacOS, device.Platform)
+	assert.Equal(t, "pending", device.Status)
 
-	found := false
-	for _, d := range devices {
-		if d.DeviceID == udid {
-			found = true
-			assert.Equal(t, models.PlatformMacOS, d.Platform)
-			assert.Equal(t, "pending", d.Status) // Authenticate = pending, TokenUpdate = enrolled
-			break
-		}
-	}
-	assert.True(t, found, "device with UDID %s should exist", udid)
+	// Clean up
+	_ = deviceRepo.Delete(ctx, device.ID)
 }
 
 // TestE2E_MacOSCheckOut simulates a CheckOut webhook and verifies
@@ -124,14 +118,14 @@ func TestE2E_MacOSCheckOut(t *testing.T) {
 	cmdRepo, err := repository.NewCommandRepository(database.Writer, database.Reader)
 	require.NoError(t, err)
 	nanomdmSvc := macos.NewNanoMDMService("http://localhost:9000", "test-key", cmdRepo, deviceRepo, logger)
-	checkinHandler := macos.NewCheckinHandler(nanomdmSvc, macosService, lifecycleSvc, logger)
+	checkinHandler := macos.NewCheckinHandler(nanomdmSvc, macosService, nil, lifecycleSvc, logger)
 
 	webhookEvent := map[string]interface{}{
-		"topic":    "com.example.mdm",
+		"topic":    "mdm.CheckOut",
 		"event_id": uuid.New().String(),
 		"checkin_event": map[string]interface{}{
-			"udid":         udid,
-			"message_type": "CheckOut",
+			"udid":        udid,
+			"raw_payload": base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf(`<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd"><plist version="1.0"><dict><key>MessageType</key><string>CheckOut</string><key>UDID</key><string>%s</string></dict></plist>`, udid))),
 		},
 	}
 	body, _ := json.Marshal(webhookEvent)

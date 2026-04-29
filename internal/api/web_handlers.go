@@ -276,6 +276,53 @@ func (s *Server) handleWebDeviceDetail(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// Extract installed profiles and apps from platform_data for tabs
+	var installedProfiles, installedApps, certificates, availableUpdates, activeExtensions, localUsers []map[string]interface{}
+	if pd := device.PlatformData; pd != nil {
+		if profiles, ok := pd["installed_profiles"].([]interface{}); ok {
+			for _, p := range profiles {
+				if pm, ok := p.(map[string]interface{}); ok {
+					installedProfiles = append(installedProfiles, pm)
+				}
+			}
+		}
+		if apps, ok := pd["installed_apps"].([]interface{}); ok {
+			for _, a := range apps {
+				if am, ok := a.(map[string]interface{}); ok {
+					installedApps = append(installedApps, am)
+				}
+			}
+		}
+		if certs, ok := pd["certificates"].([]interface{}); ok {
+			for _, c := range certs {
+				if cm, ok := c.(map[string]interface{}); ok {
+					certificates = append(certificates, cm)
+				}
+			}
+		}
+		if updates, ok := pd["available_os_updates"].([]interface{}); ok {
+			for _, u := range updates {
+				if um, ok := u.(map[string]interface{}); ok {
+					availableUpdates = append(availableUpdates, um)
+				}
+			}
+		}
+		if exts, ok := pd["active_extensions"].([]interface{}); ok {
+			for _, e := range exts {
+				if em, ok := e.(map[string]interface{}); ok {
+					activeExtensions = append(activeExtensions, em)
+				}
+			}
+		}
+		if users, ok := pd["local_users"].([]interface{}); ok {
+			for _, u := range users {
+				if um, ok := u.(map[string]interface{}); ok {
+					localUsers = append(localUsers, um)
+				}
+			}
+		}
+	}
+
 	s.renderPage(w, r, "device_detail", map[string]interface{}{
 		"ActiveNav":        "devices",
 		"Device":           device,
@@ -285,6 +332,12 @@ func (s *Server) handleWebDeviceDetail(w http.ResponseWriter, r *http.Request) {
 		"Commands":         commands,
 		"AssignedPolicies": assignedPolicies,
 		"PlatformDetails":  buildPlatformDetails(device.PlatformData),
+		"InstalledProfiles": installedProfiles,
+		"InstalledApps":     installedApps,
+		"Certificates":      certificates,
+		"AvailableUpdates":  availableUpdates,
+		"ActiveExtensions":  activeExtensions,
+		"LocalUsers":        localUsers,
 	})
 }
 
@@ -356,6 +409,49 @@ func (s *Server) handleWebDeviceUnenroll(w http.ResponseWriter, r *http.Request)
 	} else {
 		s.logAudit(r, "device.unenroll", "device", id, nil)
 	}
+
+	s.renderFragment(w, s.webTemplates["device_detail"], "action_result", map[string]interface{}{
+		"Success": success,
+		"Message": msg,
+	})
+}
+
+// handleWebDeviceCheckin sends an APNs push to trigger device check-in.
+func (s *Server) handleWebDeviceCheckin(w http.ResponseWriter, r *http.Request) {
+	id, err := uuid.Parse(mux.Vars(r)["id"])
+	if err != nil {
+		http.Error(w, "Invalid device ID", http.StatusBadRequest)
+		return
+	}
+
+	device, err := s.deviceRepo.GetByID(r.Context(), id)
+	if err != nil {
+		s.renderFragment(w, s.webTemplates["device_detail"], "action_result", map[string]interface{}{
+			"Success": false, "Message": "Device not found",
+		})
+		return
+	}
+
+	// Call NanoMDM push API to send APNs notification
+	msg := "Check-in push sent — device will connect shortly"
+	success := true
+
+	pushURL := s.config.MacOS.NanoMDMURL + "/v1/push/" + device.DeviceID
+	req, _ := http.NewRequestWithContext(r.Context(), http.MethodPost, pushURL, nil)
+	req.SetBasicAuth("nanomdm", s.config.MacOS.NanoMDMAPIKey)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		msg = "Failed to contact NanoMDM: " + err.Error()
+		success = false
+	} else {
+		resp.Body.Close()
+		if resp.StatusCode != http.StatusOK {
+			msg = "Push failed (APNs not configured?) — device will check in on next reboot"
+			success = false
+		}
+	}
+
+	s.logAudit(r, "device.checkin_push", "device", id, nil)
 
 	s.renderFragment(w, s.webTemplates["device_detail"], "action_result", map[string]interface{}{
 		"Success": success,
@@ -493,32 +589,87 @@ type platformDetailGroup struct {
 
 var platformKeyCategories = map[string]string{
 	"serial": "Hardware", "architecture": "Hardware", "storage_total_gb": "Hardware",
-	"storage_free_gb": "Hardware", "product_name": "Hardware",
+	"storage_free_gb": "Hardware", "product_name": "Hardware", "chip": "Hardware",
+	"storage_capacity_gb": "Hardware", "storage_available_gb": "Hardware",
+	"hardware_encryption_caps": "Hardware",
 	"hostname": "Network", "ip_address": "Network", "mac_address": "Network",
+	"wifi_mac": "Network", "bluetooth_mac": "Network",
+	"ethernet_mac": "Network", "local_hostname": "Network",
 	"FileVaultEnabled": "Security", "firewall_enabled": "Security", "password_present": "Security",
 	"password_length": "Security", "bitlocker_enabled": "Security", "bitlocker_status": "Security",
-	"encryption_enabled": "Security", "supervised": "Security",
-	"build_version": "Operating System", "topic": "MDM", "push_magic": "MDM",
-	"has_token": "MDM", "mdm_enrolled": "MDM",
+	"encryption_enabled": "Security", "is_supervised": "Security",
+	"authenticated_root_volume": "Security", "activation_lock_manageable": "Security",
+	"external_boot_level": "Security",
+	"activation_lock_enabled": "Security", "find_my_mac_enabled": "Security",
+	"icloud_backup_enabled": "Backup", "last_icloud_backup": "Backup",
+	"timezone": "General", "has_battery": "Hardware",
+	"auto_update_check": "Updates", "auto_os_install": "Updates",
+	"auto_security_updates": "Updates", "auto_app_install": "Updates",
+	"background_download": "Updates", "last_update_scan": "Updates",
+	"diagnostics_enabled": "Privacy", "app_analytics_enabled": "Privacy",
+	"build_version": "Operating System",
+	"topic": "MDM", "push_magic": "MDM", "has_token": "MDM", "mdm_enrolled": "MDM",
+	// Windows-specific
+	"manufacturer": "Hardware", "model": "Hardware", "dev_id": "Hardware",
+	"device_name": "Hardware", "processor_arch": "Hardware",
+	"total_ram": "Hardware", "total_storage": "Hardware",
+	"firmware_version": "Hardware", "hardware_version": "Hardware",
+	"software_version": "Operating System", "os_platform": "Operating System",
+	"FirewallEnabled": "Security",
 }
 
 var platformKeyLabels = map[string]string{
 	"serial": "Serial Number", "architecture": "Architecture", "storage_total_gb": "Total Storage (GB)",
-	"storage_free_gb": "Free Storage (GB)", "product_name": "Product Name",
+	"storage_free_gb": "Free Storage (GB)", "product_name": "Product Name", "chip": "Chip",
+	"storage_capacity_gb": "Storage Capacity (GB)", "storage_available_gb": "Storage Available (GB)",
+	"hardware_encryption_caps": "Hardware Encryption",
 	"hostname": "Hostname", "ip_address": "IP Address", "mac_address": "MAC Address",
+	"wifi_mac": "WiFi MAC", "bluetooth_mac": "Bluetooth MAC",
+	"ethernet_mac": "Ethernet MAC", "local_hostname": "Local Hostname",
 	"FileVaultEnabled": "FileVault", "firewall_enabled": "Firewall", "password_present": "Password Set",
 	"password_length": "Password Length", "bitlocker_enabled": "BitLocker", "bitlocker_status": "BitLocker Status",
-	"encryption_enabled": "Encryption", "supervised": "Supervised",
+	"encryption_enabled": "Encryption", "is_supervised": "Supervised",
+	"authenticated_root_volume": "Authenticated Root Volume", "activation_lock_manageable": "Activation Lock Manageable",
+	"external_boot_level": "External Boot Level",
+	"activation_lock_enabled": "Activation Lock", "find_my_mac_enabled": "Find My Mac",
+	"icloud_backup_enabled": "iCloud Backup", "last_icloud_backup": "Last iCloud Backup",
+	"timezone": "Time Zone", "has_battery": "Has Battery",
+	"auto_update_check": "Auto Check for Updates", "auto_os_install": "Auto Install OS Updates",
+	"auto_security_updates": "Auto Security Updates (RSR)", "auto_app_install": "Auto Install App Updates",
+	"background_download": "Background Download", "last_update_scan": "Last Update Scan",
+	"diagnostics_enabled": "Diagnostics Submission", "app_analytics_enabled": "App Analytics",
 	"build_version": "Build Version", "topic": "Push Topic", "push_magic": "Push Magic",
 	"has_token": "Has Token", "mdm_enrolled": "MDM Enrolled",
+	// Windows-specific
+	"manufacturer": "Manufacturer", "model": "Model", "dev_id": "Device ID",
+	"device_name": "Device Name", "processor_arch": "Processor Architecture",
+	"total_ram": "Total RAM", "total_storage": "Total Storage",
+	"firmware_version": "Firmware Version", "hardware_version": "Hardware Version",
+	"software_version": "Software Version", "os_platform": "OS Platform",
+	"FirewallEnabled": "Firewall",
 }
 
 func buildPlatformDetails(pd models.JSONB) []platformDetailGroup {
 	if len(pd) == 0 {
 		return nil
 	}
+	// Skip large array/object fields that have their own tabs
+	skipKeys := map[string]bool{
+		"installed_profiles": true, "installed_apps": true,
+		"installed_profiles_count": true, "installed_apps_count": true,
+		"secure_boot": true,
+		"certificates": true, "certificates_count": true,
+		"managed_app_ids": true, "managed_apps_count": true,
+		"available_os_updates": true, "available_os_updates_count": true,
+		"os_update_status": true,
+		"active_extensions": true, "active_extensions_count": true,
+		"local_users": true, "local_users_count": true,
+	}
 	groups := map[string][]platformDetailItem{}
 	for k, v := range pd {
+		if skipKeys[k] {
+			continue
+		}
 		cat := platformKeyCategories[k]
 		if cat == "" {
 			cat = "Other"
@@ -540,7 +691,7 @@ func buildPlatformDetails(pd models.JSONB) []platformDetailGroup {
 		}
 		groups[cat] = append(groups[cat], item)
 	}
-	order := []string{"Hardware", "Network", "Security", "Operating System", "MDM", "Other"}
+	order := []string{"Hardware", "Network", "Security", "Operating System", "Updates", "Backup", "Privacy", "General", "MDM", "Other"}
 	var result []platformDetailGroup
 	for _, cat := range order {
 		items := groups[cat]
