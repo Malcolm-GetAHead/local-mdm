@@ -291,6 +291,20 @@ func TestNanoMDMService(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Nil(t, resp)
 	})
+
+	t.Run("HealthCheck returns error when not configured", func(t *testing.T) {
+		svc := NewNanoMDMService("", "", nil, nil, slog.Default())
+		err := svc.HealthCheck(context.Background())
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "not configured")
+	})
+
+	t.Run("HealthCheck returns error for unreachable server", func(t *testing.T) {
+		svc := NewNanoMDMService("http://127.0.0.1:1", "", nil, nil, slog.Default())
+		err := svc.HealthCheck(context.Background())
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "unreachable")
+	})
 }
 
 // --- CheckinHandler and CommandHandler Tests ---

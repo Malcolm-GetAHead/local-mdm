@@ -204,6 +204,38 @@ func TestBuildPlatformDetails_SkipKeys(t *testing.T) {
 	assert.Equal(t, 1, total)
 }
 
+func TestDecodeBitLockerStatus(t *testing.T) {
+	assert.Equal(t, "Encrypted (Compliant)", decodeBitLockerStatus("0"))
+	assert.Contains(t, decodeBitLockerStatus("2"), "Protection off or suspended")
+	assert.Contains(t, decodeBitLockerStatus("4"), "OS volume unprotected")
+	// Bitmask: 6 = bits 1+2
+	result := decodeBitLockerStatus("6")
+	assert.Contains(t, result, "Protection off or suspended")
+	assert.Contains(t, result, "OS volume unprotected")
+	// Non-numeric
+	assert.Equal(t, "abc", decodeBitLockerStatus("abc"))
+}
+
+func TestBuildPlatformDetails_WindowsTranslations(t *testing.T) {
+	pd := models.JSONB{
+		"bitlocker_status": "2",
+		"processor_arch":   "12",
+		"total_ram":        "4096",
+		"total_storage":    "31844",
+	}
+	groups := buildPlatformDetails(pd)
+	items := map[string]string{}
+	for _, g := range groups {
+		for _, item := range g.Items {
+			items[item.Label] = item.Value
+		}
+	}
+	assert.Contains(t, items["BitLocker Status"], "Protection off or suspended")
+	assert.Equal(t, "ARM64", items["Processor Architecture"])
+	assert.Equal(t, "4.0 GB", items["Total RAM"])
+	assert.Equal(t, "31.1 GB", items["Total Storage"])
+}
+
 // --- validPolicyKeys ---
 
 func TestValidPolicyKeys(t *testing.T) {
