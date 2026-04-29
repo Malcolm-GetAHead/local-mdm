@@ -162,8 +162,13 @@ func (m *mockDeviceRepoForMgmt) GetByID(_ context.Context, id uuid.UUID) (*model
 func (m *mockDeviceRepoForMgmt) GetBySerial(_ context.Context, _ uuid.UUID, _ string) (*models.Device, error) {
 	return nil, fmt.Errorf("not implemented")
 }
-func (m *mockDeviceRepoForMgmt) GetByPlatformID(_ context.Context, _, _ string) (*models.Device, error) {
-	return nil, fmt.Errorf("not implemented")
+func (m *mockDeviceRepoForMgmt) GetByPlatformID(_ context.Context, platform, deviceID string) (*models.Device, error) {
+	for _, d := range m.devices {
+		if d.Platform == platform && d.DeviceID == deviceID {
+			return d, nil
+		}
+	}
+	return nil, fmt.Errorf("device not found: not found")
 }
 func (m *mockDeviceRepoForMgmt) List(_ context.Context, _ uuid.UUID, _, _ int) ([]*models.Device, int, error) {
 	return nil, 0, nil
@@ -464,6 +469,62 @@ func TestManagementHandler_AutoQueryDeviceInfo(t *testing.T) {
 	for _, expected := range SecurityCSPNodes() {
 		assert.Contains(t, secURIs, expected)
 	}
+}
+
+func TestManagementHandler_DeviceIDMismatchResolution(t *testing.T) {
+	// Windows devices may use a different hardware ID for OMA-DM sync than the one
+	// stored during enrollment. The handler should resolve this by checking ./DevInfo/DevId
+	// in Replace items and updating the device_id column.
+	deviceID := uuid.New()
+	enrollmentHWID := "ENROLLMENT-HW-ID-12345"
+	syncHWID := "SYNC-HW-ID-67890"
+	logger := slog.Default()
+
+	deviceRepo := &mockDeviceRepoForMgmt{devices: map[uuid.UUID]*models.Device{
+		deviceID: {
+			BaseModel:    models.BaseModel{ID: deviceID},
+			Platform:     models.PlatformWindows,
+			DeviceID:     enrollmentHWID, // stored during enrollment
+			PlatformData: models.JSONB{},
+		},
+	}}
+	cmdRepo := &mockCmdRepoForMgmt{}
+
+	handler := NewManagementHandler("https://mdm.example.com", deviceRepo, cmdRepo, logger)
+
+	// Device syncs with a DIFFERENT hardware ID than enrollment, but includes
+	// the enrollment ID in ./DevInfo/DevId Replace item
+	clientMsg := fmt.Sprintf(`<?xml version="1.0" encoding="UTF-8"?>
+	<SyncML xmlns="SYNCML:SYNCML1.2">
+		<SyncHdr>
+			<VerDTD>1.2</VerDTD><VerProto>DM/1.2</VerProto>
+			<SessionID>1</SessionID><MsgID>1</MsgID>
+			<Target><LocURI>https://mdm.example.com</LocURI></Target>
+			<Source><LocURI>%s</LocURI></Source>
+		</SyncHdr>
+		<SyncBody>
+			<Alert><CmdID>1</CmdID><Data>1201</Data></Alert>
+			<Replace>
+				<CmdID>2</CmdID>
+				<Item><Source><LocURI>./DevInfo/DevId</LocURI></Source><Data>%s</Data></Item>
+				<Item><Source><LocURI>./DevInfo/Man</LocURI></Source><Data>QEMU</Data></Item>
+			</Replace>
+			<Final/>
+		</SyncBody>
+	</SyncML>`, syncHWID, enrollmentHWID)
+
+	resp, _, err := handler.HandleSyncML(context.Background(), []byte(clientMsg))
+	require.NoError(t, err)
+
+	// Response should be valid
+	parsed, err := ParseSyncML(resp)
+	require.NoError(t, err)
+	assert.NotNil(t, parsed.SyncBody.Final)
+
+	// Device's device_id should now be updated to the sync ID
+	device := deviceRepo.devices[deviceID]
+	assert.Equal(t, syncHWID, device.DeviceID, "device_id should be updated to OMA-DM sync ID")
+	assert.Equal(t, enrollmentHWID, device.PlatformData["enrollment_device_id"], "original enrollment ID should be preserved")
 }
 
 func TestManagementHandler_WipeCommand(t *testing.T) {

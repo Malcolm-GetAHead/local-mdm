@@ -63,6 +63,28 @@ func (h *ManagementHandler) HandleSyncML(ctx context.Context, data []byte) ([]by
 	resp.AddStatus(strconv.Itoa(cmdID), msg.SyncHdr.MsgID, "0", "SyncHdr", StatusAuthAccepted)
 	cmdID++
 
+	// Resolve the device early. Windows may use a different hardware ID for OMA-DM sync
+	// than the one stored during enrollment. If the sync ID doesn't match, try to find
+	// the device via ./DevInfo/DevId in the Replace items and update device_id to match.
+	if _, resolveErr := h.findDeviceByDeviceID(ctx, deviceID); resolveErr != nil {
+		if enrollID := h.extractDevInfoDevId(msg); enrollID != "" && enrollID != deviceID {
+			if device, err := h.findDeviceByDeviceID(ctx, enrollID); err == nil {
+				device.DeviceID = deviceID
+				if device.PlatformData == nil {
+					device.PlatformData = models.JSONB{}
+				}
+				device.PlatformData["enrollment_device_id"] = enrollID
+				if updateErr := h.deviceRepo.Update(ctx, device); updateErr == nil {
+					h.logger.Info("updated device_id to match OMA-DM sync ID",
+						"device_uuid", device.ID,
+						"old_device_id", enrollID,
+						"new_device_id", deviceID,
+					)
+				}
+			}
+		}
+	}
+
 	// Process client statuses (acknowledgments of our previous commands)
 	for _, status := range msg.SyncBody.Status {
 		h.processStatus(ctx, deviceID, &status)
@@ -265,6 +287,26 @@ func (h *ManagementHandler) findDeviceByDeviceID(ctx context.Context, deviceID s
 	}
 	// Look up by platform-specific device ID (hardware DeviceID from enrollment)
 	return h.deviceRepo.GetByPlatformID(ctx, models.PlatformWindows, deviceID)
+}
+
+// extractDevInfoDevId extracts ./DevInfo/DevId from Replace items in a SyncML message.
+// Windows devices report their enrollment DeviceID here, which may differ from the
+// OMA-DM sync Source LocURI.
+func (h *ManagementHandler) extractDevInfoDevId(msg *SyncML) string {
+	for _, replace := range msg.SyncBody.Replace {
+		for _, item := range replace.Item {
+			uri := ""
+			if item.Source != nil {
+				uri = item.Source.LocURI
+			} else if item.Target != nil {
+				uri = item.Target.LocURI
+			}
+			if uri == "./DevInfo/DevId" && item.Data != "" {
+				return item.Data
+			}
+		}
+	}
+	return ""
 }
 
 // buildProfileCSPCommands converts a profile type + data into CSP commands.
