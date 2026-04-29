@@ -736,12 +736,11 @@ func (h *CheckinHandler) maybeAutoQueue(ctx context.Context, udid string) {
 		{"UserList", "user_list", `<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd"><plist version="1.0"><dict><key>CommandUUID</key><string>%s</string><key>Command</key><dict><key>RequestType</key><string>UserList</string></dict></dict></plist>`},
 	}
 
-	now := time.Now()
 	for _, cmd := range commands {
 		cmdUUID := uuid.New()
 		plistData := fmt.Sprintf(cmd.plist, cmdUUID.String())
 
-		// Create command record in Local MDM
+		// Create command record as pending
 		if h.cmdRepo != nil {
 			dbCmd := &models.DeviceCommand{
 				BaseModel:    models.BaseModel{ID: cmdUUID},
@@ -749,17 +748,24 @@ func (h *CheckinHandler) maybeAutoQueue(ctx context.Context, udid string) {
 				EnterpriseID: &device.EnterpriseID,
 				CommandType:  cmd.cmdType,
 				CommandData:  models.JSONB{"request_type": cmd.name, "auto_queued": true},
-				Status:       "sent",
-				SentAt:       &now,
+				Status:       models.CommandStatusPending,
 			}
 			if err := h.cmdRepo.Create(ctx, dbCmd); err != nil {
 				h.logger.Error("failed to create command record", "error", err, "command", cmd.name)
+				continue
 			}
 		}
 
-		// Send to NanoMDM
+		// Send to NanoMDM — mark sent on success, leave pending on failure
 		if _, err := h.nanomdm.SendCommand(ctx, udid, []byte(plistData)); err != nil {
-			h.logger.Error("failed to auto-queue command", "error", err, "command", cmd.name, "udid", udid)
+			h.logger.Error("failed to send command to NanoMDM", "error", err, "command", cmd.name, "udid", udid)
+			continue
+		}
+
+		if h.cmdRepo != nil {
+			if err := h.cmdRepo.MarkSent(ctx, cmdUUID); err != nil {
+				h.logger.Error("failed to mark command sent", "error", err, "command", cmd.name)
+			}
 		}
 	}
 }

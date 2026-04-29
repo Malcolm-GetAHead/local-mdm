@@ -134,6 +134,7 @@ func newTestCheckinHandler(t *testing.T, udid string, device *models.Device) (*C
 
 	cmdRepo := &MockCommandRepository{}
 	cmdRepo.On("Create", mock.Anything, mock.Anything).Return(nil)
+	cmdRepo.On("MarkSent", mock.Anything, mock.Anything).Return(nil)
 	cmdRepo.On("MarkCompleted", mock.Anything, mock.Anything).Return(nil)
 
 	svc := &Service{deviceRepo: repo}
@@ -535,9 +536,19 @@ func TestMaybeAutoQueue_Cooldown(t *testing.T) {
 
 	ctx := context.Background()
 
-	// First call should queue commands
+	// First call should queue commands: Create (pending) then MarkSent for each
 	h.maybeAutoQueue(ctx, udid)
-	assert.True(t, cmdRepo.AssertNumberOfCalls(t, "Create", 9)) // 9 commands
+	assert.True(t, cmdRepo.AssertNumberOfCalls(t, "Create", 9))
+	assert.True(t, cmdRepo.AssertNumberOfCalls(t, "MarkSent", 9))
+
+	// Verify commands are created with pending status
+	for _, call := range cmdRepo.Calls {
+		if call.Method == "Create" {
+			cmd := call.Arguments.Get(1).(*models.DeviceCommand)
+			assert.Equal(t, models.CommandStatusPending, cmd.Status, "command should be created as pending")
+			assert.Nil(t, cmd.SentAt, "SentAt should be nil on creation")
+		}
+	}
 
 	// Second call within cooldown should NOT queue
 	cmdRepo.Calls = nil // reset call tracking
@@ -552,6 +563,7 @@ func TestMaybeAutoQueue_Cooldown(t *testing.T) {
 	// Third call after cooldown should queue again
 	h.maybeAutoQueue(ctx, udid)
 	cmdRepo.AssertNumberOfCalls(t, "Create", 9)
+	cmdRepo.AssertNumberOfCalls(t, "MarkSent", 9)
 }
 
 // --- Integration-style webhook flow tests ---
@@ -756,6 +768,7 @@ func TestMaybeAutoQueue_DifferentDevices(t *testing.T) {
 
 	cmdRepo := &MockCommandRepository{}
 	cmdRepo.On("Create", mock.Anything, mock.Anything).Return(nil)
+	cmdRepo.On("MarkSent", mock.Anything, mock.Anything).Return(nil)
 
 	svc := &Service{deviceRepo: repo}
 	logger := slog.New(slog.NewTextHandler(&bytes.Buffer{}, &slog.HandlerOptions{Level: slog.LevelError}))
@@ -763,11 +776,11 @@ func TestMaybeAutoQueue_DifferentDevices(t *testing.T) {
 
 	ctx := context.Background()
 
-	// Queue for device 1
+	// Queue for device 1 — 9 Create + 9 MarkSent = 18 calls
 	h.maybeAutoQueue(ctx, udid1)
-	assert.Equal(t, 9, len(cmdRepo.Calls))
+	assert.Equal(t, 18, len(cmdRepo.Calls))
 
 	// Queue for device 2 — should work (different device, independent cooldown)
 	h.maybeAutoQueue(ctx, udid2)
-	assert.Equal(t, 18, len(cmdRepo.Calls))
+	assert.Equal(t, 36, len(cmdRepo.Calls))
 }
