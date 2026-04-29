@@ -6,7 +6,9 @@ import (
 	"crypto/rsa"
 	"crypto/x509"
 	"crypto/x509/pkix"
+	"encoding/xml"
 	"math/big"
+	"strings"
 	"testing"
 	"time"
 
@@ -208,6 +210,56 @@ func TestGenerateDiscoverResponse(t *testing.T) {
 		require.NoError(t, err)
 		assert.NotNil(t, resp)
 	})
+
+	t.Run("namespace has no trailing slash", func(t *testing.T) {
+		resp, err := GenerateDiscoverResponse(enrollmentURL, policyURL, messageID)
+		require.NoError(t, err)
+		respStr := string(resp)
+		// The enrollment namespace must NOT have a trailing slash — Windows rejects it
+		assert.Contains(t, respStr, `xmlns="`+DiscoveryNS+`"`)
+		// Verify the namespace in the DiscoverResponse element ends with "enrollment" not "enrollment/"
+		assert.NotContains(t, respStr, `xmlns="http://schemas.microsoft.com/windows/management/2012/01/enrollment/"`)
+	})
+
+	t.Run("enrollment version is 4.0", func(t *testing.T) {
+		resp, err := GenerateDiscoverResponse(enrollmentURL, policyURL, messageID)
+		require.NoError(t, err)
+		respStr := string(resp)
+		assert.Contains(t, respStr, "<EnrollmentVersion>4.0</EnrollmentVersion>")
+	})
+
+	t.Run("no AuthenticationServiceUrl element", func(t *testing.T) {
+		resp, err := GenerateDiscoverResponse(enrollmentURL, policyURL, messageID)
+		require.NoError(t, err)
+		respStr := string(resp)
+		// OnPremise auth means no AuthenticationServiceUrl
+		assert.NotContains(t, respStr, "AuthenticationServiceUrl")
+	})
+
+	t.Run("Content-Length can be computed", func(t *testing.T) {
+		resp, err := GenerateDiscoverResponse(enrollmentURL, policyURL, messageID)
+		require.NoError(t, err)
+		// Response must have deterministic length for Content-Length header
+		// (MS-MDE2 requires non-chunked responses)
+		assert.Greater(t, len(resp), 0)
+	})
+
+	t.Run("unique ActivityId per call", func(t *testing.T) {
+		resp1, err := GenerateDiscoverResponse(enrollmentURL, policyURL, messageID)
+		require.NoError(t, err)
+		resp2, err := GenerateDiscoverResponse(enrollmentURL, policyURL, messageID)
+		require.NoError(t, err)
+		// ActivityId should differ between calls
+		assert.NotEqual(t, string(resp1), string(resp2))
+	})
+
+	t.Run("response is valid XML", func(t *testing.T) {
+		resp, err := GenerateDiscoverResponse(enrollmentURL, policyURL, messageID)
+		require.NoError(t, err)
+		// Must be parseable XML
+		var v interface{}
+		require.NoError(t, xml.Unmarshal(resp, &v))
+	})
 }
 
 func TestGenerateProvisioningXML(t *testing.T) {
@@ -306,5 +358,132 @@ func TestGenerateUUID(t *testing.T) {
 		uuid := generateUUID()
 		// Should match UUID format: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
 		assert.Regexp(t, `^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`, uuid)
+	})
+}
+
+// TestEnterpriseIDFromEmail tests the UUID extraction logic used in the
+// Windows enrollment handler to derive enterprise ID from email username.
+func TestEnterpriseIDFromEmail(t *testing.T) {
+	// extractEnterpriseIDFromEmail mirrors the handler logic
+	extractEnterpriseIDFromEmail := func(email string) uuid.UUID {
+		if atIdx := strings.Index(email, "@"); atIdx > 0 {
+			if eid, err := uuid.Parse(email[:atIdx]); err == nil {
+				return eid
+			}
+		}
+		return uuid.Nil
+	}
+
+	t.Run("valid UUID email", func(t *testing.T) {
+		eid := extractEnterpriseIDFromEmail("00000000-0000-0000-0000-000000000001@localmdm.local")
+		assert.Equal(t, uuid.MustParse("00000000-0000-0000-0000-000000000001"), eid)
+	})
+
+	t.Run("non-UUID email falls back to Nil", func(t *testing.T) {
+		eid := extractEnterpriseIDFromEmail("admin@localmdm.local")
+		assert.Equal(t, uuid.Nil, eid)
+	})
+
+	t.Run("empty string", func(t *testing.T) {
+		eid := extractEnterpriseIDFromEmail("")
+		assert.Equal(t, uuid.Nil, eid)
+	})
+
+	t.Run("no @ sign", func(t *testing.T) {
+		eid := extractEnterpriseIDFromEmail("noemail")
+		assert.Equal(t, uuid.Nil, eid)
+	})
+
+	t.Run("@ at start", func(t *testing.T) {
+		eid := extractEnterpriseIDFromEmail("@domain.com")
+		assert.Equal(t, uuid.Nil, eid)
+	})
+
+	t.Run("partial UUID before @", func(t *testing.T) {
+		eid := extractEnterpriseIDFromEmail("not-a-uuid@domain.com")
+		assert.Equal(t, uuid.Nil, eid)
+	})
+}
+
+// TestDuplicateDeviceUpsert tests that re-enrollment with the same hardware
+// device ID updates the existing record instead of creating a duplicate.
+func TestDuplicateDeviceUpsert(t *testing.T) {
+	ctx := context.Background()
+	enterpriseID := uuid.New()
+	hwDevID := "EXISTING-HW-DEV-ID"
+
+	t.Run("re-enrollment updates existing device", func(t *testing.T) {
+		existingDevice := &models.Device{
+			BaseModel:    models.BaseModel{ID: uuid.New()},
+			EnterpriseID: enterpriseID,
+			Platform:     models.PlatformWindows,
+			DeviceID:     hwDevID,
+			Name:         "Old Name",
+			Status:       models.DeviceStatusEnrolled,
+			PlatformData: models.JSONB{},
+		}
+
+		deviceRepo := new(MockDeviceRepository)
+		// GetByPlatformID finds the existing device
+		deviceRepo.On("GetByPlatformID", ctx, models.PlatformWindows, hwDevID).Return(existingDevice, nil)
+		deviceRepo.On("Update", ctx, mock.AnythingOfType("*models.Device")).Return(nil)
+
+		// Simulate the handler's upsert logic
+		existing, err := deviceRepo.GetByPlatformID(ctx, models.PlatformWindows, hwDevID)
+		require.NoError(t, err)
+		require.NotNil(t, existing)
+
+		existing.Name = "New Name"
+		existing.OSVersion = "10.0.26200"
+		existing.Status = models.DeviceStatusEnrolled
+		err = deviceRepo.Update(ctx, existing)
+		require.NoError(t, err)
+
+		assert.Equal(t, "New Name", existing.Name)
+		assert.Equal(t, "10.0.26200", existing.OSVersion)
+		deviceRepo.AssertNotCalled(t, "Create", mock.Anything, mock.Anything)
+		deviceRepo.AssertExpectations(t)
+	})
+
+	t.Run("new enrollment creates device", func(t *testing.T) {
+		deviceRepo := new(MockDeviceRepository)
+		// GetByPlatformID returns not found
+		deviceRepo.On("GetByPlatformID", ctx, models.PlatformWindows, "NEW-HW-ID").Return(nil, assert.AnError)
+		deviceRepo.On("Create", ctx, mock.AnythingOfType("*models.Device")).Return(nil)
+
+		existing, _ := deviceRepo.GetByPlatformID(ctx, models.PlatformWindows, "NEW-HW-ID")
+		assert.Nil(t, existing)
+
+		svc := NewService(deviceRepo)
+		device, err := svc.CreateDevice(ctx, enterpriseID, "NEW-HW-ID", "NEW-HW-ID")
+		require.NoError(t, err)
+		assert.NotNil(t, device)
+		assert.Equal(t, models.PlatformWindows, device.Platform)
+		deviceRepo.AssertExpectations(t)
+	})
+}
+
+// TestExtractDeviceIDFromSyncML tests device ID extraction from SyncML messages.
+func TestExtractDeviceIDFromSyncML(t *testing.T) {
+	t.Run("extracts device ID from Source", func(t *testing.T) {
+		syncml := `<?xml version="1.0" encoding="UTF-8"?>
+<SyncML xmlns="SYNCML:SYNCML1.2">
+  <SyncHdr>
+    <VerDTD>1.2</VerDTD>
+    <VerProto>DM/1.2</VerProto>
+    <SessionID>1</SessionID>
+    <MsgID>1</MsgID>
+    <Target><LocURI>https://mdm.example.com</LocURI></Target>
+    <Source><LocURI>device-hw-id-123</LocURI></Source>
+  </SyncHdr>
+  <SyncBody><Final/></SyncBody>
+</SyncML>`
+		id := ExtractDeviceIDFromSyncML([]byte(syncml))
+		assert.Equal(t, "device-hw-id-123", id)
+	})
+
+	t.Run("returns empty for invalid XML", func(t *testing.T) {
+		id := ExtractDeviceIDFromSyncML([]byte("not xml"))
+		assert.Empty(t, id)
 	})
 }

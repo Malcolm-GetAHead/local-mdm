@@ -299,3 +299,54 @@ func TestNewCAManagerFromPEM(t *testing.T) {
 		}
 	})
 }
+
+func TestSignRawCSR_FallbackSubject(t *testing.T) {
+	// SignRawCSR is the fallback path for Windows CSRs that contain
+	// non-PrintableString characters Go's x509.ParseCertificateRequest rejects.
+	// It should produce a valid cert with CN=MDMDeviceCert.
+	dir := t.TempDir()
+	ca, err := certs.GenerateCA(dir+"/ca.crt", dir+"/ca.key")
+	if err != nil {
+		t.Fatalf("failed to generate CA: %v", err)
+	}
+
+	// Create a normal CSR (SignRawCSR works on any DER CSR)
+	key, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		t.Fatalf("failed to generate key: %v", err)
+	}
+	template := &x509.CertificateRequest{
+		Subject: pkix.Name{CommonName: "Windows Device with Ünïcödé"},
+	}
+	csrDER, err := x509.CreateCertificateRequest(rand.Reader, template, key)
+	if err != nil {
+		t.Fatalf("failed to create CSR: %v", err)
+	}
+
+	cert, err := ca.SignRawCSR(csrDER, 365*24*time.Hour)
+	if err != nil {
+		t.Fatalf("SignRawCSR failed: %v", err)
+	}
+
+	// Fallback uses generic subject
+	if cert.Subject.CommonName != "MDMDeviceCert" {
+		t.Errorf("expected CN 'MDMDeviceCert', got '%s'", cert.Subject.CommonName)
+	}
+
+	// Cert should be signed by our CA
+	if err := cert.CheckSignatureFrom(ca.GetCACertificate()); err != nil {
+		t.Errorf("certificate signature verification failed: %v", err)
+	}
+
+	// Cert should have client auth EKU
+	found := false
+	for _, eku := range cert.ExtKeyUsage {
+		if eku == x509.ExtKeyUsageClientAuth {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Error("certificate missing ClientAuth extended key usage")
+	}
+}
