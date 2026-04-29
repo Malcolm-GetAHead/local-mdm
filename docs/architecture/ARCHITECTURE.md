@@ -711,3 +711,61 @@ Commands: SecurityInfo, DeviceInformation (35 queries), ProfileList,
 InstalledApplicationList, CertificateList, ManagedApplicationList,
 AvailableOSUpdates, OSUpdateStatus, UserList
 ```
+
+## Future: Network Architecture & VPN Deployment
+
+### Design Principle
+
+Minimize internet-facing attack surface. Expose only MDM enrollment and sync endpoints publicly. Route all other management traffic over a device VPN provisioned by MDM itself.
+
+### Network Zones
+
+```
+Internet-facing (minimal surface):
+  ├── MDM enrollment (Discovery, Policy, Enrollment)
+  ├── MDM sync (OMA-DM for Windows, Apple MDM check-in for macOS)
+  └── WireGuard VPN endpoint
+
+VPN-only (management traffic):
+  ├── Software deployment / package distribution
+  ├── Remote administration (SSH, RDP)
+  ├── Monitoring and telemetry collection
+  ├── Internal application access
+  └── Extended profile/policy delivery
+```
+
+### Enrollment → VPN Bootstrap Chain
+
+```
+1. Device enrolls via MDM (internet-facing endpoints)
+2. MDM pushes WireGuard VPN profile as first policy action
+3. Device connects to VPN automatically
+4. All subsequent management flows over VPN
+5. Internet-facing MDM endpoints remain for re-enrollment and periodic sync only
+```
+
+### Per-Platform VPN Delivery
+
+- **macOS**: MDM pushes `.mobileconfig` with VPN payload type `com.wireguard.ios` — native WireGuard support, no agent required
+- **Windows**: OMA-DM pushes VPN config via `VPNv2` CSP — WireGuard supported natively in Windows 11
+- **Per-device keys**: Each device gets a unique WireGuard keypair generated at enrollment time, pushed via MDM profile
+
+### Device Provisioning (First Touch)
+
+| Scenario | Manual Steps | Post-Enrollment |
+|----------|-------------|-----------------|
+| macOS + ABM | Zero-touch (DEP enrollment) | WireGuard auto-pushed |
+| macOS without ABM | User installs enrollment profile via Safari | WireGuard auto-pushed |
+| Windows + manufacturer image | PPKG or bootstrap script in image | WireGuard auto-pushed |
+| Windows manual | IT runs bootstrap script (CA cert + hosts + open enrollment) | WireGuard auto-pushed |
+
+### Bootstrap Script (Windows)
+
+One-time provisioning script for IT to run during device setup — not a persistent agent:
+
+```powershell
+# Install CA cert, configure DNS, open enrollment UI
+certutil -addstore Root \\share\ca.crt
+Add-Content C:\Windows\System32\drivers\etc\hosts "mdm.company.com enterpriseenrollment.company.com"
+Start-Process "ms-device-enrollment:?mode=mdm"
+```
