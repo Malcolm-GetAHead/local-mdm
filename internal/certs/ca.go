@@ -8,6 +8,7 @@ import (
 	"encoding/asn1"
 	"encoding/pem"
 	"fmt"
+	"log/slog"
 	"math/big"
 	"os"
 	"path/filepath"
@@ -37,7 +38,9 @@ func NewCAManager(certPath, keyPath string) (*CAManager, error) {
 	// Ensure CRL exists alongside the CA cert
 	crlPath := filepath.Join(filepath.Dir(certPath), "ca.crl")
 	if _, err := os.Stat(crlPath); os.IsNotExist(err) {
-		_ = manager.GenerateCRL() // best-effort; CRL is non-critical for startup
+		if crlErr := manager.GenerateCRL(); crlErr != nil {
+			slog.Warn("failed to auto-generate CRL on startup", "error", crlErr, "path", crlPath)
+		}
 	}
 	return manager, nil
 }

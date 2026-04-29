@@ -9,6 +9,7 @@ import (
 	"html/template"
 	"log/slog"
 	"net/http"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -804,9 +805,13 @@ func (s *Server) setupRoutes() {
 	s.router.PathPrefix("/static/").Handler(http.StripPrefix("/static/", http.FileServer(http.Dir("web/static"))))
 
 	// CRL distribution point for Windows TLS validation
+	crlPath := "certs/ca.crl" // default
+	if s.config.Certificates.CACertPath != "" {
+		crlPath = filepath.Join(filepath.Dir(s.config.Certificates.CACertPath), "ca.crl")
+	}
 	s.router.HandleFunc("/crl/ca.crl", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/pkix-crl")
-		http.ServeFile(w, r, "certs/ca.crl")
+		http.ServeFile(w, r, crlPath)
 	}).Methods("GET")
 
 	// Root redirect
