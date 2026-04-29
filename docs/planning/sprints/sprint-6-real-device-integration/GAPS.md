@@ -112,6 +112,17 @@
 - [ ] Fix command status `pending` → `sent` → `completed` transitions
 - [x] Fix `enterpriseRepo.List` fallback in Windows enrollment handler
 
+### Retro Items (Session 2, 2026-04-28)
+- [ ] Add unit tests for Windows enrollment fixes: namespace, Content-Length, CSR fallback, duplicate device upsert, enterprise ID from email, last_seen on OMA-DM sync
+- [ ] Replace hand-rolled ASN.1 CSR parser with proper CSR signature verification (or use a lenient x509 fork)
+- [ ] CSR fallback should preserve original subject from CSR instead of generic `CN=MDMDeviceCert`
+- [ ] Use `default_enterprise_id` config value for Windows enrollment fallback instead of hardcoded UUID
+- [ ] Generate unique ActivityId per discovery response instead of hardcoded UUID
+- [ ] Refactor Windows discovery response from `fmt.Sprintf` template to Go struct XML marshaling (prevents namespace/formatting bugs)
+- [ ] Return device ID from `HandleSyncML` instead of re-parsing XML in `ExtractDeviceIDFromSyncML`
+- [ ] Make CRL endpoint configurable and co-locate with CA cert path; document that CRL is static and needs regeneration on cert revocation
+- [ ] Run `make dev-test` to verify all fixes pass the full test suite
+
 ---
 
 *This document is the output of the Sprint 6 retrospective, 2026-04-28.*
