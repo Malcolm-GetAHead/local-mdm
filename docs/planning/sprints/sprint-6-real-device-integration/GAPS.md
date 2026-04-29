@@ -66,6 +66,9 @@ All packages meet STEERING targets when measured via `make coverage-combined` (m
 ### Deferred to Future Sprints
 - **Windows PPKG format** — needs Windows ADK research (F-01 or dedicated task)
 - **ASN.1 CSR parser** — replace hand-rolled parser with proper CSR signature verification or lenient x509 fork
+- **BitLocker bitmask bits 3-15 unverified** — only bits 0, 1, 2 verified on real hardware. Bits 3-15 use MS doc labels verbatim. Requires TPM/recovery/network conditions not reproducible in QEMU VM. Verify when testing on physical hardware.
+- **Rate limiter exemption is broad** — device protocol endpoints (`/ManagementServer/`, `/EnrollmentServer/`, `/scep`, `/checkin`, `/mdm`) fully exempt from global rate limiter. Fine for dev behind nginx, but production should use WAF rules for device endpoint rate limiting instead.
+- **Device ID mismatch resolution depends on Replace data** — `HandleSyncML` resolves enrollment-vs-sync ID mismatch only when the device sends `./DevInfo/DevId` in a Replace item. If the first sync has no Replace data, the device stays unresolvable. A more robust fix would add a `GetByPlatformDataField` repository method to search JSONB.
 
 ### Dashboard Cleanup (04_DASHBOARD_CLEANUP.md)
 - **Pending enrollments visibility** — devices with `status = 'pending'` invisible in device list
