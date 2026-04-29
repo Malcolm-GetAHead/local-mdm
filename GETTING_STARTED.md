@@ -35,9 +35,10 @@ docker compose logs -f keycloak
 ### 2. Run Migrations
 
 ```bash
-docker exec localmdm-server migrate -path /app/migrations \
-  -database "postgres://postgres:postgres-dev-password-1234@postgres:5432/localmdm?sslmode=disable" up
+make migrate-up
 ```
+
+> **Note**: If using `make dev` or `docker compose up -d` (full stack), the localmdm container runs migrations automatically on startup — you can skip this step.
 
 ### 3. Copy Config
 

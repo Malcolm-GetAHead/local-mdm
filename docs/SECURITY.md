@@ -246,6 +246,27 @@ The server TLS certificate includes a CRL Distribution Point (`http://<server>:8
 - Automate CRL refresh on a schedule
 - Consider OCSP as an alternative for real-time revocation checking
 
+## TLS Termination (Dev/Test)
+
+For local development and VM testing, an nginx reverse proxy (`nginx-tls` Docker service) provides HTTPS on port 8443:
+
+- **TLS certificate**: Signed by the project CA (`internal/api/certs/ca.crt`). VMs trust this CA via manual installation.
+- **Protocols**: TLS 1.2+ only (`TLSv1.2 TLSv1.3`)
+- **Upstream**: Proxies to `localmdm:8080` (plaintext inside Docker network)
+- **CRL**: Served at `/crl/ca.crl` via nginx static file serving
+
+This is a **dev/test-only** setup. In production, TLS termination is handled by the ALB with ACM certificates (auto-renewing, no manual cert management). The nginx service is not deployed to production.
+
+## NanoMDM Webhook Authentication (Dev/Test)
+
+NanoMDM sends Apple MDM check-in and command result webhooks to Local MDM. In the dev environment:
+
+- **Webhook URL**: Configured via `NANOMDM_WEBHOOK_URL` (defaults to `http://localmdm:8080`)
+- **API key**: NanoMDM authenticates to Local MDM using a shared API key (`NANOMDM_API_KEY`), passed in the `Authorization` header
+- **Network**: Both services communicate over the Docker bridge network (plaintext, not exposed externally)
+
+In production, NanoMDM and Local MDM are separate ECS services behind the same ALB. Webhook traffic stays within the VPC and is authenticated via the same API key mechanism, with ALB security groups restricting access.
+
 ## Enrollment Security (Future)
 
 Currently, any device that knows the MDM server hostname and email format can enroll. Planned improvements (tracked in F-07):
