@@ -11,3 +11,9 @@ Dashboard uses Go templates + HTMX + Tailwind CSS. No React.
 ### 1. Pending Enrollments visibility
 Devices with `status = 'pending'` are invisible in the main device list. Add a "Pending Enrollments (N)" indicator on the devices page — clicking it shows a filtered view with device_id, platform, serial, and created_at. This helps admins see devices that started enrollment but haven't completed it.
 
+### 2. Empty state SVG inline styles → Tailwind
+The empty state illustrations on devices, groups, and policies pages use inline `style=` attributes instead of Tailwind classes (workaround from failed centering attempts). Replace with Tailwind utilities (`text-center`, `mx-auto`, `mb-2`, `block`, `mt-2`, `mt-1`) and run `make css` to rebuild. Affected files:
+- `internal/api/templates/pages/devices.html`
+- `internal/api/templates/pages/groups.html`
+- `internal/api/templates/pages/policies.html`
+
