@@ -227,6 +227,13 @@ func (s *Server) handleWindowsEnrollmentService(w http.ResponseWriter, r *http.R
 		}
 	}
 	if enterpriseID == uuid.Nil {
+		if s.config.MacOS.DefaultEnterpriseID != "" {
+			if eid, err := uuid.Parse(s.config.MacOS.DefaultEnterpriseID); err == nil {
+				enterpriseID = eid
+			}
+		}
+	}
+	if enterpriseID == uuid.Nil {
 		enterpriseID = uuid.MustParse("00000000-0000-0000-0000-000000000001") // default
 	}
 
