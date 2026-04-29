@@ -825,6 +825,12 @@ Same rules as Windows, delivered via MDM profile payload.
 
 **DNS**: Production requires public DNS for `enterpriseenrollment.<domain>` → MDM server (enrollment auto-discovery). Internal DNS over VPN for all management services (package repos, monitoring, internal apps). Eliminates hosts file entries.
 
+**Split DNS via WireGuard**: WireGuard client config pushes a DNS server accessible only over the VPN tunnel. Devices resolve internal hostnames (package repos, monitoring, internal apps) via VPN DNS, and everything else via their normal DNS. This enables:
+- Internal service discovery without public DNS records
+- Access to internal resources by hostname (e.g., `packages.internal`, `monitoring.internal`)
+- DNS-based access control — internal names only resolve for VPN-connected managed devices
+- WireGuard `DNS` and `AllowedIPs` config controls which traffic routes through the tunnel (split tunnel — only internal ranges, not all traffic)
+
 **Certificate lifecycle**: CA cert and server certs expire. Plan for automated renewal and MDM-pushed CA cert updates before expiry. Devices that miss a CA rotation lose trust and can't sync — need a re-enrollment path.
 
 **Device offboarding**: When a device is unenrolled, wiped, or deleted, automatically revoke its WireGuard key on the VPN server and remove RustDesk access. The EventBus lifecycle hooks (`ComplianceCleanupHook` pattern) can trigger this — add a `VPNCleanupHook` and `RemoteAccessCleanupHook` subscriber.
