@@ -168,6 +168,14 @@
 - [ ] Click "Remove" on "Engineering"
 - [ ] Wait 1s
 
+### Delete Test Policy
+- [ ] Visit `/dashboard/policies`
+- [ ] Click "Test Policy"
+- [ ] Click "Delete"
+- [ ] Wait 1s
+- [ ] Visit `/dashboard/policies`
+- [ ] Verify "Test Policy" is not visible
+
 ### Policy Full CRUD
 - [ ] Visit `/dashboard/policies` — page contains "Policies"
 - [ ] Click "Create Policy"
@@ -180,6 +188,11 @@
 - [ ] Click "Save Changes"
 - [ ] Wait 1s
 - [ ] Visit `/dashboard/policies` — page contains "CRUD Test Policy Updated"
+- [ ] Click "CRUD Test Policy Updated"
+- [ ] Click "Delete"
+- [ ] Wait 1s
+- [ ] Visit `/dashboard/policies`
+- [ ] Verify "CRUD Test Policy Updated" is not visible
 
 ## Groups
 

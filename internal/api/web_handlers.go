@@ -746,6 +746,14 @@ func buildPlatformDetails(pd models.JSONB) []platformDetailGroup {
 		// Translate raw numeric CSP values to human-readable text
 		if k == "bitlocker_status" {
 			item.Value = decodeBitLockerStatus(item.Value)
+		} else if k == "total_ram" || k == "total_storage" {
+			if f, err := strconv.ParseFloat(item.Value, 64); err == nil {
+				if f >= 1024 {
+					item.Value = fmt.Sprintf("%.1f GB", f/1024)
+				} else {
+					item.Value = fmt.Sprintf("%.0f MB", f)
+				}
+			}
 		} else if translated, ok := platformValueTranslations[k][item.Value]; ok {
 			item.Value = translated
 		}

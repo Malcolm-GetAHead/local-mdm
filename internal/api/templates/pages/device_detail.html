@@ -35,8 +35,8 @@
             {{if .Device.SerialNumber}}<div class="flex justify-between"><dt class="text-gray-500 dark:text-gray-400">Serial Number</dt><dd class="font-medium">{{.Device.SerialNumber}}</dd></div>{{end}}
             <div class="flex justify-between"><dt class="text-gray-500 dark:text-gray-400">Model</dt><dd class="font-medium">{{.Device.Model}}</dd></div>
             {{with index .Device.PlatformData "manufacturer"}}<div class="flex justify-between"><dt class="text-gray-500 dark:text-gray-400">Manufacturer</dt><dd class="font-medium">{{.}}</dd></div>{{end}}
-            {{with index .Device.PlatformData "total_ram"}}<div class="flex justify-between"><dt class="text-gray-500 dark:text-gray-400">RAM</dt><dd class="font-medium">{{.}} MB</dd></div>{{end}}
-            {{with index .Device.PlatformData "total_storage"}}<div class="flex justify-between"><dt class="text-gray-500 dark:text-gray-400">Storage</dt><dd class="font-medium">{{.}} MB</dd></div>{{end}}
+            {{with index .Device.PlatformData "total_ram"}}<div class="flex justify-between"><dt class="text-gray-500 dark:text-gray-400">RAM</dt><dd class="font-medium">{{formatMB .}}</dd></div>{{end}}
+            {{with index .Device.PlatformData "total_storage"}}<div class="flex justify-between"><dt class="text-gray-500 dark:text-gray-400">Storage</dt><dd class="font-medium">{{formatMB .}}</dd></div>{{end}}
             {{with index .Device.PlatformData "storage_capacity_gb"}}<div class="flex justify-between"><dt class="text-gray-500 dark:text-gray-400">Storage</dt><dd class="font-medium">{{.}} GB</dd></div>{{end}}
         </dl>
     </div>

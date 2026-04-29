@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"html/template"
 	"io/fs"
+	"strconv"
 	"strings"
 	"time"
 
@@ -142,6 +143,25 @@ var templateFuncs = template.FuncMap{
 		default:
 			return fmt.Sprintf("%.0f B", bytes)
 		}
+	},
+	"formatMB": func(v interface{}) string {
+		var mb float64
+		switch b := v.(type) {
+		case float64:
+			mb = b
+		case string:
+			f, err := strconv.ParseFloat(b, 64)
+			if err != nil {
+				return b
+			}
+			mb = f
+		default:
+			return fmt.Sprintf("%v", v)
+		}
+		if mb >= 1024 {
+			return fmt.Sprintf("%.1f GB", mb/1024)
+		}
+		return fmt.Sprintf("%.0f MB", mb)
 	},
 	"sub": func(a, b int) int { return a - b },
 	"safeHTML": func(s string) template.HTML { return template.HTML(s) },
