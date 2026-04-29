@@ -29,17 +29,18 @@ func NewManagementHandler(serverURI string, deviceRepo repository.DeviceReposito
 	}
 }
 
-// HandleSyncML processes an incoming SyncML message and returns a response.
+// HandleSyncML processes an incoming SyncML message and returns a response
+// along with the device ID extracted from the message header.
 // This implements the OMA-DM pkg 1 (client) → pkg 2 (server) exchange.
-func (h *ManagementHandler) HandleSyncML(ctx context.Context, data []byte) ([]byte, error) {
+func (h *ManagementHandler) HandleSyncML(ctx context.Context, data []byte) ([]byte, string, error) {
 	msg, err := ParseSyncML(data)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse SyncML: %w", err)
+		return nil, "", fmt.Errorf("failed to parse SyncML: %w", err)
 	}
 
 	deviceID := msg.GetDeviceID()
 	if deviceID == "" {
-		return nil, fmt.Errorf("missing device ID in SyncML source")
+		return nil, "", fmt.Errorf("missing device ID in SyncML source")
 	}
 
 	h.logger.Info("OMA-DM sync received",
@@ -91,7 +92,8 @@ func (h *ManagementHandler) HandleSyncML(ctx context.Context, data []byte) ([]by
 		h.logger.Error("failed to deliver pending commands", "error", err, "device_id", deviceID)
 	}
 
-	return GenerateSyncML(resp)
+	respBytes, err := GenerateSyncML(resp)
+	return respBytes, deviceID, err
 }
 
 // processStatus handles status responses from the device for previously sent commands.

@@ -257,7 +257,7 @@ func TestManagementHandler_HandleSyncML(t *testing.T) {
 			</SyncBody>
 		</SyncML>`, deviceID.String())
 
-		resp, err := handler.HandleSyncML(context.Background(), []byte(clientMsg))
+		resp, _, err := handler.HandleSyncML(context.Background(), []byte(clientMsg))
 		require.NoError(t, err)
 
 		// Parse response
@@ -299,7 +299,7 @@ func TestManagementHandler_HandleSyncML(t *testing.T) {
 			<SyncBody><Alert><CmdID>1</CmdID><Data>1201</Data></Alert><Final/></SyncBody>
 		</SyncML>`, deviceID.String())
 
-		resp, err := handler.HandleSyncML(context.Background(), []byte(clientMsg))
+		resp, _, err := handler.HandleSyncML(context.Background(), []byte(clientMsg))
 		require.NoError(t, err)
 
 		parsed, err := ParseSyncML(resp)
@@ -349,7 +349,7 @@ func TestManagementHandler_HandleSyncML(t *testing.T) {
 			</SyncBody>
 		</SyncML>`, deviceID.String())
 
-		_, err := handler.HandleSyncML(context.Background(), []byte(clientMsg))
+		_, _, err := handler.HandleSyncML(context.Background(), []byte(clientMsg))
 		require.NoError(t, err)
 
 		// Verify device was updated
@@ -373,14 +373,14 @@ func TestManagementHandler_HandleSyncML(t *testing.T) {
 			<SyncBody><Final/></SyncBody>
 		</SyncML>`
 
-		_, err := handler.HandleSyncML(context.Background(), []byte(clientMsg))
+		_, _, err := handler.HandleSyncML(context.Background(), []byte(clientMsg))
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "missing device ID")
 	})
 
 	t.Run("rejects invalid XML", func(t *testing.T) {
 		handler := NewManagementHandler("https://mdm.example.com", nil, nil, logger)
-		_, err := handler.HandleSyncML(context.Background(), []byte("not xml"))
+		_, _, err := handler.HandleSyncML(context.Background(), []byte("not xml"))
 		assert.Error(t, err)
 	})
 }
@@ -427,7 +427,7 @@ func TestManagementHandler_WipeCommand(t *testing.T) {
 		<SyncBody><Alert><CmdID>1</CmdID><Data>1201</Data></Alert><Final/></SyncBody>
 	</SyncML>`, deviceID.String())
 
-	resp, err := handler.HandleSyncML(context.Background(), []byte(clientMsg))
+	resp, _, err := handler.HandleSyncML(context.Background(), []byte(clientMsg))
 	require.NoError(t, err)
 
 	parsed, err := ParseSyncML(resp)

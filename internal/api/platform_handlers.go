@@ -666,7 +666,7 @@ func (s *Server) handleWindowsManagementSync(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	resp, err := s.windowsMgmtHandler.HandleSyncML(r.Context(), body)
+	resp, deviceID, err := s.windowsMgmtHandler.HandleSyncML(r.Context(), body)
 	if err != nil {
 		s.logger.Error("failed to handle OMA-DM sync", "error", err)
 		http.Error(w, "Failed to process sync", http.StatusInternalServerError)
@@ -674,7 +674,7 @@ func (s *Server) handleWindowsManagementSync(w http.ResponseWriter, r *http.Requ
 	}
 
 	// Update last_seen for the syncing device
-	if deviceID := windows.ExtractDeviceIDFromSyncML(body); deviceID != "" {
+	if deviceID != "" {
 		if device, err := s.deviceRepo.GetByPlatformID(r.Context(), models.PlatformWindows, deviceID); err == nil {
 			now := time.Now()
 			device.LastSeen = &now
