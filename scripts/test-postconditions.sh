@@ -25,6 +25,15 @@ check() {
 echo ""
 echo "=== Test Postconditions ==="
 
+# Clean up devices leaked into seed enterprise by NanoMDM webhooks during mdmb e2e tests.
+# mdmb generates serial numbers like "SN" + 8 hex chars. The running localmdm-server
+# container receives NanoMDM webhooks and creates these devices under default_enterprise_id.
+LEAKED=$(psql -h "$DB_HOST" -U postgres -d localmdm -t -A -c \
+  "DELETE FROM devices WHERE enterprise_id = '$SEED_ENT' AND serial_number ~ '^SN[0-9a-f]{8}$' AND status = 'pending' RETURNING id;" 2>/dev/null | wc -l | tr -d ' ')
+if [ "$LEAKED" -gt 0 ]; then
+  echo "  Cleaned up $LEAKED leaked mdmb test device(s) from seed enterprise"
+fi
+
 check "No leaked test enterprises" "0" \
   "SELECT count(*) FROM enterprises WHERE id != '$SEED_ENT';"
 
