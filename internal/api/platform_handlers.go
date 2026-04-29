@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -210,18 +211,23 @@ func (s *Server) handleWindowsEnrollmentService(w http.ResponseWriter, r *http.R
 		storedDeviceID = hwDeviceID
 	}
 
-	// Determine enterprise ID
+	// Determine enterprise ID from URL path, email username (UUID), or fallback
 	enterpriseID := uuid.Nil
 	if eidStr := mux.Vars(r)["enterprise_id"]; eidStr != "" {
 		if eid, err := uuid.Parse(eidStr); err == nil {
 			enterpriseID = eid
 		}
 	}
-	if enterpriseID == uuid.Nil {
-		enterprises, _, _ := s.enterpriseRepo.List(r.Context(), 1, 0)
-		if len(enterprises) > 0 {
-			enterpriseID = enterprises[0].ID
+	if enterpriseID == uuid.Nil && env.Header.Security != nil && env.Header.Security.UsernameToken != nil {
+		username := env.Header.Security.UsernameToken.Username
+		if atIdx := strings.Index(username, "@"); atIdx > 0 {
+			if eid, err := uuid.Parse(username[:atIdx]); err == nil {
+				enterpriseID = eid
+			}
 		}
+	}
+	if enterpriseID == uuid.Nil {
+		enterpriseID = uuid.MustParse("00000000-0000-0000-0000-000000000001") // default
 	}
 
 	// Create device record BEFORE signing CSR (certificates table has FK to devices)
