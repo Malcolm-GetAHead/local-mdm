@@ -658,5 +658,56 @@ In production (ECS Fargate), NanoMDM runs as a separate ECS service behind the A
 
 ---
 
-**Current Sprint**: 5d (Web Dashboard) — complete
-**Next**: Sprint 6 (Real device integration — Windows VM, macOS VM, Android)
+**Current Sprint**: 6 (Real Device Integration) — in progress
+
+## Sprint 6: Real Device Integration
+
+### nginx TLS Proxy
+
+nginx reverse proxy terminates TLS on ports 443/8443, forwarding to the Go server on port 8080. The server cert is signed by the project CA and includes SANs for `192.168.1.229` and `enterpriseenrollment.localmdm.local`. CA certs persist via Docker volume mount (`./internal/api/certs:/app/certs`) — without this mount, every `docker compose build` regenerates the CA and breaks all enrolled devices.
+
+```
+Device (HTTPS) → nginx:443 → localmdm:8080 (HTTP)
+                  ↓ TLS termination
+                  Server cert signed by project CA
+                  CA cert trusted on VMs
+```
+
+### NanoMDM Webhook Data Pipeline
+
+NanoMDM forwards all check-in and command result events to Local MDM via webhook (`POST /api/v1/macos/webhook`). The `CheckinHandler` processes these events:
+
+```
+Device check-in → NanoMDM → webhook JSON → CheckinHandler
+  ├── Authenticate: create/update device (name, serial, model, OS from plist)
+  ├── TokenUpdate: set status=enrolled, store push_magic
+  ├── CheckOut: set status=unenrolled, fire lifecycle hooks
+  └── Acknowledge: parse command results → update platform_data
+```
+
+Command results (`processCommandResult`) parse base64-encoded plist responses:
+- **SecurityInfo** → FileVault, firewall, secure boot, activation lock → compliance evaluation
+- **DeviceInformation** → 35 fields (name, OS, storage, battery, network, update settings)
+- **ProfileList** → installed profiles with payload counts
+- **InstalledApplicationList** → apps with versions and bundle sizes
+- **CertificateList** → certificates (common name, identity flag)
+- **UserList** → local users with admin/secure token status
+- **AvailableOSUpdates / OSUpdateStatus** → pending updates
+
+### Auto-Queue Flow
+
+On `Idle` status (no pending commands), the handler auto-queues 9 info commands with a 15-minute per-device cooldown to prevent storm cycles:
+
+```
+Device reports Idle → maybeAutoQueue(udid)
+  ├── Check cooldown map (15min per device)
+  ├── If cooldown elapsed:
+  │   ├── Create 9 command records in Local MDM DB
+  │   ├── Send 9 plist commands to NanoMDM API
+  │   └── Update cooldown timestamp
+  └── If within cooldown: skip
+
+Commands: SecurityInfo, DeviceInformation (35 queries), ProfileList,
+InstalledApplicationList, CertificateList, ManagedApplicationList,
+AvailableOSUpdates, OSUpdateStatus, UserList
+```

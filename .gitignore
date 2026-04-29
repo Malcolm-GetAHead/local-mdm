@@ -84,4 +84,4 @@ web/static/vendor/swagger-ui/swagger-ui-bundle.js
 web/static/vendor/swagger-ui/swagger-ui.css
 
 # Python virtual environment
-venv/
+venv/*.crl

@@ -4,6 +4,21 @@ Sprint-by-sprint development history for Local MDM. For current status, see [REA
 
 ---
 
+## Sprint 6 — Real Device Integration
+- macOS VM enrolled with full data pipeline: Authenticate → TokenUpdate → auto-queue 9 commands (SecurityInfo, DeviceInformation, ProfileList, InstalledApplicationList, CertificateList, ManagedApplicationList, AvailableOSUpdates, OSUpdateStatus, UserList)
+- NanoMDM webhook handler parses base64-encoded plist responses into `platform_data` JSONB (35+ device fields, security info, profiles, apps, certs, users, OS updates)
+- Auto-queue with 15-minute per-device cooldown prevents command storm cycles
+- Compliance engine evaluates real device data (FileVault, firewall status from SecurityInfo)
+- nginx TLS proxy for HTTPS termination (ports 443/8443), server cert signed by project CA
+- CA cert persistence via Docker volume mount (`./internal/api/certs/`)
+- Windows server-side protocol verified: Discovery, Policy, Enrollment, OMA-DM over HTTPS
+- Discovery response fixed to MS-MDE2 on-premises spec (EnrollmentVersion 3.0, no AuthenticationServiceUrl)
+- Windows enrollment agent (C# with COM P/Invoke) — blocked by .NET CLR COM threading limitation
+- Enterprise ID in macOS webhook handler now configurable via `default_enterprise_id` config
+- Debug log lines removed from webhook handler
+- Unit tests for processCommandResult (9 tests) and maybeAutoQueue cooldown (2 tests)
+- macOS package coverage: 54.1% → 62.5%
+
 ## Sprint 5g — Quality Polish
 - Fix N+1 queries in web handlers (batch `ListByIDs`, `CountMembersByGroupIDs`)
 - HTMX loading indicator (CSS progress bar)

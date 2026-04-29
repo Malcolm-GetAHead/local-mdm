@@ -62,8 +62,9 @@ macos:
   apns_password: ""
   push_topic: "com.example.mdm"
   enrollment_url: "https://localmdm:8080/macos/enroll"
-  nanomdm_url: "http://192.168.1.229:9000"
+  nanomdm_url: "http://nanomdm:9000"
   nanomdm_api_key: "localmdm-nanomdm-api-key"
+  default_enterprise_id: "00000000-0000-0000-0000-000000000001"
 
 android:
   project_id: ""

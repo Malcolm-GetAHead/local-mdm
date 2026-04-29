@@ -84,11 +84,12 @@ type LifecycleNotifier interface {
 
 // CheckinHandler handles MDM check-in requests
 type CheckinHandler struct {
-	nanomdm       *NanoMDMService
-	service       *Service
-	cmdRepo       repository.CommandRepository
-	lifecycle     LifecycleNotifier
-	logger        *slog.Logger
+	nanomdm             *NanoMDMService
+	service             *Service
+	cmdRepo             repository.CommandRepository
+	lifecycle           LifecycleNotifier
+	logger              *slog.Logger
+	defaultEnterpriseID uuid.UUID
 	// Auto-query cooldown: track last auto-queue time per UDID to prevent storm cycles
 	lastAutoQuery map[string]time.Time
 	autoQueryMu   sync.Mutex
@@ -97,13 +98,19 @@ type CheckinHandler struct {
 // NewCheckinHandler creates a new check-in handler
 func NewCheckinHandler(nanomdm *NanoMDMService, service *Service, cmdRepo repository.CommandRepository, lifecycle LifecycleNotifier, logger *slog.Logger) *CheckinHandler {
 	return &CheckinHandler{
-		nanomdm:       nanomdm,
-		service:       service,
-		cmdRepo:       cmdRepo,
-		lifecycle:     lifecycle,
-		logger:        logger,
-		lastAutoQuery: make(map[string]time.Time),
+		nanomdm:             nanomdm,
+		service:             service,
+		cmdRepo:             cmdRepo,
+		lifecycle:           lifecycle,
+		logger:              logger,
+		defaultEnterpriseID: uuid.MustParse("00000000-0000-0000-0000-000000000001"),
+		lastAutoQuery:       make(map[string]time.Time),
 	}
+}
+
+// SetDefaultEnterpriseID sets the enterprise ID used for new device registrations.
+func (h *CheckinHandler) SetDefaultEnterpriseID(id uuid.UUID) {
+	h.defaultEnterpriseID = id
 }
 
 // ServeHTTP handles MDM check-in HTTP requests (NanoMDM webhook JSON format)
@@ -172,7 +179,6 @@ func (h *CheckinHandler) handleCheckin(ctx context.Context, messageType, udid st
 			return
 		}
 		// Parse the raw plist to extract device info
-		h.logger.Debug("authenticate raw payload", "payload_len", len(ce.RawPayload), "payload_prefix", ce.RawPayload[:min(200, len(ce.RawPayload))])
 		var auth authenticatePlist
 		serial := ""
 		name := ""
@@ -201,8 +207,8 @@ func (h *CheckinHandler) handleCheckin(ctx context.Context, messageType, udid st
 			topic = auth.Topic
 		}
 
-		// Use a default enterprise ID
-		enterpriseID, _ := uuid.Parse("00000000-0000-0000-0000-000000000001")
+		// Use the configured default enterprise ID
+		enterpriseID := h.defaultEnterpriseID
 
 		// Try to update existing device, or create new one
 		device, err := h.service.GetDeviceByUDID(ctx, udid)
@@ -317,7 +323,6 @@ func (h *CheckinHandler) handleAcknowledge(ctx context.Context, ae *AcknowledgeE
 
 	// Parse command results and update device platform_data
 	if ae.Status == "Acknowledged" && udid != "" && ae.RawPayload != "" {
-		h.logger.Debug("raw acknowledge payload", "len", len(ae.RawPayload), "prefix", ae.RawPayload[:min(300, len(ae.RawPayload))])
 		h.processCommandResult(ctx, udid, ae.RawPayload)
 		// Mark command as completed in Local MDM
 		if cmdUUID != "" && h.cmdRepo != nil {

@@ -64,7 +64,11 @@ open http://localhost:8080
 
 All backend features complete through Sprint 5g. Web dashboard operational with full device/policy/group/compliance management.
 
-**Current**: Sprint 6 — Real device integration (Windows VM, macOS VM, Android)
+**Current**: Sprint 6 — Real device integration
+- macOS VM enrolled with full data pipeline (9 auto-queued commands, 35+ device fields)
+- Windows server-side protocol verified (Discovery, Policy, Enrollment, OMA-DM over HTTPS)
+- Windows native enrollment blocked by COM threading limitation; Settings UI "Enroll only in device management" is the working path
+- nginx TLS proxy for HTTPS termination, CA cert persistence via Docker volume mount
 
 See [CHANGELOG.md](CHANGELOG.md) for detailed sprint history.
 

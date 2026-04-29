@@ -759,6 +759,11 @@ func (s *Server) setupRoutes() {
 		http.HandlerFunc(s.handleDEPDevices),
 	)).Methods("GET")
 	checkinHandler := macos.NewCheckinHandler(s.nanomdmService, s.macosService, s.cmdRepo, s.lifecycleService, s.logger)
+	if s.config.MacOS.DefaultEnterpriseID != "" {
+		if eid, err := uuid.Parse(s.config.MacOS.DefaultEnterpriseID); err == nil {
+			checkinHandler.SetDefaultEnterpriseID(eid)
+		}
+	}
 	commandHandler := macos.NewCommandHandler(s.nanomdmService, s.logger)
 	s.router.Handle("/mdm", commandHandler).Methods("PUT")
 	s.router.Handle("/checkin", checkinHandler).Methods("PUT")
@@ -797,6 +802,12 @@ func (s *Server) setupRoutes() {
 	// ── Dashboard (Sprint 5d) ────────────────────────────────────────────
 	// Static files
 	s.router.PathPrefix("/static/").Handler(http.StripPrefix("/static/", http.FileServer(http.Dir("web/static"))))
+
+	// CRL distribution point for Windows TLS validation
+	s.router.HandleFunc("/crl/ca.crl", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/pkix-crl")
+		http.ServeFile(w, r, "certs/ca.crl")
+	}).Methods("GET")
 
 	// Root redirect
 	s.router.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {

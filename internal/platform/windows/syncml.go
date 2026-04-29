@@ -219,3 +219,12 @@ func (msg *SyncML) GetDeviceID() string {
 	}
 	return ""
 }
+
+// ExtractDeviceIDFromSyncML quickly extracts the device ID from raw SyncML bytes.
+func ExtractDeviceIDFromSyncML(data []byte) string {
+	msg, err := ParseSyncML(data)
+	if err != nil {
+		return ""
+	}
+	return msg.GetDeviceID()
+}

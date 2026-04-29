@@ -25,6 +25,7 @@ Build a minimal Windows enrollment agent:
 - Start VMs: `utmctl start "LocalMDM-Windows-Test"` / `utmctl start "LocalMDM-macOS-Test"`
 - Restore from template if needed: `utmctl stop "LocalMDM-Windows-Test"` then restore via UTM GUI or `restore_vms.sh`
 - The Windows VM has: CA cert trusted, hosts entry for `enterpriseenrollment.localmdm.local`, Windows ADK/ICD installed
+  - if you restore the template it does NOT have these thing and they would need to be added!
 - MDM server: `http://192.168.1.229:8080` (HTTP) / `https://192.168.1.229:8443` (HTTPS via nginx)
 
 **If the agent approach works**, verify:

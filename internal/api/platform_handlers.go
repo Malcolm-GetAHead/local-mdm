@@ -149,6 +149,7 @@ func (s *Server) handleWindowsDiscoveryService(w http.ResponseWriter, r *http.Re
 	}
 
 	w.Header().Set("Content-Type", "application/soap+xml; charset=utf-8")
+	w.Header().Set("Content-Length", fmt.Sprintf("%d", len(resp)))
 	w.WriteHeader(http.StatusOK)
 	w.Write(resp)
 }
@@ -225,20 +226,30 @@ func (s *Server) handleWindowsEnrollmentService(w http.ResponseWriter, r *http.R
 
 	// Create device record BEFORE signing CSR (certificates table has FK to devices)
 	if enterpriseID != uuid.Nil {
-		device := &models.Device{
-			BaseModel:    models.BaseModel{ID: deviceID},
-			EnterpriseID: enterpriseID,
-			Platform:     models.PlatformWindows,
-			DeviceID:     storedDeviceID,
-			Name:         deviceName,
-			OSVersion:    osVersion,
-			Status:       models.DeviceStatusEnrolled,
-			PlatformData: models.JSONB{},
-		}
-		if err := s.deviceRepo.Create(r.Context(), device); err != nil {
-			s.logger.Error("failed to create windows device record", "error", err, "device_id", deviceID)
-			respondError(w, r, http.StatusInternalServerError, "device_creation_failed", "Failed to create device record")
-			return
+		// Try to find existing device first (re-enrollment)
+		existing, _ := s.deviceRepo.GetByPlatformID(r.Context(), models.PlatformWindows, storedDeviceID)
+		if existing != nil {
+			deviceID = existing.ID
+			existing.Name = deviceName
+			existing.OSVersion = osVersion
+			existing.Status = models.DeviceStatusEnrolled
+			_ = s.deviceRepo.Update(r.Context(), existing)
+		} else {
+			device := &models.Device{
+				BaseModel:    models.BaseModel{ID: deviceID},
+				EnterpriseID: enterpriseID,
+				Platform:     models.PlatformWindows,
+				DeviceID:     storedDeviceID,
+				Name:         deviceName,
+				OSVersion:    osVersion,
+				Status:       models.DeviceStatusEnrolled,
+				PlatformData: models.JSONB{},
+			}
+			if err := s.deviceRepo.Create(r.Context(), device); err != nil {
+				s.logger.Error("failed to create windows device record", "error", err, "device_id", deviceID)
+				respondError(w, r, http.StatusInternalServerError, "device_creation_failed", "Failed to create device record")
+				return
+			}
 		}
 		s.logger.Info("windows device record created",
 			"device_id", deviceID,
@@ -318,6 +329,7 @@ func (s *Server) handleWindowsEnrollmentService(w http.ResponseWriter, r *http.R
 	)
 
 	w.Header().Set("Content-Type", "application/soap+xml; charset=utf-8")
+	w.Header().Set("Content-Length", fmt.Sprintf("%d", len(resp)))
 	w.WriteHeader(http.StatusOK)
 	w.Write(resp)
 }
@@ -410,6 +422,7 @@ func (s *Server) handleWindowsPolicyService(w http.ResponseWriter, r *http.Reque
 </s:Envelope>`, messageID)
 
 	w.Header().Set("Content-Type", "application/soap+xml; charset=utf-8")
+	w.Header().Set("Content-Length", fmt.Sprintf("%d", len(policy)))
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte(policy))
 }
@@ -645,6 +658,15 @@ func (s *Server) handleWindowsManagementSync(w http.ResponseWriter, r *http.Requ
 		s.logger.Error("failed to handle OMA-DM sync", "error", err)
 		http.Error(w, "Failed to process sync", http.StatusInternalServerError)
 		return
+	}
+
+	// Update last_seen for the syncing device
+	if deviceID := windows.ExtractDeviceIDFromSyncML(body); deviceID != "" {
+		if device, err := s.deviceRepo.GetByPlatformID(r.Context(), models.PlatformWindows, deviceID); err == nil {
+			now := time.Now()
+			device.LastSeen = &now
+			_ = s.deviceRepo.Update(r.Context(), device)
+		}
 	}
 
 	w.Header().Set("Content-Type", "application/vnd.syncml.dm+xml")

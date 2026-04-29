@@ -7,7 +7,7 @@ import (
 
 // MS-MDE2 discovery namespace and action URIs
 const (
-	DiscoveryNS       = "http://schemas.microsoft.com/windows/management/2012/01/enrollment/"
+	DiscoveryNS       = "http://schemas.microsoft.com/windows/management/2012/01/enrollment"
 	DiscoveryAction   = "http://schemas.microsoft.com/windows/management/2012/01/enrollment/IDiscoveryService/Discover"
 	DiscoverRespAction = "http://schemas.microsoft.com/windows/management/2012/01/enrollment/IDiscoveryService/DiscoverResponse"
 )
@@ -67,6 +67,7 @@ func GenerateDiscoverResponse(enrollmentURL, policyURL, relatesToMessageID strin
    xmlns:a="http://www.w3.org/2005/08/addressing">
   <s:Header>
     <a:Action s:mustUnderstand="1">%s</a:Action>
+    <ActivityId xmlns="http://schemas.microsoft.com/2004/09/ServiceModel/Diagnostics">d9eb2fdd-e38a-46ee-bd93-aea9dc86a3b8</ActivityId>
     <a:RelatesTo>%s</a:RelatesTo>
   </s:Header>
   <s:Body xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
@@ -75,13 +76,12 @@ func GenerateDiscoverResponse(enrollmentURL, policyURL, relatesToMessageID strin
       <DiscoverResult>
         <AuthPolicy>OnPremise</AuthPolicy>
         <EnrollmentVersion>4.0</EnrollmentVersion>
-        <AuthenticationServiceUrl>%s</AuthenticationServiceUrl>
         <EnrollmentPolicyServiceUrl>%s</EnrollmentPolicyServiceUrl>
         <EnrollmentServiceUrl>%s</EnrollmentServiceUrl>
       </DiscoverResult>
     </DiscoverResponse>
   </s:Body>
-</s:Envelope>`, DiscoverRespAction, relatesToMessageID, DiscoveryNS, enrollmentURL, policyURL, enrollmentURL)
+</s:Envelope>`, DiscoverRespAction, relatesToMessageID, DiscoveryNS, policyURL, enrollmentURL)
 
 	return []byte(resp), nil
 }
