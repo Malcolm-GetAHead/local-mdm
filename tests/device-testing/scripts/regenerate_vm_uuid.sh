@@ -14,12 +14,12 @@ if [ ! -f "$PLIST" ]; then
     exit 1
 fi
 
-OLD_UUID=$(plutil -extract UUID raw "$PLIST")
+OLD_UUID=$(plutil -extract Information.UUID raw "$PLIST")
 NEW_UUID=$(uuidgen)
 
 echo "VM: $VM_NAME"
 echo "Old UUID: $OLD_UUID"
 echo "New UUID: $NEW_UUID"
 
-plutil -replace UUID -string "$NEW_UUID" "$PLIST"
+plutil -replace Information.UUID -string "$NEW_UUID" "$PLIST"
 echo "✓ UUID updated. Boot the VM — Windows will see a new hardware ID."
