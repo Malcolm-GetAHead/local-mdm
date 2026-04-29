@@ -292,3 +292,29 @@ make dev-test         # All 19 packages, race detector, Docker networking
 - **Check mock stubs** before writing handler tests — some mock methods may be no-ops that need to be made functional
 - **Grep for existing tests** before changing a function's behavior — fleshing out a stub handler will break tests that send nil/empty bodies
 - **New endpoints need test routes** — add them to `newTestServer()` in `handler_test_helpers_test.go`
+
+## Real Device Testing (Sprint 6)
+
+### Windows Enrollment Testing
+
+Windows 11 devices enroll via Settings UI — no agent or Azure AD required.
+
+**Prerequisites on Windows VM:**
+1. Import CA cert: `certutil -addstore Root ca.crt`
+2. Add hosts entry: `echo 192.168.1.229 enterpriseenrollment.localmdm.local >> C:\Windows\System32\drivers\etc\hosts`
+
+**Enrollment:** Settings → Accounts → Access work or school → "Enroll only in device management" → `admin@localmdm.local` → any credentials
+
+**Verify:** Device appears in dashboard under Acme Corp, OMA-DM sync updates `last_seen`
+
+### macOS Enrollment Testing
+
+macOS devices enroll via Safari profile download. Reboot triggers NanoMDM check-in → webhook → auto-queue 9 commands.
+
+### Important: Test Database Conflict
+
+`make dev-test` shares the production database and deletes test data broadly. **Real enrolled devices will be deleted.** Run tests BEFORE enrolling real devices, or plan to re-enroll after testing.
+
+### TLS Requirements for Windows
+
+The server cert must have a CRL Distribution Point extension. Without it, Windows schannel rejects TLS connections with `CRYPT_E_NO_REVOCATION_CHECK`. The CRL is served at `http://<server>:8080/crl/ca.crl`.

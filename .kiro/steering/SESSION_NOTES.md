@@ -1,6 +1,6 @@
 # Session Notes — Working Preferences & Project Knowledge
 
-**Last Updated**: 2026-04-26  
+**Last Updated**: 2026-04-28  
 **Purpose**: Guidance for AI agents working on this codebase. Keep this file lean — patterns and conventions that apply to every session. One-shot implementation details belong in sprint docs, not here.
 
 ## Current State
@@ -10,7 +10,7 @@
 - **Sprint 5f**: ✅ COMPLETE, merged to main (via sprint-5d branch)
 - **Sprint 5g**: ✅ COMPLETE, merged to main
 - **Sprint 5g addendum**: ✅ Blueprint assessment fixes merged (B-01 through B-10, F-03, T-04)
-- **Sprint 6**: 🟡 In Progress — macOS fully enrolled with real data pipeline, Windows protocol verified but native enrollment blocked by Azure AD requirement
+- **Sprint 6**: ✅ COMPLETE — macOS full data pipeline, Windows enrolled via Settings UI, OMA-DM sync working
 - **Retrospective**: Pending (Sprint 5b)
 ---
 
@@ -104,6 +104,13 @@
 - **`runtime/coverage.WriteCountersDir` doesn't work with `-coverpkg` scoping on Go 1.26.** The API reports `covermode=<invalid>`. Don't use the explicit flush API — rely on Go's automatic atexit flush by ensuring `main()` returns cleanly (no `os.Exit` in shutdown path).
 - **Test DB password mismatch was hiding 5+ tests.** `testutil/db.go` defaulted to password `postgres`, Docker Compose uses `postgres-dev-password-1234`. Tests silently skipped via `t.Skipf`. The mdmb full enrollment test was hiding behind this — once the password was fixed, it ran but failed on assertions that mdmb doesn't populate (Model, OSVersion, build_version). Always check if "passing" tests are actually skipping.
 - **Sprint effort estimates for agent work are 10-25x too high.** Sprint 5g was estimated at 8.5 hours, took ~20 minutes. The blueprint assessment fixes (9 items) took ~15 minutes. Mechanical, well-scoped changes compress dramatically. Investigation and debugging (like the coverage flush issue) don't compress as much.
+- **A trailing slash on an XML namespace is a different namespace.** The Windows enrollment discovery response was rejected for months because `enrollment/` != `enrollment`. Always compare namespaces character-by-character against the spec or a known working implementation (Fleet DM).
+- **MS-MDE2 requires non-chunked HTTP responses.** Go's default HTTP server sends chunked responses when Content-Length isn't set explicitly. Windows returns `0x80192F76` (ERROR_HTTP_HEADER_NOT_FOUND). Always set Content-Length on SOAP responses.
+- **Windows schannel requires CRL Distribution Points.** Self-signed CA certs without a CRL DP cause `CRYPT_E_NO_REVOCATION_CHECK`. Add a CRL DP to the server cert and serve an empty CRL at that URL.
+- **`make dev-test` destroys real device data.** Tests share the production database and do broad deletes. Run tests BEFORE enrolling real devices, or use a separate test database. Real devices deleted by tests must re-enroll.
+- **'Enroll only in device management' is available natively on fresh Windows 11.** No PPKG or registry hack needed. Previous session's assumption was wrong.
+- **Go syscall bypasses .NET COM threading issues.** `RegisterDeviceWithManagement` works from Go (no COM pre-initialization) but still fails with `0x80180006`. The Settings UI is the working enrollment path.
+- **When debugging protocol issues, compare with a known working implementation byte-by-byte.** Fleet DM's source code revealed the namespace bug, the correct EnrollmentVersion (4.0), and the proper XML marshaling approach.
 
 ## Known Issues
 
@@ -114,6 +121,9 @@
 - **Recovery key escrow tracked in F-03** — gap analysis with 7 specific items (migration, repo, profile payloads, response parsing, API endpoint). Depends on F-01.
 - **NanoMDM config uses host IP** — `configs/config.docker.yaml` has `nanomdm_url: "http://192.168.1.229:9000"` which is host-specific. The enrollment profile uses this URL (must be reachable from VMs), but the server-to-NanoMDM API calls also use it (works from inside Docker via host networking). Needs env var override for portability.
 - **macOS webhook enterprise ID is hardcoded** — Authenticate handler uses `00000000-0000-0000-0000-000000000001`. Multi-tenant requires passing enterprise ID through the enrollment flow.
+- **Windows OMA-DM sync doesn't query device state** — sync handler acknowledges sessions but doesn't send CSP queries for BitLocker, firewall, etc. Windows compliance shows 'unknown' until device info queries are implemented.
+- **CRL is static** — served from a file generated once. Cert revocations won't be reflected until CRL regeneration is implemented.
+- **ASN.1 CSR fallback uses generic subject** — Windows CSRs with non-PrintableString characters get signed with `CN=MDMDeviceCert` instead of the original subject.
 
 ## Project-Specific Knowledge
 
@@ -146,5 +156,5 @@
 | 5b | ✅ Complete | EventBus listener, compliance wiring, lifecycle hooks, k6 load tests |
 | 5d | ✅ Complete | Web dashboard (HTMX), 199 Playwright tests |
 | 5g | ✅ Complete | Quality polish: N+1 fixes, loading indicator, empty states, error tests, interface refactor |
-| 6 | 🟡 In Progress | macOS enrolled with full data pipeline (9 auto-queued commands), Windows protocol verified (SOAP/OMA-DM), native Win enrollment blocked by Azure AD |
+| 6 | ✅ Complete | macOS full data pipeline (9 auto-queued commands), Windows enrolled via Settings UI, OMA-DM sync, enterprise assignment, nginx TLS with CRL |
 | 7 | 🔲 Not Started | macOS Platform SSO (Java/Swift) — requires Apple Developer account |

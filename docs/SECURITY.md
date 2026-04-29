@@ -236,6 +236,22 @@ Simple Certificate Enrollment Protocol server for device certificate issuance (S
 - **Hourly cleanup**: Expired challenges are purged every hour via background goroutine
 - **Enterprise-scoped**: Challenges are tied to an enterprise, preventing cross-tenant enrollment
 
+## Certificate Revocation
+
+The server TLS certificate includes a CRL Distribution Point (`http://<server>:8080/crl/ca.crl`). This is required for Windows schannel TLS validation. The CRL is currently static (generated once, empty). Future work:
+- Regenerate CRL on certificate revocation
+- Automate CRL refresh on a schedule
+- Consider OCSP as an alternative for real-time revocation checking
+
+## Enrollment Security (Future)
+
+Currently, any device that knows the MDM server hostname and email format can enroll. Planned improvements (tracked in F-07):
+- Enrollment tokens with expiry and use limits
+- Per-enterprise enrollment codes
+- Enrollment audit trail
+
+See `docs/planning/future/F-07-advanced-features.md` for the enrollment token system design.
+
 ### 13. Idempotency ✅
 
 Request deduplication for safe retries on all mutating endpoints (Sprint 4):
