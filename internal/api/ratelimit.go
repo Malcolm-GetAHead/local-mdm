@@ -154,6 +154,16 @@ func (rl *rateLimiter) cleanup() {
 func rateLimitMiddleware(limiter *rateLimiter) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// Exempt device protocol endpoints — OMA-DM sends many messages per sync
+			if strings.HasPrefix(r.URL.Path, "/ManagementServer/") ||
+				strings.HasPrefix(r.URL.Path, "/EnrollmentServer/") ||
+				r.URL.Path == "/scep" ||
+				r.URL.Path == "/checkin" ||
+				r.URL.Path == "/mdm" {
+				next.ServeHTTP(w, r)
+				return
+			}
+
 			// Use client IP — trust X-Forwarded-For from ALB
 			key := r.RemoteAddr
 			if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
