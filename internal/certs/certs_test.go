@@ -46,6 +46,7 @@ func createTestDevice(t *testing.T, database *db.DB) uuid.UUID {
 	if err != nil {
 		t.Fatalf("Failed to create enterprise: %v", err)
 	}
+	t.Cleanup(func() { _, _ = database.Writer.ExecContext(context.Background(), "DELETE FROM enterprises WHERE id = $1", enterpriseID) })
 	
 	// Create device
 	deviceID := uuid.New()

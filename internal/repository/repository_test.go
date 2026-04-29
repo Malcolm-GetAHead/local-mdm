@@ -32,6 +32,7 @@ func TestEnterpriseRepository(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create enterprise: %v", err)
 	}
+	t.Cleanup(func() { database.Writer.Exec("DELETE FROM enterprises WHERE id = $1", enterprise.ID) })
 	
 	if enterprise.ID == uuid.Nil {
 		t.Fatal("Enterprise ID should be set after create")
@@ -109,6 +110,7 @@ func TestDeviceRepository(t *testing.T) {
 		Slug: "device-test-" + uuid.New().String()[:8],
 	}
 	enterpriseRepo.Create(context.Background(), enterprise)
+	t.Cleanup(func() { database.Writer.Exec("DELETE FROM enterprises WHERE id = $1", enterprise.ID) })
 	
 	repo, err := repository.NewDeviceRepository(database.Writer, database.Reader)
 	if err != nil {
@@ -198,6 +200,7 @@ func TestPolicyRepository(t *testing.T) {
 		Slug: "policy-test-" + uuid.New().String()[:8],
 	}
 	enterpriseRepo.Create(context.Background(), enterprise)
+	t.Cleanup(func() { database.Writer.Exec("DELETE FROM enterprises WHERE id = $1", enterprise.ID) })
 	
 	// Create device for assignment tests
 	deviceRepo, err := repository.NewDeviceRepository(database.Writer, database.Reader)

@@ -30,7 +30,7 @@ func TestDeviceRepository_List_ContextCancellation(t *testing.T) {
 	if err := enterpriseRepo.Create(context.Background(), enterprise); err != nil {
 		t.Fatalf("failed to create enterprise: %v", err)
 	}
-	t.Cleanup(func() { enterpriseRepo.Delete(context.Background(), enterprise.ID) })
+	t.Cleanup(func() { db.Writer.Exec("DELETE FROM enterprises WHERE id = $1", enterprise.ID) })
 
 	// Create test devices
 	deviceIDs := make([]uuid.UUID, 5)
@@ -118,7 +118,7 @@ func TestEnterpriseRepository_List_ContextCancellation(t *testing.T) {
 	}
 	t.Cleanup(func() {
 		for _, id := range entIDs {
-			repo.Delete(context.Background(), id)
+			db.Writer.Exec("DELETE FROM enterprises WHERE id = $1", id)
 		}
 	})
 
@@ -184,7 +184,7 @@ func TestPolicyRepository_List_ContextCancellation(t *testing.T) {
 	if err := enterpriseRepo.Create(context.Background(), enterprise); err != nil {
 		t.Fatalf("failed to create enterprise: %v", err)
 	}
-	t.Cleanup(func() { enterpriseRepo.Delete(context.Background(), enterprise.ID) })
+	t.Cleanup(func() { db.Writer.Exec("DELETE FROM enterprises WHERE id = $1", enterprise.ID) })
 
 	// Create test policies
 	policyIDs := make([]uuid.UUID, 4)

@@ -42,6 +42,7 @@ func TestE2E_MacOSWebhook(t *testing.T) {
 		Slug:      "macos-webhook-" + uuid.New().String()[:8],
 	}
 	require.NoError(t, entRepo.Create(ctx, enterprise))
+	t.Cleanup(func() { database.Writer.Exec("DELETE FROM enterprises WHERE id = $1", enterprise.ID) })
 
 	// Create macOS service and webhook handler
 	macosService := macos.NewService(deviceRepo)
@@ -100,6 +101,7 @@ func TestE2E_MacOSCheckOut(t *testing.T) {
 		Slug:      "macos-checkout-" + uuid.New().String()[:8],
 	}
 	require.NoError(t, entRepo.Create(ctx, enterprise))
+	t.Cleanup(func() { database.Writer.Exec("DELETE FROM enterprises WHERE id = $1", enterprise.ID) })
 
 	udid := uuid.New().String()
 	device := &models.Device{
@@ -160,6 +162,7 @@ func TestE2E_AndroidWebhookEnrollment(t *testing.T) {
 		Slug:      "android-webhook-" + uuid.New().String()[:8],
 	}
 	require.NoError(t, entRepo.Create(ctx, enterprise))
+	t.Cleanup(func() { database.Writer.Exec("DELETE FROM enterprises WHERE id = $1", enterprise.ID) })
 
 	// Create Android service and webhook handler (no Google client)
 	androidService := android.NewService(deviceRepo, entRepo, "", "")
@@ -214,6 +217,7 @@ func TestE2E_AndroidWebhookUnenrollment(t *testing.T) {
 		Slug:      "android-unenroll-" + uuid.New().String()[:8],
 	}
 	require.NoError(t, entRepo.Create(ctx, enterprise))
+	t.Cleanup(func() { database.Writer.Exec("DELETE FROM enterprises WHERE id = $1", enterprise.ID) })
 
 	deviceName := "enterprises/test/devices/" + uuid.New().String()
 	device := &models.Device{

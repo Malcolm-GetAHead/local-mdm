@@ -17,22 +17,14 @@ import (
 
 func TestStructuredLogging(t *testing.T) {
 	db := testutil.ConnectDB(t)
-	defer db.Close()
 
 	ctx := context.Background()
 
-	// Create test enterprise with unique slug
-	enterpriseID := uuid.New()
-	slug := "test-ent-" + enterpriseID.String()[:8]
-	_, err := db.Writer.ExecContext(ctx, `
-		INSERT INTO enterprises (id, name, slug) 
-		VALUES ($1, 'Test Enterprise', $2)
-	`, enterpriseID, slug)
-	require.NoError(t, err)
+	enterpriseID := testutil.CreateTestEnterprise(t, db.Writer, "Test Enterprise")
 
 	// Create test user
 	userID := uuid.New()
-	_, err = db.Writer.ExecContext(ctx, `
+	_, err := db.Writer.ExecContext(ctx, `
 		INSERT INTO users (id, enterprise_id, email, password_hash, role) 
 		VALUES ($1, $2, $3, 'hash', 'admin')
 	`, userID, enterpriseID, "test-"+userID.String()[:8]+"@example.com")

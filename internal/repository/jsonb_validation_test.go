@@ -15,7 +15,6 @@ func TestDeviceRepository_JSONBValidation(t *testing.T) {
 	}
 
 	db := testutil.ConnectDB(t)
-	defer db.Close()
 
 	repo, err := NewDeviceRepository(db.Writer, db.Writer)
 	if err != nil {
@@ -33,6 +32,7 @@ func TestDeviceRepository_JSONBValidation(t *testing.T) {
 	if err := enterpriseRepo.Create(ctx, enterprise); err != nil {
 		t.Fatalf("failed to create test enterprise: %v", err)
 	}
+	t.Cleanup(func() { db.Writer.Exec("DELETE FROM enterprises WHERE id = $1", enterprise.ID) })
 
 	t.Run("create with oversized JSONB", func(t *testing.T) {
 		device := &models.Device{
@@ -184,7 +184,6 @@ func TestEnterpriseRepository_JSONBValidation(t *testing.T) {
 	}
 
 	db := testutil.ConnectDB(t)
-	defer db.Close()
 
 	repo, err := NewEnterpriseRepository(db.Writer, db.Writer)
 	if err != nil {
@@ -214,6 +213,7 @@ func TestEnterpriseRepository_JSONBValidation(t *testing.T) {
 		if err != nil {
 			t.Errorf("unexpected error for valid JSONB: %v", err)
 		}
+		t.Cleanup(func() { db.Writer.Exec("DELETE FROM enterprises WHERE id = $1", enterprise.ID) })
 	})
 
 	t.Run("create with nil JSONB", func(t *testing.T) {
@@ -224,6 +224,7 @@ func TestEnterpriseRepository_JSONBValidation(t *testing.T) {
 		if err != nil {
 			t.Errorf("unexpected error for nil JSONB: %v", err)
 		}
+		t.Cleanup(func() { db.Writer.Exec("DELETE FROM enterprises WHERE id = $1", enterprise.ID) })
 	})
 
 	t.Run("update with invalid JSONB", func(t *testing.T) {
@@ -233,6 +234,7 @@ func TestEnterpriseRepository_JSONBValidation(t *testing.T) {
 		if err := repo.Create(ctx, enterprise); err != nil {
 			t.Fatalf("failed to create enterprise: %v", err)
 		}
+		t.Cleanup(func() { db.Writer.Exec("DELETE FROM enterprises WHERE id = $1", enterprise.ID) })
 
 		enterprise.Settings = models.JSONB{"data": strings.Repeat("x", 2<<20)}
 		err := repo.Update(ctx, enterprise)
@@ -251,7 +253,6 @@ func TestPolicyRepository_JSONBValidation(t *testing.T) {
 	}
 
 	db := testutil.ConnectDB(t)
-	defer db.Close()
 
 	repo, err := NewPolicyRepository(db.Writer, db.Reader)
 	if err != nil {
@@ -269,6 +270,7 @@ func TestPolicyRepository_JSONBValidation(t *testing.T) {
 	if err := enterpriseRepo.Create(ctx, enterprise); err != nil {
 		t.Fatalf("failed to create test enterprise: %v", err)
 	}
+	t.Cleanup(func() { db.Writer.Exec("DELETE FROM enterprises WHERE id = $1", enterprise.ID) })
 
 	t.Run("create with oversized JSONB", func(t *testing.T) {
 		policy := &models.Policy{

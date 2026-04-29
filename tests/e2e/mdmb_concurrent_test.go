@@ -46,6 +46,7 @@ func TestE2E_Mdmb_ConcurrentEnrollment(t *testing.T) {
 		Slug:      "concurrent-" + uuid.New().String()[:8],
 	}
 	require.NoError(t, entRepo.Create(ctx, enterprise))
+	t.Cleanup(func() { database.Writer.Exec("DELETE FROM enterprises WHERE id = $1", enterprise.ID) })
 
 	ca, err := certs.NewCAManager(
 		projectPath(t, "internal/api/certs/ca.crt"),

@@ -31,7 +31,7 @@ func TestCommandRepository(t *testing.T) {
 		Slug: "cmd-test-" + uuid.New().String()[:8],
 	}
 	require.NoError(t, entRepo.Create(context.Background(), enterprise))
-	t.Cleanup(func() { entRepo.Delete(context.Background(), enterprise.ID) })
+	t.Cleanup(func() { database.Writer.Exec("DELETE FROM enterprises WHERE id = $1", enterprise.ID) })
 
 	device := &models.Device{
 		EnterpriseID: enterprise.ID,

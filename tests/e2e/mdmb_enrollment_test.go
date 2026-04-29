@@ -58,6 +58,7 @@ func TestE2E_Mdmb_FullEnrollment(t *testing.T) {
 		Slug:      "mdmb-full-" + uuid.New().String()[:8],
 	}
 	require.NoError(t, entRepo.Create(ctx, enterprise))
+	t.Cleanup(func() { database.Writer.Exec("DELETE FROM enterprises WHERE id = $1", enterprise.ID) })
 
 	// Use the project's CA (same one mounted in NanoMDM's docker container)
 	ca, err := certs.NewCAManager(

@@ -15,16 +15,7 @@ import (
 
 // createTestEnterprise creates a test enterprise and returns its ID
 func createTestEnterprise(t testing.TB, database *db.DB) uuid.UUID {
-	t.Helper()
-
-	enterpriseID := uuid.New()
-	_, err := database.Writer.Exec(`
-		INSERT INTO enterprises (id, name, slug)
-		VALUES ($1, $2, $3)
-	`, enterpriseID, "Test Enterprise", "test-"+enterpriseID.String())
-	require.NoError(t, err)
-
-	return enterpriseID
+	return testutil.CreateTestEnterprise(t, database.Writer, "Test Enterprise")
 }
 
 // createTestUser creates a test user and returns its ID

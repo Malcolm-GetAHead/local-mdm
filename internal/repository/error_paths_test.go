@@ -161,6 +161,7 @@ func TestDeviceRepository_Delete_SoftDelete(t *testing.T) {
 	if err := enterpriseRepo.Create(context.Background(), enterprise); err != nil {
 		t.Fatalf("failed to create enterprise: %v", err)
 	}
+	t.Cleanup(func() { db.Writer.Exec("DELETE FROM enterprises WHERE id = $1", enterprise.ID) })
 
 	// Create device
 	device := &models.Device{
@@ -238,6 +239,7 @@ func TestEnterpriseRepository_List_EmptyResults(t *testing.T) {
 	if err := repo.Create(context.Background(), enterprise); err != nil {
 		t.Fatalf("failed to create enterprise: %v", err)
 	}
+	t.Cleanup(func() { db.Writer.Exec("DELETE FROM enterprises WHERE id = $1", enterprise.ID) })
 	if err := repo.Delete(context.Background(), enterprise.ID); err != nil {
 		t.Fatalf("failed to delete enterprise: %v", err)
 	}

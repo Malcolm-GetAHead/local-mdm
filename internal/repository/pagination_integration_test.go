@@ -15,7 +15,6 @@ import (
 
 func TestDeviceRepository_List_PaginationValidation(t *testing.T) {
 	db := testutil.ConnectDB(t)
-	defer db.Close()
 
 	repo, err := NewDeviceRepository(db.Writer, db.Writer)
 	require.NoError(t, err)
@@ -29,7 +28,7 @@ func TestDeviceRepository_List_PaginationValidation(t *testing.T) {
 	require.NoError(t, err)
 	err = enterpriseRepo.Create(ctx, enterprise)
 	require.NoError(t, err)
-	t.Cleanup(func() { enterpriseRepo.Delete(ctx, enterprise.ID) })
+	t.Cleanup(func() { db.Writer.Exec("DELETE FROM enterprises WHERE id = $1", enterprise.ID) })
 
 	t.Run("excessive limit rejected", func(t *testing.T) {
 		_, _, err := repo.List(ctx, enterprise.ID, 10000, 0)
@@ -60,7 +59,6 @@ func TestDeviceRepository_List_PaginationValidation(t *testing.T) {
 
 func TestEnterpriseRepository_List_PaginationValidation(t *testing.T) {
 	db := testutil.ConnectDB(t)
-	defer db.Close()
 
 	repo, err := NewEnterpriseRepository(db.Writer, db.Writer)
 	require.NoError(t, err)
@@ -88,7 +86,6 @@ func TestEnterpriseRepository_List_PaginationValidation(t *testing.T) {
 
 func TestPolicyRepository_List_PaginationValidation(t *testing.T) {
 	db := testutil.ConnectDB(t)
-	defer db.Close()
 
 	repo, err := NewPolicyRepository(db.Writer, db.Reader)
 	require.NoError(t, err)
@@ -102,7 +99,7 @@ func TestPolicyRepository_List_PaginationValidation(t *testing.T) {
 	require.NoError(t, err)
 	err = enterpriseRepo.Create(ctx, enterprise)
 	require.NoError(t, err)
-	t.Cleanup(func() { enterpriseRepo.Delete(ctx, enterprise.ID) })
+	t.Cleanup(func() { db.Writer.Exec("DELETE FROM enterprises WHERE id = $1", enterprise.ID) })
 
 	t.Run("excessive limit rejected", func(t *testing.T) {
 		_, _, err := repo.List(ctx, enterprise.ID, 10000, 0)
@@ -126,7 +123,6 @@ func TestPolicyRepository_List_PaginationValidation(t *testing.T) {
 
 func TestPaginationValidation_DoSPrevention(t *testing.T) {
 	db := testutil.ConnectDB(t)
-	defer db.Close()
 
 	deviceRepo, err := NewDeviceRepository(db.Writer, db.Writer)
 	require.NoError(t, err)
@@ -141,7 +137,7 @@ func TestPaginationValidation_DoSPrevention(t *testing.T) {
 	require.NoError(t, err)
 	err = enterpriseRepo.Create(ctx, enterprise)
 	require.NoError(t, err)
-	t.Cleanup(func() { enterpriseRepo.Delete(ctx, enterprise.ID) })
+	t.Cleanup(func() { db.Writer.Exec("DELETE FROM enterprises WHERE id = $1", enterprise.ID) })
 
 	// Create some test devices
 	var deviceIDs []uuid.UUID

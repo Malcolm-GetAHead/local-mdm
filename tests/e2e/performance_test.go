@@ -24,11 +24,7 @@ func TestPerformance_DeviceListLatency(t *testing.T) {
 	enterprise := &models.Enterprise{Name: "perf-" + uuid.New().String()[:8], Slug: "perf-" + uuid.New().String()[:8]}
 	require.NoError(t, entRepo.Create(ctx, enterprise))
 	t.Cleanup(func() {
-		devices, _, _ := deviceRepo.List(ctx, enterprise.ID, 1000, 0)
-		for _, d := range devices {
-			deviceRepo.Delete(ctx, d.ID)
-		}
-		entRepo.Delete(ctx, enterprise.ID)
+		database.Writer.Exec("DELETE FROM enterprises WHERE id = $1", enterprise.ID)
 	})
 
 	// Create 100 devices
@@ -69,12 +65,7 @@ func TestPerformance_ConcurrentEnrollments(t *testing.T) {
 	enterprise := &models.Enterprise{Name: "conc-" + uuid.New().String()[:8], Slug: "conc-" + uuid.New().String()[:8]}
 	require.NoError(t, entRepo.Create(ctx, enterprise))
 	t.Cleanup(func() {
-		// Clean up devices first (soft delete doesn't cascade)
-		devices, _, _ := deviceRepo.List(ctx, enterprise.ID, 1000, 0)
-		for _, d := range devices {
-			deviceRepo.Delete(ctx, d.ID)
-		}
-		entRepo.Delete(ctx, enterprise.ID)
+		database.Writer.Exec("DELETE FROM enterprises WHERE id = $1", enterprise.ID)
 	})
 
 	// Simulate 50 concurrent enrollments

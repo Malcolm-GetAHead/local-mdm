@@ -44,7 +44,7 @@ func TestE2E_DeviceLifecycle(t *testing.T) {
 	// 1. Create enterprise
 	enterprise := &models.Enterprise{Name: "e2e-test-" + uuid.New().String()[:8], Slug: "e2e-" + uuid.New().String()[:8]}
 	require.NoError(t, entRepo.Create(ctx, enterprise))
-	t.Cleanup(func() { entRepo.Delete(ctx, enterprise.ID) })
+	t.Cleanup(func() { database.Writer.Exec("DELETE FROM enterprises WHERE id = $1", enterprise.ID) })
 
 	// 2. Enroll a device (simulated)
 	device := &models.Device{
@@ -152,7 +152,7 @@ func TestE2E_CrossPlatformPolicy(t *testing.T) {
 
 	enterprise := &models.Enterprise{Name: "e2e-xplat-" + uuid.New().String()[:8], Slug: "e2e-xplat-" + uuid.New().String()[:8]}
 	require.NoError(t, entRepo.Create(ctx, enterprise))
-	t.Cleanup(func() { entRepo.Delete(ctx, enterprise.ID) })
+	t.Cleanup(func() { database.Writer.Exec("DELETE FROM enterprises WHERE id = $1", enterprise.ID) })
 
 	// Create devices for each platform
 	platforms := []struct {

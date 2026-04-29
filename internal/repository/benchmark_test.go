@@ -39,6 +39,7 @@ func setupBenchDB(b *testing.B) *db.DB {
 	if err != nil {
 		b.Fatalf("Failed to connect to database: %v", err)
 	}
+	b.Cleanup(func() { database.Close() })
 
 	return database
 }
@@ -52,6 +53,7 @@ func createBenchEnterprise(b *testing.B, database *db.DB) uuid.UUID {
 		Slug: "bench-" + uuid.New().String()[:8],
 	}
 	_ = repo.Create(context.Background(), enterprise)
+	b.Cleanup(func() { database.Writer.Exec("DELETE FROM enterprises WHERE id = $1", enterprise.ID) })
 	return enterprise.ID
 }
 
@@ -72,7 +74,6 @@ func createBenchDevice(b *testing.B, database *db.DB, enterpriseID uuid.UUID) *m
 // BenchmarkDeviceRepository_Create measures device creation performance
 func BenchmarkDeviceRepository_Create(b *testing.B) {
 	database := setupBenchDB(b)
-	defer database.Close()
 
 	repo, err := NewDeviceRepository(database.Writer, database.Reader)
 	if err != nil {
@@ -97,7 +98,6 @@ func BenchmarkDeviceRepository_Create(b *testing.B) {
 // BenchmarkDeviceRepository_GetByID measures device retrieval performance
 func BenchmarkDeviceRepository_GetByID(b *testing.B) {
 	database := setupBenchDB(b)
-	defer database.Close()
 
 	repo, err := NewDeviceRepository(database.Writer, database.Reader)
 	if err != nil {
@@ -117,7 +117,6 @@ func BenchmarkDeviceRepository_GetByID(b *testing.B) {
 // BenchmarkDeviceRepository_List measures pagination performance
 func BenchmarkDeviceRepository_List(b *testing.B) {
 	database := setupBenchDB(b)
-	defer database.Close()
 
 	repo, err := NewDeviceRepository(database.Writer, database.Reader)
 	if err != nil {
@@ -142,7 +141,6 @@ func BenchmarkDeviceRepository_List(b *testing.B) {
 // BenchmarkDeviceRepository_List_SmallPage measures small page performance
 func BenchmarkDeviceRepository_List_SmallPage(b *testing.B) {
 	database := setupBenchDB(b)
-	defer database.Close()
 
 	repo, err := NewDeviceRepository(database.Writer, database.Reader)
 	if err != nil {
@@ -166,7 +164,6 @@ func BenchmarkDeviceRepository_List_SmallPage(b *testing.B) {
 // BenchmarkDeviceRepository_List_LargePage measures large page performance
 func BenchmarkDeviceRepository_List_LargePage(b *testing.B) {
 	database := setupBenchDB(b)
-	defer database.Close()
 
 	repo, err := NewDeviceRepository(database.Writer, database.Reader)
 	if err != nil {
@@ -190,7 +187,6 @@ func BenchmarkDeviceRepository_List_LargePage(b *testing.B) {
 // BenchmarkDeviceRepository_Update measures device update performance
 func BenchmarkDeviceRepository_Update(b *testing.B) {
 	database := setupBenchDB(b)
-	defer database.Close()
 
 	repo, err := NewDeviceRepository(database.Writer, database.Reader)
 	if err != nil {
@@ -212,7 +208,6 @@ func BenchmarkDeviceRepository_Update(b *testing.B) {
 // BenchmarkEnterpriseRepository_Create measures enterprise creation performance
 func BenchmarkEnterpriseRepository_Create(b *testing.B) {
 	database := setupBenchDB(b)
-	defer database.Close()
 
 	repo, err := NewEnterpriseRepository(database.Writer, database.Reader)
 	if err != nil {
@@ -220,12 +215,14 @@ func BenchmarkEnterpriseRepository_Create(b *testing.B) {
 	}
 
 	ctx := context.Background()
+	prefix := "bench-ent-" + uuid.New().String()[:8] + "-"
+	b.Cleanup(func() { database.Writer.Exec("DELETE FROM enterprises WHERE slug LIKE $1", prefix+"%") })
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		enterprise := &models.Enterprise{
 			Name: uuid.New().String(),
-			Slug: uuid.New().String(),
+			Slug: prefix + uuid.New().String()[:8],
 		}
 		_ = repo.Create(ctx, enterprise)
 	}
@@ -234,7 +231,6 @@ func BenchmarkEnterpriseRepository_Create(b *testing.B) {
 // BenchmarkEnterpriseRepository_GetByID measures enterprise retrieval performance
 func BenchmarkEnterpriseRepository_GetByID(b *testing.B) {
 	database := setupBenchDB(b)
-	defer database.Close()
 
 	repo, err := NewEnterpriseRepository(database.Writer, database.Reader)
 	if err != nil {
@@ -253,7 +249,6 @@ func BenchmarkEnterpriseRepository_GetByID(b *testing.B) {
 // BenchmarkPolicyRepository_Create measures policy creation performance
 func BenchmarkPolicyRepository_Create(b *testing.B) {
 	database := setupBenchDB(b)
-	defer database.Close()
 
 	repo, err := NewPolicyRepository(database.Writer, database.Reader)
 	if err != nil {
@@ -278,7 +273,6 @@ func BenchmarkPolicyRepository_Create(b *testing.B) {
 // BenchmarkPolicyRepository_List measures policy pagination performance
 func BenchmarkPolicyRepository_List(b *testing.B) {
 	database := setupBenchDB(b)
-	defer database.Close()
 
 	repo, err := NewPolicyRepository(database.Writer, database.Reader)
 	if err != nil {

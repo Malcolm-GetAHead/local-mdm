@@ -15,7 +15,6 @@ import (
 
 func TestTransactionCommit(t *testing.T) {
 	db := testutil.ConnectDB(t)
-	defer db.Close()
 
 	transactor, err := NewTransactor(db.Writer)
 	if err != nil {
@@ -66,6 +65,7 @@ func TestTransactionCommit(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Transaction failed: %v", err)
 	}
+	t.Cleanup(func() { db.Writer.Exec("DELETE FROM enterprises WHERE id = $1", enterpriseID) })
 
 	// Verify both records exist
 	enterprise, err := enterpriseRepo.GetByID(ctx, enterpriseID)
@@ -87,7 +87,6 @@ func TestTransactionCommit(t *testing.T) {
 
 func TestTransactionRollback(t *testing.T) {
 	db := testutil.ConnectDB(t)
-	defer db.Close()
 
 	transactor, err := NewTransactor(db.Writer)
 	if err != nil {
@@ -133,6 +132,7 @@ func TestTransactionRollback(t *testing.T) {
 	if err := enterpriseRepo.Create(ctx, enterprise); err != nil {
 		t.Fatalf("Failed to create enterprise: %v", err)
 	}
+	t.Cleanup(func() { db.Writer.Exec("DELETE FROM enterprises WHERE id = $1", enterprise.ID) })
 
 	// Try to create device in transaction that will fail
 	testError := errors.New("intentional error")
@@ -167,7 +167,6 @@ func TestTransactionRollback(t *testing.T) {
 
 func TestTransactionRollbackOnPanic(t *testing.T) {
 	db := testutil.ConnectDB(t)
-	defer db.Close()
 
 	transactor, err := NewTransactor(db.Writer)
 	if err != nil {
@@ -213,6 +212,7 @@ func TestTransactionRollbackOnPanic(t *testing.T) {
 	if err := enterpriseRepo.Create(ctx, enterprise); err != nil {
 		t.Fatalf("Failed to create enterprise: %v", err)
 	}
+	t.Cleanup(func() { db.Writer.Exec("DELETE FROM enterprises WHERE id = $1", enterprise.ID) })
 
 	// Try to create device in transaction that will panic
 	defer func() {
@@ -249,7 +249,6 @@ func TestTransactionRollbackOnPanic(t *testing.T) {
 
 func TestNestedTransactions(t *testing.T) {
 	db := testutil.ConnectDB(t)
-	defer db.Close()
 
 	transactor, err := NewTransactor(db.Writer)
 	if err != nil {
@@ -321,6 +320,7 @@ func TestNestedTransactions(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Nested transaction failed: %v", err)
 	}
+	t.Cleanup(func() { db.Writer.Exec("DELETE FROM enterprises WHERE id = $1", enterpriseID) })
 
 	// Verify both records exist
 	_, err = enterpriseRepo.GetByID(ctx, enterpriseID)
@@ -336,7 +336,6 @@ func TestNestedTransactions(t *testing.T) {
 
 func TestTransactionWithMultipleOperations(t *testing.T) {
 	db := testutil.ConnectDB(t)
-	defer db.Close()
 
 	transactor, err := NewTransactor(db.Writer)
 	if err != nil {
@@ -436,6 +435,7 @@ func TestTransactionWithMultipleOperations(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Multi-operation transaction failed: %v", err)
 	}
+	t.Cleanup(func() { db.Writer.Exec("DELETE FROM enterprises WHERE id = $1", enterpriseID) })
 
 	// Verify all records exist
 	_, err = enterpriseRepo.GetByID(ctx, enterpriseID)
@@ -456,7 +456,6 @@ func TestTransactionWithMultipleOperations(t *testing.T) {
 
 func TestGetExecutor(t *testing.T) {
 	db := testutil.ConnectDB(t)
-	defer db.Close()
 
 	ctx := context.Background()
 
@@ -482,7 +481,6 @@ func TestGetExecutor(t *testing.T) {
 
 func TestGetTx(t *testing.T) {
 	db := testutil.ConnectDB(t)
-	defer db.Close()
 
 	ctx := context.Background()
 
@@ -508,7 +506,6 @@ func TestGetTx(t *testing.T) {
 
 func TestTransactionUpdateOperations(t *testing.T) {
 	db := testutil.ConnectDB(t)
-	defer db.Close()
 
 	transactor, err := NewTransactor(db.Writer)
 	if err != nil {
@@ -554,6 +551,7 @@ func TestTransactionUpdateOperations(t *testing.T) {
 	if err := enterpriseRepo.Create(ctx, enterprise); err != nil {
 		t.Fatalf("Failed to create enterprise: %v", err)
 	}
+	t.Cleanup(func() { db.Writer.Exec("DELETE FROM enterprises WHERE id = $1", enterprise.ID) })
 
 	device := &models.Device{
 		EnterpriseID: enterprise.ID,
@@ -606,7 +604,6 @@ func TestTransactionUpdateOperations(t *testing.T) {
 
 func TestTransactionUpdateRollback(t *testing.T) {
 	db := testutil.ConnectDB(t)
-	defer db.Close()
 
 	transactor, err := NewTransactor(db.Writer)
 	if err != nil {
@@ -652,6 +649,7 @@ func TestTransactionUpdateRollback(t *testing.T) {
 	if err := enterpriseRepo.Create(ctx, enterprise); err != nil {
 		t.Fatalf("Failed to create enterprise: %v", err)
 	}
+	t.Cleanup(func() { db.Writer.Exec("DELETE FROM enterprises WHERE id = $1", enterprise.ID) })
 
 	device := &models.Device{
 		EnterpriseID: enterprise.ID,
@@ -693,7 +691,6 @@ func TestTransactionUpdateRollback(t *testing.T) {
 
 func TestTransactionDeleteOperations(t *testing.T) {
 	db := testutil.ConnectDB(t)
-	defer db.Close()
 
 	transactor, err := NewTransactor(db.Writer)
 	if err != nil {
@@ -749,6 +746,7 @@ func TestTransactionDeleteOperations(t *testing.T) {
 	if err := enterpriseRepo.Create(ctx, enterprise); err != nil {
 		t.Fatalf("Failed to create enterprise: %v", err)
 	}
+	t.Cleanup(func() { db.Writer.Exec("DELETE FROM enterprises WHERE id = $1", enterprise.ID) })
 
 	device := &models.Device{
 		EnterpriseID: enterprise.ID,
@@ -803,7 +801,6 @@ func TestTransactionDeleteOperations(t *testing.T) {
 
 func TestTransactionDeleteRollback(t *testing.T) {
 	db := testutil.ConnectDB(t)
-	defer db.Close()
 
 	transactor, err := NewTransactor(db.Writer)
 	if err != nil {
@@ -849,6 +846,7 @@ func TestTransactionDeleteRollback(t *testing.T) {
 	if err := enterpriseRepo.Create(ctx, enterprise); err != nil {
 		t.Fatalf("Failed to create enterprise: %v", err)
 	}
+	t.Cleanup(func() { db.Writer.Exec("DELETE FROM enterprises WHERE id = $1", enterprise.ID) })
 
 	device := &models.Device{
 		EnterpriseID: enterprise.ID,
@@ -884,7 +882,6 @@ func TestTransactionDeleteRollback(t *testing.T) {
 
 func TestTransactionErrorPaths(t *testing.T) {
 	db := testutil.ConnectDB(t)
-	defer db.Close()
 
 	transactor, err := NewTransactor(db.Writer)
 	if err != nil {
@@ -970,7 +967,6 @@ func TestNewTransactorWithNil(t *testing.T) {
 
 func TestNewTransactorWithExecutor(t *testing.T) {
 	db := testutil.ConnectDB(t)
-	defer db.Close()
 	
 	// Start a transaction to get an executor
 	tx, err := db.Writer.Begin()
@@ -1056,7 +1052,6 @@ func TestNewRepositoryWithNil(t *testing.T) {
 
 func TestNewRepositoryWithExecutor(t *testing.T) {
 	db := testutil.ConnectDB(t)
-	defer db.Close()
 	
 	// Start a transaction to get an executor
 	tx, err := db.Writer.Begin()
@@ -1109,7 +1104,6 @@ func TestGetExecutorWithInvalidType(t *testing.T) {
 
 func TestTransactionWithCancelledContext(t *testing.T) {
 	db := testutil.ConnectDB(t)
-	defer db.Close()
 
 	transactor, err := NewTransactor(db.Writer)
 	if err != nil {
@@ -1156,7 +1150,6 @@ func TestTransactionWithCancelledContext(t *testing.T) {
 
 func TestTransactionWithTimeout(t *testing.T) {
 	db := testutil.ConnectDB(t)
-	defer db.Close()
 
 	transactor, err := NewTransactor(db.Writer)
 	if err != nil {
@@ -1182,7 +1175,6 @@ func TestTransactionWithTimeout(t *testing.T) {
 
 func TestTransactionIsolationLevels(t *testing.T) {
 	db := testutil.ConnectDB(t)
-	defer db.Close()
 
 	transactor, err := NewTransactor(db.Writer)
 	if err != nil {
@@ -1207,16 +1199,24 @@ func TestTransactionIsolationLevels(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			var entID uuid.UUID
 			err := transactor.WithTransactionIsolation(ctx, tt.isolation, func(txCtx context.Context) error {
 				enterprise := &models.Enterprise{
 					Name: "Test Enterprise " + tt.name,
 					Slug: "test-" + uuid.New().String()[:8],
 				}
-				return enterpriseRepo.Create(txCtx, enterprise)
+				if err := enterpriseRepo.Create(txCtx, enterprise); err != nil {
+					return err
+				}
+				entID = enterprise.ID
+				return nil
 			})
 
 			if err != nil {
 				t.Errorf("Transaction with %s failed: %v", tt.name, err)
+			}
+			if entID != uuid.Nil {
+				t.Cleanup(func() { db.Writer.Exec("DELETE FROM enterprises WHERE id = $1", entID) })
 			}
 		})
 	}
@@ -1224,7 +1224,6 @@ func TestTransactionIsolationLevels(t *testing.T) {
 
 func TestSerializableTransactionRetry(t *testing.T) {
 	db := testutil.ConnectDB(t)
-	defer db.Close()
 
 	transactor, err := NewTransactor(db.Writer)
 	if err != nil {
@@ -1248,6 +1247,7 @@ func TestSerializableTransactionRetry(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create enterprise: %v", err)
 	}
+	t.Cleanup(func() { db.Writer.Exec("DELETE FROM enterprises WHERE id = $1", enterprise.ID) })
 
 	// Test serializable transaction
 	err = transactor.WithTransactionIsolation(ctx, IsolationSerializable, func(txCtx context.Context) error {
@@ -1349,7 +1349,6 @@ func TestToSQLIsolation(t *testing.T) {
 
 func TestTransactionIsolationWithError(t *testing.T) {
 	db := testutil.ConnectDB(t)
-	defer db.Close()
 
 	transactor, err := NewTransactor(db.Writer)
 	if err != nil {
@@ -1374,7 +1373,6 @@ func TestTransactionIsolationWithError(t *testing.T) {
 
 func TestNestedTransactionWithIsolation(t *testing.T) {
 	db := testutil.ConnectDB(t)
-	defer db.Close()
 
 	transactor, err := NewTransactor(db.Writer)
 	if err != nil {
@@ -1389,6 +1387,7 @@ func TestNestedTransactionWithIsolation(t *testing.T) {
 	ctx := context.Background()
 
 	// Test nested transaction (should reuse outer transaction)
+	var outerID, innerID uuid.UUID
 	err = transactor.WithTransactionIsolation(ctx, IsolationSerializable, func(txCtx context.Context) error {
 		enterprise := &models.Enterprise{
 			Name: "Outer Transaction",
@@ -1398,6 +1397,7 @@ func TestNestedTransactionWithIsolation(t *testing.T) {
 		if err := enterpriseRepo.Create(txCtx, enterprise); err != nil {
 			return err
 		}
+		outerID = enterprise.ID
 
 		// Nested transaction should reuse the same transaction
 		return transactor.WithTransactionIsolation(txCtx, IsolationSerializable, func(nestedCtx context.Context) error {
@@ -1405,12 +1405,20 @@ func TestNestedTransactionWithIsolation(t *testing.T) {
 				Name: "Inner Transaction",
 				Slug: "inner-" + uuid.New().String()[:8],
 			}
-			return enterpriseRepo.Create(nestedCtx, enterprise2)
+			if err := enterpriseRepo.Create(nestedCtx, enterprise2); err != nil {
+				return err
+			}
+			innerID = enterprise2.ID
+			return nil
 		})
 	})
 
 	if err != nil {
 		t.Errorf("Nested transaction failed: %v", err)
 	}
+	t.Cleanup(func() {
+		db.Writer.Exec("DELETE FROM enterprises WHERE id = $1", outerID)
+		db.Writer.Exec("DELETE FROM enterprises WHERE id = $1", innerID)
+	})
 }
 

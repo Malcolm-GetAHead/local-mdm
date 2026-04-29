@@ -20,7 +20,7 @@ func TestUserRepository(t *testing.T) {
 	require.NoError(t, err)
 	enterprise := &models.Enterprise{Name: "user-test-" + uuid.New().String()[:8], Slug: "user-test-" + uuid.New().String()[:8]}
 	require.NoError(t, entRepo.Create(context.Background(), enterprise))
-	t.Cleanup(func() { entRepo.Delete(context.Background(), enterprise.ID) })
+	t.Cleanup(func() { database.Writer.Exec("DELETE FROM enterprises WHERE id = $1", enterprise.ID) })
 
 	repo, err := repository.NewUserRepository(database.Writer, database.Reader)
 	require.NoError(t, err)
@@ -97,7 +97,7 @@ func TestTokenRepository(t *testing.T) {
 	require.NoError(t, err)
 	enterprise := &models.Enterprise{Name: "token-test-" + uuid.New().String()[:8], Slug: "token-test-" + uuid.New().String()[:8]}
 	require.NoError(t, entRepo.Create(context.Background(), enterprise))
-	t.Cleanup(func() { entRepo.Delete(context.Background(), enterprise.ID) })
+	t.Cleanup(func() { database.Writer.Exec("DELETE FROM enterprises WHERE id = $1", enterprise.ID) })
 
 	userRepo, err := repository.NewUserRepository(database.Writer, database.Reader)
 	require.NoError(t, err)
@@ -153,7 +153,7 @@ func TestAuditLogRepository_Search(t *testing.T) {
 	require.NoError(t, err)
 	enterprise := &models.Enterprise{Name: "audit-search-" + uuid.New().String()[:8], Slug: "audit-search-" + uuid.New().String()[:8]}
 	require.NoError(t, entRepo.Create(context.Background(), enterprise))
-	t.Cleanup(func() { entRepo.Delete(context.Background(), enterprise.ID) })
+	t.Cleanup(func() { database.Writer.Exec("DELETE FROM enterprises WHERE id = $1", enterprise.ID) })
 
 	// Insert audit logs directly
 	ctx := context.Background()

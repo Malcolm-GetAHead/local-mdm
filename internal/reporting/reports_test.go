@@ -82,6 +82,7 @@ func TestDeviceInventory_WithData(t *testing.T) {
 	_, err := db.ExecContext(ctx, `INSERT INTO enterprises (id, name, slug) VALUES ($1, $2, $3)`,
 		entID, "report-test-"+entID.String()[:8], "rpt-"+entID.String()[:8])
 	require.NoError(t, err)
+	t.Cleanup(func() { _, _ = db.ExecContext(ctx, "DELETE FROM enterprises WHERE id = $1", entID) })
 
 	devID := uuid.New()
 	_, err = db.ExecContext(ctx,
@@ -116,6 +117,7 @@ func TestComplianceReport_WithData(t *testing.T) {
 	_, err := db.ExecContext(ctx, `INSERT INTO enterprises (id, name, slug) VALUES ($1, $2, $3)`,
 		entID, "compliance-rpt-"+entID.String()[:8], "crpt-"+entID.String()[:8])
 	require.NoError(t, err)
+	t.Cleanup(func() { _, _ = db.ExecContext(ctx, "DELETE FROM enterprises WHERE id = $1", entID) })
 
 	devID := uuid.New()
 	_, err = db.ExecContext(ctx,
@@ -188,6 +190,7 @@ func TestEnrollmentReport_WithData(t *testing.T) {
 	_, err := db.ExecContext(ctx, `INSERT INTO enterprises (id, name, slug) VALUES ($1, $2, $3)`,
 		entID, "enroll-rpt-"+entID.String()[:8], "erpt-"+entID.String()[:8])
 	require.NoError(t, err)
+	t.Cleanup(func() { _, _ = db.ExecContext(ctx, "DELETE FROM enterprises WHERE id = $1", entID) })
 
 	for i := 0; i < 3; i++ {
 		devID := uuid.New()

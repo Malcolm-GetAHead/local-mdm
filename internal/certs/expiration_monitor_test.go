@@ -54,6 +54,7 @@ func createTestCertificateWithDevice(t testing.TB, db *sql.DB, expiresAt time.Ti
 		VALUES ($1, $2, $3)
 	`, enterpriseID, "Test Enterprise", "test-"+enterpriseID.String())
 	require.NoError(t, err)
+	t.Cleanup(func() { _, _ = db.Exec("DELETE FROM enterprises WHERE id = $1", enterpriseID) })
 
 	// Create device
 	deviceID := createTestDevice(t, db, enterpriseID)
