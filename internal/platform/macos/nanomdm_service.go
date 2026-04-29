@@ -2,7 +2,10 @@ package macos
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
+	"net/http"
+	"time"
 
 	"github.com/malcolm-getahead/local-mdm/internal/repository"
 )
@@ -57,4 +60,26 @@ func (s *NanoMDMService) SendCommand(ctx context.Context, udid string, commandPl
 		return nil, nil
 	}
 	return s.cmdSender.SendCommand(ctx, udid, commandPlist)
+}
+
+// HealthCheck verifies NanoMDM is reachable by hitting its /version endpoint.
+func (s *NanoMDMService) HealthCheck(ctx context.Context) error {
+	if s.cmdSender == nil {
+		return fmt.Errorf("nanomdm not configured")
+	}
+	url := s.cmdSender.nanomdmURL + "/version"
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return fmt.Errorf("create request: %w", err)
+	}
+	client := &http.Client{Timeout: 5 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return fmt.Errorf("nanomdm unreachable: %w", err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode >= 500 {
+		return fmt.Errorf("nanomdm returned status %d", resp.StatusCode)
+	}
+	return nil
 }

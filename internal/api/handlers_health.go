@@ -42,6 +42,15 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 		checks["keycloak"] = "healthy"
 	}
 
+	// Check NanoMDM (external dependency — degraded, not unhealthy)
+	if s.nanomdmService != nil {
+		if err := s.nanomdmService.HealthCheck(ctx); err != nil {
+			checks["nanomdm"] = "degraded: " + err.Error()
+		} else {
+			checks["nanomdm"] = "healthy"
+		}
+	}
+
 	status := "healthy"
 	httpStatus := http.StatusOK
 	if !allHealthy {
@@ -87,6 +96,16 @@ func (s *Server) handleHealthReady(w http.ResponseWriter, r *http.Request) {
 		checks["keycloak"] = depCheck{Status: "degraded", Latency: time.Since(start).String()}
 	} else {
 		checks["keycloak"] = depCheck{Status: "healthy", Latency: time.Since(start).String()}
+	}
+
+	// Check NanoMDM (external dependency — degraded, not failing readiness)
+	if s.nanomdmService != nil {
+		start = time.Now()
+		if err := s.nanomdmService.HealthCheck(ctx); err != nil {
+			checks["nanomdm"] = depCheck{Status: "degraded", Latency: time.Since(start).String()}
+		} else {
+			checks["nanomdm"] = depCheck{Status: "healthy", Latency: time.Since(start).String()}
+		}
 	}
 
 	status := http.StatusOK
