@@ -769,3 +769,54 @@ certutil -addstore Root \\share\ca.crt
 Add-Content C:\Windows\System32\drivers\etc\hosts "mdm.company.com enterpriseenrollment.company.com"
 Start-Process "ms-device-enrollment:?mode=mdm"
 ```
+
+### Software Distribution
+
+Package managers deployed via MDM as part of the first-sync policy:
+
+- **Windows**: Chocolatey — installed via OMA-DM script CSP, packages served from internal repo over VPN
+- **macOS**: Munki — installed via MDM profile, catalog and packages served from internal repo over VPN
+
+Package repositories live inside the VPN network only — devices must be VPN-connected to install/update software. This prevents package tampering and ensures only managed devices can access internal packages.
+
+### Remote Access (RustDesk)
+
+Self-hosted RustDesk for IT remote support. Internet-facing so IT can reach devices even when VPN is down.
+
+```
+Internet-facing:
+  └── RustDesk relay/rendezvous server (encrypted P2P relay only)
+
+Managed devices:
+  └── RustDesk client (pushed via MDM, locked to our relay server)
+```
+
+**Deployment**: MDM pushes RustDesk client as a managed application on first sync. Client is pre-configured with the organization's relay server address — no user configuration needed.
+
+**Security**: RustDesk client connections are end-to-end encrypted. The relay server only facilitates NAT traversal, it cannot inspect traffic.
+
+### Device Firewall Policy
+
+MDM pushes host firewall rules to lock down outbound connectivity. Only approved destinations are allowed for management services:
+
+**Windows** (via Firewall CSP):
+```
+Outbound allow:
+  ├── MDM server (enrollment + sync)     → mdm.company.com:443
+  ├── WireGuard VPN endpoint             → vpn.company.com:51820/udp
+  ├── RustDesk relay server              → rustdesk.company.com:21115-21119
+  └── Standard traffic (HTTP/S, DNS)     → any (or corporate proxy)
+
+Outbound deny:
+  └── RustDesk to any OTHER relay server → block rustdesk ports to non-approved IPs
+```
+
+**macOS** (via configuration profile, pf/packet filter):
+```
+Same rules as Windows, delivered via MDM profile payload.
+```
+
+**Key principle**: RustDesk client is firewalled so it can ONLY connect to the organization's relay server. This prevents:
+- Attacker installing their own RustDesk relay and hijacking remote access
+- Unauthorized remote access via public RustDesk infrastructure
+- Data exfiltration over RustDesk tunnels to external relays
