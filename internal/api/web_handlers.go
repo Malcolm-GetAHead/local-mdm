@@ -652,9 +652,10 @@ var platformKeyLabels = map[string]string{
 // platformValueTranslations maps raw CSP numeric values to human-readable text.
 var platformValueTranslations = map[string]map[string]string{
 	"bitlocker_status": {
-		"0": "Not encrypted", "1": "Encrypted (BitLocker)", "2": "Encryption in progress",
-		"3": "Decryption in progress", "4": "Encryption paused", "5": "Decryption paused",
-		"14": "Not available (VM or unsupported)",
+		"0":  "Encrypted (Compliant)",
+		"4":  "OS volume unprotected",
+		"6":  "OS unprotected, no TPM protector",
+		"14": "OS unprotected, no TPM protector, encryption method mismatch",
 	},
 	"processor_arch": {
 		"0": "x86", "5": "ARM", "9": "x64 (AMD64)", "12": "ARM64",
