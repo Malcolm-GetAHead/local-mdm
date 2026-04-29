@@ -820,3 +820,19 @@ Same rules as Windows, delivered via MDM profile payload.
 - Attacker installing their own RustDesk relay and hijacking remote access
 - Unauthorized remote access via public RustDesk infrastructure
 - Data exfiltration over RustDesk tunnels to external relays
+
+### Operational Considerations
+
+**DNS**: Production requires public DNS for `enterpriseenrollment.<domain>` → MDM server (enrollment auto-discovery). Internal DNS over VPN for all management services (package repos, monitoring, internal apps). Eliminates hosts file entries.
+
+**Certificate lifecycle**: CA cert and server certs expire. Plan for automated renewal and MDM-pushed CA cert updates before expiry. Devices that miss a CA rotation lose trust and can't sync — need a re-enrollment path.
+
+**Device offboarding**: When a device is unenrolled, wiped, or deleted, automatically revoke its WireGuard key on the VPN server and remove RustDesk access. The EventBus lifecycle hooks (`ComplianceCleanupHook` pattern) can trigger this — add a `VPNCleanupHook` and `RemoteAccessCleanupHook` subscriber.
+
+**Stale device alerting**: Devices that miss MDM sync for a configurable threshold (e.g., 24 hours) should trigger an alert. Could indicate stolen device, network issue, or tampered MDM client. EventBus + a periodic check job can implement this. Alert channels: email, webhook to Slack/Teams, dashboard notification.
+
+**Break-glass access**: If the MDM server goes down, IT loses the ability to push new configs. Mitigations:
+- RustDesk relay is independent of MDM — remote access survives MDM outage
+- WireGuard configs are persistent on-device — VPN survives MDM outage
+- Pre-provision a static break-glass VPN config that doesn't depend on MDM for renewal
+- Document manual recovery procedures for MDM server restore
