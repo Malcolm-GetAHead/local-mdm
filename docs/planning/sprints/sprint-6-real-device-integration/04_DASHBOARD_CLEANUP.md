@@ -6,6 +6,29 @@ Branch: `main`. Dashboard is functional but has rough edges found during Sprint 
 Read `.kiro/steering/STEERING.md` and `.kiro/steering/SESSION_NOTES.md` for project conventions.
 Dashboard uses Go templates + HTMX + Tailwind CSS. No React.
 
+## Workflow
+For each item, use a custom Playwright script to visit the relevant page, take a screenshot, verify the fix visually, and iterate. Example:
+
+```js
+const { chromium } = require('playwright');
+(async () => {
+  const browser = await chromium.launch();
+  const page = await browser.newPage();
+  // Login
+  await page.goto('http://localhost:8080/dashboard/');
+  await page.fill('input[name="username"]', 'admin');
+  await page.fill('input[name="password"]', 'admin123');
+  await page.click('text=Sign In');
+  await page.waitForTimeout(2000);
+  // Navigate and screenshot
+  await page.goto('http://localhost:8080/dashboard/devices');
+  await page.screenshot({ path: '/tmp/devices.png', fullPage: true });
+  await browser.close();
+})();
+```
+
+Run with `node script.js` from `tests/browser/`. Review screenshots before committing.
+
 ## Items
 
 ### 1. Pending Enrollments visibility
