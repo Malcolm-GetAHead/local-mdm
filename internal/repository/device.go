@@ -249,13 +249,13 @@ func (r *deviceRepository) Update(ctx context.Context, device *models.Device) er
 
 	query := `
 		UPDATE devices
-		SET name = $1, model = $2, os_version = $3, last_seen = $4, status = $5, platform_data = $6
-		WHERE id = $7 AND deleted_at IS NULL`
+		SET name = $1, model = $2, os_version = $3, last_seen = $4, status = $5, platform_data = $6, device_id = $7
+		WHERE id = $8 AND deleted_at IS NULL`
 	
 	exec := getExecutor(ctx, r.writer)
 	result, err := exec.ExecContext(ctx, query,
 		device.Name, device.Model, device.OSVersion, device.LastSeen,
-		device.Status, device.PlatformData, device.ID,
+		device.Status, device.PlatformData, device.DeviceID, device.ID,
 	)
 	if err != nil {
 		return err
