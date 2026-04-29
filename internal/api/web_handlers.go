@@ -657,26 +657,26 @@ var platformValueTranslations = map[string]map[string]string{
 }
 
 // bitlockerStatusBits maps DeviceEncryptionStatus bitmask bits to descriptions.
-// Value 0 = compliant (encrypted and protection active). Non-zero is a bitmask
-// of compliance issues per MS BitLocker CSP docs. These are policy compliance
-// flags, not direct encryption state descriptions.
+// Value 0 = compliant (encrypted and protection active). Non-zero is a bitmask.
+// Labels verified against real Windows 11 VM testing (2026-04-29):
+//   FullyEncrypted+ProtectionOn → 0, Suspended/Decrypted/Decrypting → 2
 var bitlockerStatusBits = []string{
-	"User consent needed to encrypt",       // bit 0
-	"Protection suspended or method issue",  // bit 1
-	"OS volume not encrypted",               // bit 2
-	"TPM-only protector required",           // bit 3
-	"TPM+PIN required",                      // bit 4
-	"TPM+startup key required",              // bit 5
-	"TPM+PIN+startup key required",          // bit 6
-	"TPM required but not present",          // bit 7
-	"Recovery key backup failed",            // bit 8
-	"Fixed drive not encrypted",             // bit 9
-	"Fixed drive encryption method issue",   // bit 10
-	"Admin sign-in required to encrypt",     // bit 11
-	"WinRE not configured",                  // bit 12
-	"TPM not available",                     // bit 13
-	"TPM not ready",                         // bit 14
-	"Network unavailable for key backup",    // bit 15
+	"User consent needed to encrypt",       // bit 0 (value 1)
+	"Protection off or suspended",           // bit 1 (value 2) — verified: suspended, decrypted, and decrypting all report this
+	"OS volume not encrypted",               // bit 2 (value 4)
+	"TPM-only protector required",           // bit 3 (value 8)
+	"TPM+PIN required",                      // bit 4 (value 16)
+	"TPM+startup key required",              // bit 5 (value 32)
+	"TPM+PIN+startup key required",          // bit 6 (value 64)
+	"TPM required but not present",          // bit 7 (value 128)
+	"Recovery key backup failed",            // bit 8 (value 256)
+	"Fixed drive not encrypted",             // bit 9 (value 512)
+	"Fixed drive encryption issue",          // bit 10 (value 1024)
+	"Admin sign-in required to encrypt",     // bit 11 (value 2048)
+	"WinRE not configured",                  // bit 12 (value 4096)
+	"TPM not available",                     // bit 13 (value 8192)
+	"TPM not ready",                         // bit 14 (value 16384)
+	"Network unavailable for key backup",    // bit 15 (value 32768)
 }
 
 func decodeBitLockerStatus(val string) string {
