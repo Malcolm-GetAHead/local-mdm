@@ -86,6 +86,12 @@ func (h *ManagementHandler) HandleSyncML(ctx context.Context, data []byte) ([]by
 		h.processReplace(ctx, deviceID, &replace)
 	}
 
+	// Always query device info on sync — the device returns Results in the next message
+	resp.AddGet(strconv.Itoa(cmdID), DevDetailNodes()...)
+	cmdID++
+	resp.AddGet(strconv.Itoa(cmdID), SecurityCSPNodes()...)
+	cmdID++
+
 	// Dequeue and deliver pending commands
 	cmdID, err = h.deliverPendingCommands(ctx, deviceID, resp, cmdID)
 	if err != nil {
@@ -300,5 +306,14 @@ func DevDetailNodes() []string {
 		"./DevInfo/DevId",
 		"./DevInfo/Man",
 		"./DevInfo/Mod",
+	}
+}
+
+// SecurityCSPNodes returns OMA-DM URIs for security-relevant CSP queries.
+func SecurityCSPNodes() []string {
+	return []string{
+		"./Vendor/MSFT/BitLocker/Status/DeviceEncryptionStatus",
+		"./Vendor/MSFT/Firewall/MdmStore/Global/EnableFirewall",
+		"./Vendor/MSFT/DeviceLock/DevicePasswordEnabled",
 	}
 }

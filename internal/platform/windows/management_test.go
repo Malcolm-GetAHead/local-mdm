@@ -268,6 +268,8 @@ func TestManagementHandler_HandleSyncML(t *testing.T) {
 		assert.Equal(t, deviceID.String(), parsed.SyncHdr.Target.LocURI)
 		// Should have status for SyncHdr and Alert
 		assert.GreaterOrEqual(t, len(parsed.SyncBody.Status), 2)
+		// Should have auto-query Get commands (DevDetail + SecurityCSP)
+		assert.Len(t, parsed.SyncBody.Get, 2)
 	})
 
 	t.Run("delivers pending commands", func(t *testing.T) {
@@ -305,11 +307,11 @@ func TestManagementHandler_HandleSyncML(t *testing.T) {
 		parsed, err := ParseSyncML(resp)
 		require.NoError(t, err)
 
-		// Should have Exec (lock) and Get (device info) commands
+		// Should have Exec (lock) and Get commands:
+		// 2 auto-query Gets (DevDetail + SecurityCSP) + 1 pending DeviceInfo Get = 3
 		assert.Len(t, parsed.SyncBody.Exec, 1)
 		assert.Equal(t, "./Vendor/MSFT/RemoteLock/Lock", parsed.SyncBody.Exec[0].Item[0].Target.LocURI)
-		assert.Len(t, parsed.SyncBody.Get, 1)
-		assert.Len(t, parsed.SyncBody.Get[0].Item, len(DevDetailNodes()))
+		assert.Len(t, parsed.SyncBody.Get, 3)
 
 		// Both commands should be marked sent
 		assert.Len(t, cmdRepo.sent, 2)
@@ -395,6 +397,73 @@ func TestDevDetailNodes(t *testing.T) {
 	assert.Contains(t, found, "DevId")
 	assert.Contains(t, found, "Man")
 	assert.Contains(t, found, "Mod")
+}
+
+func TestSecurityCSPNodes(t *testing.T) {
+	nodes := SecurityCSPNodes()
+	assert.Len(t, nodes, 3)
+	found := strings.Join(nodes, ",")
+	assert.Contains(t, found, "BitLocker")
+	assert.Contains(t, found, "Firewall")
+	assert.Contains(t, found, "DeviceLock")
+}
+
+func TestManagementHandler_AutoQueryDeviceInfo(t *testing.T) {
+	deviceID := uuid.New()
+	logger := slog.Default()
+
+	deviceRepo := &mockDeviceRepoForMgmt{devices: map[uuid.UUID]*models.Device{
+		deviceID: {
+			BaseModel:    models.BaseModel{ID: deviceID},
+			Platform:     models.PlatformWindows,
+			PlatformData: models.JSONB{},
+		},
+	}}
+	cmdRepo := &mockCmdRepoForMgmt{}
+
+	handler := NewManagementHandler("https://mdm.example.com", deviceRepo, cmdRepo, logger)
+
+	clientMsg := fmt.Sprintf(`<?xml version="1.0" encoding="UTF-8"?>
+	<SyncML xmlns="SYNCML:SYNCML1.2">
+		<SyncHdr>
+			<VerDTD>1.2</VerDTD><VerProto>DM/1.2</VerProto>
+			<SessionID>1</SessionID><MsgID>1</MsgID>
+			<Target><LocURI>https://mdm.example.com</LocURI></Target>
+			<Source><LocURI>%s</LocURI></Source>
+		</SyncHdr>
+		<SyncBody><Alert><CmdID>1</CmdID><Data>1201</Data></Alert><Final/></SyncBody>
+	</SyncML>`, deviceID.String())
+
+	resp, _, err := handler.HandleSyncML(context.Background(), []byte(clientMsg))
+	require.NoError(t, err)
+
+	parsed, err := ParseSyncML(resp)
+	require.NoError(t, err)
+
+	// Should have 2 Get commands: DevDetail nodes + Security CSP nodes
+	require.Len(t, parsed.SyncBody.Get, 2, "expected 2 Get commands (DevDetail + SecurityCSP)")
+
+	// First Get: DevDetail nodes
+	devDetailItems := parsed.SyncBody.Get[0].Item
+	assert.Len(t, devDetailItems, len(DevDetailNodes()))
+	devDetailURIs := make([]string, len(devDetailItems))
+	for i, item := range devDetailItems {
+		devDetailURIs[i] = item.Target.LocURI
+	}
+	for _, expected := range DevDetailNodes() {
+		assert.Contains(t, devDetailURIs, expected)
+	}
+
+	// Second Get: Security CSP nodes
+	secItems := parsed.SyncBody.Get[1].Item
+	assert.Len(t, secItems, len(SecurityCSPNodes()))
+	secURIs := make([]string, len(secItems))
+	for i, item := range secItems {
+		secURIs[i] = item.Target.LocURI
+	}
+	for _, expected := range SecurityCSPNodes() {
+		assert.Contains(t, secURIs, expected)
+	}
 }
 
 func TestManagementHandler_WipeCommand(t *testing.T) {

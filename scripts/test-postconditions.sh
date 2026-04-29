@@ -34,6 +34,13 @@ if [ "$LEAKED" -gt 0 ]; then
   echo "  Cleaned up $LEAKED leaked mdmb test device(s) from seed enterprise"
 fi
 
+# Clean up policies leaked by Playwright tests (non-seed UUIDs in seed enterprise)
+LEAKED_POLICIES=$(psql -h "$DB_HOST" -U postgres -d localmdm -t -A -c \
+  "DELETE FROM policies WHERE enterprise_id = '$SEED_ENT' AND id::text NOT LIKE 'e0000000-%' RETURNING id;" 2>/dev/null | wc -l | tr -d ' ')
+if [ "$LEAKED_POLICIES" -gt 0 ]; then
+  echo "  Cleaned up $LEAKED_POLICIES leaked test policy(ies) from seed enterprise"
+fi
+
 check "No leaked test enterprises" "0" \
   "SELECT count(*) FROM enterprises WHERE id != '$SEED_ENT';"
 
