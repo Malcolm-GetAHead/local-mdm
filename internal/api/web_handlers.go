@@ -657,24 +657,26 @@ var platformValueTranslations = map[string]map[string]string{
 }
 
 // bitlockerStatusBits maps DeviceEncryptionStatus bitmask bits to descriptions.
-// Value 0 = compliant. Non-zero is a bitmask of these error flags.
+// Value 0 = compliant (encrypted and protection active). Non-zero is a bitmask
+// of compliance issues per MS BitLocker CSP docs. These are policy compliance
+// flags, not direct encryption state descriptions.
 var bitlockerStatusBits = []string{
-	"User consent needed",           // bit 0
-	"Encryption method mismatch",    // bit 1
-	"OS volume unprotected",         // bit 2
-	"TPM-only protector not used",   // bit 3
-	"TPM+PIN not used",              // bit 4
-	"TPM+startup key not used",      // bit 5
-	"TPM+PIN+key not used",          // bit 6
-	"TPM not used",                  // bit 7
-	"Recovery key backup failed",    // bit 8
-	"Fixed drive unprotected",       // bit 9
-	"Fixed drive method mismatch",   // bit 10
-	"Admin sign-in required",        // bit 11
-	"WinRE not configured",          // bit 12
-	"TPM not available",             // bit 13
-	"TPM not ready",                 // bit 14
-	"Network unavailable for backup", // bit 15
+	"User consent needed to encrypt",       // bit 0
+	"Protection suspended or method issue",  // bit 1
+	"OS volume not encrypted",               // bit 2
+	"TPM-only protector required",           // bit 3
+	"TPM+PIN required",                      // bit 4
+	"TPM+startup key required",              // bit 5
+	"TPM+PIN+startup key required",          // bit 6
+	"TPM required but not present",          // bit 7
+	"Recovery key backup failed",            // bit 8
+	"Fixed drive not encrypted",             // bit 9
+	"Fixed drive encryption method issue",   // bit 10
+	"Admin sign-in required to encrypt",     // bit 11
+	"WinRE not configured",                  // bit 12
+	"TPM not available",                     // bit 13
+	"TPM not ready",                         // bit 14
+	"Network unavailable for key backup",    // bit 15
 }
 
 func decodeBitLockerStatus(val string) string {
