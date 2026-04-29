@@ -94,6 +94,7 @@
 - **Dashboard**: Go templates + HTMX + Tailwind CSS. Not React.
 - **macOS Platform SSO**: Sprint 7 (Java + Swift, separate from Go work).
 - **Default to ECS Fargate, not Kubernetes.**
+- **Microsoft MDM reference**: `MicrosoftDocs/memdocs` repo is indexed as a knowledge base. Search it for Windows CSP definitions (BitLocker, Firewall, DeviceLock, WiFi, VPN, app management, certificate store, Windows Update), Intune compliance policy logic, enrollment flows, and OMA-DM protocol details. The BitLocker CSP bitmask was verified against real device testing — MS doc labels don't always match observed behavior, so verify with actual devices when possible.
 
 ## Sprint Status
 
