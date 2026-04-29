@@ -1,12 +1,11 @@
 # Session Notes — Working Preferences & Project Knowledge
 
-**Last Updated**: 2026-04-28  
+**Last Updated**: 2026-04-29  
 **Purpose**: Guidance for AI agents working on this codebase. Keep this file lean — patterns and conventions that apply to every session. One-shot implementation details belong in sprint docs, not here.
 
 ## Current State
 
-- **Sprint 6**: ✅ COMPLETE — macOS full data pipeline, Windows enrolled via Settings UI, OMA-DM sync, enterprise assignment, nginx TLS with CRL
-- **Sprint 6 remainder**: OMA-DM device info queries, retro cleanup items (see GAPS.md)
+- **Sprint 6**: ✅ COMPLETE — all cleanup items resolved, Windows OMA-DM fully operational with real device
 - **Sprint 7**: 🔲 Not Started — macOS Platform SSO (Java/Swift, requires Apple Developer account)
 
 ---
@@ -37,6 +36,9 @@
 - **When a bug has a complex explanation, check the simple one first.** The "pkcs7 library incompatibility" theory was believed for two sprints. The actual cause was a wrong file path.
 - **When debugging protocol issues, compare with a known working implementation byte-by-byte.** Fleet DM's source code revealed the namespace bug, the correct EnrollmentVersion, and the proper XML marshaling approach.
 - **Don't claim something is blocked without checking.** Before saying something is blocked, actually look at the infrastructure and tooling available.
+- **Verify CSP/protocol values on real devices, not just docs.** MS doc labels for BitLocker DeviceEncryptionStatus bitmask didn't match observed behavior. Three commits were wasted guessing from docs before SSH'ing into the VM and testing each state. Always test on the device first.
+- **Check if the running container has your code.** After pushing code, the Docker container still runs the old image until rebuilt. If something "doesn't work" after a code change, check `docker ps` creation time before investigating.
+- **When a mock-based test passes but the feature doesn't work, write an integration test.** The device ID resolution passed all mock tests but failed in production because `deviceRepository.Update()` didn't include `device_id` in the SQL UPDATE. The integration test caught it instantly.
 
 ### Code Quality
 
@@ -79,9 +81,7 @@
 
 ## Known Issues
 
-- **Windows OMA-DM sync doesn't query device state** — sync handler acknowledges sessions but doesn't send CSP queries for BitLocker, firewall, etc. Windows compliance shows 'unknown' until device info queries are implemented.
 - **CRL is static** — served from a file generated once. Cert revocations won't be reflected until CRL regeneration is implemented.
-- **ASN.1 CSR fallback uses generic subject** — Windows CSRs with non-PrintableString characters get signed with `CN=MDMDeviceCert` instead of the original subject.
 - **NanoMDM config uses host IP** — `configs/config.docker.yaml` has `nanomdm_url` with env var override (`NANOMDM_URL`), but enrollment profiles use the host IP which must be reachable from VMs.
 - **macOS webhook enterprise ID is hardcoded** — Authenticate handler uses configurable `default_enterprise_id`. Multi-tenant requires passing enterprise ID through the enrollment flow.
 - **Container rebuilds regenerate the CA unless certs are volume-mounted.** Without the `./internal/api/certs:/app/certs` mount, every `docker compose build` creates a new CA, breaking all enrolled devices.
@@ -95,6 +95,8 @@
 - **macOS Platform SSO**: Sprint 7 (Java + Swift, separate from Go work).
 - **Default to ECS Fargate, not Kubernetes.**
 - **Microsoft MDM reference**: `MicrosoftDocs/memdocs` repo is indexed as a knowledge base. Search it for Windows CSP definitions (BitLocker, Firewall, DeviceLock, WiFi, VPN, app management, certificate store, Windows Update), Intune compliance policy logic, enrollment flows, and OMA-DM protocol details. The BitLocker CSP bitmask was verified against real device testing — MS doc labels don't always match observed behavior, so verify with actual devices when possible.
+- **Apple MDM reference**: `apple/device-management` repo indexed as KB. Contains MDM command schemas, profile payload definitions, check-in protocol, declarative management specs. Machine-readable YAML — the definitive source for command fields and supported OS versions.
+- **Android MDM reference**: `googleapis/google-api-nodejs-client` (androidmanagement directory) indexed as KB. Contains full API type definitions with JSDoc descriptions for policies, devices, compliance, enrollment tokens, app management. The `v1.ts` file is the complete API reference in code form.
 
 ## Sprint Status
 
