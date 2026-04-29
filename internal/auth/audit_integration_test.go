@@ -29,8 +29,12 @@ func TestMiddleware_AuditLogging_AuthFailure(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	}))
 
+	// Use unique user-agent to scope cleanup
+	testUA := "test-auth-failure-" + t.Name()
+
 	// Make request without auth token
 	req := httptest.NewRequest("GET", "/test", nil)
+	req.Header.Set("User-Agent", testUA)
 	w := httptest.NewRecorder()
 
 	handler.ServeHTTP(w, req)
@@ -43,17 +47,17 @@ func TestMiddleware_AuditLogging_AuthFailure(t *testing.T) {
 
 	var count int
 	err := database.Writer.QueryRowContext(context.Background(),
-		"SELECT COUNT(*) FROM audit_logs WHERE action = $1 AND created_at > NOW() - INTERVAL '5 seconds'",
-		"auth.failure",
+		"SELECT COUNT(*) FROM audit_logs WHERE action = $1 AND user_agent = $2",
+		"auth.failure", testUA,
 	).Scan(&count)
 	require.NoError(t, err)
 	assert.GreaterOrEqual(t, count, 1, "Expected at least one auth.failure audit log")
 
-	// Cleanup
-	_, _ = database.Writer.ExecContext(context.Background(),
-		"DELETE FROM audit_logs WHERE action = $1 AND created_at > NOW() - INTERVAL '5 seconds'",
-		"auth.failure",
-	)
+	// Cleanup scoped by unique user_agent
+	t.Cleanup(func() {
+		database.Writer.ExecContext(context.Background(),
+			"DELETE FROM audit_logs WHERE user_agent = $1", testUA)
+	})
 }
 
 func TestMiddleware_AuditLogging_AccessDenied(t *testing.T) {
@@ -71,8 +75,12 @@ func TestMiddleware_AuditLogging_AccessDenied(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	}))
 
+	// Use unique user-agent to scope cleanup
+	testUA := "test-access-denied-" + t.Name()
+
 	// Create request with user context (but wrong role)
 	req := httptest.NewRequest("GET", "/test", nil)
+	req.Header.Set("User-Agent", testUA)
 	user := &AuthUser{
 		ID:    "test-user",
 		Email: "test@example.com",
@@ -92,17 +100,17 @@ func TestMiddleware_AuditLogging_AccessDenied(t *testing.T) {
 
 	var count int
 	err := database.Writer.QueryRowContext(context.Background(),
-		"SELECT COUNT(*) FROM audit_logs WHERE action = $1 AND created_at > NOW() - INTERVAL '5 seconds'",
-		"auth.access_denied",
+		"SELECT COUNT(*) FROM audit_logs WHERE action = $1 AND user_agent = $2",
+		"auth.access_denied", testUA,
 	).Scan(&count)
 	require.NoError(t, err)
 	assert.GreaterOrEqual(t, count, 1, "Expected at least one auth.access_denied audit log")
 
-	// Cleanup
-	_, _ = database.Writer.ExecContext(context.Background(),
-		"DELETE FROM audit_logs WHERE action = $1 AND created_at > NOW() - INTERVAL '5 seconds'",
-		"auth.access_denied",
-	)
+	// Cleanup scoped by unique user_agent
+	t.Cleanup(func() {
+		database.Writer.ExecContext(context.Background(),
+			"DELETE FROM audit_logs WHERE user_agent = $1", testUA)
+	})
 }
 
 func TestGetIP(t *testing.T) {
