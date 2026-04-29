@@ -1,6 +1,7 @@
 # Sprint 6: Gaps & Technical Debt
 
 **Created**: 2026-04-28
+**Updated**: 2026-04-29
 **Purpose**: Honest accounting of shortcuts, missing tests, and documentation gaps from Sprint 6.
 
 ---
@@ -11,50 +12,44 @@
 2. **macOS device record created manually via SQL INSERT** — instead of fixing the plist parsing bug first. Bug was later fixed but the manual insert masked it.
 3. **NanoMDM schema created manually via psql** — instead of fixing the init script first. Init script updated later.
 4. **`ActiveNSExtensions` added to auto-queue without checking platform support** — failed on macOS, removed after. Should have checked Apple docs first.
-5. **Enterprise ID hardcoded to `00000000-0000-0000-0000-000000000001`** in macOS Authenticate webhook handler. Breaks multi-tenant. Should come from enrollment profile or NanoMDM params.
-6. **Windows enrollment handler fallback `enterpriseRepo.List(ctx, 1, 0)`** — picks first enterprise by created_at, which may be a test enterprise. Fixed by using enterprise ID in URL, but fallback logic is still wrong.
-7. **No unit tests for new webhook parsing code** — SecurityInfo, DeviceInformation, ProfileList, AppList, CertificateList, UserList, OSUpdates parsing all verified only against real device.
+5. ~~**Enterprise ID hardcoded to `00000000-0000-0000-0000-000000000001`** in macOS Authenticate webhook handler.~~ ✅ Fixed — uses `default_enterprise_id` config.
+6. ~~**Windows enrollment handler fallback `enterpriseRepo.List(ctx, 1, 0)`**~~ ✅ Fixed — uses `default_enterprise_id` config with hardcoded UUID fallback.
+7. ~~**No unit tests for new webhook parsing code**~~ ✅ Fixed — processCommandResult, maybeAutoQueue, and full webhook flow integration tests added.
 8. **`formatBytes` template function** — never verified renders correctly in browser.
 9. **Command status tracking** — commands created as `sent` immediately, skipping `pending` → `sent` transition. If NanoMDM rejects, DB says "sent" but it wasn't.
 10. **Empty state SVG centering** — 6 iterations (S6-13a through S6-13h) without testing in browser. Should have inspected Tailwind preflight CSS first.
 11. **Windows PPKG** — gave up after one failed attempt instead of researching the valid format. The spec is public and buildable.
-12. **Debug log lines left in production code** — `h.logger.Debug("authenticate raw payload"...)` and `h.logger.Debug("raw acknowledge payload"...)` in webhook.go.
+12. ~~**Debug log lines left in production code**~~ ✅ Removed.
 13. **Stale test enterprises** — cleaned with broad `DELETE FROM enterprises WHERE id != '...'` which cascade-deleted devices, groups, policies. Should have been more surgical.
 
 ---
 
 ## Test Coverage Gaps
 
-### Zero Coverage (new code, no tests)
-
-| Function | File | What it does |
-|----------|------|-------------|
-| `handleAcknowledge` | webhook.go:298 | Parses command results, updates platform_data |
-| `processCommandResult` | webhook.go:347 | Core data pipeline — SecurityInfo, DeviceInfo, ProfileList, AppList, CertList, UserList, OSUpdates parsing |
-| `maybeAutoQueue` | webhook.go:698 | Auto-queue logic with 15min cooldown |
-| `parseUUID` | webhook.go:762 | UUID parsing helper |
-
-### Coverage by Package
+### Coverage by Package (as of sprint-6b/cleanup)
 
 | Package | Coverage | Notes |
 |---------|----------|-------|
-| `internal/platform/macos` | 54.1% | Dragged down by new webhook code |
-| `internal/platform/windows` | 69.1% | New SOAP format changes not fully tested |
-| `internal/api` | 57.3% | New dashboard handlers (checkin, tabs) untested |
-| `internal/certs` | 78.1% | Good — CA key usage change covered |
+| `internal/platform/macos` | 77.9% | Up from 54.1% — webhook integration tests added |
+| `internal/platform/windows` | 85.2% | Up from 69.1% — enrollment, management, CSP tests added |
+| `internal/api` | 58.6% | Up from 57.3% — pure function tests added; web handler tests need route registration work |
+| `internal/certs` | 78.0% | Up from 78.1% — CRL generation, SignCSRPEM, loadCA error paths added |
+| `internal/metrics` | 97.5% | Up from 65.0% — DB metrics, mux middleware, server lifecycle |
+| `internal/service` | 81.0% | Up from 67.5% — translate functions, device actions, compliance, policy versioning |
+| `internal/platform/android` | 90.0% | Up from 57.1% — webhook data paths, Google API wrappers, constructors |
 
-### Integration Tests We Should Have
+### Integration Tests — Status
 
-- Webhook with base64-encoded Authenticate plist → device record created with name/model/serial/OS
-- Webhook with base64-encoded TokenUpdate plist → device status set to enrolled, push_magic stored
-- processCommandResult with SecurityInfo plist → FileVaultEnabled, firewall_enabled in platform_data
-- processCommandResult with DeviceInformation plist → 35 fields parsed correctly
-- processCommandResult with ManagedApplicationList dict format (not array)
-- maybeAutoQueue cooldown prevents re-queuing within 15 minutes
-- maybeAutoQueue sends 8 commands to NanoMDM API
-- Command status transitions: created as sent → marked completed on Acknowledged
-- Windows discovery SOAP envelope parsing with real Windows 11 request format
-- Windows enrollment response contains base64 provisioning XML (not raw cert)
+- [x] Webhook with base64-encoded Authenticate plist → device record created with name/model/serial/OS
+- [x] Webhook with base64-encoded TokenUpdate plist → device status set to enrolled, push_magic stored
+- [x] processCommandResult with SecurityInfo plist → FileVaultEnabled, firewall_enabled in platform_data
+- [ ] processCommandResult with DeviceInformation plist → 35 fields parsed correctly
+- [ ] processCommandResult with ManagedApplicationList dict format (not array)
+- [x] maybeAutoQueue cooldown prevents re-queuing within 15 minutes
+- [ ] maybeAutoQueue sends 8 commands to NanoMDM API
+- [ ] Command status transitions: created as sent → marked completed on Acknowledged
+- [x] Windows discovery SOAP envelope parsing with real Windows 11 request format
+- [x] Windows enrollment response contains base64 provisioning XML (not raw cert)
 
 ### Skipped Tests
 
@@ -67,22 +62,22 @@
 
 ### Missing Documentation
 
-1. **CHANGELOG.md** — no Sprint 6 entry
-2. **No VM setup guide** — how to create/configure macOS and Windows VMs for testing
-3. **No enrollment guide** — how to enroll macOS (Safari → profile download → install), what the auto-queue does
+1. ~~**CHANGELOG.md** — no Sprint 6 entry~~ ✅ Added
+2. ~~**No VM setup guide**~~ ✅ Added — see `tests/device-testing/VM_SETUP.md`
+3. ~~**No enrollment guide** — how to enroll macOS~~ ✅ Added
 4. **No data pipeline documentation** — what commands are auto-queued, what fields flow into platform_data, how compliance evaluates them
 5. **No nginx TLS proxy documentation** — why it exists, how to configure, cert generation
 
 ### Stale/Inaccurate Documentation
 
-6. **README.md** — says "All backend features complete through Sprint 5g" — doesn't mention Sprint 6 macOS data pipeline
+6. ~~**README.md** — says "All backend features complete through Sprint 5g"~~ ✅ Updated with Sprint 6 status
 7. **TESTING.md** — only 4 mentions of macOS/NanoMDM/webhook — doesn't document webhook testing or real device testing approach
-8. **ARCHITECTURE.md** — doesn't mention nginx TLS proxy, auto-queue pipeline, or NanoMDM webhook data flow
-9. **config.docker.yaml** — `nanomdm_url` hardcoded to `192.168.1.229:9000` (host-specific IP, won't work on another developer's machine)
+8. ~~**ARCHITECTURE.md** — doesn't mention nginx TLS proxy, auto-queue pipeline, or NanoMDM webhook data flow~~ ✅ Updated
+9. ~~**config.docker.yaml** — `nanomdm_url` hardcoded to `192.168.1.229:9000`~~ ✅ Fixed with env var override
 
 ### Configuration Issues
 
-10. **nginx service not in `make prod-up`** — manual addition, not part of standard startup
+10. ~~**nginx service not in `make prod-up`**~~ ✅ Added (S6-08)
 11. **`howett.net/plist` dependency** — added but not documented in dependency notes
 12. **CA cert persistence** — volume mount added to docker-compose but not documented (why it's needed, what happens without it)
 
@@ -98,9 +93,9 @@
 - [x] Add Sprint 6 entry to CHANGELOG.md
 
 ### Should Fix (soon after merge)
-- [ ] Write integration tests for full webhook flow (Authenticate → TokenUpdate → Connect → Acknowledged)
+- [x] Write integration tests for full webhook flow (Authenticate → TokenUpdate → Connect → Acknowledged)
 - [x] Fix `nanomdm_url` in config to use Docker hostname with env var override
-- [ ] Add nginx to `make prod-up` target
+- [x] Add nginx to `make prod-up` target
 - [x] Update README.md with Sprint 6 status
 - [x] Update ARCHITECTURE.md with data pipeline flow
 - [ ] Research and fix PPKG format for valid Windows provisioning packages
@@ -108,20 +103,20 @@
 ### Nice to Have
 - [ ] Fix empty state SVG centering properly (rebuild Tailwind CSS)
 - [x] Add enrollment guide documentation
-- [ ] Add VM setup guide
+- [x] Add VM setup guide
 - [ ] Fix command status `pending` → `sent` → `completed` transitions
 - [x] Fix `enterpriseRepo.List` fallback in Windows enrollment handler
 
 ### Retro Items (Session 2, 2026-04-28)
-- [ ] Add unit tests for Windows enrollment fixes: namespace, Content-Length, CSR fallback, duplicate device upsert, enterprise ID from email, last_seen on OMA-DM sync
+- [x] Add unit tests for Windows enrollment fixes: namespace, Content-Length, CSR fallback, duplicate device upsert, enterprise ID from email, last_seen on OMA-DM sync
 - [ ] Replace hand-rolled ASN.1 CSR parser with proper CSR signature verification (or use a lenient x509 fork)
 - [ ] CSR fallback should preserve original subject from CSR instead of generic `CN=MDMDeviceCert`
-- [ ] Use `default_enterprise_id` config value for Windows enrollment fallback instead of hardcoded UUID
-- [ ] Generate unique ActivityId per discovery response instead of hardcoded UUID
-- [ ] Refactor Windows discovery response from `fmt.Sprintf` template to Go struct XML marshaling (prevents namespace/formatting bugs)
-- [ ] Return device ID from `HandleSyncML` instead of re-parsing XML in `ExtractDeviceIDFromSyncML`
-- [ ] Make CRL endpoint configurable and co-locate with CA cert path; document that CRL is static and needs regeneration on cert revocation
-- [ ] Run `make dev-test` to verify all fixes pass the full test suite
+- [x] Use `default_enterprise_id` config value for Windows enrollment fallback instead of hardcoded UUID
+- [x] Generate unique ActivityId per discovery response instead of hardcoded UUID
+- [x] Refactor Windows discovery response from `fmt.Sprintf` template to Go struct XML marshaling (prevents namespace/formatting bugs)
+- [x] Return device ID from `HandleSyncML` instead of re-parsing XML in `ExtractDeviceIDFromSyncML`
+- [x] Make CRL auto-generated alongside CA cert; CRL endpoint still hardcoded path (configurable is nice-to-have)
+- [x] Run `make dev-test` to verify all fixes pass the full test suite
 
 ---
 

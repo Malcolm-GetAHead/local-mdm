@@ -26,10 +26,25 @@ The OMA-DM sync handler acknowledges sessions but doesn't query device state. Ne
 Results should update `platform_data` JSONB, triggering compliance re-evaluation via EventBus.
 
 ### Remaining GAPS.md Items
-- [ ] Integration tests for full webhook flow
-- [ ] Add nginx to `make prod-up` target
-- [ ] VM setup guide documentation
 - [ ] Fix command status `pending` → `sent` → `completed` transitions
+- [ ] Research and fix PPKG format for valid Windows provisioning packages
+- [ ] Data pipeline documentation (what commands auto-queue, what fields flow into platform_data)
+- [ ] nginx TLS proxy documentation
+- [ ] Document `howett.net/plist` dependency and CA cert persistence volume mount
+- [ ] CSR fallback should preserve original subject instead of generic `CN=MDMDeviceCert`
+- [ ] Replace hand-rolled ASN.1 CSR parser with proper verification (or lenient x509 fork)
+- [ ] Fix empty state SVG centering (rebuild Tailwind CSS)
+- [ ] Make CRL endpoint path configurable
+
+### Completed Since This Prompt Was Written
+- [x] Integration tests for full webhook flow — done (S6-07)
+- [x] Add nginx to `make prod-up` target — done (S6-08)
+- [x] XML marshaling refactor (discovery response) — done (S6-02)
+- [x] Enterprise ID fallback uses config — done (S6-04)
+- [x] HandleSyncML returns device ID (no double parse) — done (S6-05)
+- [x] Unique ActivityId per discovery response — done (S6-02)
+- [x] CRL auto-generated alongside CA cert — done
+- [x] Test coverage improvements: metrics 97.5%, service 81%, windows 85.2%, android 90%, certs 78%, api 58.6%
 
 ### VM Access
 - Windows VM: `ssh testuser@192.168.65.2` (password: testuser)

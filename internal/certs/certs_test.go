@@ -111,6 +111,12 @@ func TestCAGeneration(t *testing.T) {
 		t.Error("NewCAManager should fail on missing files")
 	}
 
+	// Verify CRL was created alongside CA
+	crlPath := tmpDir + "/ca.crl"
+	if _, err := os.Stat(crlPath); os.IsNotExist(err) {
+		t.Error("CRL file was not created alongside CA")
+	}
+
 	// Test GenerateCA refuses to overwrite
 	_, err = certs.GenerateCA(certPath, keyPath)
 	if err == nil {
@@ -348,5 +354,263 @@ func TestSignRawCSR_FallbackSubject(t *testing.T) {
 	}
 	if !found {
 		t.Error("certificate missing ClientAuth extended key usage")
+	}
+}
+
+func TestCertTemplate(t *testing.T) {
+	dir := t.TempDir()
+	ca, err := certs.GenerateCA(dir+"/ca.crt", dir+"/ca.key")
+	if err != nil {
+		t.Fatalf("failed to generate CA: %v", err)
+	}
+
+	tmpl := ca.CertTemplate(24 * time.Hour)
+
+	if tmpl.SerialNumber == nil {
+		t.Fatal("serial number is nil")
+	}
+	if tmpl.IsCA {
+		t.Error("template should not be CA")
+	}
+	// NotAfter should be ~24h from now (allow 5s tolerance)
+	expected := time.Now().Add(24 * time.Hour)
+	if diff := tmpl.NotAfter.Sub(expected); diff < -5*time.Second || diff > 5*time.Second {
+		t.Errorf("NotAfter off by %v", diff)
+	}
+	found := false
+	for _, eku := range tmpl.ExtKeyUsage {
+		if eku == x509.ExtKeyUsageClientAuth {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("missing ClientAuth ExtKeyUsage")
+	}
+}
+
+func TestSignCSRPEM(t *testing.T) {
+	dir := t.TempDir()
+	ca, err := certs.GenerateCA(dir+"/ca.crt", dir+"/ca.key")
+	if err != nil {
+		t.Fatalf("failed to generate CA: %v", err)
+	}
+
+	key, _ := rsa.GenerateKey(rand.Reader, 2048)
+	csrTemplate := &x509.CertificateRequest{Subject: pkix.Name{CommonName: "test"}}
+	csrDER, _ := x509.CreateCertificateRequest(rand.Reader, csrTemplate, key)
+	csrPEM := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE REQUEST", Bytes: csrDER})
+
+	t.Run("valid CSR", func(t *testing.T) {
+		certPEM, err := ca.SignCSRPEM(csrPEM, 24*time.Hour)
+		if err != nil {
+			t.Fatalf("SignCSRPEM failed: %v", err)
+		}
+		block, _ := pem.Decode(certPEM)
+		if block == nil {
+			t.Fatal("returned PEM is not decodable")
+		}
+		cert, err := x509.ParseCertificate(block.Bytes)
+		if err != nil {
+			t.Fatalf("returned cert is not parseable: %v", err)
+		}
+		if cert.Subject.CommonName != "test" {
+			t.Errorf("CN = %q, want %q", cert.Subject.CommonName, "test")
+		}
+		if err := cert.CheckSignatureFrom(ca.GetCACertificate()); err != nil {
+			t.Errorf("signature check failed: %v", err)
+		}
+	})
+
+	t.Run("garbage bytes", func(t *testing.T) {
+		_, err := ca.SignCSRPEM([]byte("not pem at all"), 24*time.Hour)
+		if err == nil {
+			t.Error("expected error for garbage input")
+		}
+	})
+
+	t.Run("valid PEM bad DER", func(t *testing.T) {
+		badPEM := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE REQUEST", Bytes: []byte("bad der")})
+		_, err := ca.SignCSRPEM(badPEM, 24*time.Hour)
+		if err == nil {
+			t.Error("expected error for bad DER inside PEM")
+		}
+	})
+}
+
+func TestGetCACertificateServiceWrapper(t *testing.T) {
+	dir := t.TempDir()
+	ca, err := certs.GenerateCA(dir+"/ca.crt", dir+"/ca.key")
+	if err != nil {
+		t.Fatalf("failed to generate CA: %v", err)
+	}
+
+	svc := certs.NewCertificateService(ca, nil)
+	cert, err := svc.GetCACertificate()
+	if err != nil {
+		t.Fatalf("GetCACertificate failed: %v", err)
+	}
+	if cert != ca.GetCACertificate() {
+		t.Error("service should return same cert pointer as CAManager")
+	}
+}
+
+func TestLoadCAErrorPaths(t *testing.T) {
+	dir := t.TempDir()
+	// Generate a valid CA to get valid PEM files
+	validCA, err := certs.GenerateCA(dir+"/valid.crt", dir+"/valid.key")
+	if err != nil {
+		t.Fatalf("failed to generate CA: %v", err)
+	}
+	_ = validCA
+
+	validCertPEM, _ := os.ReadFile(dir + "/valid.crt")
+	validKeyPEM, _ := os.ReadFile(dir + "/valid.key")
+
+	t.Run("garbage cert file", func(t *testing.T) {
+		d := t.TempDir()
+		os.WriteFile(d+"/ca.crt", []byte("garbage"), 0644)
+		os.WriteFile(d+"/ca.key", validKeyPEM, 0644)
+		_, err := certs.NewCAManager(d+"/ca.crt", d+"/ca.key")
+		if err == nil {
+			t.Error("expected error for garbage cert file")
+		}
+	})
+
+	t.Run("valid PEM bad DER cert", func(t *testing.T) {
+		d := t.TempDir()
+		badCert := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: []byte("bad der")})
+		os.WriteFile(d+"/ca.crt", badCert, 0644)
+		os.WriteFile(d+"/ca.key", validKeyPEM, 0644)
+		_, err := certs.NewCAManager(d+"/ca.crt", d+"/ca.key")
+		if err == nil {
+			t.Error("expected error for bad DER in cert PEM")
+		}
+	})
+
+	t.Run("valid cert garbage key", func(t *testing.T) {
+		d := t.TempDir()
+		os.WriteFile(d+"/ca.crt", validCertPEM, 0644)
+		os.WriteFile(d+"/ca.key", []byte("garbage"), 0644)
+		_, err := certs.NewCAManager(d+"/ca.crt", d+"/ca.key")
+		if err == nil {
+			t.Error("expected error for garbage key file")
+		}
+	})
+
+	t.Run("valid cert valid PEM bad DER key", func(t *testing.T) {
+		d := t.TempDir()
+		os.WriteFile(d+"/ca.crt", validCertPEM, 0644)
+		badKey := pem.EncodeToMemory(&pem.Block{Type: "RSA PRIVATE KEY", Bytes: []byte("bad der")})
+		os.WriteFile(d+"/ca.key", badKey, 0644)
+		_, err := certs.NewCAManager(d+"/ca.crt", d+"/ca.key")
+		if err == nil {
+			t.Error("expected error for bad DER in key PEM")
+		}
+	})
+}
+
+func TestNewCAManagerFromPEM_BadDER(t *testing.T) {
+	dir := t.TempDir()
+	_, err := certs.GenerateCA(dir+"/ca.crt", dir+"/ca.key")
+	if err != nil {
+		t.Fatalf("failed to generate CA: %v", err)
+	}
+	validCertPEM, _ := os.ReadFile(dir + "/ca.crt")
+	validKeyPEM, _ := os.ReadFile(dir + "/ca.key")
+
+	t.Run("invalid cert DER", func(t *testing.T) {
+		badCert := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: []byte("bad")})
+		_, err := certs.NewCAManagerFromPEM(badCert, validKeyPEM)
+		if err == nil {
+			t.Error("expected error for invalid cert DER")
+		}
+	})
+
+	t.Run("invalid key DER", func(t *testing.T) {
+		badKey := pem.EncodeToMemory(&pem.Block{Type: "RSA PRIVATE KEY", Bytes: []byte("bad")})
+		_, err := certs.NewCAManagerFromPEM(validCertPEM, badKey)
+		if err == nil {
+			t.Error("expected error for invalid key DER")
+		}
+	})
+}
+
+func TestGenerateCA_KeyExistsOnly(t *testing.T) {
+	dir := t.TempDir()
+	// Create only the key file
+	os.WriteFile(dir+"/ca.key", []byte("existing key"), 0644)
+	_, err := certs.GenerateCA(dir+"/ca.crt", dir+"/ca.key")
+	if err == nil {
+		t.Error("expected error when key file already exists")
+	}
+}
+
+func TestSignCSR_BadSignature(t *testing.T) {
+	dir := t.TempDir()
+	ca, err := certs.GenerateCA(dir+"/ca.crt", dir+"/ca.key")
+	if err != nil {
+		t.Fatalf("failed to generate CA: %v", err)
+	}
+
+	key, _ := rsa.GenerateKey(rand.Reader, 2048)
+	csrTemplate := &x509.CertificateRequest{Subject: pkix.Name{CommonName: "tampered"}}
+	csrDER, _ := x509.CreateCertificateRequest(rand.Reader, csrTemplate, key)
+
+	// Parse the CSR, tamper with its signature, then call SignCSR
+	csr, err := x509.ParseCertificateRequest(csrDER)
+	if err != nil {
+		t.Fatalf("failed to parse CSR: %v", err)
+	}
+	// Corrupt the signature by flipping bits
+	csr.Signature[0] ^= 0xFF
+
+	_, err = ca.SignCSR(csr, 24*time.Hour)
+	if err == nil {
+		t.Error("expected error for tampered CSR signature")
+	}
+}
+
+func TestSignRawCSR_BadDER(t *testing.T) {
+	dir := t.TempDir()
+	ca, err := certs.GenerateCA(dir+"/ca.crt", dir+"/ca.key")
+	if err != nil {
+		t.Fatalf("failed to generate CA: %v", err)
+	}
+
+	_, err = ca.SignRawCSR([]byte("garbage der"), 24*time.Hour)
+	if err == nil {
+		t.Error("expected error for garbage DER input")
+	}
+}
+
+func TestGenerateCRL(t *testing.T) {
+	dir := t.TempDir()
+	ca, err := certs.GenerateCA(dir+"/ca.crt", dir+"/ca.key")
+	if err != nil {
+		t.Fatalf("failed to generate CA: %v", err)
+	}
+	_ = ca
+
+	crlPath := dir + "/ca.crl"
+	// CRL should already exist from GenerateCA
+	data, err := os.ReadFile(crlPath)
+	if err != nil {
+		t.Fatalf("CRL file not found: %v", err)
+	}
+
+	block, _ := pem.Decode(data)
+	if block == nil {
+		t.Fatal("CRL is not valid PEM")
+	}
+	if block.Type != "X509 CRL" {
+		t.Errorf("PEM type = %q, want %q", block.Type, "X509 CRL")
+	}
+
+	crl, err := x509.ParseRevocationList(block.Bytes)
+	if err != nil {
+		t.Fatalf("failed to parse CRL: %v", err)
+	}
+	if err := crl.CheckSignatureFrom(ca.GetCACertificate()); err != nil {
+		t.Errorf("CRL signature check failed: %v", err)
 	}
 }

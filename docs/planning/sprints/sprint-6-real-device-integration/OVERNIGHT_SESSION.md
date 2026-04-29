@@ -1,4 +1,4 @@
-# Sprint 6 Remainder: Autonomous Overnight Session
+`# Sprint 6 Remainder: Autonomous Overnight Session
 
 ## Context
 Branch: `main`. All tests should pass before you start — run `make dev-test` first to confirm. Read `docs/planning/sprints/sprint-6-real-device-integration/GAPS.md` for full context, especially the "Retro Items" and "Should Fix" sections.
@@ -53,3 +53,4 @@ Add entries for whatever you completed in this session under a "Sprint 6 (contin
 - Do not start Docker services or restart containers — tests run in their own Docker context via `make dev-test`.
 - Do not SSH into VMs or interact with real devices.
 - If you finish all tasks, stop. Do not invent new work.
+- 

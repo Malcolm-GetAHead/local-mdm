@@ -33,10 +33,14 @@ configs/*.json
 # Certificates
 certs/*.key
 certs/*.crt
+certs/*.crl
 certs/*.p12
 certs/*.pem
 **/certs/*.key
 **/certs/*.crt
+**/certs/*.crl
+**/certs/*.pem
+**/certs/*.p12
 
 # Logs
 logs/

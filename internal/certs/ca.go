@@ -34,6 +34,11 @@ func NewCAManager(certPath, keyPath string) (*CAManager, error) {
 	if err := manager.loadCA(); err != nil {
 		return nil, fmt.Errorf("failed to load CA (use 'localmdm-cli certs init' to generate): %w", err)
 	}
+	// Ensure CRL exists alongside the CA cert
+	crlPath := filepath.Join(filepath.Dir(certPath), "ca.crl")
+	if _, err := os.Stat(crlPath); os.IsNotExist(err) {
+		_ = manager.GenerateCRL() // best-effort; CRL is non-critical for startup
+	}
 	return manager, nil
 }
 
@@ -160,6 +165,11 @@ func (m *CAManager) generateCA() error {
 	m.caCert = cert
 	m.caKey = key
 	
+	// Generate an empty CRL alongside the CA
+	if err := m.GenerateCRL(); err != nil {
+		return fmt.Errorf("generate initial CRL: %w", err)
+	}
+	
 	return nil
 }
 
@@ -198,6 +208,28 @@ func (m *CAManager) saveCertificate(cert *x509.Certificate, key *rsa.PrivateKey)
 	}
 	
 	return nil
+}
+
+// GenerateCRL creates an empty CRL signed by this CA and writes it next to the CA cert.
+// The CRL file is placed at the same directory as the CA cert with the name "ca.crl".
+func (m *CAManager) GenerateCRL() error {
+	if m.certPath == "" {
+		return nil // PEM-only manager (production), no filesystem path
+	}
+	template := &x509.RevocationList{
+		Number:     big.NewInt(1),
+		ThisUpdate: time.Now(),
+		NextUpdate: time.Now().AddDate(0, 3, 0), // 3 months
+	}
+	crlDER, err := x509.CreateRevocationList(rand.Reader, template, m.caCert, m.caKey)
+	if err != nil {
+		return fmt.Errorf("create revocation list: %w", err)
+	}
+	crlPath := filepath.Join(filepath.Dir(m.certPath), "ca.crl")
+	return os.WriteFile(crlPath, pem.EncodeToMemory(&pem.Block{
+		Type:  "X509 CRL",
+		Bytes: crlDER,
+	}), 0644)
 }
 
 func (m *CAManager) GetCACertificate() *x509.Certificate {

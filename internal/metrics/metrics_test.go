@@ -1,11 +1,19 @@
 package metrics
 
 import (
+	"context"
+	"database/sql"
+	"fmt"
+	"log/slog"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
+	"github.com/gorilla/mux"
+	_ "github.com/lib/pq"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -122,4 +130,70 @@ func TestMetrics_EnrollmentCounters(t *testing.T) {
 	assert.True(t, strings.Contains(body, `platform="macos"`))
 	assert.True(t, strings.Contains(body, `platform="windows"`))
 	assert.True(t, strings.Contains(body, `platform="android"`))
+}
+
+func TestNew_WithDB(t *testing.T) {
+	db, err := sql.Open("postgres", "")
+	require.NoError(t, err)
+	defer db.Close()
+
+	m := New(db)
+	require.NotNil(t, m)
+	assert.NotNil(t, m.DBOpenConnections)
+	assert.NotNil(t, m.DBIdleConnections)
+	assert.NotNil(t, m.DBWaitCount)
+
+	scrape := httptest.NewRecorder()
+	m.Handler().ServeHTTP(scrape, httptest.NewRequest("GET", "/metrics", nil))
+	body := scrape.Body.String()
+	assert.Contains(t, body, "db_open_connections")
+	assert.Contains(t, body, "db_idle_connections")
+	assert.Contains(t, body, "db_wait_count_total")
+}
+
+func TestMiddleware_MuxRouteTemplate(t *testing.T) {
+	m := New(nil)
+
+	router := mux.NewRouter()
+	router.Handle("/api/v1/devices/{id}", m.Middleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})))
+
+	req := httptest.NewRequest("GET", "/api/v1/devices/abc-123", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusOK, w.Code)
+
+	scrape := httptest.NewRecorder()
+	m.Handler().ServeHTTP(scrape, httptest.NewRequest("GET", "/metrics", nil))
+	body := scrape.Body.String()
+
+	assert.Contains(t, body, `path="/api/v1/devices/{id}"`)
+	assert.NotContains(t, body, `path="/api/v1/devices/abc-123"`)
+}
+
+func TestServer_StartAndShutdown(t *testing.T) {
+	m := New(nil)
+
+	// Get a free port
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	port := ln.Addr().(*net.TCPAddr).Port
+	ln.Close()
+
+	logger := slog.Default()
+	s := NewServer("127.0.0.1", port, m, logger)
+	s.Start()
+
+	// Give the server a moment to start
+	time.Sleep(50 * time.Millisecond)
+
+	resp, err := http.Get(fmt.Sprintf("http://127.0.0.1:%d/metrics", port))
+	require.NoError(t, err)
+	defer resp.Body.Close()
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	require.NoError(t, s.Shutdown(ctx))
 }

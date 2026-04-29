@@ -1,7 +1,7 @@
 # Sprint 6: Real Device Integration
 
-**Status**: 🔲 Not Started
-**Branch**: `sprint-6/real-device-integration`
+**Status**: ✅ Complete
+**Branches**: `sprint-6/real-device-integration` (merged), `sprint-6b/cleanup` (pending merge)
 **Duration**: 1-2 weeks (iterative test-fix cycles, not feature development)
 **Goal**: Enroll real devices (Windows VM, macOS VM, Android) into Local MDM and verify the full management loop end-to-end
 **Depends on**: Sprint 5g (quality polish) — merged to main
@@ -19,21 +19,21 @@ This is an **iterative sprint** — the workflow is: attempt enrollment → diag
 ## Prerequisites (Owner Setup)
 
 ### VM Infrastructure
-- [ ] Install UTM (or raw QEMU) on macOS host
-- [ ] Create Windows 11 ARM VM template:
+- [x] Install UTM (or raw QEMU) on macOS host
+- [x] Create Windows 11 ARM VM template:
   - Enable PowerShell Remoting (`Enable-PSRemoting -Force`)
   - Enable WinRM over HTTP for local network (`winrm set winrm/config/service @{AllowUnencrypted="true"}`)
   - Note VM IP address
   - Create "clean" snapshot after setup
-- [ ] Create macOS VM template (UTM supports macOS guests on Apple Silicon):
+- [x] Create macOS VM template (UTM supports macOS guests on Apple Silicon):
   - Enable SSH (`sudo systemsetup -setremotelogin on`)
   - Note VM IP address
   - Create "clean" snapshot after setup
 - [ ] (Optional) Android: Google Cloud project with Android Management API enabled, service account key
 
 ### Network
-- [ ] Local MDM Docker stack accessible from VMs (host IP on bridge network)
-- [ ] NanoMDM accessible from macOS VM (for Apple MDM protocol)
+- [x] Local MDM Docker stack accessible from VMs (host IP on bridge network)
+- [x] NanoMDM accessible from macOS VM (for Apple MDM protocol)
 
 ---
 
@@ -147,7 +147,7 @@ Each protocol fix discovered during testing should be committed individually wit
 
 | Platform | Enrolled | Syncs Data | Policy Applied | Compliance Evaluated |
 |----------|----------|------------|----------------|---------------------|
-| Windows  | ⚠️ Protocol verified (SOAP), native enrollment blocked by Azure AD requirement on Win11 | ⚠️ OMA-DM sync verified via SOAP | ☐ | ☐ |
+| Windows  | ✅ Settings UI enrollment | ✅ OMA-DM sync, enterprise-scoped | ⚠️ Policies assigned, CSP delivery untested | ⚠️ Shows "unknown" — needs device info queries |
 | macOS    | ✅ Real device via SCEP + NanoMDM | ✅ 9 auto-queued commands, full data pipeline | ✅ Check-in only (no APNs push) | ✅ Real FileVault/Firewall evaluation |
 | Android  | ☐ Not attempted (requires Google Cloud project) | ☐ | ☐ | ☐ |
 
@@ -163,24 +163,24 @@ Each protocol fix discovered during testing should be committed individually wit
 - **NanoMDM v0.9.0 webhook integration**: Full plist parsing with base64 decode
 - **Windows protocol fixes**: SOAP envelope wrapping, RSTRC wrapper, provisioning XML with certs, device ID mapping
 
-### Windows enrollment blockers (for future sprint)
+### Windows enrollment — resolved
 
-**RESOLVED** — Windows enrollment working via Settings UI ("Enroll only in device management"). Key fixes:
+Windows enrollment working via Settings UI ("Enroll only in device management"). Key fixes:
 - XML namespace trailing slash (`enrollment/` → `enrollment`)
 - Non-chunked HTTP responses (Content-Length headers required by MS-MDE2)
 - CRL Distribution Point on server cert (Windows schannel requires revocation checking)
 - Lenient CSR signing for Windows ASN.1 PrintableString characters
 - Enterprise ID resolution from email local part (UUID) with Acme Corp default
 
-**Remaining Windows work** (next sprint):
-- OMA-DM device info queries (BitLocker, firewall, OS version CSPs)
+**Remaining Windows work** (deferred):
+- OMA-DM device info queries (BitLocker, firewall, OS version CSPs) — sync handler acknowledges but doesn't query device state
 - Windows compliance evaluation from real device data
 - Enrollment token system (F-07) for secure enrollment
 
+**Programmatic enrollment blockers** (not blocking — Settings UI works):
 1. `RegisterDeviceWithManagement` API has COM threading requirement — fails with `0x80010106` from any programmatic context
-2. Windows 11 Settings UI "Access work or school" requires Azure AD identity validation before MDM enrollment
-3. PPKG format requires Windows ADK tooling (`icd.exe`) to produce valid packages — our ZIP-based generator is incomplete
-4. Server-side protocol is fully verified and correct — the blocker is entirely device-side
+2. PPKG format requires Windows ADK tooling (`icd.exe`) to produce valid packages — our ZIP-based generator is incomplete
+3. Server-side protocol is fully verified and correct — the blocker is entirely device-side
 
 ---
 

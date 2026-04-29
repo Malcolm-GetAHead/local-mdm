@@ -77,6 +77,7 @@ See [CHANGELOG.md](CHANGELOG.md) for detailed sprint history.
 - [Setup Guide](docs/dev/SETUP.md) — Development environment setup
 - [Quick Reference](docs/dev/QUICK_REFERENCE.md) — Common commands and workflows
 - [Testing Guide](docs/TESTING.md) — Testing guidelines and best practices
+- [VM Setup Guide](tests/device-testing/VM_SETUP.md) — macOS and Windows VM setup for real device testing
 - [Architecture](docs/architecture/ARCHITECTURE.md) — System design and components
 - [API Documentation](docs/schemas/API.md) — REST API reference
 - [Database Schema](docs/schemas/DATABASE.md) — Data model and migrations
