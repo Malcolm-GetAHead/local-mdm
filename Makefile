@@ -109,10 +109,11 @@ prod-build: ## Build production container
 
 prod-up: ## Start full production-like stack
 	@echo "Starting production-like stack..."
-	@docker compose up -d postgres keycloak nanomdm localmdm adminer
+	@docker compose up -d postgres keycloak nanomdm localmdm nginx-tls adminer
 	@echo ""
 	@echo "Production stack running:"
 	@echo "  Local MDM:  http://localhost:8080"
+	@echo "  Local MDM:  https://localhost:8443 (via nginx)"
 	@echo "  NanoMDM:    http://localhost:9000"
 	@echo "  Keycloak:   http://localhost:8180"
 
