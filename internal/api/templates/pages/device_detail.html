@@ -32,16 +32,20 @@
     <div class="card">
         <h3 class="text-sm font-semibold uppercase text-gray-500 dark:text-gray-400 mb-3">Hardware</h3>
         <dl class="space-y-2 text-sm">
-            <div class="flex justify-between"><dt class="text-gray-500 dark:text-gray-400">Serial Number</dt><dd class="font-medium">{{.Device.SerialNumber}}</dd></div>
+            {{if .Device.SerialNumber}}<div class="flex justify-between"><dt class="text-gray-500 dark:text-gray-400">Serial Number</dt><dd class="font-medium">{{.Device.SerialNumber}}</dd></div>{{end}}
             <div class="flex justify-between"><dt class="text-gray-500 dark:text-gray-400">Model</dt><dd class="font-medium">{{.Device.Model}}</dd></div>
-            <div class="flex justify-between"><dt class="text-gray-500 dark:text-gray-400">Device ID</dt><dd class="font-mono text-xs">{{.Device.DeviceID}}</dd></div>
+            {{with index .Device.PlatformData "manufacturer"}}<div class="flex justify-between"><dt class="text-gray-500 dark:text-gray-400">Manufacturer</dt><dd class="font-medium">{{.}}</dd></div>{{end}}
+            {{with index .Device.PlatformData "total_ram"}}<div class="flex justify-between"><dt class="text-gray-500 dark:text-gray-400">RAM</dt><dd class="font-medium">{{.}} MB</dd></div>{{end}}
+            {{with index .Device.PlatformData "total_storage"}}<div class="flex justify-between"><dt class="text-gray-500 dark:text-gray-400">Storage</dt><dd class="font-medium">{{.}} MB</dd></div>{{end}}
+            {{with index .Device.PlatformData "storage_capacity_gb"}}<div class="flex justify-between"><dt class="text-gray-500 dark:text-gray-400">Storage</dt><dd class="font-medium">{{.}} GB</dd></div>{{end}}
         </dl>
     </div>
     <div class="card">
         <h3 class="text-sm font-semibold uppercase text-gray-500 dark:text-gray-400 mb-3">Operating System</h3>
         <dl class="space-y-2 text-sm">
-            <div class="flex justify-between"><dt class="text-gray-500 dark:text-gray-400">Platform</dt><dd class="font-medium capitalize">{{.Device.Platform}}</dd></div>
+            <div class="flex justify-between"><dt class="text-gray-500 dark:text-gray-400">Platform</dt><dd class="font-medium capitalize">{{with index .Device.PlatformData "os_platform"}}{{.}}{{else}}{{.Device.Platform}}{{end}}</dd></div>
             <div class="flex justify-between"><dt class="text-gray-500 dark:text-gray-400">OS Version</dt><dd class="font-medium">{{.Device.OSVersion}}</dd></div>
+            {{with index .Device.PlatformData "build_version"}}<div class="flex justify-between"><dt class="text-gray-500 dark:text-gray-400">Build</dt><dd class="font-medium">{{.}}</dd></div>{{end}}
             <div class="flex justify-between"><dt class="text-gray-500 dark:text-gray-400">Status</dt><dd>
                 {{if eq .Device.Status "enrolled"}}<span class="badge badge-green">Enrolled</span>
                 {{else if eq .Device.Status "unenrolled"}}<span class="badge badge-gray">Unenrolled</span>
@@ -50,9 +54,19 @@
         </dl>
     </div>
     <div class="card">
-        <h3 class="text-sm font-semibold uppercase text-gray-500 dark:text-gray-400 mb-3">Enrollment</h3>
+        <h3 class="text-sm font-semibold uppercase text-gray-500 dark:text-gray-400 mb-3">Security</h3>
         <dl class="space-y-2 text-sm">
-            <div class="flex justify-between"><dt class="text-gray-500 dark:text-gray-400">Enrolled</dt><dd class="font-medium">{{formatDate .Device.EnrollmentDate}}</dd></div>
+            {{if eq .Device.Platform "macos"}}
+            <div class="flex justify-between"><dt class="text-gray-500 dark:text-gray-400">FileVault</dt><dd>{{if index .Device.PlatformData "FileVaultEnabled"}}<span class="text-green-600 font-medium">✓ Enabled</span>{{else}}<span class="text-red-500 font-medium">✗ Disabled</span>{{end}}</dd></div>
+            <div class="flex justify-between"><dt class="text-gray-500 dark:text-gray-400">Firewall</dt><dd>{{if index .Device.PlatformData "firewall_enabled"}}<span class="text-green-600 font-medium">✓ Enabled</span>{{else}}<span class="text-red-500 font-medium">✗ Disabled</span>{{end}}</dd></div>
+            {{with index .Device.PlatformData "is_supervised"}}<div class="flex justify-between"><dt class="text-gray-500 dark:text-gray-400">Supervised</dt><dd>{{if .}}<span class="text-green-600 font-medium">✓ Yes</span>{{else}}<span class="text-gray-400">No</span>{{end}}</dd></div>{{end}}
+            {{else if eq .Device.Platform "windows"}}
+            <div class="flex justify-between"><dt class="text-gray-500 dark:text-gray-400">BitLocker</dt><dd class="font-medium">{{with index .Device.PlatformData "bitlocker_status"}}Status {{.}}{{else}}<span class="text-gray-400">Unknown</span>{{end}}</dd></div>
+            <div class="flex justify-between"><dt class="text-gray-500 dark:text-gray-400">Firewall</dt><dd>{{with index .Device.PlatformData "firewall_enabled"}}{{if eq . "1"}}<span class="text-green-600 font-medium">✓ Enabled</span>{{else}}<span class="text-red-500 font-medium">✗ Disabled</span>{{end}}{{else}}<span class="text-gray-400">Unknown</span>{{end}}</dd></div>
+            <div class="flex justify-between"><dt class="text-gray-500 dark:text-gray-400">Password</dt><dd>{{with index .Device.PlatformData "password_present"}}{{if eq . "1"}}<span class="text-green-600 font-medium">✓ Set</span>{{else}}<span class="text-red-500 font-medium">✗ Not Set</span>{{end}}{{else}}<span class="text-gray-400">Unknown</span>{{end}}</dd></div>
+            {{else}}
+            <div class="flex justify-between"><dt class="text-gray-500 dark:text-gray-400">Encryption</dt><dd><span class="text-gray-400">—</span></dd></div>
+            {{end}}
             <div class="flex justify-between"><dt class="text-gray-500 dark:text-gray-400">Last Seen</dt><dd class="font-medium">{{if .Device.LastSeen}}{{timeAgo .Device.LastSeen}}{{else}}Never{{end}}</dd></div>
             <div class="flex justify-between"><dt class="text-gray-500 dark:text-gray-400">Last Evaluated</dt><dd class="flex items-center gap-2">
                 <button hx-post="/dashboard/devices/{{.Device.ID}}/evaluate" hx-target="#tab-compliance" hx-swap="innerHTML" title="Manual re-evaluate" class="text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
@@ -60,26 +74,25 @@
                 </button>
                 <span class="font-medium">{{if .LastEvaluated}}{{timeAgo .LastEvaluated}}{{else}}Never{{end}}</span>
             </dd></div>
-            <div class="flex justify-between"><dt class="text-gray-500 dark:text-gray-400">Groups</dt><dd>
-                {{range .Groups}}<a href="/dashboard/groups/{{.ID}}" class="badge badge-blue mr-1">{{.Name}}</a>{{else}}<span class="text-gray-400">None</span>{{end}}
-            </dd></div>
         </dl>
     </div>
 </div>
 
 <!-- Tabs -->
 <div class="card p-0 overflow-hidden">
-    <div class="flex border-b border-gray-200 dark:border-gray-700" id="device-tabs">
-        <button class="tab-btn px-6 py-3 text-sm font-medium border-b-2 border-blue-600 text-blue-600 dark:text-blue-400" data-tab="compliance">Compliance</button>
-        <button class="tab-btn px-6 py-3 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400" data-tab="policies">Policies</button>
-        <button class="tab-btn px-6 py-3 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400" data-tab="commands">Commands</button>
-        <button class="tab-btn px-6 py-3 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400" data-tab="profiles">Profiles</button>
-        <button class="tab-btn px-6 py-3 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400" data-tab="apps">Applications</button>
-        <button class="tab-btn px-6 py-3 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400" data-tab="certs">Certificates</button>
-        <button class="tab-btn px-6 py-3 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400" data-tab="updates">Updates</button>
-        <button class="tab-btn px-6 py-3 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400" data-tab="users">Users</button>
-        <button class="tab-btn px-6 py-3 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400" data-tab="extensions">Extensions</button>
-        <button class="tab-btn px-6 py-3 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400" data-tab="platform">Platform Details</button>
+    <div class="flex border-b border-gray-200 dark:border-gray-700 overflow-x-auto" id="device-tabs">
+        <button class="tab-btn px-6 py-3 text-sm font-medium border-b-2 border-blue-600 text-blue-600 dark:text-blue-400 whitespace-nowrap" data-tab="compliance">Compliance</button>
+        <button class="tab-btn px-6 py-3 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 whitespace-nowrap" data-tab="policies">Policies</button>
+        <button class="tab-btn px-6 py-3 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 whitespace-nowrap" data-tab="commands">Commands</button>
+        {{if eq .Device.Platform "macos"}}
+        <button class="tab-btn px-6 py-3 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 whitespace-nowrap" data-tab="profiles">Profiles</button>
+        <button class="tab-btn px-6 py-3 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 whitespace-nowrap" data-tab="apps">Applications</button>
+        <button class="tab-btn px-6 py-3 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 whitespace-nowrap" data-tab="certs">Certificates</button>
+        <button class="tab-btn px-6 py-3 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 whitespace-nowrap" data-tab="updates">Updates</button>
+        <button class="tab-btn px-6 py-3 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 whitespace-nowrap" data-tab="users">Users</button>
+        <button class="tab-btn px-6 py-3 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 whitespace-nowrap" data-tab="extensions">Extensions</button>
+        {{end}}
+        <button class="tab-btn px-6 py-3 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 whitespace-nowrap" data-tab="platform">Platform Details</button>
     </div>
 
     <div class="tab-panel" id="tab-compliance">
@@ -116,6 +129,7 @@
         </table>
     </div>
 
+    {{if eq .Device.Platform "macos"}}
     <div class="tab-panel hidden" id="tab-profiles">
         <table class="w-full text-sm">
             <thead><tr class="table-header"><th class="px-6 py-2">Profile Name</th><th class="px-6 py-2">Identifier</th><th class="px-6 py-2">Organization</th><th class="px-6 py-2">Managed</th></tr></thead>
@@ -213,6 +227,7 @@
             </tbody>
         </table>
     </div>
+    {{end}}{{/* end macOS-only tabs */}}
 
     <div class="tab-panel hidden" id="tab-platform">
         {{if .PlatformDetails}}
