@@ -2,10 +2,12 @@ package certs_test
 
 import (
 	"context"
+	"crypto"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
 	"crypto/x509/pkix"
+	"encoding/asn1"
 	"encoding/pem"
 	"os"
 	"testing"
@@ -308,16 +310,14 @@ func TestNewCAManagerFromPEM(t *testing.T) {
 }
 
 func TestSignRawCSR_FallbackSubject(t *testing.T) {
-	// SignRawCSR is the fallback path for Windows CSRs that contain
-	// non-PrintableString characters Go's x509.ParseCertificateRequest rejects.
-	// It should produce a valid cert with CN=MDMDeviceCert.
+	// SignRawCSR preserves the original CSR subject when Go can parse it.
 	dir := t.TempDir()
 	ca, err := certs.GenerateCA(dir+"/ca.crt", dir+"/ca.key")
 	if err != nil {
 		t.Fatalf("failed to generate CA: %v", err)
 	}
 
-	// Create a normal CSR (SignRawCSR works on any DER CSR)
+	// Create a CSR with a UTF-8 subject (Go handles this via UTF8String encoding)
 	key, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
 		t.Fatalf("failed to generate key: %v", err)
@@ -335,9 +335,9 @@ func TestSignRawCSR_FallbackSubject(t *testing.T) {
 		t.Fatalf("SignRawCSR failed: %v", err)
 	}
 
-	// Fallback uses generic subject
-	if cert.Subject.CommonName != "MDMDeviceCert" {
-		t.Errorf("expected CN 'MDMDeviceCert', got '%s'", cert.Subject.CommonName)
+	// Subject should be preserved from the CSR
+	if cert.Subject.CommonName != "Windows Device with Ünïcödé" {
+		t.Errorf("expected CN 'Windows Device with Ünïcödé', got '%s'", cert.Subject.CommonName)
 	}
 
 	// Cert should be signed by our CA
@@ -355,6 +355,120 @@ func TestSignRawCSR_FallbackSubject(t *testing.T) {
 	}
 	if !found {
 		t.Error("certificate missing ClientAuth extended key usage")
+	}
+}
+
+func TestSignRawCSR_BMPStringSubjectPreserved(t *testing.T) {
+	// Test the ASN.1 fallback path: construct a CSR with a BMPString-encoded CN
+	// that Go's x509.ParseCertificateRequest rejects, but our manual parser preserves.
+	dir := t.TempDir()
+	ca, err := certs.GenerateCA(dir+"/ca.crt", dir+"/ca.key")
+	if err != nil {
+		t.Fatalf("failed to generate CA: %v", err)
+	}
+
+	key, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		t.Fatalf("failed to generate key: %v", err)
+	}
+
+	// Build a CSR with BMPString CN manually via ASN.1
+	// BMPString tag = 30 (0x1e)
+	cnValue := "TestDevice"
+	bmpBytes := make([]byte, len(cnValue)*2)
+	for i, c := range cnValue {
+		bmpBytes[i*2] = 0
+		bmpBytes[i*2+1] = byte(c)
+	}
+
+	// CN OID = 2.5.4.3
+	cnOID := asn1.ObjectIdentifier{2, 5, 4, 3}
+	attrValue := asn1.RawValue{Tag: 30, Class: asn1.ClassUniversal, Bytes: bmpBytes}
+	attrValueBytes, _ := asn1.Marshal(attrValue)
+	oidBytes, _ := asn1.Marshal(cnOID)
+
+	// AttributeTypeAndValue SEQUENCE
+	atv, _ := asn1.Marshal(asn1.RawValue{
+		Tag: asn1.TagSequence, Class: asn1.ClassUniversal, IsCompound: true,
+		Bytes: append(oidBytes, attrValueBytes...),
+	})
+	// RDN SET
+	rdn, _ := asn1.Marshal(asn1.RawValue{
+		Tag: asn1.TagSet, Class: asn1.ClassUniversal, IsCompound: true,
+		Bytes: atv,
+	})
+	// Subject SEQUENCE
+	subject, _ := asn1.Marshal(asn1.RawValue{
+		Tag: asn1.TagSequence, Class: asn1.ClassUniversal, IsCompound: true,
+		Bytes: rdn,
+	})
+
+	// Build SubjectPublicKeyInfo from the key
+	pubDER, _ := x509.MarshalPKIXPublicKey(&key.PublicKey)
+
+	// Version INTEGER 0
+	version, _ := asn1.Marshal(0)
+
+	// CertificationRequestInfo SEQUENCE
+	criBytes := append(version, subject...)
+	criBytes = append(criBytes, pubDER...)
+	// Add empty attributes [0] IMPLICIT
+	emptyAttrs, _ := asn1.Marshal(asn1.RawValue{
+		Tag: 0, Class: asn1.ClassContextSpecific, IsCompound: true, Bytes: nil,
+	})
+	criBytes = append(criBytes, emptyAttrs...)
+	cri, _ := asn1.Marshal(asn1.RawValue{
+		Tag: asn1.TagSequence, Class: asn1.ClassUniversal, IsCompound: true,
+		Bytes: criBytes,
+	})
+
+	// Sign the CRI with SHA-256
+	h := crypto.SHA256.New()
+	h.Write(cri)
+	hashed := h.Sum(nil)
+	sig, err := rsa.SignPKCS1v15(rand.Reader, key, crypto.SHA256, hashed)
+	if err != nil {
+		t.Fatalf("failed to sign CRI: %v", err)
+	}
+
+	// SignatureAlgorithm (sha256WithRSAEncryption = 1.2.840.113549.1.1.11)
+	sigAlg, _ := asn1.Marshal(asn1.RawValue{
+		Tag: asn1.TagSequence, Class: asn1.ClassUniversal, IsCompound: true,
+		Bytes: func() []byte {
+			oid, _ := asn1.Marshal(asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 1, 11})
+			null, _ := asn1.Marshal(asn1.RawValue{Tag: asn1.TagNull, Class: asn1.ClassUniversal})
+			return append(oid, null...)
+		}(),
+	})
+
+	// Signature BIT STRING
+	sigBits, _ := asn1.Marshal(asn1.BitString{Bytes: sig, BitLength: len(sig) * 8})
+
+	// Full CSR SEQUENCE
+	csrDER, _ := asn1.Marshal(asn1.RawValue{
+		Tag: asn1.TagSequence, Class: asn1.ClassUniversal, IsCompound: true,
+		Bytes: append(append(cri, sigAlg...), sigBits...),
+	})
+
+	// Verify Go's parser rejects this CSR (BMPString not supported)
+	_, parseErr := x509.ParseCertificateRequest(csrDER)
+	if parseErr == nil {
+		t.Skip("Go's parser accepted the BMPString CSR — test not applicable")
+	}
+
+	cert, err := ca.SignRawCSR(csrDER, 365*24*time.Hour)
+	if err != nil {
+		t.Fatalf("SignRawCSR failed: %v", err)
+	}
+
+	// The raw subject should be preserved (not the fallback CN=MDMDeviceCert)
+	if cert.Subject.CommonName == "MDMDeviceCert" {
+		t.Error("expected preserved subject, got fallback CN=MDMDeviceCert")
+	}
+
+	// Cert should be signed by our CA
+	if err := cert.CheckSignatureFrom(ca.GetCACertificate()); err != nil {
+		t.Errorf("certificate signature verification failed: %v", err)
 	}
 }
 
