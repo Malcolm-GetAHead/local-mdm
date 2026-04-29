@@ -40,3 +40,6 @@ The empty state illustrations on devices, groups, and policies pages use inline 
 - `internal/api/templates/pages/groups.html`
 - `internal/api/templates/pages/policies.html`
 
+### 3. Verify `formatBytes` template function
+The `formatBytes` helper was added but never verified in a browser. Find where it's used in templates, navigate to that page with Playwright, and screenshot to confirm it renders correctly (e.g., "4.2 GB" not "4200000000").
+

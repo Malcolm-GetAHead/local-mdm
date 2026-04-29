@@ -1,7 +1,7 @@
 # Sprint 6: Real Device Integration
 
 **Status**: ✅ Complete
-**Branches**: `sprint-6/real-device-integration` (merged), `sprint-6b/cleanup` (pending merge)
+**Branches**: Work done directly on `main` (per-task commits with `S6-XX:` prefix)
 **Duration**: 1-2 weeks (iterative test-fix cycles, not feature development)
 **Goal**: Enroll real devices (Windows VM, macOS VM, Android) into Local MDM and verify the full management loop end-to-end
 **Depends on**: Sprint 5g (quality polish) — merged to main

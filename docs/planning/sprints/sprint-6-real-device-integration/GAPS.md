@@ -65,8 +65,11 @@ All packages meet STEERING targets when measured via `make coverage-combined` (m
 ### Deferred to Future Sprints
 - **Windows PPKG format** — needs Windows ADK research (F-01 or dedicated task)
 - **ASN.1 CSR parser** — replace hand-rolled parser with proper CSR signature verification or lenient x509 fork
-- **Empty state SVG centering** — cosmetic, needs Tailwind CSS rebuild
-- **`formatBytes` browser verification** — cosmetic
+
+### Dashboard Cleanup (04_DASHBOARD_CLEANUP.md)
+- **Pending enrollments visibility** — devices with `status = 'pending'` invisible in device list
+- **Empty state SVG centering** — inline styles instead of Tailwind classes, needs `make css` rebuild
+- **`formatBytes` browser verification** — template function never verified in browser
 
 ---
 
