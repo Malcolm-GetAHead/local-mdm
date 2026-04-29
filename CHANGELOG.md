@@ -12,7 +12,8 @@ Sprint-by-sprint development history for Local MDM. For current status, see [REA
 - Unit tests for Windows enrollment fixes: namespace validation, EnrollmentVersion 4.0, no AuthenticationServiceUrl, Content-Length, CSR fallback with `SignRawCSR`, enterprise ID extraction from email, duplicate device upsert, `ExtractDeviceIDFromSyncML`
 - Integration tests for macOS webhook flow: Authenticate (device created with plist fields), TokenUpdate (status enrolled, push_magic stored), Acknowledge with SecurityInfo (FileVault/firewall in platform_data)
 - nginx-tls added to `make prod-up` target (HTTPS on port 8443)
-- Coverage: `internal/platform/windows` 69.4%, `internal/platform/macos` 77.9% (up from 54.1%)
+- Test enterprise leak fixed: `testutil.CreateTestEnterprise()` helper with `t.Cleanup()` cascade delete across 27 test files; removed broad name-scoped pre-clean from `connectAndCleanDB`; fixed `defer db.Close()` ordering that prevented cleanup from running
+- Coverage: `internal/platform/windows` 85.2%, `internal/platform/macos` 77.9%, `internal/audit` 95.2%, `internal/repository` 77.9%
 
 ## Sprint 6 — Real Device Integration
 - macOS VM enrolled with full data pipeline: Authenticate → TokenUpdate → auto-queue 9 commands (SecurityInfo, DeviceInformation, ProfileList, InstalledApplicationList, CertificateList, ManagedApplicationList, AvailableOSUpdates, OSUpdateStatus, UserList)

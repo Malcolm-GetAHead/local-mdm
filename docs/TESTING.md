@@ -1,6 +1,6 @@
 # Testing Guide
 
-**Last Updated**: 2026-04-23
+**Last Updated**: 2026-04-29
 
 ## Running Tests
 
@@ -162,6 +162,27 @@ func TestTokenCache(t *testing.T) {
 
 **Never create database connections inline in test files.** Always use `testutil.ConnectDB(t)` or `testutil.ConnectRawDB(t)`.
 
+### Test Enterprise Cleanup
+
+Every integration test that creates an enterprise **must** register cleanup. Use the shared helper:
+
+```go
+enterpriseID := testutil.CreateTestEnterprise(t, db.Writer, "Test Enterprise")
+// CASCADE FK deletes all child rows (devices, policies, groups, etc.) on cleanup
+```
+
+For tests that create enterprises via the repository layer instead of raw SQL:
+```go
+err := entRepo.Create(ctx, enterprise)
+require.NoError(t, err)
+t.Cleanup(func() { db.Writer.Exec("DELETE FROM enterprises WHERE id = $1", enterprise.ID) })
+```
+
+**Rules:**
+- Always use hard `DELETE FROM enterprises WHERE id = $1` — never `entRepo.Delete()` (that's a soft delete, the row stays)
+- Don't use `defer db.Close()` alongside `t.Cleanup()` — `defer` runs before `t.Cleanup()`, closing the connection before cleanup can execute. `testutil.ConnectDB(t)` already registers its own close via `t.Cleanup()`
+- Never scope cleanup by enterprise name — always by ID
+
 ### File Paths in Tests
 
 `go test` changes the working directory to the package directory. Use these patterns:
@@ -239,7 +260,7 @@ The `make coverage-combined` target merges Go unit/integration coverage with Pla
 make coverage-combined  # Outputs combined HTML report
 ```
 
-## Current Coverage (Sprint 5g)
+## Current Coverage (Sprint 6)
 
 > **Note**: Coverage numbers below are from Docker runs (`make dev-test`) where integration tests have access to PostgreSQL and Keycloak. Running locally without Docker shows lower numbers for packages with integration tests (repository, reporting, audit, certs, auth, macos).
 
@@ -247,22 +268,22 @@ make coverage-combined  # Outputs combined HTML report
 |---------|----------|-------|
 | apperrors | 100.0% | |
 | models | 100.0% | |
+| metrics | 97.5% | |
 | validation | 96.6% | |
-| config | 91.9% | |
+| audit | 95.2% | Async logger, structured logging, shutdown |
+| config | 91.6% | |
+| auth | 90.7% | Keycloak integration tests |
+| android | 90.0% | |
 | tracing | 86.7% | |
+| reporting | 86.0% | |
+| windows | 85.2% | |
 | db | 82.4% | With integration tests |
-| auth | 78.0% | Keycloak integration tests |
-| windows | 69.7% | |
-| scep | 67.4% | |
-| metrics | 65.0% | |
-| service | 63.5% | EventBus, compliance, groups |
-| android | 57.1% | |
-| macos | 55.5% | DEP storage integration tests |
-| api | 59.1% | Web handlers tested via 199 Playwright browser tests |
-| certs | 28.6% | CA manager integration tests need Docker |
-| reporting | 17.0% | Integration tests need Docker PostgreSQL |
-| audit | 10.7% | Integration tests need Docker PostgreSQL |
-| repository | 7.9% | Integration tests need Docker PostgreSQL |
+| service | 81.0% | |
+| certs | 78.0% | |
+| macos | 77.9% | |
+| repository | 77.9% | |
+| scep | 75.9% | |
+| api | 58.6% | ⚠️ Below 70% handler target — web handlers need route registration work |
 
 ## Coverage Goals
 
@@ -313,7 +334,7 @@ macOS devices enroll via Safari profile download. Reboot triggers NanoMDM check-
 
 ### Important: Test Database Conflict
 
-`make dev-test` shares the production database and deletes test data broadly. **Real enrolled devices will be deleted.** Run tests BEFORE enrolling real devices, or plan to re-enroll after testing.
+Tests and real enrolled devices share the same PostgreSQL database. Test cleanup is now scoped to test-created enterprise IDs (CASCADE deletes child rows), so real device data is no longer broadly deleted. However, the shared database means test failures or interrupted runs could leave orphaned data. **Run tests BEFORE enrolling real devices when possible**, or plan to verify real device data after testing.
 
 ### TLS Requirements for Windows
 

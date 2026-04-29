@@ -20,23 +20,34 @@
 10. **Empty state SVG centering** — 6 iterations (S6-13a through S6-13h) without testing in browser. Should have inspected Tailwind preflight CSS first.
 11. **Windows PPKG** — gave up after one failed attempt instead of researching the valid format. The spec is public and buildable.
 12. ~~**Debug log lines left in production code**~~ ✅ Removed.
-13. **Stale test enterprises** — cleaned with broad `DELETE FROM enterprises WHERE id != '...'` which cascade-deleted devices, groups, policies. Should have been more surgical.
+13. ~~**Stale test enterprises** — cleaned with broad `DELETE FROM enterprises WHERE id != '...'` which cascade-deleted devices, groups, policies. Should have been more surgical.~~ ✅ Fixed — `testutil.CreateTestEnterprise()` with `t.Cleanup()` cascade delete; broad pre-clean removed from `connectAndCleanDB`.
 
 ---
 
 ## Test Coverage Gaps
 
-### Coverage by Package (as of sprint-6b/cleanup)
+### Coverage by Package (as of S6-12 cleanup)
 
 | Package | Coverage | Notes |
 |---------|----------|-------|
-| `internal/platform/macos` | 77.9% | Up from 54.1% — webhook integration tests added |
-| `internal/platform/windows` | 85.2% | Up from 69.1% — enrollment, management, CSP tests added |
-| `internal/api` | 58.6% | Up from 57.3% — pure function tests added; web handler tests need route registration work |
-| `internal/certs` | 78.0% | Up from 78.1% — CRL generation, SignCSRPEM, loadCA error paths added |
+| `internal/apperrors` | 100.0% | |
+| `internal/models` | 100.0% | |
 | `internal/metrics` | 97.5% | Up from 65.0% — DB metrics, mux middleware, server lifecycle |
-| `internal/service` | 81.0% | Up from 67.5% — translate functions, device actions, compliance, policy versioning |
-| `internal/platform/android` | 90.0% | Up from 57.1% — webhook data paths, Google API wrappers, constructors |
+| `internal/validation` | 96.6% | |
+| `internal/audit` | 95.2% | Up from 10.7% — async logger, structured logging, shutdown tests |
+| `internal/config` | 91.6% | |
+| `internal/auth` | 90.7% | Keycloak integration tests |
+| `internal/platform/android` | 90.0% | Up from 57.1% — webhook data paths, Google API wrappers |
+| `internal/tracing` | 86.7% | |
+| `internal/reporting` | 86.0% | Up from 17.0% — integration tests with Docker PostgreSQL |
+| `internal/platform/windows` | 85.2% | Up from 69.1% — enrollment, management, CSP tests |
+| `internal/db` | 82.4% | With integration tests |
+| `internal/service` | 81.0% | Up from 67.5% — translate, device actions, compliance |
+| `internal/certs` | 78.0% | CRL generation, SignCSRPEM, loadCA error paths |
+| `internal/platform/macos` | 77.9% | Up from 54.1% — webhook integration tests |
+| `internal/repository` | 77.9% | Up from 7.9% — integration tests with Docker PostgreSQL |
+| `internal/scep` | 75.9% | |
+| `internal/api` | 58.6% | ⚠️ Below 70% handler target — web handlers need route registration work |
 
 ### Integration Tests — Status
 
@@ -53,7 +64,7 @@
 
 ### Skipped Tests
 
-- `jsonb_validation_test.go` — 3 integration tests skip unconditionally with `t.Skip("skipping integration test")`. Should run in Docker.
+- `jsonb_validation_test.go` — 3 integration tests skip with `testing.Short()`. They run normally in Docker (`make dev-test` does not pass `-short`).
 - `auth_coverage_test.go` — 6 tests skip when Keycloak unavailable. Run in Docker (fixed this sprint) but skip locally.
 
 ---

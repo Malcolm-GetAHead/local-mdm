@@ -45,7 +45,9 @@
 - **Don't shim around test failures — fix the root cause.** When a test fails, write an isolated test that reproduces the failure, fix the underlying issue, then verify.
 - **Don't overestimate effort on test coverage.** Before claiming something is expensive, actually look at the uncovered lines and count them.
 - **Establish a test baseline before starting work.** Run `make dev-test` before the first change to confirm the branch is green.
-- **`make dev-test` destroys real device data.** Tests share the production database and do broad deletes. Run tests BEFORE enrolling real devices, or use a separate test database.
+- **`make dev-test` destroys real device data.** ~~Tests share the production database and do broad deletes.~~ Test cleanup is now scoped to test enterprise IDs (CASCADE), but tests and real data still share the same database. Run tests BEFORE enrolling real devices, or use a separate test database.
+- **Every test that creates an enterprise must clean it up.** Use `testutil.CreateTestEnterprise(t, db, name)` for raw SQL, or `t.Cleanup(func() { db.Writer.Exec("DELETE FROM enterprises WHERE id = $1", id) })` after `entRepo.Create()`. Never use `entRepo.Delete()` for cleanup — that's a soft delete.
+- **`defer db.Close()` breaks `t.Cleanup()`.** `defer` runs before `t.Cleanup()`, closing the connection before cleanup can execute. `testutil.ConnectDB(t)` already registers close via `t.Cleanup()` — don't add `defer db.Close()` on top of it.
 - **A trailing slash on an XML namespace is a different namespace.** Always compare namespaces character-by-character against the spec or a known working implementation.
 - **MS-MDE2 requires non-chunked HTTP responses.** Always set Content-Length on SOAP responses.
 - **Go map iteration order is random.** Always sort before rendering.
