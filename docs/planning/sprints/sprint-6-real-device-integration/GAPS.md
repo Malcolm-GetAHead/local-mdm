@@ -91,26 +91,26 @@
 ## Action Items (Priority Order)
 
 ### Must Fix (before merge to main)
-- [ ] Write unit tests for `processCommandResult` (SecurityInfo + DeviceInfo at minimum)
-- [ ] Write unit test for `maybeAutoQueue` cooldown logic
-- [ ] Remove debug log lines from webhook.go
-- [ ] Fix hardcoded enterprise ID in Authenticate handler
-- [ ] Add Sprint 6 entry to CHANGELOG.md
+- [x] Write unit tests for `processCommandResult` (SecurityInfo + DeviceInfo at minimum)
+- [x] Write unit test for `maybeAutoQueue` cooldown logic
+- [x] Remove debug log lines from webhook.go
+- [x] Fix hardcoded enterprise ID in Authenticate handler
+- [x] Add Sprint 6 entry to CHANGELOG.md
 
 ### Should Fix (soon after merge)
 - [ ] Write integration tests for full webhook flow (Authenticate → TokenUpdate → Connect → Acknowledged)
-- [ ] Fix `nanomdm_url` in config to use Docker hostname with env var override
+- [x] Fix `nanomdm_url` in config to use Docker hostname with env var override
 - [ ] Add nginx to `make prod-up` target
-- [ ] Update README.md with Sprint 6 status
-- [ ] Update ARCHITECTURE.md with data pipeline flow
+- [x] Update README.md with Sprint 6 status
+- [x] Update ARCHITECTURE.md with data pipeline flow
 - [ ] Research and fix PPKG format for valid Windows provisioning packages
 
 ### Nice to Have
 - [ ] Fix empty state SVG centering properly (rebuild Tailwind CSS)
-- [ ] Add enrollment guide documentation
+- [x] Add enrollment guide documentation
 - [ ] Add VM setup guide
 - [ ] Fix command status `pending` → `sent` → `completed` transitions
-- [ ] Fix `enterpriseRepo.List` fallback in Windows enrollment handler
+- [x] Fix `enterpriseRepo.List` fallback in Windows enrollment handler
 
 ---
 

@@ -165,6 +165,18 @@ Each protocol fix discovered during testing should be committed individually wit
 
 ### Windows enrollment blockers (for future sprint)
 
+**RESOLVED** — Windows enrollment working via Settings UI ("Enroll only in device management"). Key fixes:
+- XML namespace trailing slash (`enrollment/` → `enrollment`)
+- Non-chunked HTTP responses (Content-Length headers required by MS-MDE2)
+- CRL Distribution Point on server cert (Windows schannel requires revocation checking)
+- Lenient CSR signing for Windows ASN.1 PrintableString characters
+- Enterprise ID resolution from email local part (UUID) with Acme Corp default
+
+**Remaining Windows work** (next sprint):
+- OMA-DM device info queries (BitLocker, firewall, OS version CSPs)
+- Windows compliance evaluation from real device data
+- Enrollment token system (F-07) for secure enrollment
+
 1. `RegisterDeviceWithManagement` API has COM threading requirement — fails with `0x80010106` from any programmatic context
 2. Windows 11 Settings UI "Access work or school" requires Azure AD identity validation before MDM enrollment
 3. PPKG format requires Windows ADK tooling (`icd.exe`) to produce valid packages — our ZIP-based generator is incomplete
