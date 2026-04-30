@@ -96,6 +96,7 @@ dev: ## Start full dev stack (hot reload)
 
 dev-test: ## Run tests in dev container (fast, uses cached modules)
 	@echo "Running tests in Docker..."
+	@docker compose --profile test run --rm test-runner sh /src/scripts/test-postconditions.sh --preflight
 	@docker compose --profile test run --rm test-runner
 	@docker compose --profile test run --rm test-runner sh /src/scripts/test-postconditions.sh
 
@@ -122,6 +123,7 @@ prod-test: prod-build ## Build prod container + run full E2E tests
 	@echo "Running full test suite against production build..."
 	@docker compose up -d postgres keycloak nanomdm
 	@sleep 5
+	@docker compose --profile test run --rm test-runner sh /src/scripts/test-postconditions.sh --preflight
 	@docker compose --profile test run --rm test-runner
 	@docker compose --profile test run --rm test-runner sh /src/scripts/test-postconditions.sh
 	@echo "✓ All tests passed against production build"
