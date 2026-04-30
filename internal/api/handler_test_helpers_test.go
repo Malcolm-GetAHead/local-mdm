@@ -679,19 +679,81 @@ func (m *mockAppRepo) Delete(_ context.Context, id uuid.UUID) error {
 	return fmt.Errorf("app not found: %w", apperrors.ErrNotFound)
 }
 
+// Mock enrollment token repo
+type mockEnrollmentTokenRepo struct {
+	tokens []*models.EnrollmentToken
+}
+
+func (m *mockEnrollmentTokenRepo) Create(_ context.Context, t *models.EnrollmentToken) error {
+	if t.ID == uuid.Nil {
+		t.ID = uuid.New()
+	}
+	t.CreatedAt = time.Now()
+	m.tokens = append(m.tokens, t)
+	return nil
+}
+func (m *mockEnrollmentTokenRepo) GetByToken(_ context.Context, token string) (*models.EnrollmentToken, error) {
+	for _, t := range m.tokens {
+		if t.Token == token {
+			return t, nil
+		}
+	}
+	return nil, fmt.Errorf("enrollment token not found: %w", apperrors.ErrNotFound)
+}
+func (m *mockEnrollmentTokenRepo) List(_ context.Context, eid uuid.UUID, limit, offset int) ([]*models.EnrollmentToken, int, error) {
+	var result []*models.EnrollmentToken
+	for _, t := range m.tokens {
+		if t.EnterpriseID == eid {
+			result = append(result, t)
+		}
+	}
+	total := len(result)
+	if offset >= total {
+		return nil, total, nil
+	}
+	end := offset + limit
+	if end > total {
+		end = total
+	}
+	return result[offset:end], total, nil
+}
+func (m *mockEnrollmentTokenRepo) Revoke(_ context.Context, id uuid.UUID) error {
+	for _, t := range m.tokens {
+		if t.ID == id && t.RevokedAt == nil {
+			now := time.Now()
+			t.RevokedAt = &now
+			return nil
+		}
+	}
+	return fmt.Errorf("enrollment token not found: %w", apperrors.ErrNotFound)
+}
+func (m *mockEnrollmentTokenRepo) DecrementUses(_ context.Context, id uuid.UUID) error {
+	for _, t := range m.tokens {
+		if t.ID == id {
+			if t.UsesRemaining != nil && *t.UsesRemaining > 0 {
+				v := *t.UsesRemaining - 1
+				t.UsesRemaining = &v
+			}
+			return nil
+		}
+	}
+	return fmt.Errorf("enrollment token not found: %w", apperrors.ErrNotFound)
+}
+
 // --- Test Helper ---
 
 type testServer struct {
-	server         *Server
-	enterpriseRepo *mockEnterpriseRepo
-	deviceRepo     *mockDeviceRepo
-	policyRepo     *mockPolicyRepo
-	certRepo       *mockCertRepo
-	auditLogRepo   *mockAuditLogRepo
-	auditLogger    *mockAuditLogger
-	commandRepo    *mockCommandRepo
-	appRepo        *mockAppRepo
-	userRepo       *mockUserRepo
+	server              *Server
+	enterpriseRepo      *mockEnterpriseRepo
+	deviceRepo          *mockDeviceRepo
+	policyRepo          *mockPolicyRepo
+	certRepo            *mockCertRepo
+	auditLogRepo        *mockAuditLogRepo
+	auditLogger         *mockAuditLogger
+	commandRepo         *mockCommandRepo
+	appRepo             *mockAppRepo
+	userRepo            *mockUserRepo
+	enrollmentTokenRepo *mockEnrollmentTokenRepo
 }
 
 func newTestServer(t *testing.T) *testServer {
@@ -705,20 +767,22 @@ func newTestServer(t *testing.T) *testServer {
 	al := &mockAuditLogger{}
 	cmdr := &mockCommandRepo{}
 	appr := &mockAppRepo{}
+	etr := &mockEnrollmentTokenRepo{}
 
 	s := &Server{
-		router:           mux.NewRouter(),
-		config:           &config.Config{},
-		logger:           slog.New(slog.NewTextHandler(bytes.NewBuffer(nil), &slog.HandlerOptions{Level: slog.LevelError})),
-		auditLogger:      al,
-		challengeManager: &mockChallengeStore{},
-		enterpriseRepo:   er,
-		deviceRepo:       dr,
-		policyRepo:       pr,
-		certRepo:         cr,
-		auditLogRepo:     ar,
-		cmdRepo:          cmdr,
-		appRepo:          appr,
+		router:              mux.NewRouter(),
+		config:              &config.Config{},
+		logger:              slog.New(slog.NewTextHandler(bytes.NewBuffer(nil), &slog.HandlerOptions{Level: slog.LevelError})),
+		auditLogger:         al,
+		challengeManager:    &mockChallengeStore{},
+		enterpriseRepo:      er,
+		deviceRepo:          dr,
+		policyRepo:          pr,
+		certRepo:            cr,
+		auditLogRepo:        ar,
+		cmdRepo:             cmdr,
+		appRepo:             appr,
+		enrollmentTokenRepo: etr,
 		cmdDispatcher:    newCommandDispatcher(cmdr, nil, slog.New(slog.NewTextHandler(bytes.NewBuffer(nil), nil))),
 		enrollmentLimiter: newRateLimiterWithSize(10, time.Minute, 100),
 		depService:       macos.NewDEPService(&testDEPStorage{}, slog.New(slog.NewTextHandler(bytes.NewBuffer(nil), nil))),
@@ -825,22 +889,28 @@ func newTestServer(t *testing.T) *testServer {
 	api.HandleFunc("/reports/compliance", s.handleComplianceReport).Methods("GET")
 	api.HandleFunc("/reports/enrollments", s.handleEnrollmentReport).Methods("GET")
 
+	// Enrollment tokens
+	api.HandleFunc("/enrollment-tokens", s.handleCreateEnrollmentToken).Methods("POST")
+	api.HandleFunc("/enrollment-tokens", s.handleListEnrollmentTokens).Methods("GET")
+	api.HandleFunc("/enrollment-tokens/{id}", s.handleRevokeEnrollmentToken).Methods("DELETE")
+
 	// Health/version/auth routes (registered at root, not under /api/v1)
 	s.router.HandleFunc("/version", s.handleVersion).Methods("GET")
 	s.router.HandleFunc("/api/v1/auth/login", s.handleLogin).Methods("POST")
 	s.router.HandleFunc("/api/v1/auth/refresh", s.handleRefresh).Methods("POST")
 
 	return &testServer{
-		server:         s,
-		enterpriseRepo: er,
-		deviceRepo:     dr,
-		policyRepo:     pr,
-		certRepo:       cr,
-		auditLogRepo:   ar,
-		auditLogger:    al,
-		commandRepo:    cmdr,
-		appRepo:        appr,
-		userRepo:       ur,
+		server:              s,
+		enterpriseRepo:      er,
+		deviceRepo:          dr,
+		policyRepo:          pr,
+		certRepo:            cr,
+		auditLogRepo:        ar,
+		auditLogger:         al,
+		commandRepo:         cmdr,
+		appRepo:             appr,
+		userRepo:            ur,
+		enrollmentTokenRepo: etr,
 	}
 }
 
