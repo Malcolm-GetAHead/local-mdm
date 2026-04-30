@@ -733,7 +733,7 @@ func (m *mockEnrollmentTokenRepo) Revoke(_ context.Context, id uuid.UUID) error 
 }
 func (m *mockEnrollmentTokenRepo) DecrementUses(_ context.Context, id uuid.UUID) error {
 	for _, t := range m.tokens {
-		if t.ID == id {
+		if t.ID == id && t.Status == models.EnrollmentTokenStatusActive {
 			if t.UsesRemaining != nil && *t.UsesRemaining > 0 {
 				v := *t.UsesRemaining - 1
 				t.UsesRemaining = &v
@@ -741,7 +741,7 @@ func (m *mockEnrollmentTokenRepo) DecrementUses(_ context.Context, id uuid.UUID)
 			return nil
 		}
 	}
-	return fmt.Errorf("enrollment token not found: %w", apperrors.ErrNotFound)
+	return fmt.Errorf("enrollment token not found or not active: %w", apperrors.ErrNotFound)
 }
 func (m *mockEnrollmentTokenRepo) SetStatus(_ context.Context, id uuid.UUID, status string) error {
 	for _, t := range m.tokens {

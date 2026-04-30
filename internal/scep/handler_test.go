@@ -341,3 +341,86 @@ func mustBuildSCEPRequest(t *testing.T, recipientCert *x509.Certificate, challen
 	return msg.Raw
 }
 
+
+func TestHandler_PostIssueHook_CalledWithDeviceID(t *testing.T) {
+	ca := setupTestCA(t)
+	store := &mockStore{challenges: map[string]string{"hook-pw": "ent-123:token:abc456"}}
+	h := NewHandler(ca, store, slog.Default())
+
+	var hookCalled bool
+	var hookDeviceID string
+	h.SetPostIssueHook(func(deviceID string) {
+		hookCalled = true
+		hookDeviceID = deviceID
+	})
+
+	csrDER := mustBuildCSRWithChallenge(t, "hook-pw")
+	b64 := []byte(base64.StdEncoding.EncodeToString(csrDER))
+	req := httptest.NewRequest("POST", "/scep?operation=PKIOperation", bytes.NewReader(b64))
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	assert.True(t, hookCalled, "PostIssueHook should be called")
+	assert.Equal(t, "ent-123:token:abc456", hookDeviceID)
+}
+
+func TestHandler_PostIssueHook_NotCalledOnFailure(t *testing.T) {
+	ca := setupTestCA(t)
+	store := &mockStore{challenges: map[string]string{}} // no valid challenge
+	h := NewHandler(ca, store, slog.Default())
+
+	var hookCalled bool
+	h.SetPostIssueHook(func(deviceID string) {
+		hookCalled = true
+	})
+
+	csrDER := mustBuildCSRWithChallenge(t, "bad-pw")
+	b64 := []byte(base64.StdEncoding.EncodeToString(csrDER))
+	req := httptest.NewRequest("POST", "/scep?operation=PKIOperation", bytes.NewReader(b64))
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, req)
+
+	assert.False(t, hookCalled, "PostIssueHook should NOT be called on failed challenge")
+}
+
+func TestHandler_PostIssueHook_SCEPEnvelope(t *testing.T) {
+	ca := setupTestCA(t)
+	caCert := ca.GetCACertificate()
+	store := &mockStore{challenges: map[string]string{"scep-hook-pw": "ent-456:token:def789"}}
+	h := NewHandler(ca, store, slog.Default())
+
+	var hookDeviceID string
+	h.SetPostIssueHook(func(deviceID string) {
+		hookDeviceID = deviceID
+	})
+
+	envelope := mustBuildSCEPRequest(t, caCert, "scep-hook-pw")
+	req := httptest.NewRequest("POST", "/scep?operation=PKIOperation", bytes.NewReader(envelope))
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	assert.Equal(t, "ent-456:token:def789", hookDeviceID)
+}
+
+func TestHandler_PostIssueHook_NoTokenMetadata(t *testing.T) {
+	ca := setupTestCA(t)
+	store := &mockStore{challenges: map[string]string{"plain-pw": "just-an-enterprise-id"}}
+	h := NewHandler(ca, store, slog.Default())
+
+	var hookDeviceID string
+	h.SetPostIssueHook(func(deviceID string) {
+		hookDeviceID = deviceID
+	})
+
+	csrDER := mustBuildCSRWithChallenge(t, "plain-pw")
+	b64 := []byte(base64.StdEncoding.EncodeToString(csrDER))
+	req := httptest.NewRequest("POST", "/scep?operation=PKIOperation", bytes.NewReader(b64))
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	// Hook is called but with plain deviceID (no :token: separator)
+	assert.Equal(t, "just-an-enterprise-id", hookDeviceID)
+}

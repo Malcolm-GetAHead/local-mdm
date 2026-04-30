@@ -512,3 +512,56 @@ func TestWebEnrollmentTokens_Revoke(t *testing.T) {
 	fetched, _ := ts.enrollmentTokenRepo.GetByToken(nil, "webrevoke")
 	assert.Equal(t, models.EnrollmentTokenStatusRevoked, fetched.Status)
 }
+
+func TestSCEPPostIssueHook_DecrementsToken(t *testing.T) {
+	ts := newTestServer(t)
+	maxUses := 5
+	tok := &models.EnrollmentToken{
+		EnterpriseID: uuid.New(), Token: "sceptoken",
+		MaxUses: &maxUses, UsesRemaining: &maxUses,
+		ExpiresAt: time.Now().Add(time.Hour),
+	}
+	ts.enrollmentTokenRepo.Create(nil, tok)
+
+	// Simulate what the server's PostIssueHook does
+	deviceID := tok.EnterpriseID.String() + ":token:" + tok.Token
+	parts := strings.SplitN(deviceID, ":token:", 2)
+	require.Len(t, parts, 2)
+	assert.Equal(t, "sceptoken", parts[1])
+
+	// Decrement via repo (same as the hook does)
+	fetched, _ := ts.enrollmentTokenRepo.GetByToken(nil, parts[1])
+	require.NotNil(t, fetched)
+	require.NoError(t, ts.enrollmentTokenRepo.DecrementUses(nil, fetched.ID))
+
+	after, _ := ts.enrollmentTokenRepo.GetByToken(nil, "sceptoken")
+	assert.Equal(t, 4, *after.UsesRemaining)
+}
+
+func TestSCEPPostIssueHook_IgnoresNonTokenDeviceID(t *testing.T) {
+	// DeviceID without :token: separator — should not attempt decrement
+	deviceID := "00000000-0000-0000-0000-000000000001"
+	parts := strings.SplitN(deviceID, ":token:", 2)
+	assert.Len(t, parts, 1, "plain enterprise ID should not split on :token:")
+}
+
+func TestSCEPPostIssueHook_SkipsExpiredToken(t *testing.T) {
+	ts := newTestServer(t)
+	maxUses := 5
+	tok := &models.EnrollmentToken{
+		EnterpriseID: uuid.New(), Token: "expiredscep",
+		MaxUses: &maxUses, UsesRemaining: &maxUses,
+		ExpiresAt: time.Now().Add(-time.Hour),
+		Status:    models.EnrollmentTokenStatusExpired,
+	}
+	ts.enrollmentTokenRepo.Create(nil, tok)
+
+	// The hook checks status before decrementing
+	fetched, _ := ts.enrollmentTokenRepo.GetByToken(nil, "expiredscep")
+	assert.Equal(t, models.EnrollmentTokenStatusExpired, fetched.Status)
+
+	// DecrementUses should fail because status != active
+	err := ts.enrollmentTokenRepo.DecrementUses(nil, fetched.ID)
+	assert.Error(t, err, "should not decrement expired token")
+	assert.Equal(t, 5, *fetched.UsesRemaining)
+}
