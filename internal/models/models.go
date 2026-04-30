@@ -307,6 +307,19 @@ type DeviceCommand struct {
 }
 
 // Command type constants
+type EnrollmentToken struct {
+	ID            uuid.UUID  `json:"id" db:"id"`
+	EnterpriseID  uuid.UUID  `json:"enterprise_id" db:"enterprise_id"`
+	Token         string     `json:"token" db:"token"`
+	Description   string     `json:"description" db:"description"`
+	MaxUses       *int       `json:"max_uses" db:"max_uses"`
+	UsesRemaining *int       `json:"uses_remaining" db:"uses_remaining"`
+	ExpiresAt     time.Time  `json:"expires_at" db:"expires_at"`
+	CreatedBy     *uuid.UUID `json:"created_by" db:"created_by"`
+	CreatedAt     time.Time  `json:"created_at" db:"created_at"`
+	RevokedAt     *time.Time `json:"revoked_at,omitempty" db:"revoked_at"`
+}
+
 const (
 	CommandTypeDeviceInfo      = "device_info"
 	CommandTypeLock            = "lock"
