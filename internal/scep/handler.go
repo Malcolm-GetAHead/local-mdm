@@ -15,17 +15,27 @@ import (
 	"go.mozilla.org/pkcs7"
 )
 
+// PostIssueFunc is called after a certificate is successfully issued.
+// deviceID is the value stored with the SCEP challenge (may contain token metadata).
+type PostIssueFunc func(deviceID string)
+
 // Handler serves SCEP protocol requests (GetCACert and PKCSReq).
 type Handler struct {
-	ca      *certs.CAManager
-	store   ChallengeStore
-	logger  *slog.Logger
-	certTTL time.Duration
+	ca            *certs.CAManager
+	store         ChallengeStore
+	logger        *slog.Logger
+	certTTL       time.Duration
+	postIssueHook PostIssueFunc
 }
 
 // NewHandler creates a SCEP HTTP handler.
 func NewHandler(ca *certs.CAManager, store ChallengeStore, logger *slog.Logger) *Handler {
 	return &Handler{ca: ca, store: store, logger: logger, certTTL: 365 * 24 * time.Hour}
+}
+
+// SetPostIssueHook registers a callback invoked after each successful certificate issuance.
+func (h *Handler) SetPostIssueHook(fn PostIssueFunc) {
+	h.postIssueHook = fn
 }
 
 // ServeHTTP handles GET (GetCACert/GetCACaps) and POST (PKIOperation) SCEP operations.
@@ -115,9 +125,11 @@ func (h *Handler) pkiOperation(w http.ResponseWriter, r *http.Request) {
 			w.Write(certRep.Raw)
 			return
 		}
-		// Use a clean template — SignCSR will sign the CSR with our CA
-		tmpl := h.ca.CertTemplate(h.certTTL)
 		h.logger.Info("SCEP certificate issued", "device_id", deviceID)
+		if h.postIssueHook != nil {
+			h.postIssueHook(deviceID)
+		}
+		tmpl := h.ca.CertTemplate(h.certTTL)
 		certRep, err := msg.SignCSR(caCert, caKey, tmpl)
 		if err != nil {
 			h.logger.Error("failed to build SCEP response", "error", err)
@@ -158,6 +170,9 @@ func (h *Handler) pkiOperation(w http.ResponseWriter, r *http.Request) {
 	}
 
 	h.logger.Info("SCEP certificate issued", "device_id", deviceID, "serial", cert.SerialNumber.String())
+	if h.postIssueHook != nil {
+		h.postIssueHook(deviceID)
+	}
 
 	// Wrap signed cert in PKCS#7 degenerate certificates-only envelope
 	respData, err := buildCertResponse(cert, caCert)

@@ -593,9 +593,9 @@ func TestHandleMacOSEnrollmentProfile(t *testing.T) {
 		assert.Equal(t, "application/x-apple-aspen-config", w.Header().Get("Content-Type"))
 		assert.Contains(t, w.Header().Get("Content-Disposition"), "enrollment.mobileconfig")
 
-		// Verify token uses decremented
+		// Token should NOT be decremented at profile download — decrement happens at SCEP cert issuance
 		tok, _ := ts.enrollmentTokenRepo.GetByToken(nil, "macostoken")
-		assert.Equal(t, 9, *tok.UsesRemaining)
+		assert.Equal(t, 10, *tok.UsesRemaining)
 	})
 }
 

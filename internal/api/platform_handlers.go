@@ -107,16 +107,7 @@ func (s *Server) handleMacOSEnrollmentProfile(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	// Decrement enrollment token uses if one was used
-	if enrollToken != nil {
-		if err := s.enrollmentTokenRepo.DecrementUses(r.Context(), enrollToken.ID); err != nil {
-			s.logger.Warn("failed to decrement enrollment token uses", "error", err, "token_id", enrollToken.ID)
-		}
-		s.logAudit(r, "enrollment_token.use", "enrollment_token", enrollToken.ID, map[string]interface{}{
-			"enterprise_id": enterpriseID,
-			"platform":      models.PlatformMacOS,
-		})
-	}
+	// Token validated at download for user feedback; uses decremented at SCEP certificate issuance
 
 	s.logAudit(r, "enrollment.macos.profile_generated", "enterprise", enterpriseID, map[string]interface{}{
 		"platform": models.PlatformMacOS,

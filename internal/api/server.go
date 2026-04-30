@@ -22,6 +22,7 @@ import (
 	"github.com/malcolm-getahead/local-mdm/internal/constants"
 	"github.com/malcolm-getahead/local-mdm/internal/db"
 	"github.com/malcolm-getahead/local-mdm/internal/metrics"
+	"github.com/malcolm-getahead/local-mdm/internal/models"
 	"github.com/malcolm-getahead/local-mdm/internal/platform/android"
 	"github.com/malcolm-getahead/local-mdm/internal/platform/macos"
 	"github.com/malcolm-getahead/local-mdm/internal/platform/windows"
@@ -764,6 +765,26 @@ func (s *Server) setupRoutes() {
 	// SCEP endpoint (public — devices use this during enrollment)
 	if s.caManager != nil {
 		scepHandler := scep.NewHandler(s.caManager, s.challengeManager, s.logger)
+		// Decrement enrollment token uses when a certificate is actually issued (not at profile download)
+		scepHandler.SetPostIssueHook(func(deviceID string) {
+			// deviceID format: "enterpriseID:token:tokenStr" when an enrollment token was used
+			parts := strings.SplitN(deviceID, ":token:", 2)
+			if len(parts) != 2 {
+				return
+			}
+			tokenStr := parts[1]
+			ctx := context.Background()
+			tok, err := s.enrollmentTokenRepo.GetByToken(ctx, tokenStr)
+			if err != nil {
+				return
+			}
+			if tok.Status != models.EnrollmentTokenStatusActive {
+				return
+			}
+			if err := s.enrollmentTokenRepo.DecrementUses(ctx, tok.ID); err != nil {
+				s.logger.Warn("failed to decrement enrollment token at SCEP issuance", "error", err, "token_id", tok.ID)
+			}
+		})
 		s.router.Handle("/scep", scepHandler).Methods("GET", "POST")
 	}
 
