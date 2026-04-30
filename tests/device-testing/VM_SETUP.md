@@ -78,11 +78,16 @@ sudo security add-trusted-cert -d -r trustRoot \
 
 ### Enroll in MDM
 
-1. Open **Safari** on the VM and navigate to: `http://<host-ip>:8080/enrollment/macos/profile`
-2. This downloads an enrollment `.mobileconfig` profile
-3. Open **System Settings → Privacy & Security → Profiles** (or the notification)
-4. Install the profile — this triggers SCEP certificate enrollment and MDM check-in
-5. The device will appear in the dashboard at `http://<host-ip>:8080/dashboard/`
+> **Enrollment tokens required (AUT-01):** Enrollment now requires a valid token. Create one
+> via the dashboard (Enrollment Tokens → Create Token) or API before enrolling. The macOS
+> enrollment URL is shown in the dashboard after token creation.
+
+1. Create an enrollment token in the dashboard or via API
+2. Open **Safari** on the VM and navigate to the macOS enrollment URL from the dashboard (includes `?token=`)
+3. This downloads an enrollment `.mobileconfig` profile
+4. Open **System Settings → Privacy & Security → Profiles** (or the notification)
+5. Install the profile — this triggers SCEP certificate enrollment and MDM check-in
+6. The device will appear in the dashboard at `http://<host-ip>:8080/dashboard/`
 
 ### What Happens After Enrollment
 
@@ -152,15 +157,17 @@ Add-Content C:\Windows\System32\drivers\etc\hosts "<host-ip> enterpriseenrollmen
 
 ### Enroll in MDM
 
-1. Open **Settings → Accounts → Access work or school**
-2. Click **Enroll only in device management**
-3. Enter email: `admin@localmdm.local` (or `<enterprise-uuid>@localmdm.local` for a specific enterprise)
-4. The device discovers the MDM server via the hosts entry, completes WSTEP enrollment
-5. OMA-DM sync begins on the configured schedule
+> **Enrollment tokens required (AUT-01):** Enrollment now requires a valid token. Create one
+> via the dashboard (Enrollment Tokens → Create Token) or API before enrolling. If restoring
+> from a template snapshot, you'll need a fresh token for re-enrollment.
 
-The email local part is used for enterprise assignment:
-- UUID format (e.g. `00000000-0000-0000-0000-000000000001@localmdm.local`) → uses that enterprise ID
-- Non-UUID (e.g. `admin@localmdm.local`) → falls back to `default_enterprise_id` config, then hardcoded Acme Corp
+1. Create an enrollment token in the dashboard or via API
+2. Open **Settings → Accounts → Access work or school**
+3. Click **Enroll only in device management**
+4. Enter the token email: `<token>@localmdm.local` (shown in dashboard after token creation)
+5. Enter any password (not validated)
+6. The device discovers the MDM server via the hosts entry, completes WSTEP enrollment
+7. OMA-DM sync begins on the configured schedule
 
 ### Monitor Enrollment
 
