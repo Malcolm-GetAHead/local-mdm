@@ -15,21 +15,14 @@ import (
 
 func TestPolicyAssignmentRepository(t *testing.T) {
 	database := testutil.ConnectDB(t)
-
-	// Setup: enterprise, device, group, two policies
-	entRepo, err := repository.NewEnterpriseRepository(database.Writer, database.Reader)
-	require.NoError(t, err)
-	enterprise := &models.Enterprise{
-		Name: "pa-test-" + uuid.New().String()[:8],
-		Slug: "pa-test-" + uuid.New().String()[:8],
-	}
-	require.NoError(t, entRepo.Create(context.Background(), enterprise))
-	t.Cleanup(func() { database.Writer.Exec("DELETE FROM enterprises WHERE id = $1", enterprise.ID) })
+	testutil.EnsureTestEnterprise(t, database.Writer)
+	t.Cleanup(func() { testutil.CleanupTestData(t, database.Writer) })
+	enterpriseID := testutil.TestEnterpriseID
 
 	deviceRepo, err := repository.NewDeviceRepository(database.Writer, database.Reader)
 	require.NoError(t, err)
 	device := &models.Device{
-		EnterpriseID: enterprise.ID,
+		EnterpriseID: enterpriseID,
 		Platform:     models.PlatformWindows,
 		DeviceID:     "pa-dev-" + uuid.New().String()[:8],
 		Status:       models.DeviceStatusEnrolled,
@@ -41,7 +34,7 @@ func TestPolicyAssignmentRepository(t *testing.T) {
 	groupRepo, err := repository.NewGroupRepository(database.Writer, database.Reader)
 	require.NoError(t, err)
 	group := &models.DeviceGroup{
-		EnterpriseID: enterprise.ID,
+		EnterpriseID: enterpriseID,
 		Name:         "PA Test Group",
 	}
 	require.NoError(t, groupRepo.Create(context.Background(), group))
@@ -50,7 +43,7 @@ func TestPolicyAssignmentRepository(t *testing.T) {
 	policyRepo, err := repository.NewPolicyRepository(database.Writer, database.Reader)
 	require.NoError(t, err)
 	policy1 := &models.Policy{
-		EnterpriseID: enterprise.ID,
+		EnterpriseID: enterpriseID,
 		Name:         "PA Policy 1",
 		Platform:     models.PlatformWindows,
 		PolicyType:   "wifi",
@@ -58,7 +51,7 @@ func TestPolicyAssignmentRepository(t *testing.T) {
 		IsActive:     true,
 	}
 	policy2 := &models.Policy{
-		EnterpriseID: enterprise.ID,
+		EnterpriseID: enterpriseID,
 		Name:         "PA Policy 2",
 		Platform:     models.PlatformWindows,
 		PolicyType:   "security",
@@ -105,7 +98,7 @@ func TestPolicyAssignmentRepository(t *testing.T) {
 		a := &models.PolicyAssignment{
 			PolicyID:   policy2.ID,
 			TargetType: models.TargetTypeEnterprise,
-			TargetID:   enterprise.ID,
+			TargetID:   enterpriseID,
 			Priority:   100,
 		}
 		err := repo.Create(ctx, a)
@@ -130,7 +123,7 @@ func TestPolicyAssignmentRepository(t *testing.T) {
 		// Device has: direct assignment (priority 1), group assignment (priority 10),
 		// enterprise assignment for policy2 (priority 100)
 		groupIDs := []uuid.UUID{group.ID}
-		effective, err := repo.GetEffectivePolicies(ctx, device.ID, groupIDs, enterprise.ID)
+		effective, err := repo.GetEffectivePolicies(ctx, device.ID, groupIDs, enterpriseID)
 		require.NoError(t, err)
 		// Should have 2 policies (policy1 and policy2)
 		assert.GreaterOrEqual(t, len(effective), 2)
@@ -145,7 +138,7 @@ func TestPolicyAssignmentRepository(t *testing.T) {
 	})
 
 	t.Run("get effective policies with no groups", func(t *testing.T) {
-		effective, err := repo.GetEffectivePolicies(ctx, device.ID, nil, enterprise.ID)
+		effective, err := repo.GetEffectivePolicies(ctx, device.ID, nil, enterpriseID)
 		require.NoError(t, err)
 		assert.GreaterOrEqual(t, len(effective), 1)
 	})
