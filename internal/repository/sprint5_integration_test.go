@@ -161,22 +161,22 @@ func TestAuditLogRepository_Search(t *testing.T) {
 	t.Run("search by action", func(t *testing.T) {
 		logs, total, err := repo.Search(ctx, enterpriseID, "device", "", "", 10, 0)
 		require.NoError(t, err)
-		assert.GreaterOrEqual(t, total, 2) // at least device.create + device.lock
-		assert.GreaterOrEqual(t, len(logs), 2)
+		assert.Equal(t, 2, total) // device.create + device.lock
+		assert.Len(t, logs, 2)
 	})
 
 	t.Run("search with no filter returns all", func(t *testing.T) {
 		logs, total, err := repo.Search(ctx, enterpriseID, "", "", "", 10, 0)
 		require.NoError(t, err)
-		assert.GreaterOrEqual(t, total, 4)
-		assert.GreaterOrEqual(t, len(logs), 4)
+		assert.Equal(t, 4, total)
+		assert.Len(t, logs, 4)
 	})
 
 	t.Run("search with date range", func(t *testing.T) {
 		logs, total, err := repo.Search(ctx, enterpriseID, "", "2020-01-01", "2099-12-31", 10, 0)
 		require.NoError(t, err)
-		assert.GreaterOrEqual(t, total, 4)
-		assert.GreaterOrEqual(t, len(logs), 4)
+		assert.Equal(t, 4, total)
+		assert.Len(t, logs, 4)
 	})
 
 	t.Run("search with future start date returns empty", func(t *testing.T) {

@@ -135,20 +135,21 @@ func TestPaginationValidation_DoSPrevention(t *testing.T) {
 	t.Run("legitimate large request within limits works", func(t *testing.T) {
 		devices, total, err := deviceRepo.List(ctx, enterpriseID, MaxPageSize, 0)
 		require.NoError(t, err)
-		assert.GreaterOrEqual(t, total, 10)
-		assert.GreaterOrEqual(t, len(devices), 10)
+		assert.Equal(t, 10, total)
+		assert.Len(t, devices, 10)
 	})
 
 	t.Run("pagination works correctly with limits", func(t *testing.T) {
 		// Get first 5
 		devices1, total, err := deviceRepo.List(ctx, enterpriseID, 5, 0)
 		require.NoError(t, err)
-		assert.GreaterOrEqual(t, total, 10)
+		assert.Equal(t, 10, total)
 		assert.Len(t, devices1, 5)
 
 		// Get next 5
-		devices2, _, err := deviceRepo.List(ctx, enterpriseID, 5, 5)
+		devices2, total, err := deviceRepo.List(ctx, enterpriseID, 5, 5)
 		require.NoError(t, err)
+		assert.Equal(t, 10, total)
 		assert.Len(t, devices2, 5)
 
 		// Verify no overlap
