@@ -9,6 +9,7 @@ PGPASSWORD="$DB_PASSWORD"
 export PGPASSWORD
 
 SEED_ENT="00000000-0000-0000-0000-000000000001"
+TEST_ENT="99999999-9999-9999-9999-999999999999"
 FAIL=0
 
 check() {
@@ -24,6 +25,15 @@ check() {
 
 echo ""
 echo "=== Test Postconditions ==="
+
+# Clean up test data under the test enterprise (child rows only, never the enterprise itself)
+for tbl in compliance_results policy_assignments device_group_members device_commands device_certificates enrollment_tokens devices policies device_groups users; do
+  psql -h "$DB_HOST" -U postgres -d localmdm -t -A -c \
+    "DELETE FROM $tbl WHERE enterprise_id = '$TEST_ENT';" 2>/dev/null || true
+done
+# Clean up audit logs created by tests under the test enterprise
+psql -h "$DB_HOST" -U postgres -d localmdm -t -A -c \
+  "DELETE FROM audit_logs WHERE enterprise_id = '$TEST_ENT';" 2>/dev/null || true
 
 # Clean up devices leaked into seed enterprise by NanoMDM webhooks during mdmb e2e tests.
 # mdmb generates serial numbers like "SN" + 8 hex chars. The running localmdm-server
@@ -42,10 +52,13 @@ if [ "$LEAKED_POLICIES" -gt 0 ]; then
 fi
 
 check "No leaked test enterprises" "0" \
-  "SELECT count(*) FROM enterprises WHERE id != '$SEED_ENT';"
+  "SELECT count(*) FROM enterprises WHERE id NOT IN ('$SEED_ENT', '$TEST_ENT');"
 
 check "Seed enterprise exists" "1" \
   "SELECT count(*) FROM enterprises WHERE id = '$SEED_ENT' AND deleted_at IS NULL;"
+
+check "Test enterprise exists" "1" \
+  "SELECT count(*) FROM enterprises WHERE id = '$TEST_ENT' AND deleted_at IS NULL;"
 
 check "Seed policies intact" "8" \
   "SELECT count(*) FROM policies WHERE enterprise_id = '$SEED_ENT' AND deleted_at IS NULL;"
