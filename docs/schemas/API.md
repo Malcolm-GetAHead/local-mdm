@@ -1181,12 +1181,17 @@ GET /api/v1/windows/ppkg/templates
 
 ## Enrollment Tokens
 
-Enrollment tokens control who can enroll devices. Admins create tokens with optional use limits and expiry. The response includes platform-specific enrollment instructions:
+Enrollment tokens control who can enroll devices. Admins create tokens with optional use limits and expiry. Both enrollment paths require a valid token — enrollment is blocked without one.
 
+**Platform-specific enrollment instructions** (included in create response):
 - **Windows**: Email address (`<token>@localmdm.local`) — enter in Settings → Accounts → Access work or school → Enroll only in device management
 - **macOS**: Enrollment URL — open in Safari to download the enrollment profile
 
-Tokens have three statuses: `active`, `expired`, `revoked`. Expired tokens are updated automatically by a periodic cleanup job (hourly) and on-access when a device attempts to use an expired token.
+**Token lifecycle**:
+- Tokens have three statuses: `active`, `expired`, `revoked`.
+- Expired tokens are updated automatically by a periodic cleanup job (hourly) and on-access when a device attempts to use an expired token.
+- `uses_remaining` is decremented when a device actually enrolls (certificate issuance), not when the enrollment profile is downloaded. This prevents a shared `.mobileconfig` file from bypassing the use limit.
+- The macOS profile download endpoint validates the token (rejects expired/revoked/exhausted) but does not decrement — this gives users immediate feedback on invalid links.
 
 ### Create Enrollment Token
 
