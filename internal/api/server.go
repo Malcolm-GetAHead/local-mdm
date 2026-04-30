@@ -83,9 +83,10 @@ type Server struct {
 	policyVersionRepo repository.PolicyVersionRepository
 	groupService     *service.GroupService
 	complianceService *service.ComplianceService
-	eventBus          *service.EventBus
-	cleanupCancel     context.CancelFunc
-	webTemplates      map[string]*template.Template
+	eventBus              *service.EventBus
+	cleanupCancel         context.CancelFunc
+	webTemplates          map[string]*template.Template
+	enrollmentTokenRepo   repository.EnrollmentTokenRepository
 }
 
 // New creates a new API server
@@ -360,6 +361,13 @@ func New(cfg *config.Config, database *db.DB, logger *slog.Logger) (*Server, err
 	}
 	s.tokenService = service.NewTokenService(tokenRepo, userRepo, logger)
 	s.reportService = reporting.NewService(reporting.NewSQLReportStore(database.Writer))
+
+	// Initialize enrollment token repository
+	enrollmentTokenRepo, err := repository.NewEnrollmentTokenRepository(database.Writer, database.Reader)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create enrollment token repository: %w", err)
+	}
+	s.enrollmentTokenRepo = enrollmentTokenRepo
 
 	// Wire API token auth into middleware
 	s.authMiddleware.SetTokenValidator(&tokenAuthAdapter{tokenService: s.tokenService})
@@ -699,6 +707,23 @@ func (s *Server) setupRoutes() {
 			http.HandlerFunc(s.handleListAuditLogs),
 		),
 	)).Methods("GET")
+
+	// Enrollment tokens
+	api.Handle("/enrollment-tokens", s.authMiddleware.RequireAuth(
+		s.authMiddleware.RequireRole("admin", "super_admin")(
+			http.HandlerFunc(s.handleCreateEnrollmentToken),
+		),
+	)).Methods("POST")
+	api.Handle("/enrollment-tokens", s.authMiddleware.RequireAuth(
+		s.authMiddleware.RequireRole("admin", "super_admin")(
+			http.HandlerFunc(s.handleListEnrollmentTokens),
+		),
+	)).Methods("GET")
+	api.Handle("/enrollment-tokens/{id}", s.authMiddleware.RequireAuth(
+		s.authMiddleware.RequireRole("admin", "super_admin")(
+			http.HandlerFunc(s.handleRevokeEnrollmentToken),
+		),
+	)).Methods("DELETE")
 
 	// App catalog (Sprint 3)
 	api.Handle("/apps", s.authMiddleware.RequireAuth(
