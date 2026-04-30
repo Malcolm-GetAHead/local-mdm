@@ -1181,7 +1181,12 @@ GET /api/v1/windows/ppkg/templates
 
 ## Enrollment Tokens
 
-Enrollment tokens control who can enroll devices. Admins create tokens with optional use limits and expiry. The token is distributed as an email address (`<token>@localmdm.local`) that users enter during device enrollment.
+Enrollment tokens control who can enroll devices. Admins create tokens with optional use limits and expiry. The response includes platform-specific enrollment instructions:
+
+- **Windows**: Email address (`<token>@localmdm.local`) — enter in Settings → "Enroll only in device management"
+- **macOS**: Enrollment URL — open in Safari to download the enrollment profile
+
+Tokens have three statuses: `active`, `expired`, `revoked`. Expired tokens are updated automatically by a periodic cleanup job (hourly) and on-access when a device attempts to use an expired token.
 
 ### Create Enrollment Token
 
@@ -1213,9 +1218,11 @@ Content-Type: application/json
     "enterprise_id": "00000000-0000-0000-0000-000000000001",
     "token": "5370aa74b9005ce7b52398a2951a3a1b",
     "email": "5370aa74b9005ce7b52398a2951a3a1b@localmdm.local",
+    "macos_enroll_url": "https://192.168.1.102:8443/api/v1/macos/enroll/00000000-0000-0000-0000-000000000001?token=5370aa74b9005ce7b52398a2951a3a1b",
     "description": "IT onboarding batch May 2026",
     "max_uses": 5,
     "uses_remaining": 5,
+    "status": "active",
     "expires_at": "2026-05-07T10:00:00Z",
     "created_at": "2026-04-30T10:00:00Z"
   }
@@ -1234,7 +1241,7 @@ GET /api/v1/enrollment-tokens?enterprise_id=00000000-0000-0000-0000-000000000001
 - `enterprise_id` (required): Filter by enterprise
 - `limit`, `offset`: Pagination (default: 100, 0)
 
-**Response**: `200 OK` — paginated list of tokens with `max_uses`, `uses_remaining`, `expires_at`, `revoked_at`.
+**Response**: `200 OK` — paginated list of tokens with `status`, `max_uses`, `uses_remaining`, `expires_at`, `revoked_at`.
 
 ### Revoke Enrollment Token
 
@@ -1246,7 +1253,7 @@ DELETE /api/v1/enrollment-tokens/{id}
 
 **Response**: `204 No Content`
 
-Revoked tokens immediately stop accepting new enrollments. Existing enrolled devices are not affected.
+Revoked tokens immediately stop accepting new enrollments (status changes to `revoked`). Existing enrolled devices are not affected.
 
 ## Platform-Specific Endpoints
 

@@ -107,17 +107,25 @@ func (s *Server) handleCreateEnrollmentToken(w http.ResponseWriter, r *http.Requ
 		"expires_at":    token.ExpiresAt,
 	})
 
-	// Return token with the enrollment email address
+	// Return token with platform-specific enrollment instructions
+	scheme := "http"
+	if r.TLS != nil || r.Header.Get("X-Forwarded-Proto") == "https" {
+		scheme = "https"
+	}
+	macosURL := fmt.Sprintf("%s://%s/api/v1/macos/enroll/%s?token=%s", scheme, r.Host, enterpriseID, token.Token)
+
 	respondJSON(w, r, http.StatusCreated, map[string]interface{}{
-		"id":             token.ID,
-		"enterprise_id":  token.EnterpriseID,
-		"token":          token.Token,
-		"email":          token.Token + "@localmdm.local",
-		"description":    token.Description,
-		"max_uses":       token.MaxUses,
-		"uses_remaining": token.UsesRemaining,
-		"expires_at":     token.ExpiresAt,
-		"created_at":     token.CreatedAt,
+		"id":               token.ID,
+		"enterprise_id":    token.EnterpriseID,
+		"token":            token.Token,
+		"email":            token.Token + "@localmdm.local",
+		"macos_enroll_url": macosURL,
+		"description":      token.Description,
+		"max_uses":         token.MaxUses,
+		"uses_remaining":   token.UsesRemaining,
+		"status":           token.Status,
+		"expires_at":       token.ExpiresAt,
+		"created_at":       token.CreatedAt,
 	})
 }
 

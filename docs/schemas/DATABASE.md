@@ -870,10 +870,12 @@ Short-lived, limited-use codes that authorize device enrollment to a specific en
 | created_by | UUID FK → users | Admin who created the token |
 | created_at | TIMESTAMPTZ | Creation timestamp |
 | revoked_at | TIMESTAMPTZ | NULL while active, set on revocation |
+| status | VARCHAR(20) | Token state: `active`, `expired`, `revoked` (default: `active`) |
 
 **Indexes**:
 - `idx_enrollment_tokens_enterprise` on `enterprise_id`
 - `idx_enrollment_tokens_token` on `token` WHERE `revoked_at IS NULL`
 - `idx_enrollment_tokens_expires` on `expires_at` WHERE `revoked_at IS NULL`
+- `idx_enrollment_tokens_status` on `status` WHERE `status = 'active'`
 
-**Migration**: `000014_enrollment_tokens`
+**Migrations**: `000014_enrollment_tokens`, `000015_enrollment_token_status`

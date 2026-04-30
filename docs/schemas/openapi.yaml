@@ -52,6 +52,8 @@ tags:
     description: Android enrollment and webhooks
   - name: SCEP
     description: SCEP certificate enrollment
+  - name: EnrollmentTokens
+    description: Enrollment token management (controls who can enroll devices)
 
 paths:
   # ── Public ──────────────────────────────────────────────
@@ -1238,6 +1240,101 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/AuditLogListResponse"
+
+  # ── Enrollment Tokens ────────────────────────────────────
+  /api/v1/enrollment-tokens:
+    post:
+      tags: [EnrollmentTokens]
+      summary: Create enrollment token
+      operationId: createEnrollmentToken
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [enterprise_id]
+              properties:
+                enterprise_id:
+                  type: string
+                  format: uuid
+                description:
+                  type: string
+                max_uses:
+                  type: integer
+                  minimum: 1
+                expires_in:
+                  type: string
+                  description: "Duration string (e.g., 1h, 24h, 168h). Default: 24h"
+      responses:
+        "201":
+          description: Token created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/EnrollmentTokenCreated"
+                  meta:
+                    $ref: "#/components/schemas/Meta"
+        "400":
+          description: Validation error
+        "404":
+          description: Enterprise not found
+    get:
+      tags: [EnrollmentTokens]
+      summary: List enrollment tokens
+      operationId: listEnrollmentTokens
+      parameters:
+        - name: enterprise_id
+          in: query
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 100
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+      responses:
+        "200":
+          description: Paginated list of tokens
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/EnrollmentToken"
+                  meta:
+                    $ref: "#/components/schemas/Meta"
+
+  /api/v1/enrollment-tokens/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    delete:
+      tags: [EnrollmentTokens]
+      summary: Revoke enrollment token
+      operationId: revokeEnrollmentToken
+      responses:
+        "204":
+          description: Token revoked
+        "404":
+          description: Token not found or not active
 
   # ── macOS Platform ──────────────────────────────────────
   /api/v1/macos/enroll/{enterprise_id}:
@@ -2468,3 +2565,52 @@ components:
             $ref: "#/components/schemas/AuditLog"
         meta:
           $ref: "#/components/schemas/Meta"
+
+    EnrollmentToken:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        enterprise_id:
+          type: string
+          format: uuid
+        token:
+          type: string
+        description:
+          type: string
+        max_uses:
+          type: integer
+          nullable: true
+        uses_remaining:
+          type: integer
+          nullable: true
+        status:
+          type: string
+          enum: [active, expired, revoked]
+        expires_at:
+          type: string
+          format: date-time
+        created_by:
+          type: string
+          format: uuid
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        revoked_at:
+          type: string
+          format: date-time
+          nullable: true
+
+    EnrollmentTokenCreated:
+      allOf:
+        - $ref: "#/components/schemas/EnrollmentToken"
+        - type: object
+          properties:
+            email:
+              type: string
+              description: "Windows enrollment email (e.g., abc123@localmdm.local)"
+            macos_enroll_url:
+              type: string
+              description: "macOS enrollment profile download URL"

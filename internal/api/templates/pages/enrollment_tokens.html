@@ -33,13 +33,22 @@
 </div>
 
 {{if .CreatedToken}}
-<div class="mb-6 p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
-    <p class="font-semibold text-green-800 dark:text-green-200 mb-2">Token created! Copy the enrollment email address:</p>
-    <div class="flex items-center gap-2">
-        <code id="token-email" class="flex-1 px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-sm font-mono">{{.CreatedToken}}@localmdm.local</code>
-        <button data-copy="#token-email" class="btn-secondary text-sm">Copy</button>
+<div class="mb-6 p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg space-y-3">
+    <p class="font-semibold text-green-800 dark:text-green-200">Token created! Share the appropriate enrollment method:</p>
+    <div>
+        <p class="text-sm font-medium text-green-800 dark:text-green-200 mb-1">Windows — enter in Settings → "Enroll only in device management":</p>
+        <div class="flex items-center gap-2">
+            <code id="token-email" class="flex-1 px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-sm font-mono">{{.CreatedToken}}@localmdm.local</code>
+            <button data-copy="#token-email" class="btn-secondary text-sm">Copy</button>
+        </div>
     </div>
-    <p class="text-sm text-green-700 dark:text-green-300 mt-2">Give this email address to the user enrolling their device.</p>
+    <div>
+        <p class="text-sm font-medium text-green-800 dark:text-green-200 mb-1">macOS — open in Safari to download enrollment profile:</p>
+        <div class="flex items-center gap-2">
+            <code id="token-macos-url" class="flex-1 px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-sm font-mono break-all">{{.MacOSBaseURL}}{{.CreatedToken}}</code>
+            <button data-copy="#token-macos-url" class="btn-secondary text-sm">Copy</button>
+        </div>
+    </div>
 </div>
 {{end}}
 
@@ -66,9 +75,17 @@
             {{range .Tokens}}
             <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
                 <td class="px-6 py-4">
-                    <div class="flex items-center gap-2">
-                        <code class="text-sm font-mono">{{.Token}}@localmdm.local</code>
-                        <button data-copy-text="{{.Token}}@localmdm.local" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 text-sm" title="Copy email">📋</button>
+                    <div class="space-y-1">
+                        <div class="flex items-center gap-2">
+                            <span class="text-xs text-gray-400 w-12">Win:</span>
+                            <code class="text-sm font-mono">{{.Token}}@localmdm.local</code>
+                            <button data-copy-text="{{.Token}}@localmdm.local" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 text-sm" title="Copy Windows email">📋</button>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span class="text-xs text-gray-400 w-12">Mac:</span>
+                            <code class="text-xs font-mono text-gray-500 dark:text-gray-400 truncate max-w-xs">{{$.MacOSBaseURL}}{{.Token}}</code>
+                            <button data-copy-text="{{$.MacOSBaseURL}}{{.Token}}" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 text-sm" title="Copy macOS URL">📋</button>
+                        </div>
                     </div>
                 </td>
                 <td class="px-6 py-4 text-sm">{{if .Description}}{{.Description}}{{else}}<span class="text-gray-400">—</span>{{end}}</td>

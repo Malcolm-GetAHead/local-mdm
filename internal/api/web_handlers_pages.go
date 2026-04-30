@@ -899,6 +899,13 @@ func (s *Server) handleWebEnrollmentTokens(w http.ResponseWriter, r *http.Reques
 	tokens, total, _ := s.enrollmentTokenRepo.List(r.Context(), sess.EnterpriseID, perPage, (page-1)*perPage)
 	totalPages := (total + perPage - 1) / perPage
 
+	// Build macOS enrollment base URL for the template
+	scheme := "http"
+	if r.TLS != nil || r.Header.Get("X-Forwarded-Proto") == "https" {
+		scheme = "https"
+	}
+	macosBaseURL := fmt.Sprintf("%s://%s/api/v1/macos/enroll/%s?token=", scheme, r.Host, sess.EnterpriseID)
+
 	data := map[string]interface{}{
 		"ActiveNav":    "enrollment-tokens",
 		"Tokens":       toTokenViews(tokens),
@@ -906,6 +913,7 @@ func (s *Server) handleWebEnrollmentTokens(w http.ResponseWriter, r *http.Reques
 		"CurrentPage":  page,
 		"TotalItems":   total,
 		"CreatedToken": r.URL.Query().Get("created"),
+		"MacOSBaseURL": macosBaseURL,
 	}
 
 	if isHTMXFragment(r) {
@@ -964,6 +972,12 @@ func (s *Server) handleWebEnrollmentTokenCreate(w http.ResponseWriter, r *http.R
 
 	// For standard browser POST: redirect with ?created= so banner survives refresh
 	// For HTMX-boosted POST: render page directly (redirect loses HX-Target header)
+	scheme := "http"
+	if r.TLS != nil || r.Header.Get("X-Forwarded-Proto") == "https" {
+		scheme = "https"
+	}
+	macosBaseURL := fmt.Sprintf("%s://%s/api/v1/macos/enroll/%s?token=", scheme, r.Host, sess.EnterpriseID)
+
 	if r.Header.Get("HX-Request") == "true" {
 		tokens, total, _ := s.enrollmentTokenRepo.List(r.Context(), sess.EnterpriseID, 50, 0)
 		data := map[string]interface{}{
@@ -973,6 +987,7 @@ func (s *Server) handleWebEnrollmentTokenCreate(w http.ResponseWriter, r *http.R
 			"CurrentPage":  1,
 			"TotalItems":   total,
 			"CreatedToken": tokenStr,
+			"MacOSBaseURL": macosBaseURL,
 		}
 		w.Header().Set("HX-Push-Url", "/dashboard/enrollment-tokens?created="+tokenStr)
 		s.renderPage(w, r, "enrollment_tokens", data)
