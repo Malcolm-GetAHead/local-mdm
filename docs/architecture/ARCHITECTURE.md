@@ -119,9 +119,21 @@ Local MDM follows a layered architecture with clear separation of concerns:
 
 #### macOS (`internal/platform/macos`)
 - `nanomdm.go` - nanoMDM integration
+- `webhook.go` - Processes check-in and command result events from NanoMDM
 - `enrollment.go` - Profile generation
-- `commands.go` - MDM command handlers
+- `commands.go` - MDM command builders
+- `profiles.go` - Profile payload translation
 - `apns.go` - APNs integration
+- `dep_storage.go` - DEP token storage
+
+**NanoMDM Integration Flow:** Local MDM does not speak the Apple MDM protocol directly. Instead, [NanoMDM](https://github.com/micromdm/nanomdm) runs as a separate service and handles the low-level MDM protocol (device check-ins, command queuing, push notifications). The flow works like this:
+
+1. **Device → NanoMDM**: Apple devices send MDM requests (`/checkin`, `/mdm`) to NanoMDM, which handles protocol-level concerns (authentication, command queue, APNs push).
+2. **NanoMDM → Local MDM (webhook)**: NanoMDM is configured with a webhook URL pointing back to Local MDM. On every check-in or command response, NanoMDM forwards the event as JSON to Local MDM's `/webhook/nanomdm` endpoint.
+3. **Local MDM processes the event**: The `CheckinHandler` in `webhook.go` parses the forwarded event — registering new devices on `Authenticate`, updating push tokens on `TokenUpdate`, marking devices unenrolled on `CheckOut`, and extracting device data from command responses (DeviceInformation, SecurityInfo, ProfileList, etc.) into the Local MDM database.
+4. **Local MDM → NanoMDM (commands)**: When Local MDM needs to send a command to a device (lock, wipe, query info), it calls NanoMDM's HTTP API (`nanomdm_url` in config) to enqueue the command. NanoMDM then pushes it to the device via APNs.
+
+This separation means Local MDM owns business logic (policies, compliance, UI) while NanoMDM owns protocol handling. Both services share the same PostgreSQL instance but use separate databases.
 
 #### Android (`internal/platform/android`)
 - `client.go` - Android Management API client

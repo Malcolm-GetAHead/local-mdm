@@ -1,13 +1,13 @@
 # Local MDM - Unified Multi-Platform Mobile Device Management
 
-A unified, open-source MDM platform supporting Windows, macOS, and Android devices with minimal agent requirements.
+A unified, open-source MDM platform supporting Windows and macOS devices with minimal agent requirements.
 
 ## Overview
 
 Local MDM provides enterprise device management capabilities across multiple platforms:
 - **Windows 10/11**: Agent-less enrollment using native MDM client
 - **macOS**: Integration with nanoMDM for Apple device management
-- **Android**: Google Android Management API integration
+- **Android** *(experimental — paused)*: Google Android Management API integration
 
 ## Architecture
 
@@ -15,12 +15,12 @@ Local MDM provides enterprise device management capabilities across multiple pla
 Unified Control Plane (Go)
 ├── Windows Module (Custom OMA-DM/MS-MDE2)
 ├── macOS Module (nanoMDM wrapper)
-└── Android Module (Google Management API)
+└── Android Module (Google Management API) — experimental, paused
 ```
 
 ## Key Features
 
-- **Multi-platform support**: Manage Windows, macOS, and Android from a single interface
+- **Multi-platform support**: Manage Windows and macOS from a single interface
 - **Web dashboard**: HTMX-powered admin UI with 10 themes and dark mode
 - **Policy abstraction**: Define policies once, deploy across platforms
 - **Compliance engine**: Real-time evaluation with per-setting pass/fail
@@ -57,7 +57,7 @@ open http://localhost:8080
 - **Database**: PostgreSQL 15+ (Writer/Reader pool split for Aurora)
 - **Frontend**: Go templates + HTMX v2.0.9 + Tailwind CSS v4
 - **Auth**: Keycloak OIDC + API tokens
-- **Protocols**: OMA-DM, MS-MDE2, Apple MDM, Android Management API, SCEP
+- **Protocols**: OMA-DM, MS-MDE2, Apple MDM, SCEP
 - **Testing**: 199 Playwright browser tests, Go unit/integration tests, k6 load tests
 
 ## Project Status

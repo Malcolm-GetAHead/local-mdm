@@ -808,6 +808,13 @@ Tasks:
    - `troubleshooting.md` — FAQ format, minimum 15 entries covering: enrollment failures,
      certificate trust issues, device not appearing, compliance showing unknown, SCEP errors,
      NanoMDM connectivity, Keycloak login issues, Docker stack issues, VM setup issues.
+   - `configuration.md` — full config reference. Read `internal/config/config.go` and
+     document every config option with: description, type, default value (if any), and
+     whether it is required or optional. Group by section (server, database, keycloak,
+     certificates, macos, windows, features, rate_limiting, metrics, audit_log, etc.).
+     Include a `config.example.minimal.yaml` showing only the required fields needed to
+     get a working instance (roughly 10-15 fields). Include a `config.example.full.yaml`
+     showing all options with comments.
 2. Take screenshots using Playwright scripts (login, navigate, screenshot) for key pages.
    Save to `docs/user-guide/images/`. Reference in markdown docs.
 3. Create `docs/user-guide/README.md` as table of contents.
@@ -956,11 +963,273 @@ After the retrospective, provide:
 
 ---
 
+## Session 9: Service Layer Consolidation
+
+**ID**: `AUT-09`
+**Effort**: ~1 day (3 parts, ~2-3 hours each)
+**Source**: Maintainability analysis (2026-04-30)
+**Branch**: `feature/aut-09-service-consolidation`
+**Depends on**: None (refactor only — no new features)
+
+### Prompt
+
+```
+Read `.kiro/steering/STEERING.md` and `.kiro/steering/SESSION_NOTES.md` for project conventions.
+Read `docs/planning/future/autonomous_sessions.md` Session 9 for task list.
+
+Consolidate the codebase so all handlers use the service layer (`internal/service/`)
+instead of calling repositories directly. Currently, pre-Sprint 4 handlers call repos
+from the handler; post-Sprint 4 handlers go through services. This creates two patterns
+that confuse new developers.
+
+Branch: `feature/aut-09-service-consolidation` from `main`.
+Commit per sub-task with `AUT-09:` prefix. Push after each commit.
+Run `go test -race ./...` after every change.
+Follow the Mandatory Verification Gates in the Prerequisites section — rebuild Docker,
+hit real endpoints, and verify dashboard rendering after every sub-task.
+
+CRITICAL: This is a pure refactor. No API behavior changes. No database changes.
+Every existing test must continue to pass. If a test breaks, the refactor is wrong — fix
+the refactor, not the test.
+
+### Part A: New Services + Easy Handlers (~2 hours)
+
+1. Create `internal/service/enterprise.go` — `EnterpriseService` wrapping enterprise repo
+   with CRUD methods (Create, Get, List, Update, Delete). Follow existing service patterns
+   (accept repo interface via constructor, no net/http imports).
+   Write service-level tests in `internal/service/enterprise_test.go`.
+2. Create `internal/service/enrollment_token.go` — `EnrollmentTokenService` wrapping
+   enrollment token repo (Create, List, Revoke, GetByToken, Validate, DecrementUses, SetStatus).
+   Write service-level tests.
+3. Create `internal/service/command.go` — `CommandService` wrapping command repo and device
+   repo (ListByDevice, Create) and cert repo (List for device certs). Note: DeviceService
+   already has Lock/Wipe/Restart — CommandService handles the lower-level command record
+   CRUD and cert listing.
+   Write service-level tests.
+4. Extend `internal/service/report.go` (or create it) — wrap audit log repo Search/List.
+   Write service-level tests.
+5. Rewire `handlers_enterprise.go` — replace all 6 `s.enterpriseRepo.*` calls with
+   `s.enterpriseService.*` calls. Update Server struct and constructor.
+6. Rewire `handlers_command.go` — replace all 8 repo calls with service calls.
+7. Rewire `handlers_enrollment_token.go` — replace all 6 repo calls with service calls.
+8. Rewire `handlers_report.go` — replace 2 repo calls with service calls.
+9. Clean up: remove repo fields from Server struct that are no longer referenced directly.
+   Verify: `go test -race ./...` must pass. Rebuild Docker and hit each affected endpoint.
+
+### Part B: Mixed Handlers (~3 hours)
+
+10. Add missing read methods to `PolicyService`: Get, List, Delete, ListTemplates, and any
+    other repo methods called directly from `handlers_policy.go`. Write tests.
+11. Rewire `handlers_policy.go` — replace all 9 remaining repo calls with service calls.
+12. Add missing read method to `DeviceService` if needed (check `handlers_device.go`).
+    Rewire the 1 remaining repo call.
+13. Rewire `handlers_compliance.go` — replace 1 repo call with service call.
+14. Rewire `web_handlers.go` — replace all 10 repo calls with service calls. These are
+    dashboard handlers that should call the same services the API handlers use.
+15. Rewire `web_handlers_pages.go` — replace all 16 repo calls with service calls.
+    Verify: rebuild Docker, visit every dashboard page, confirm rendering is identical.
+
+### Part C: Platform Handlers (~2 hours)
+
+16. Create `internal/service/enrollment.go` — `EnrollmentService` encapsulating the
+    multi-step enrollment flow: enterprise lookup, device creation/update, token validation
+    and decrement. This is the trickiest part — enrollment handlers have protocol-specific
+    logic interleaved with business logic. Extract only the business logic (enterprise
+    validation, device record management, token handling). Leave protocol parsing (SOAP XML,
+    SCEP) in the handlers.
+    Write service-level tests.
+17. Rewire `platform_handlers.go` — replace 8 repo calls with enrollment service calls.
+    Verify: rebuild Docker, test Windows discovery endpoint, test macOS enrollment profile
+    endpoint. If real VMs are available, do a full enrollment test.
+18. Final cleanup: verify no handler file imports `internal/repository` directly (they
+    should only import `internal/service` and `internal/models`). Remove any unused repo
+    fields from Server struct.
+
+Acceptance criteria:
+- Zero handler files call repo methods directly — all go through services
+- All existing tests pass with `go test -race ./...` (no test modifications allowed
+  except updating mock setup in handler test helpers)
+- API behavior is identical — same request/response for every endpoint
+- Dashboard renders identically — every page loads without errors
+- Server struct holds services, not repos (repos are internal to services)
+- New service tests exist for every new service created
+
+When complete, perform this retrospective:
+1. List every task where you made a shortcut, used a stub, skipped a test, or deviated from the spec.
+2. Does everything align with the existing codebase? Any dependencies broken or gaps?
+3. How's test coverage and documentation? Are they still accurate?
+4. Did any handler need logic beyond "parse request → call service → format response"?
+   If so, should that logic move to the service?
+5. Are there any repo methods that are now only called from services and could have their
+   visibility reduced?
+
+After the retrospective, provide:
+- Summary of work completed
+- Checklist of how the owner can verify the work (specific URLs to visit, commands to run)
+- Before/after count: how many handler files still import repository directly (should be 0)
+```
+
+### Deliverables
+- New services: `EnterpriseService`, `EnrollmentTokenService`, `CommandService`, `ReportService`, `EnrollmentService`
+- Extended services: `PolicyService` (read methods), `DeviceService` (if needed)
+- All handlers rewired to use services exclusively
+- Service-level tests for every new service
+- Server struct cleaned up — holds services, not repos
+- Zero behavior changes to API or dashboard
+
+---
+
+## Session 10: HTTP Client Timeouts & Context Propagation
+
+**ID**: `AUT-10`
+**Effort**: ~2 hours
+**Source**: Code audit (2026-04-30)
+**Branch**: `feature/aut-10-http-timeouts`
+**Depends on**: None
+
+### Prompt
+
+```
+Read `.kiro/steering/STEERING.md` and `.kiro/steering/SESSION_NOTES.md` for project conventions.
+Read `docs/planning/future/autonomous_sessions.md` Session 10 for task list.
+
+Fix HTTP calls that lack timeouts and database calls that ignore request context.
+These are production safety issues — if an upstream service (Keycloak, NanoMDM) hangs,
+goroutines block forever.
+
+Branch: `feature/aut-10-http-timeouts` from `main`.
+Commit per sub-task with `AUT-10:` prefix. Push after each commit.
+Run `go test -race ./...` after every change.
+
+Tasks:
+1. `internal/auth/keycloak.go` lines 75 and 103: two bare `http.Post()` calls with no
+   context or timeout. These are user-facing login and token refresh. Replace with
+   `http.NewRequestWithContext` using the caller's context, and use a client with a
+   30-second timeout. The functions need a `ctx context.Context` parameter added.
+   Update all callers.
+2. `internal/api/web_session.go` line 218: bare `http.PostForm()` for OAuth callback
+   token exchange. Replace with `http.NewRequestWithContext` using `r.Context()` and
+   a client with a 30-second timeout.
+3. `internal/auth/oidc.go` line 402: `http.DefaultClient.Do(req)` in HealthCheck.
+   Replace with a package-level client that has a 10-second timeout. The request
+   already uses `NewRequestWithContext` so this is just the client-level fallback.
+4. `internal/scep/challenge.go`: all three methods (`GenerateChallenge`,
+   `ValidateChallenge`, `CleanupExpired`) use `context.Background()`. Add
+   `ctx context.Context` as the first parameter to each. Update the `ChallengeStore`
+   interface, the concrete implementation, all callers in `scep/handler.go` and
+   `platform_handlers.go` and `server.go`, and any test mocks.
+5. `internal/service/token.go` line 90: fire-and-forget goroutine with
+   `context.Background()` and discarded error. Add a 5-second timeout context and
+   log errors instead of discarding them.
+
+Acceptance criteria:
+- No bare `http.Post`, `http.PostForm`, or `http.DefaultClient` usage in non-test code
+- No `context.Background()` in code that has a request context available
+- All existing tests pass with `go test -race ./...`
+- Verify: `grep -rn 'http\.Post\b\|http\.PostForm\|http\.DefaultClient' --include='*.go' | grep -v _test.go | grep -v vendor` returns nothing
+
+When complete, provide a summary and verification checklist.
+```
+
+### Deliverables
+- All HTTP calls use clients with explicit timeouts
+- SCEP `ChallengeStore` interface accepts context
+- Token update goroutine has timeout and error logging
+- Zero behavior changes to API or dashboard
+
+---
+
+## Session 11: Device Re-enrollment & Soft-Delete Fix
+
+**ID**: `AUT-11`
+**Effort**: ~2 hours
+**Source**: Code audit (2026-04-30) — unique constraint blocks re-enrollment of deleted devices
+**Branch**: `feature/aut-11-reenrollment-fix`
+**Depends on**: None
+
+### Problem
+
+The `devices` table has `UNIQUE(enterprise_id, platform, device_id)` but soft-deletes set
+`deleted_at` without removing the row. When a device is deleted from the dashboard and then
+re-enrolled into the same enterprise, the INSERT fails because the soft-deleted row still
+occupies the unique slot. The device silently fails to create, and the macOS Authenticate
+webhook falls back to `defaultEnterpriseID`, potentially placing the device in the wrong
+enterprise or failing entirely.
+
+Additionally, the macOS Authenticate webhook always uses `defaultEnterpriseID` for new
+devices. If a device record doesn't exist at Authenticate time (deleted, or SCEP creation
+failed), the device gets assigned to the wrong enterprise.
+
+### Prompt
+
+```
+Read `.kiro/steering/STEERING.md` and `.kiro/steering/SESSION_NOTES.md` for project conventions.
+Read `docs/planning/future/autonomous_sessions.md` Session 11 for task list.
+
+Fix device re-enrollment after soft-delete and close the macOS multi-tenant gap.
+
+Branch: `feature/aut-11-reenrollment-fix` from `main`.
+Commit per sub-task with `AUT-11:` prefix. Push after each commit.
+Run `go test -race ./...` after every change.
+
+Tasks:
+1. In the device repository `Create` method: if the INSERT fails due to a unique constraint
+   violation, query for a soft-deleted device with the same (enterprise_id, platform, device_id).
+   If found, restore it: clear `deleted_at`, reset `status` to 'enrolled', update
+   `enrollment_date` to NOW(), and return the restored device. This preserves the device UUID
+   and audit trail. If no soft-deleted record is found, return the original error.
+   Write an integration test: create device → soft-delete → create again with same IDs →
+   verify same UUID is returned with cleared deleted_at.
+
+2. In `internal/platform/macos/webhook.go` Authenticate handler (around line 211): when
+   `GetDeviceByUDID` fails (device not found), before falling back to `defaultEnterpriseID`,
+   attempt to look up the device including soft-deleted records. Add a repository method
+   `GetByPlatformIDIncludeDeleted(ctx, platform, deviceID)` that queries WITHOUT the
+   `deleted_at IS NULL` filter. If a soft-deleted record is found, use its `enterprise_id`
+   instead of the default. If NO record exists at all (not even soft-deleted), do NOT create
+   a device in the default enterprise — log a warning with the UDID and return without
+   creating. A device with a valid cert but no record is an anomaly. Remove the
+   `defaultEnterpriseID` field and `SetDefaultEnterpriseID` method entirely — they are no
+   longer needed.
+   Write unit tests:
+   - Mock GetDeviceByUDID returns not-found, GetByPlatformIDIncludeDeleted returns a
+     soft-deleted device → verify correct enterprise ID is used for restoration.
+   - Mock both lookups return not-found → verify no device is created and a warning is logged.
+
+3. Write an end-to-end integration test covering the full flow:
+   - Create enterprise and device
+   - Soft-delete the device
+   - Simulate re-enrollment (call Create with same enterprise/platform/device_id)
+   - Verify device is restored with same UUID, correct enterprise, enrolled status
+   - Verify a second enterprise can enroll the same UDID independently
+
+4. Update DATABASE.md to document the soft-delete re-enrollment behavior.
+
+Acceptance criteria:
+- Deleting a device and re-enrolling it into the same enterprise restores the original record
+- Deleting a device and enrolling it into a different enterprise creates a new record
+- macOS Authenticate handler uses the correct enterprise for re-authenticating deleted devices
+- macOS Authenticate handler rejects devices with no record (active or deleted) — logs warning, does not create
+- `defaultEnterpriseID` is removed — no silent fallback to a default tenant
+- All existing tests pass with `go test -race ./...`
+- No migration needed (fix is in application logic, not schema)
+
+When complete, provide a summary and verification checklist.
+```
+
+### Deliverables
+- Device repository handles re-enrollment of soft-deleted devices
+- macOS webhook uses correct enterprise for deleted device re-authentication
+- Integration tests covering both re-enrollment scenarios
+- DATABASE.md updated
+
+---
+
 ## Session Dependency Graph
 
 ```
 AUT-00 (Test Enterprise)       — run first
-AUT-01 (Enrollment Tokens)     — independent
+AUT-01 (Enrollment Tokens)     — independent ✅
 AUT-02 (Dynamic Groups)        — independent
 AUT-03 (Tags + Bulk Ops)       — independent
 AUT-04 (Webhooks)              — independent
@@ -968,19 +1237,29 @@ AUT-05 (Dry-Run + Scheduling)  — independent
 AUT-06 (Security Hardening)    — independent
 AUT-07 (A11y + i18n)           — independent
 AUT-08 (Docs + OTel)           — independent
+AUT-09 (Service Consolidation) — run BEFORE feature sessions (reduces merge conflicts)
+AUT-10 (HTTP Timeouts)         — independent (can run anytime)
+AUT-11 (Re-enrollment Fix)     — independent (can run anytime)
 ```
 
 All sessions are independent and can run in any order. If running multiple sessions
 sequentially, each should merge to `main` before the next starts to avoid conflicts.
 
+AUT-09 is a refactor-only session. Running it before feature sessions (AUT-02 through AUT-08)
+means new features will be written against the consolidated service pattern from the start,
+avoiding further mixed-pattern code.
+
 ## Recommended Execution Order
 
 0. **AUT-00** (Test Enterprise Isolation) — run first, protects real data for all future sessions
-1. **AUT-01** (Enrollment Tokens) — highest security value, closes a real gap
-2. **AUT-03** (Tags + Bulk Ops) — highest admin UX value
-3. **AUT-04** (Webhooks) — enables external integrations
-4. **AUT-02** (Dynamic Groups) — builds on tags for auto-membership
-5. **AUT-05** (Dry-Run + Scheduling) — policy management maturity
-6. **AUT-06** (Security Hardening) — production readiness
-7. **AUT-07** (A11y + i18n) — compliance and reach
-8. **AUT-08** (Docs + OTel) — operational maturity
+1. **AUT-01** (Enrollment Tokens) ✅ — highest security value, closes a real gap
+2. **AUT-10** (HTTP Timeouts) — quick safety fix, no dependencies
+3. **AUT-11** (Re-enrollment Fix) — closes multi-tenant gap and soft-delete bug
+4. **AUT-09** (Service Consolidation) — clean up handler patterns before adding features
+5. **AUT-03** (Tags + Bulk Ops) — highest admin UX value
+6. **AUT-04** (Webhooks) — enables external integrations
+7. **AUT-02** (Dynamic Groups) — builds on tags for auto-membership
+8. **AUT-05** (Dry-Run + Scheduling) — policy management maturity
+9. **AUT-06** (Security Hardening) — production readiness
+10. **AUT-07** (A11y + i18n) — compliance and reach
+11. **AUT-08** (Docs + OTel) — operational maturity
