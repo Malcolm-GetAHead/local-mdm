@@ -1283,7 +1283,7 @@ POST /EnrollmentServer/Enrollment.svc
 POST /EnrollmentServer/:enterprise_id/Enrollment.svc
 ```
 
-Handles Windows device enrollment with certificate signing. When `enterprise_id` is present in the URL, a device record is created in the database upon successful enrollment.
+Handles Windows device enrollment with certificate signing. **Requires a valid enrollment token** — the email address entered during enrollment (e.g., `<token>@localmdm.local`) must contain an active token as the local part. Returns a SOAP fault if the token is missing, expired, revoked, or exhausted.
 
 #### Management Sync
 
@@ -1298,10 +1298,10 @@ OMA-DM SyncML endpoint for device management sync sessions.
 #### Enrollment Profile
 
 ```http
-GET /api/v1/macos/enroll/:enterprise_id
+GET /api/v1/macos/enroll/:enterprise_id?token=<enrollment_token>
 ```
 
-Returns `.mobileconfig` enrollment profile for download.
+Returns `.mobileconfig` enrollment profile for download. **Requires a valid enrollment token** — returns `403` without one. The full URL is provided in the `macos_enroll_url` field when creating an enrollment token.
 
 #### DEP Token PKI
 
