@@ -33,6 +33,22 @@ func (s *Server) handleMacOSEnrollmentProfile(w http.ResponseWriter, r *http.Req
 		return
 	}
 
+	// Check for optional enrollment token
+	var enrollToken *models.EnrollmentToken
+	if tokenStr := r.URL.Query().Get("token"); tokenStr != "" && s.enrollmentTokenRepo != nil {
+		tok, errMsg := s.validateEnrollmentToken(r, tokenStr)
+		if tok != nil {
+			enrollToken = tok
+			enterpriseID = tok.EnterpriseID
+		} else if errMsg != "" {
+			respondError(w, r, http.StatusForbidden, "token_invalid", errMsg)
+			return
+		} else {
+			respondError(w, r, http.StatusForbidden, "token_invalid", "Invalid enrollment token")
+			return
+		}
+	}
+
 	// Verify enterprise exists
 	if _, err := s.enterpriseRepo.GetByID(r.Context(), enterpriseID); err != nil {
 		if errors.Is(err, apperrors.ErrNotFound) {
@@ -45,11 +61,16 @@ func (s *Server) handleMacOSEnrollmentProfile(w http.ResponseWriter, r *http.Req
 	}
 
 	// Generate unique SCEP challenge with configurable expiration
+	// Include enrollment token in challenge metadata if present
 	challengeTTL := s.config.Certificates.SCEPChallengeTTL
 	if challengeTTL == 0 {
 		challengeTTL = 5 * time.Minute
 	}
-	challenge, err := s.challengeManager.GenerateChallenge(enterpriseID.String(), challengeTTL)
+	challengeDeviceID := enterpriseID.String()
+	if enrollToken != nil {
+		challengeDeviceID = enterpriseID.String() + ":token:" + enrollToken.Token
+	}
+	challenge, err := s.challengeManager.GenerateChallenge(challengeDeviceID, challengeTTL)
 	if err != nil {
 		s.logger.Error("failed to generate SCEP challenge", "error", err)
 		respondError(w, r, http.StatusInternalServerError, "challenge_generation_failed", "Failed to generate enrollment challenge")
@@ -81,6 +102,17 @@ func (s *Server) handleMacOSEnrollmentProfile(w http.ResponseWriter, r *http.Req
 		s.logger.Error("failed to generate enrollment profile", "error", err)
 		respondError(w, r, http.StatusInternalServerError, "generation_failed", "Failed to generate profile")
 		return
+	}
+
+	// Decrement enrollment token uses if one was used
+	if enrollToken != nil {
+		if err := s.enrollmentTokenRepo.DecrementUses(r.Context(), enrollToken.ID); err != nil {
+			s.logger.Warn("failed to decrement enrollment token uses", "error", err, "token_id", enrollToken.ID)
+		}
+		s.logAudit(r, "enrollment_token.use", "enrollment_token", enrollToken.ID, map[string]interface{}{
+			"enterprise_id": enterpriseID,
+			"platform":      models.PlatformMacOS,
+		})
 	}
 
 	s.logAudit(r, "enrollment.macos.profile_generated", "enterprise", enterpriseID, map[string]interface{}{
