@@ -159,9 +159,11 @@ Each protocol fix discovered during testing should be committed individually wit
 - **Command tracking**: Auto-queued commands show in Commands tab with sent → completed status
 - **Force Check-in button**: Ready for APNs (shows friendly error without push cert)
 - **Persistent CA**: Mounted from host, survives container rebuilds
-- **nginx TLS proxy**: Port 443/8443 with CA-signed cert for Windows HTTPS requirement
+- **nginx TLS proxy**: Port 443/8443 with CA-signed cert for Windows HTTPS requirement. Proxies `/checkin` and `/mdm` to NanoMDM so all device traffic uses one HTTPS endpoint.
 - **NanoMDM v0.9.0 webhook integration**: Full plist parsing with base64 decode
 - **Windows protocol fixes**: SOAP envelope wrapping, RSTRC wrapper, provisioning XML with certs, device ID mapping
+- **Dashboard cleanup**: Pending enrollments indicator, empty state SVG centering (Tailwind), `formatBytes` verified on real device
+- **Enrollment profile fix**: Uses request-derived URLs (not Docker-internal hostnames), respects `X-Forwarded-Proto` from nginx
 
 ### Windows enrollment — resolved
 

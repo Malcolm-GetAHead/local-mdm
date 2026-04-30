@@ -205,14 +205,18 @@ func (s *Server) handleWebDeviceList(w http.ResponseWriter, r *http.Request) {
 
 	devices, total, _ := s.deviceRepo.ListFiltered(ctx, sess.EnterpriseID, platform, status, query, sortField, sortDir, perPage, (page-1)*perPage)
 
+	// Get pending enrollment count (reuse ListFiltered to avoid new interface method)
+	_, pendingCount, _ := s.deviceRepo.ListFiltered(ctx, sess.EnterpriseID, "", "pending", "", "name", "asc", 1, 0)
+
 	totalPages := (total + perPage - 1) / perPage
 
 	data := map[string]interface{}{
-		"ActiveNav":   "devices",
-		"Devices":     devices,
-		"TotalPages":  totalPages,
-		"CurrentPage": page,
-		"TotalItems":  total,
+		"ActiveNav":    "devices",
+		"Devices":      devices,
+		"TotalPages":   totalPages,
+		"CurrentPage":  page,
+		"TotalItems":   total,
+		"PendingCount": pendingCount,
 		"Filter": map[string]string{
 			"Platform": platform, "Status": status, "Query": r.URL.Query().Get("q"),
 			"Sort": sortField, "Dir": sortDir,

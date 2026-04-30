@@ -67,9 +67,9 @@ macos:
   default_enterprise_id: "00000000-0000-0000-0000-000000000001"
 
 android:
-  project_id: ""
-  service_account_json: ""
-  webhook_url: "http://localmdm:8080/android/webhook"
+  project_id: "devops-collection"
+  service_account_json: "/app/secrets/android-service-account.json"
+  webhook_url: ""
   webhook_secret: ""
 
 logging:

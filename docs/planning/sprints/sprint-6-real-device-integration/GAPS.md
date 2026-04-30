@@ -1,7 +1,7 @@
 # Sprint 6: Gaps & Technical Debt
 
 **Created**: 2026-04-28
-**Updated**: 2026-04-29 (post S6-19 final cleanup)
+**Updated**: 2026-04-29 (post dashboard cleanup + nginx proxy fix)
 **Purpose**: Honest accounting of shortcuts, missing tests, and documentation gaps from Sprint 6.
 
 ---
@@ -15,7 +15,7 @@
 5. ~~**Enterprise ID hardcoded**~~ ✅ Fixed — uses `default_enterprise_id` config.
 6. ~~**Windows enrollment handler fallback `enterpriseRepo.List(ctx, 1, 0)`**~~ ✅ Fixed — uses `default_enterprise_id` config.
 7. ~~**No unit tests for webhook parsing code**~~ ✅ Fixed — processCommandResult, maybeAutoQueue, full webhook flow tests.
-8. **`formatBytes` template function** — never verified renders correctly in browser.
+8. ~~**`formatBytes` template function** — never verified renders correctly in browser.~~ ✅ Verified — unit test (11 cases) + browser verified on real macOS device (301 apps, formatted sizes render correctly, no raw bytes).
 9. **Command status tracking** — commands created as `sent` immediately, skipping `pending` → `sent` transition. If NanoMDM rejects, DB says "sent" but it wasn't.
 10. ~~**Debug log lines left in production code**~~ ✅ Removed.
 11. ~~**Stale test enterprises**~~ ✅ Fixed — `testutil.CreateTestEnterprise()` with `t.Cleanup()` cascade delete; broad pre-clean removed. Postcondition gate added. Leaked mdmb devices now cleaned up automatically.
@@ -71,9 +71,14 @@ All packages meet STEERING targets when measured via `make coverage-combined` (m
 - **Device ID mismatch resolution depends on Replace data** — `HandleSyncML` resolves enrollment-vs-sync ID mismatch only when the device sends `./DevInfo/DevId` in a Replace item. If the first sync has no Replace data, the device stays unresolvable. A more robust fix would add a `GetByPlatformDataField` repository method to search JSONB.
 
 ### Dashboard Cleanup (04_DASHBOARD_CLEANUP.md)
-- **Pending enrollments visibility** — devices with `status = 'pending'` invisible in device list
-- **Empty state SVG centering** — inline styles instead of Tailwind classes, needs `make css` rebuild
-- **`formatBytes` browser verification** — template function never verified in browser
+- [x] **Pending enrollments visibility** — added yellow banner with count + "Pending" status dropdown option + filtered view
+- [x] **Empty state SVG centering** — replaced inline styles with Tailwind (`inline-block mb-2`, `text-center`, `mt-2`, `mt-1`) on 5 pages (devices, groups, policies, compliance, audit). CSS rebuilt.
+- [x] **`formatBytes` browser verification** — unit test (11 cases) + verified on real macOS device with 301 apps. Renders "4.2 GB" not raw bytes.
+
+### Nginx Proxy & Enrollment Profile Fix (04_DASHBOARD_CLEANUP session)
+- [x] **Enrollment profile used Docker-internal NanoMDM URL** — mobileconfig had `http://nanomdm:9000` as ServerURL/CheckInURL, unreachable from VMs. Fixed: nginx now proxies `/checkin` and `/mdm` to NanoMDM; enrollment profile uses the request-derived external URL.
+- [x] **SCEP URL ignored X-Forwarded-Proto** — requests through nginx HTTPS generated `http://` SCEP URLs. Fixed: proto detection checks `X-Forwarded-Proto` header.
+- [x] **macOS re-enrollment verified** — new Mac enrolled successfully through `https://192.168.1.102:8443` with all URLs (SCEP, ServerURL, CheckInURL) going through nginx HTTPS.
 
 ---
 
@@ -112,7 +117,7 @@ Sprint 7 focuses on macOS Platform SSO — enabling single sign-on for managed M
 ### Docker Stack
 - `localmdm` — Go server on port 8080, CA certs mounted from `./internal/api/certs/`
 - `nanomdm` — Apple MDM on port 9000, CA cert mounted from same dir
-- `nginx-tls` — TLS proxy on ports 443/8443, server cert signed by project CA
+- `nginx-tls` — TLS proxy on ports 443/8443, server cert signed by project CA. Proxies `/checkin` and `/mdm` to NanoMDM; everything else to Go server.
 - `keycloak` — OIDC on port 8180, admin/admin
 - `postgres` — port 5432, password `postgres-dev-password-1234`
 

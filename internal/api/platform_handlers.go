@@ -57,18 +57,16 @@ func (s *Server) handleMacOSEnrollmentProfile(w http.ResponseWriter, r *http.Req
 	}
 
 	serverURL := fmt.Sprintf("http://%s", r.Host)
-	if r.TLS != nil {
+	if r.TLS != nil || r.Header.Get("X-Forwarded-Proto") == "https" {
 		serverURL = fmt.Sprintf("https://%s", r.Host)
 	}
 	scepURL := serverURL + "/scep"
 	topic := s.config.MacOS.PushTopic
 	orgName := "Local MDM"
 
-	// NanoMDM handles the Apple MDM protocol; devices check in there
-	nanomdmURL := s.config.MacOS.NanoMDMURL
-	if nanomdmURL == "" {
-		nanomdmURL = serverURL // fallback if NanoMDM not configured
-	}
+	// NanoMDM handles the Apple MDM protocol; nginx proxies /checkin and /mdm to it.
+	// The enrollment profile uses the external-facing URL so the device can reach it.
+	mdmBaseURL := serverURL
 
 	// Load CA cert if available
 	var caCert *x509.Certificate
@@ -77,7 +75,7 @@ func (s *Server) handleMacOSEnrollmentProfile(w http.ResponseWriter, r *http.Req
 	}
 
 	profile, err := macos.GenerateEnrollmentProfile(
-		enterpriseID, nanomdmURL, scepURL, topic, challenge, orgName, caCert,
+		enterpriseID, mdmBaseURL, scepURL, topic, challenge, orgName, caCert,
 	)
 	if err != nil {
 		s.logger.Error("failed to generate enrollment profile", "error", err)

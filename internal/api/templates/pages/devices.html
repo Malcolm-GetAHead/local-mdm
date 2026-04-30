@@ -14,6 +14,7 @@
                 class="input-field w-auto">
             <option value="">All Statuses</option>
             <option value="enrolled" {{if eq .Filter.Status "enrolled"}}selected{{end}}>Enrolled</option>
+            <option value="pending" {{if eq .Filter.Status "pending"}}selected{{end}}>Pending</option>
             <option value="unenrolled" {{if eq .Filter.Status "unenrolled"}}selected{{end}}>Unenrolled</option>
             <option value="wiped" {{if eq .Filter.Status "wiped"}}selected{{end}}>Wiped</option>
         </select>
@@ -24,6 +25,14 @@
            hx-get="/dashboard/devices" hx-trigger="keyup changed delay:500ms" hx-target="#device-table" hx-include="[name='platform'],[name='status'],[name='sort'],[name='dir']"
            class="input-field w-full md:w-64">
 </div>
+
+{{if and .PendingCount (ne .Filter.Status "pending")}}
+<div class="mb-4 flex items-center gap-2 rounded-lg border border-yellow-300 bg-yellow-50 px-4 py-3 text-sm text-yellow-800 dark:border-yellow-600 dark:bg-yellow-900/30 dark:text-yellow-300">
+    <svg class="h-5 w-5 shrink-0" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+    <span><strong>{{.PendingCount}}</strong> pending enrollment{{if ne .PendingCount 1}}s{{end}} —</span>
+    <a href="/dashboard/devices?status=pending" class="font-medium underline hover:no-underline">View pending devices</a>
+</div>
+{{end}}
 
 <div id="device-table">
     {{template "device_table_body" .}}
@@ -62,10 +71,10 @@
             </tr>
             {{else}}
             <tr><td colspan="6" class="px-6 py-6">
-                <div style="text-align:center">
-                <svg width="48" height="48" style="display:block;margin:0 auto 8px" class="text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
-                <p class="text-gray-500 dark:text-gray-400 font-medium" style="margin-top:8px">No devices found</p>
-                <p class="text-sm text-gray-400 dark:text-gray-500" style="margin-top:4px">Enroll a device to get started, or adjust your filters.</p>
+                <div class="text-center">
+                <svg width="48" height="48" class="inline-block mb-2 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
+                <p class="text-gray-500 dark:text-gray-400 font-medium mt-2">No devices found</p>
+                <p class="text-sm text-gray-400 dark:text-gray-500 mt-1">Enroll a device to get started, or adjust your filters.</p>
                 </div>
             </td>
             {{end}}

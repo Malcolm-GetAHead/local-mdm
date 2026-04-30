@@ -94,6 +94,7 @@ services:
       retries: 10
     volumes:
       - ./internal/api/certs:/app/certs
+      - ./secrets:/app/secrets:ro
 
   # === Dev mode: hot reload with source mounted ===
   localmdm-dev:
