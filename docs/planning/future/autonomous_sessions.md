@@ -25,8 +25,14 @@ Every session MUST follow these — no exceptions.
 
 ### After all sub-tasks complete:
 4. `make dev-test` — full integration test suite in Docker (scoped cleanup only — never `DELETE FROM <table>` without a WHERE clause scoped to test data)
-5. Run Playwright browser tests: `cd tests/browser && node run-playbook.js` — all existing tests must still pass, plus new steps for the feature you implemented
-6. Verify documentation is updated: DATABASE.md, API.md, openapi.yaml
+5. Run Playwright browser tests: `cd tests/browser && node run-playbook.js` — all existing tests must still pass, plus new steps for the feature you implemented. Compare pass/fail count before and after your changes.
+6. `git diff main --stat` — sanity check the changeset. Verify no unexpected files were modified.
+7. Verify documentation is updated: DATABASE.md, API.md, openapi.yaml
+
+### Test priority:
+Both Go integration tests (against live PostgreSQL + Keycloak) and Playwright browser tests are
+**high priority**. These catch real bugs that mock-based tests miss. If either suite regresses,
+fix it before declaring the session complete.
 
 ### Test requirements:
 - **Repository tests**: MUST be integration tests against Docker PostgreSQL (not mocks). Use `testutil.ConnectDB(t)`.
@@ -410,12 +416,22 @@ Tasks:
    No inline JavaScript — use event delegation in app.js. Verify in browser after implementing.
 7. Event types to support: device.enrolled, device.unenrolled, device.wiped, policy.assigned,
    policy.removed, compliance.changed, command.completed.
-8. Tests: dispatcher unit tests (mock HTTP server), retry logic tests, HMAC signature
+8. Tests: dispatcher unit tests (use `httptest.NewServer` as the webhook target — never
+   configure webhooks pointing to external hosts), retry logic tests, HMAC signature
    verification test, handler tests, auto-disable after consecutive failures test.
    Repository integration tests against Docker PostgreSQL (not mocks).
    Go-level dashboard tests using newTestServerWithTemplates + doWithSession for webhook pages.
    Add Playwright playbook steps for webhook create, test, and delivery history.
-9. Update DATABASE.md, API.md, and openapi.yaml with new tables/columns/endpoints.
+9. Webhook sink container: add an nginx service to docker-compose (`webhook-sink`) that
+   captures inbound POST/GET requests and logs full payloads. Configuration:
+   - Listen on port 9999
+   - Custom `log_format` that captures `$request_body`, `$http_x_webhook_signature`, method, URI
+   - Set `client_body_buffer_size 64k` to capture full payloads without truncation
+   - Log to a mounted volume (`./logs/webhook-sink/`) for inspection
+   - Use `return 200` for all requests (always succeed so retry logic can be tested separately)
+   This container is used for deployment-level validation — configure a webhook pointing to
+   `http://webhook-sink:9999/hooks` and trigger events to verify the full outbound payload.
+10. Update DATABASE.md, API.md, and openapi.yaml with new tables/columns/endpoints.
 
 Acceptance criteria:
 - Creating a webhook and enrolling a device sends a POST to the configured URL
@@ -442,6 +458,7 @@ After the retrospective, provide:
 - EventBus subscriber registration
 - API endpoints + dashboard page
 - HMAC signature signing and verification
+- `webhook-sink` nginx container in docker-compose for payload inspection
 
 ---
 
@@ -596,12 +613,24 @@ Tasks:
    showing count of certs expiring in 7/30/90 days.
    No inline JavaScript — use event delegation in app.js. Verify in browser after implementing.
 5. Recovery key escrow: migration adding `recovery_keys` table (id, device_id FK, key_type
-   VARCHAR — 'bitlocker' or 'filevault', encrypted_key TEXT — pgcrypto encrypted, escrowed_at).
+   VARCHAR — 'bitlocker' or 'filevault', encrypted_key TEXT — pgcrypto encrypted, escrowed_at,
+   rotated_at TIMESTAMPTZ).
    After rebuild, verify migration applied with `\d` in psql.
    Repository methods. API endpoint to retrieve key (admin only, audit logged).
    After implementing, curl each endpoint against the running server to verify.
    For macOS: parse FileVault recovery key from SecurityInfo command response and store.
    For Windows: parse BitLocker recovery key from OMA-DM response and store.
+   **VM encryption setup**: Before testing escrow, verify BitLocker and FileVault are enabled
+   on the VMs. If not, enable them via SSH:
+   - Windows: `manage-bde -on C: -RecoveryPassword` (check with `manage-bde -status`)
+   - macOS: `sudo fdesetup enable` (check with `fdesetup status`)
+   **Key rotation**: implement a rotation endpoint (POST /api/v1/devices/{id}/recovery-key/rotate)
+   that triggers a new recovery key on the device. For BitLocker this is
+   `manage-bde -protectors -add C: -RecoveryPassword` via OMA-DM CSP. For FileVault, check
+   if rotation is supported via MDM SecurityInfo — if not, document the limitation.
+   **Logging**: Recovery key values may be logged at DEBUG level during development. Ensure
+   production log level (INFO+) never includes key values. The API response and audit log
+   should reference key IDs, not key values.
    Dashboard: "Recovery Key" button on device detail page (admin only), shows key in a
    modal with copy button. Every access is audit logged.
    No inline JavaScript — use event delegation in app.js. Verify in browser after implementing.
@@ -674,6 +703,9 @@ Tasks:
    - Ensure all interactive elements are keyboard-accessible (tab order, Enter/Space activation)
    - Add `aria-expanded` to collapsible sections and dropdowns
    - Verify color contrast ratios meet 4.5:1 for text, 3:1 for large text (check Tailwind classes)
+   **Important**: After modifying each template, rebuild and verify that specific page renders
+   correctly in the browser before moving to the next template. Do not batch all template
+   changes and test at the end — a broken template breaks the entire dashboard.
 2. Add focus-visible styles: ensure keyboard focus is visually distinct (Tailwind `focus-visible:ring-2`)
    on all buttons, links, and form controls.
 3. Add `alt` text to all SVG icons (or `aria-hidden="true"` for decorative ones).
@@ -780,6 +812,9 @@ Tasks:
 
 Tasks:
 4. Add OpenTelemetry SDK dependency: `go.opentelemetry.io/otel` and the OTLP exporter.
+   Pin exact versions in go.mod (not open ranges). Run `go mod tidy` and verify the
+   dependency count is reasonable. Check that the binary size increase is acceptable
+   (compare `ls -la` of the built binary before and after).
    Use `otelhttp` middleware for automatic HTTP handler instrumentation.
 5. Create `internal/tracing/otel.go`: initialize TracerProvider with OTLP exporter
    (configurable endpoint via `tracing.endpoint` config, disabled by default).
