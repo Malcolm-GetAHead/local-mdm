@@ -1055,6 +1055,14 @@ func (s *Server) startCleanupTicker() {
 				}
 				s.challengeManager.CleanupExpired()
 				s.refreshGaugeMetrics()
+				// Expire enrollment tokens that have passed their expires_at
+				if s.enrollmentTokenRepo != nil {
+					if n, err := s.enrollmentTokenRepo.ExpireTokens(context.Background()); err != nil {
+						s.logger.Warn("enrollment token expiry failed", "error", err)
+					} else if n > 0 {
+						s.logger.Info("expired enrollment tokens", "count", n)
+					}
+				}
 			}
 		}
 	}()

@@ -871,20 +871,17 @@ type enrollmentTokenView struct {
 	ExpiresAt     time.Time
 	CreatedAt     time.Time
 	RevokedAt     *time.Time
-	Expired       bool
-	Exhausted     bool
+	Status        string
 }
 
 func toTokenViews(tokens []*models.EnrollmentToken) []enrollmentTokenView {
-	now := time.Now()
 	views := make([]enrollmentTokenView, 0, len(tokens))
 	for _, t := range tokens {
 		views = append(views, enrollmentTokenView{
 			ID: t.ID, Token: t.Token, Description: t.Description,
 			MaxUses: t.MaxUses, UsesRemaining: t.UsesRemaining,
 			ExpiresAt: t.ExpiresAt, CreatedAt: t.CreatedAt, RevokedAt: t.RevokedAt,
-			Expired:   now.After(t.ExpiresAt),
-			Exhausted: t.UsesRemaining != nil && *t.UsesRemaining <= 0,
+			Status: t.Status,
 		})
 	}
 	return views

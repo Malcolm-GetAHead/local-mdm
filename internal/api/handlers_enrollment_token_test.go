@@ -103,6 +103,7 @@ func TestHandleRevokeEnrollmentToken(t *testing.T) {
 	// Verify revoked
 	fetched, _ := ts.enrollmentTokenRepo.GetByToken(nil, "revokeme")
 	assert.NotNil(t, fetched.RevokedAt)
+	assert.Equal(t, models.EnrollmentTokenStatusRevoked, fetched.Status)
 }
 
 func TestHandleRevokeEnrollmentToken_NotFound(t *testing.T) {
@@ -141,6 +142,25 @@ func TestValidateEnrollmentToken_Expired(t *testing.T) {
 	result, errMsg := ts.server.validateEnrollmentToken(req, "expiredtoken")
 	assert.Nil(t, result)
 	assert.Contains(t, errMsg, "expired")
+
+	// Verify status was updated to expired
+	fetched, _ := ts.enrollmentTokenRepo.GetByToken(nil, "expiredtoken")
+	assert.Equal(t, models.EnrollmentTokenStatusExpired, fetched.Status)
+}
+
+func TestValidateEnrollmentToken_AlreadyExpiredStatus(t *testing.T) {
+	ts := newTestServer(t)
+	tok := &models.EnrollmentToken{
+		EnterpriseID: uuid.New(), Token: "alreadyexpired",
+		ExpiresAt: time.Now().Add(-time.Hour),
+		Status:    models.EnrollmentTokenStatusExpired,
+	}
+	ts.enrollmentTokenRepo.Create(nil, tok)
+
+	req := httptest.NewRequest("GET", "/", nil)
+	result, errMsg := ts.server.validateEnrollmentToken(req, "alreadyexpired")
+	assert.Nil(t, result)
+	assert.Contains(t, errMsg, "expired")
 }
 
 func TestValidateEnrollmentToken_Revoked(t *testing.T) {
@@ -149,6 +169,7 @@ func TestValidateEnrollmentToken_Revoked(t *testing.T) {
 	tok := &models.EnrollmentToken{
 		EnterpriseID: uuid.New(), Token: "revokedtoken",
 		ExpiresAt: time.Now().Add(time.Hour), RevokedAt: &now,
+		Status: models.EnrollmentTokenStatusRevoked,
 	}
 	ts.enrollmentTokenRepo.Create(nil, tok)
 

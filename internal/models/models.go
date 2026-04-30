@@ -318,7 +318,14 @@ type EnrollmentToken struct {
 	CreatedBy     *uuid.UUID `json:"created_by" db:"created_by"`
 	CreatedAt     time.Time  `json:"created_at" db:"created_at"`
 	RevokedAt     *time.Time `json:"revoked_at,omitempty" db:"revoked_at"`
+	Status        string     `json:"status" db:"status"`
 }
+
+const (
+	EnrollmentTokenStatusActive  = "active"
+	EnrollmentTokenStatusExpired = "expired"
+	EnrollmentTokenStatusRevoked = "revoked"
+)
 
 const (
 	CommandTypeDeviceInfo      = "device_info"

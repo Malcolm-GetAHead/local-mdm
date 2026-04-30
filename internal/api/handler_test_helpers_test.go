@@ -688,6 +688,9 @@ func (m *mockEnrollmentTokenRepo) Create(_ context.Context, t *models.Enrollment
 	if t.ID == uuid.Nil {
 		t.ID = uuid.New()
 	}
+	if t.Status == "" {
+		t.Status = models.EnrollmentTokenStatusActive
+	}
 	t.CreatedAt = time.Now()
 	m.tokens = append(m.tokens, t)
 	return nil
@@ -719,9 +722,10 @@ func (m *mockEnrollmentTokenRepo) List(_ context.Context, eid uuid.UUID, limit, 
 }
 func (m *mockEnrollmentTokenRepo) Revoke(_ context.Context, id uuid.UUID) error {
 	for _, t := range m.tokens {
-		if t.ID == id && t.RevokedAt == nil {
+		if t.ID == id && t.Status == models.EnrollmentTokenStatusActive {
 			now := time.Now()
 			t.RevokedAt = &now
+			t.Status = models.EnrollmentTokenStatusRevoked
 			return nil
 		}
 	}
@@ -738,6 +742,26 @@ func (m *mockEnrollmentTokenRepo) DecrementUses(_ context.Context, id uuid.UUID)
 		}
 	}
 	return fmt.Errorf("enrollment token not found: %w", apperrors.ErrNotFound)
+}
+func (m *mockEnrollmentTokenRepo) SetStatus(_ context.Context, id uuid.UUID, status string) error {
+	for _, t := range m.tokens {
+		if t.ID == id {
+			t.Status = status
+			return nil
+		}
+	}
+	return fmt.Errorf("enrollment token not found: %w", apperrors.ErrNotFound)
+}
+func (m *mockEnrollmentTokenRepo) ExpireTokens(_ context.Context) (int64, error) {
+	var n int64
+	now := time.Now()
+	for _, t := range m.tokens {
+		if t.Status == models.EnrollmentTokenStatusActive && now.After(t.ExpiresAt) {
+			t.Status = models.EnrollmentTokenStatusExpired
+			n++
+		}
+	}
+	return n, nil
 }
 
 // --- Test Helper ---

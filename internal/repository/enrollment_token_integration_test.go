@@ -52,6 +52,7 @@ func TestEnrollmentTokenRepository(t *testing.T) {
 		assert.Equal(t, "integration test token", fetched.Description)
 		assert.Equal(t, 5, *fetched.MaxUses)
 		assert.Equal(t, 5, *fetched.UsesRemaining)
+		assert.Equal(t, models.EnrollmentTokenStatusActive, fetched.Status)
 		assert.Nil(t, fetched.RevokedAt)
 	})
 
@@ -104,6 +105,7 @@ func TestEnrollmentTokenRepository(t *testing.T) {
 		fetched, err := repo.GetByToken(ctx, tok.Token)
 		require.NoError(t, err)
 		assert.NotNil(t, fetched.RevokedAt)
+		assert.Equal(t, models.EnrollmentTokenStatusRevoked, fetched.Status)
 	})
 
 	t.Run("revoke not found", func(t *testing.T) {
@@ -207,5 +209,53 @@ func TestEnrollmentTokenRepository(t *testing.T) {
 		require.NoError(t, err)
 		// Should not panic on NULL description scan
 		assert.Equal(t, "", fetched.Description)
+	})
+
+	t.Run("set status", func(t *testing.T) {
+		tok := &models.EnrollmentToken{
+			EnterpriseID: enterprise.ID,
+			Token:        "inttest-setstatus-" + uuid.New().String()[:8],
+			ExpiresAt:    time.Now().Add(time.Hour),
+		}
+		require.NoError(t, repo.Create(ctx, tok))
+		assert.Equal(t, models.EnrollmentTokenStatusActive, tok.Status)
+
+		require.NoError(t, repo.SetStatus(ctx, tok.ID, models.EnrollmentTokenStatusExpired))
+
+		fetched, err := repo.GetByToken(ctx, tok.Token)
+		require.NoError(t, err)
+		assert.Equal(t, models.EnrollmentTokenStatusExpired, fetched.Status)
+	})
+
+	t.Run("expire tokens bulk", func(t *testing.T) {
+		// Create an active token that's already past expiry
+		tok := &models.EnrollmentToken{
+			EnterpriseID: enterprise.ID,
+			Token:        "inttest-bulkexpire-" + uuid.New().String()[:8],
+			ExpiresAt:    time.Now().Add(-time.Hour),
+		}
+		require.NoError(t, repo.Create(ctx, tok))
+
+		// Create an active token that's NOT expired
+		tok2 := &models.EnrollmentToken{
+			EnterpriseID: enterprise.ID,
+			Token:        "inttest-notexpired-" + uuid.New().String()[:8],
+			ExpiresAt:    time.Now().Add(time.Hour),
+		}
+		require.NoError(t, repo.Create(ctx, tok2))
+
+		n, err := repo.ExpireTokens(ctx)
+		require.NoError(t, err)
+		assert.GreaterOrEqual(t, n, int64(1))
+
+		// Expired token should have status=expired
+		fetched, err := repo.GetByToken(ctx, tok.Token)
+		require.NoError(t, err)
+		assert.Equal(t, models.EnrollmentTokenStatusExpired, fetched.Status)
+
+		// Non-expired token should still be active
+		fetched2, err := repo.GetByToken(ctx, tok2.Token)
+		require.NoError(t, err)
+		assert.Equal(t, models.EnrollmentTokenStatusActive, fetched2.Status)
 	})
 }

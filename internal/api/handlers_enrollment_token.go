@@ -168,15 +168,21 @@ func (s *Server) handleRevokeEnrollmentToken(w http.ResponseWriter, r *http.Requ
 
 // validateEnrollmentToken checks if a token is valid for enrollment.
 // Returns the token if valid, or nil and an error message if not.
+// If an active token is time-expired, updates its status to expired before rejecting.
 func (s *Server) validateEnrollmentToken(r *http.Request, tokenStr string) (*models.EnrollmentToken, string) {
 	token, err := s.enrollmentTokenRepo.GetByToken(r.Context(), tokenStr)
 	if err != nil {
 		return nil, ""
 	}
-	if token.RevokedAt != nil {
+	if token.Status == models.EnrollmentTokenStatusRevoked {
 		return nil, "Enrollment token has been revoked"
 	}
+	if token.Status == models.EnrollmentTokenStatusExpired {
+		return nil, "Enrollment token has expired"
+	}
+	// Active token but time-expired — update status before rejecting
 	if time.Now().After(token.ExpiresAt) {
+		_ = s.enrollmentTokenRepo.SetStatus(r.Context(), token.ID, models.EnrollmentTokenStatusExpired)
 		return nil, "Enrollment token has expired"
 	}
 	if token.UsesRemaining != nil && *token.UsesRemaining <= 0 {
