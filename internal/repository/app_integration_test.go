@@ -15,9 +15,16 @@ import (
 
 func TestAppRepository(t *testing.T) {
 	database := testutil.ConnectDB(t)
-	testutil.EnsureTestEnterprise(t, database.Writer)
-	t.Cleanup(func() { testutil.CleanupTestData(t, database.Writer) })
-	enterpriseID := testutil.TestEnterpriseID
+
+	entRepo, err := repository.NewEnterpriseRepository(database.Writer, database.Reader)
+	require.NoError(t, err)
+
+	enterprise := &models.Enterprise{
+		Name: "app-test-ent-" + uuid.New().String()[:8],
+		Slug: "app-test-" + uuid.New().String()[:8],
+	}
+	require.NoError(t, entRepo.Create(context.Background(), enterprise))
+	t.Cleanup(func() { database.Writer.Exec("DELETE FROM enterprises WHERE id = $1", enterprise.ID) })
 
 	repo, err := repository.NewAppRepository(database.Writer, database.Reader)
 	require.NoError(t, err)
@@ -25,7 +32,7 @@ func TestAppRepository(t *testing.T) {
 
 	t.Run("create and get by ID", func(t *testing.T) {
 		app := &models.App{
-			EnterpriseID: enterpriseID,
+			EnterpriseID: enterprise.ID,
 			Name:         "Test App",
 			Platform:     models.PlatformWindows,
 			Identifier:   "com.test.app-" + uuid.New().String()[:8],
@@ -49,7 +56,7 @@ func TestAppRepository(t *testing.T) {
 	t.Run("list with pagination", func(t *testing.T) {
 		for i := 0; i < 3; i++ {
 			require.NoError(t, repo.Create(ctx, &models.App{
-				EnterpriseID: enterpriseID,
+				EnterpriseID: enterprise.ID,
 				Name:         "List App " + uuid.New().String()[:4],
 				Platform:     models.PlatformMacOS,
 				Identifier:   "com.list." + uuid.New().String()[:8],
@@ -58,7 +65,7 @@ func TestAppRepository(t *testing.T) {
 			}))
 		}
 
-		apps, total, err := repo.List(ctx, enterpriseID, 2, 0)
+		apps, total, err := repo.List(ctx, enterprise.ID, 2, 0)
 		require.NoError(t, err)
 		assert.Equal(t, 2, len(apps))
 		assert.GreaterOrEqual(t, total, 3)
@@ -66,7 +73,7 @@ func TestAppRepository(t *testing.T) {
 
 	t.Run("update", func(t *testing.T) {
 		app := &models.App{
-			EnterpriseID: enterpriseID,
+			EnterpriseID: enterprise.ID,
 			Name:         "Update Me",
 			Platform:     models.PlatformAndroid,
 			Identifier:   "com.update." + uuid.New().String()[:8],
@@ -89,7 +96,7 @@ func TestAppRepository(t *testing.T) {
 
 	t.Run("delete soft-deletes", func(t *testing.T) {
 		app := &models.App{
-			EnterpriseID: enterpriseID,
+			EnterpriseID: enterprise.ID,
 			Name:         "Delete Me",
 			Platform:     models.PlatformWindows,
 			Identifier:   "com.delete." + uuid.New().String()[:8],

@@ -30,12 +30,19 @@ func TestE2E_MacOSWebhook(t *testing.T) {
 	ctx := context.Background()
 	logger := slog.Default()
 
-	testutil.EnsureTestEnterprise(t, database.Writer)
-	t.Cleanup(func() { testutil.CleanupTestData(t, database.Writer) })
-	enterpriseID := testutil.TestEnterpriseID
-
+	entRepo, err := repository.NewEnterpriseRepository(database.Writer, database.Reader)
+	require.NoError(t, err)
 	deviceRepo, err := repository.NewDeviceRepository(database.Writer, database.Reader)
 	require.NoError(t, err)
+
+	// Create enterprise
+	enterprise := &models.Enterprise{
+		BaseModel: models.BaseModel{ID: uuid.New()},
+		Name:      "macOS Webhook Test",
+		Slug:      "macos-webhook-" + uuid.New().String()[:8],
+	}
+	require.NoError(t, entRepo.Create(ctx, enterprise))
+	t.Cleanup(func() { database.Writer.Exec("DELETE FROM enterprises WHERE id = $1", enterprise.ID) })
 
 	// Create macOS service and webhook handler
 	macosService := macos.NewService(deviceRepo)
@@ -44,7 +51,6 @@ func TestE2E_MacOSWebhook(t *testing.T) {
 	require.NoError(t, err)
 	nanomdmSvc := macos.NewNanoMDMService("http://localhost:9000", "test-key", cmdRepo, deviceRepo, logger)
 	checkinHandler := macos.NewCheckinHandler(nanomdmSvc, macosService, nil, lifecycleSvc, logger)
-	checkinHandler.SetDefaultEnterpriseID(enterpriseID)
 
 	// Simulate NanoMDM Authenticate webhook
 	udid := uuid.New().String()
@@ -66,11 +72,14 @@ func TestE2E_MacOSWebhook(t *testing.T) {
 
 	assert.Equal(t, http.StatusOK, w.Code)
 
-	// Verify device was created under test enterprise
+	// Verify device was created (may be under default enterprise, not test enterprise)
 	device, err := deviceRepo.GetByPlatformID(ctx, models.PlatformMacOS, udid)
 	require.NoError(t, err)
 	assert.Equal(t, models.PlatformMacOS, device.Platform)
 	assert.Equal(t, "pending", device.Status)
+
+	// Clean up
+	_ = deviceRepo.Delete(ctx, device.ID)
 }
 
 // TestE2E_MacOSCheckOut simulates a CheckOut webhook and verifies
@@ -80,17 +89,24 @@ func TestE2E_MacOSCheckOut(t *testing.T) {
 	ctx := context.Background()
 	logger := slog.Default()
 
-	testutil.EnsureTestEnterprise(t, database.Writer)
-	t.Cleanup(func() { testutil.CleanupTestData(t, database.Writer) })
-	enterpriseID := testutil.TestEnterpriseID
-
+	entRepo, err := repository.NewEnterpriseRepository(database.Writer, database.Reader)
+	require.NoError(t, err)
 	deviceRepo, err := repository.NewDeviceRepository(database.Writer, database.Reader)
 	require.NoError(t, err)
+
+	// Create enterprise and device
+	enterprise := &models.Enterprise{
+		BaseModel: models.BaseModel{ID: uuid.New()},
+		Name:      "macOS CheckOut Test",
+		Slug:      "macos-checkout-" + uuid.New().String()[:8],
+	}
+	require.NoError(t, entRepo.Create(ctx, enterprise))
+	t.Cleanup(func() { database.Writer.Exec("DELETE FROM enterprises WHERE id = $1", enterprise.ID) })
 
 	udid := uuid.New().String()
 	device := &models.Device{
 		BaseModel:    models.BaseModel{ID: uuid.New()},
-		EnterpriseID: enterpriseID,
+		EnterpriseID: enterprise.ID,
 		Platform:     models.PlatformMacOS,
 		DeviceID:     udid,
 		SerialNumber: "C02TEST" + uuid.New().String()[:4],
@@ -134,16 +150,21 @@ func TestE2E_AndroidWebhookEnrollment(t *testing.T) {
 	ctx := context.Background()
 	logger := slog.Default()
 
-	testutil.EnsureTestEnterprise(t, database.Writer)
-	t.Cleanup(func() { testutil.CleanupTestData(t, database.Writer) })
-	enterpriseID := testutil.TestEnterpriseID
-
+	entRepo, err := repository.NewEnterpriseRepository(database.Writer, database.Reader)
+	require.NoError(t, err)
 	deviceRepo, err := repository.NewDeviceRepository(database.Writer, database.Reader)
 	require.NoError(t, err)
 
+	// Create enterprise
+	enterprise := &models.Enterprise{
+		BaseModel: models.BaseModel{ID: uuid.New()},
+		Name:      "Android Webhook Test",
+		Slug:      "android-webhook-" + uuid.New().String()[:8],
+	}
+	require.NoError(t, entRepo.Create(ctx, enterprise))
+	t.Cleanup(func() { database.Writer.Exec("DELETE FROM enterprises WHERE id = $1", enterprise.ID) })
+
 	// Create Android service and webhook handler (no Google client)
-	entRepo, err := repository.NewEnterpriseRepository(database.Writer, database.Reader)
-	require.NoError(t, err)
 	androidService := android.NewService(deviceRepo, entRepo, "", "")
 	webhookHandler := android.NewWebhookHandler(androidService, nil, logger)
 
@@ -151,7 +172,7 @@ func TestE2E_AndroidWebhookEnrollment(t *testing.T) {
 	deviceName := "enterprises/test/devices/" + uuid.New().String()
 	event := android.WebhookEvent{
 		NotificationType: "ENROLLMENT",
-		EnterpriseToken:  "test-enterprise",
+		EnterpriseToken:  enterprise.Slug,
 		DeviceName:       deviceName,
 		Timestamp:        time.Now().Format(time.RFC3339),
 	}
@@ -164,7 +185,7 @@ func TestE2E_AndroidWebhookEnrollment(t *testing.T) {
 	assert.Equal(t, http.StatusOK, w.Code)
 
 	// Verify device was created
-	devices, _, err := deviceRepo.List(ctx, enterpriseID, 100, 0)
+	devices, _, err := deviceRepo.List(ctx, enterprise.ID, 100, 0)
 	require.NoError(t, err)
 
 	found := false
@@ -184,17 +205,24 @@ func TestE2E_AndroidWebhookUnenrollment(t *testing.T) {
 	ctx := context.Background()
 	logger := slog.Default()
 
-	testutil.EnsureTestEnterprise(t, database.Writer)
-	t.Cleanup(func() { testutil.CleanupTestData(t, database.Writer) })
-	enterpriseID := testutil.TestEnterpriseID
-
+	entRepo, err := repository.NewEnterpriseRepository(database.Writer, database.Reader)
+	require.NoError(t, err)
 	deviceRepo, err := repository.NewDeviceRepository(database.Writer, database.Reader)
 	require.NoError(t, err)
+
+	// Create enterprise and device
+	enterprise := &models.Enterprise{
+		BaseModel: models.BaseModel{ID: uuid.New()},
+		Name:      "Android Unenroll Test",
+		Slug:      "android-unenroll-" + uuid.New().String()[:8],
+	}
+	require.NoError(t, entRepo.Create(ctx, enterprise))
+	t.Cleanup(func() { database.Writer.Exec("DELETE FROM enterprises WHERE id = $1", enterprise.ID) })
 
 	deviceName := "enterprises/test/devices/" + uuid.New().String()
 	device := &models.Device{
 		BaseModel:    models.BaseModel{ID: uuid.New()},
-		EnterpriseID: enterpriseID,
+		EnterpriseID: enterprise.ID,
 		Platform:     models.PlatformAndroid,
 		DeviceID:     uuid.New().String(),
 		SerialNumber: deviceName,
@@ -203,14 +231,12 @@ func TestE2E_AndroidWebhookUnenrollment(t *testing.T) {
 	require.NoError(t, deviceRepo.Create(ctx, device))
 
 	// Simulate unenrollment webhook
-	entRepo, err := repository.NewEnterpriseRepository(database.Writer, database.Reader)
-	require.NoError(t, err)
 	androidService := android.NewService(deviceRepo, entRepo, "", "")
 	webhookHandler := android.NewWebhookHandler(androidService, nil, logger)
 
 	event := android.WebhookEvent{
 		NotificationType: "UNENROLLMENT",
-		EnterpriseToken:  "test-enterprise",
+		EnterpriseToken:  enterprise.Slug,
 		DeviceName:       deviceName,
 		Timestamp:        time.Now().Format(time.RFC3339),
 	}

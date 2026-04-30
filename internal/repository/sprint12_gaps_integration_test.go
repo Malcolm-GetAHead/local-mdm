@@ -15,9 +15,15 @@ import (
 
 func TestDeviceRepository_GetByPlatformID(t *testing.T) {
 	database := testutil.ConnectDB(t)
-	testutil.EnsureTestEnterprise(t, database.Writer)
-	t.Cleanup(func() { testutil.CleanupTestData(t, database.Writer) })
-	enterpriseID := testutil.TestEnterpriseID
+
+	entRepo, err := repository.NewEnterpriseRepository(database.Writer, database.Reader)
+	require.NoError(t, err)
+	enterprise := &models.Enterprise{
+		Name: "plat-test-" + uuid.New().String()[:8],
+		Slug: "plat-test-" + uuid.New().String()[:8],
+	}
+	require.NoError(t, entRepo.Create(context.Background(), enterprise))
+	t.Cleanup(func() { database.Writer.Exec("DELETE FROM enterprises WHERE id = $1", enterprise.ID) })
 
 	repo, err := repository.NewDeviceRepository(database.Writer, database.Reader)
 	require.NoError(t, err)
@@ -25,7 +31,7 @@ func TestDeviceRepository_GetByPlatformID(t *testing.T) {
 
 	platformDeviceID := "WIN-PLAT-" + uuid.New().String()[:8]
 	device := &models.Device{
-		EnterpriseID: enterpriseID,
+		EnterpriseID: enterprise.ID,
 		Platform:     models.PlatformWindows,
 		DeviceID:     platformDeviceID,
 		SerialNumber: "SN" + uuid.New().String()[:8],
@@ -58,14 +64,20 @@ func TestDeviceRepository_GetByPlatformID(t *testing.T) {
 
 func TestCommandRepository_GetByID(t *testing.T) {
 	database := testutil.ConnectDB(t)
-	testutil.EnsureTestEnterprise(t, database.Writer)
-	t.Cleanup(func() { testutil.CleanupTestData(t, database.Writer) })
-	enterpriseID := testutil.TestEnterpriseID
+
+	entRepo, err := repository.NewEnterpriseRepository(database.Writer, database.Reader)
+	require.NoError(t, err)
+	enterprise := &models.Enterprise{
+		Name: "cmd-getid-" + uuid.New().String()[:8],
+		Slug: "cmd-getid-" + uuid.New().String()[:8],
+	}
+	require.NoError(t, entRepo.Create(context.Background(), enterprise))
+	t.Cleanup(func() { database.Writer.Exec("DELETE FROM enterprises WHERE id = $1", enterprise.ID) })
 
 	deviceRepo, err := repository.NewDeviceRepository(database.Writer, database.Reader)
 	require.NoError(t, err)
 	device := &models.Device{
-		EnterpriseID: enterpriseID,
+		EnterpriseID: enterprise.ID,
 		Platform:     models.PlatformWindows,
 		DeviceID:     "cmd-getid-" + uuid.New().String()[:8],
 		Status:       models.DeviceStatusEnrolled,
@@ -116,14 +128,20 @@ func TestCommandRepository_GetByID(t *testing.T) {
 
 func TestCommandRepository_ListByDevice(t *testing.T) {
 	database := testutil.ConnectDB(t)
-	testutil.EnsureTestEnterprise(t, database.Writer)
-	t.Cleanup(func() { testutil.CleanupTestData(t, database.Writer) })
-	enterpriseID := testutil.TestEnterpriseID
+
+	entRepo, err := repository.NewEnterpriseRepository(database.Writer, database.Reader)
+	require.NoError(t, err)
+	enterprise := &models.Enterprise{
+		Name: "cmd-list-" + uuid.New().String()[:8],
+		Slug: "cmd-list-" + uuid.New().String()[:8],
+	}
+	require.NoError(t, entRepo.Create(context.Background(), enterprise))
+	t.Cleanup(func() { database.Writer.Exec("DELETE FROM enterprises WHERE id = $1", enterprise.ID) })
 
 	deviceRepo, err := repository.NewDeviceRepository(database.Writer, database.Reader)
 	require.NoError(t, err)
 	device := &models.Device{
-		EnterpriseID: enterpriseID,
+		EnterpriseID: enterprise.ID,
 		Platform:     models.PlatformMacOS,
 		DeviceID:     "cmd-list-" + uuid.New().String()[:8],
 		Status:       models.DeviceStatusEnrolled,

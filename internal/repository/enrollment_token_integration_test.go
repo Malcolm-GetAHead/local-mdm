@@ -17,9 +17,15 @@ import (
 func TestEnrollmentTokenRepository(t *testing.T) {
 	database := testutil.ConnectDB(t)
 	ctx := context.Background()
-	testutil.EnsureTestEnterprise(t, database.Writer)
-	t.Cleanup(func() { testutil.CleanupTestData(t, database.Writer) })
-	enterpriseID := testutil.TestEnterpriseID
+
+	entRepo, err := repository.NewEnterpriseRepository(database.Writer, database.Reader)
+	require.NoError(t, err)
+	enterprise := &models.Enterprise{
+		Name: "etok-test-" + uuid.New().String()[:8],
+		Slug: "etok-test-" + uuid.New().String()[:8],
+	}
+	require.NoError(t, entRepo.Create(ctx, enterprise))
+	t.Cleanup(func() { database.Writer.Exec("DELETE FROM enterprises WHERE id = $1", enterprise.ID) })
 
 	repo, err := repository.NewEnrollmentTokenRepository(database.Writer, database.Reader)
 	require.NoError(t, err)
@@ -27,7 +33,7 @@ func TestEnrollmentTokenRepository(t *testing.T) {
 	t.Run("create and get by token", func(t *testing.T) {
 		maxUses := 5
 		tok := &models.EnrollmentToken{
-			EnterpriseID:  enterpriseID,
+			EnterpriseID:  enterprise.ID,
 			Token:         "inttest-" + uuid.New().String()[:8],
 			Description:   "integration test token",
 			MaxUses:       &maxUses,
@@ -42,7 +48,7 @@ func TestEnrollmentTokenRepository(t *testing.T) {
 		fetched, err := repo.GetByToken(ctx, tok.Token)
 		require.NoError(t, err)
 		assert.Equal(t, tok.ID, fetched.ID)
-		assert.Equal(t, enterpriseID, fetched.EnterpriseID)
+		assert.Equal(t, enterprise.ID, fetched.EnterpriseID)
 		assert.Equal(t, "integration test token", fetched.Description)
 		assert.Equal(t, 5, *fetched.MaxUses)
 		assert.Equal(t, 5, *fetched.UsesRemaining)
@@ -59,20 +65,20 @@ func TestEnrollmentTokenRepository(t *testing.T) {
 	t.Run("list by enterprise", func(t *testing.T) {
 		// Create a second token
 		tok2 := &models.EnrollmentToken{
-			EnterpriseID: enterpriseID,
+			EnterpriseID: enterprise.ID,
 			Token:        "inttest-list-" + uuid.New().String()[:8],
 			ExpiresAt:    time.Now().Add(time.Hour),
 		}
 		require.NoError(t, repo.Create(ctx, tok2))
 
-		tokens, total, err := repo.List(ctx, enterpriseID, 10, 0)
+		tokens, total, err := repo.List(ctx, enterprise.ID, 10, 0)
 		require.NoError(t, err)
 		assert.GreaterOrEqual(t, total, 2)
 		assert.GreaterOrEqual(t, len(tokens), 2)
 	})
 
 	t.Run("list pagination", func(t *testing.T) {
-		tokens, total, err := repo.List(ctx, enterpriseID, 1, 0)
+		tokens, total, err := repo.List(ctx, enterprise.ID, 1, 0)
 		require.NoError(t, err)
 		assert.GreaterOrEqual(t, total, 2)
 		assert.Len(t, tokens, 1) // limit=1
@@ -87,7 +93,7 @@ func TestEnrollmentTokenRepository(t *testing.T) {
 
 	t.Run("revoke", func(t *testing.T) {
 		tok := &models.EnrollmentToken{
-			EnterpriseID: enterpriseID,
+			EnterpriseID: enterprise.ID,
 			Token:        "inttest-revoke-" + uuid.New().String()[:8],
 			ExpiresAt:    time.Now().Add(time.Hour),
 		}
@@ -110,7 +116,7 @@ func TestEnrollmentTokenRepository(t *testing.T) {
 
 	t.Run("revoke already revoked", func(t *testing.T) {
 		tok := &models.EnrollmentToken{
-			EnterpriseID: enterpriseID,
+			EnterpriseID: enterprise.ID,
 			Token:        "inttest-double-revoke-" + uuid.New().String()[:8],
 			ExpiresAt:    time.Now().Add(time.Hour),
 		}
@@ -125,7 +131,7 @@ func TestEnrollmentTokenRepository(t *testing.T) {
 	t.Run("decrement uses", func(t *testing.T) {
 		maxUses := 3
 		tok := &models.EnrollmentToken{
-			EnterpriseID:  enterpriseID,
+			EnterpriseID:  enterprise.ID,
 			Token:         "inttest-dec-" + uuid.New().String()[:8],
 			MaxUses:       &maxUses,
 			UsesRemaining: &maxUses,
@@ -155,7 +161,7 @@ func TestEnrollmentTokenRepository(t *testing.T) {
 
 	t.Run("decrement unlimited uses", func(t *testing.T) {
 		tok := &models.EnrollmentToken{
-			EnterpriseID: enterpriseID,
+			EnterpriseID: enterprise.ID,
 			Token:        "inttest-unlimited-" + uuid.New().String()[:8],
 			ExpiresAt:    time.Now().Add(time.Hour),
 			// MaxUses and UsesRemaining are nil = unlimited
@@ -171,13 +177,13 @@ func TestEnrollmentTokenRepository(t *testing.T) {
 		userID := uuid.New()
 		_, err := database.Writer.Exec(
 			"INSERT INTO users (id, enterprise_id, email, full_name, role, is_active) VALUES ($1, $2, $3, $4, $5, true)",
-			userID, enterpriseID, "test-"+uuid.New().String()[:8]+"@test.com", "Test User", "admin",
+			userID, enterprise.ID, "test-"+uuid.New().String()[:8]+"@test.com", "Test User", "admin",
 		)
 		require.NoError(t, err)
 		t.Cleanup(func() { database.Writer.Exec("DELETE FROM users WHERE id = $1", userID) })
 
 		tok := &models.EnrollmentToken{
-			EnterpriseID: enterpriseID,
+			EnterpriseID: enterprise.ID,
 			Token:        "inttest-createdby-" + uuid.New().String()[:8],
 			ExpiresAt:    time.Now().Add(time.Hour),
 			CreatedBy:    &userID,
@@ -192,7 +198,7 @@ func TestEnrollmentTokenRepository(t *testing.T) {
 
 	t.Run("null description scans correctly", func(t *testing.T) {
 		tok := &models.EnrollmentToken{
-			EnterpriseID: enterpriseID,
+			EnterpriseID: enterprise.ID,
 			Token:        "inttest-nulldesc-" + uuid.New().String()[:8],
 			ExpiresAt:    time.Now().Add(time.Hour),
 			// Description is empty string, stored as NULL
@@ -207,7 +213,7 @@ func TestEnrollmentTokenRepository(t *testing.T) {
 
 	t.Run("set status", func(t *testing.T) {
 		tok := &models.EnrollmentToken{
-			EnterpriseID: enterpriseID,
+			EnterpriseID: enterprise.ID,
 			Token:        "inttest-setstatus-" + uuid.New().String()[:8],
 			ExpiresAt:    time.Now().Add(time.Hour),
 		}
@@ -224,7 +230,7 @@ func TestEnrollmentTokenRepository(t *testing.T) {
 	t.Run("expire tokens bulk", func(t *testing.T) {
 		// Create an active token that's already past expiry
 		tok := &models.EnrollmentToken{
-			EnterpriseID: enterpriseID,
+			EnterpriseID: enterprise.ID,
 			Token:        "inttest-bulkexpire-" + uuid.New().String()[:8],
 			ExpiresAt:    time.Now().Add(-time.Hour),
 		}
@@ -232,7 +238,7 @@ func TestEnrollmentTokenRepository(t *testing.T) {
 
 		// Create an active token that's NOT expired
 		tok2 := &models.EnrollmentToken{
-			EnterpriseID: enterpriseID,
+			EnterpriseID: enterprise.ID,
 			Token:        "inttest-notexpired-" + uuid.New().String()[:8],
 			ExpiresAt:    time.Now().Add(time.Hour),
 		}

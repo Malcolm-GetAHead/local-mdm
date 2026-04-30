@@ -15,14 +15,20 @@ import (
 
 func TestGroupRepository(t *testing.T) {
 	database := testutil.ConnectDB(t)
-	testutil.EnsureTestEnterprise(t, database.Writer)
-	t.Cleanup(func() { testutil.CleanupTestData(t, database.Writer) })
-	enterpriseID := testutil.TestEnterpriseID
+
+	entRepo, err := repository.NewEnterpriseRepository(database.Writer, database.Reader)
+	require.NoError(t, err)
+	enterprise := &models.Enterprise{
+		Name: "grp-test-" + uuid.New().String()[:8],
+		Slug: "grp-test-" + uuid.New().String()[:8],
+	}
+	require.NoError(t, entRepo.Create(context.Background(), enterprise))
+	t.Cleanup(func() { database.Writer.Exec("DELETE FROM enterprises WHERE id = $1", enterprise.ID) })
 
 	deviceRepo, err := repository.NewDeviceRepository(database.Writer, database.Reader)
 	require.NoError(t, err)
 	device := &models.Device{
-		EnterpriseID: enterpriseID,
+		EnterpriseID: enterprise.ID,
 		Platform:     models.PlatformMacOS,
 		DeviceID:     "grp-dev-" + uuid.New().String()[:8],
 		Status:       models.DeviceStatusEnrolled,
@@ -37,7 +43,7 @@ func TestGroupRepository(t *testing.T) {
 
 	t.Run("create and get by ID", func(t *testing.T) {
 		group := &models.DeviceGroup{
-			EnterpriseID: enterpriseID,
+			EnterpriseID: enterprise.ID,
 			Name:         "Engineering",
 			Description:  "Engineering team devices",
 		}
@@ -55,12 +61,12 @@ func TestGroupRepository(t *testing.T) {
 	t.Run("list with pagination", func(t *testing.T) {
 		for i := 0; i < 3; i++ {
 			require.NoError(t, repo.Create(ctx, &models.DeviceGroup{
-				EnterpriseID: enterpriseID,
+				EnterpriseID: enterprise.ID,
 				Name:         "List Group " + uuid.New().String()[:4],
 			}))
 		}
 
-		groups, total, err := repo.List(ctx, enterpriseID, 2, 0)
+		groups, total, err := repo.List(ctx, enterprise.ID, 2, 0)
 		require.NoError(t, err)
 		assert.Equal(t, 2, len(groups))
 		assert.GreaterOrEqual(t, total, 3)
@@ -68,7 +74,7 @@ func TestGroupRepository(t *testing.T) {
 
 	t.Run("update", func(t *testing.T) {
 		group := &models.DeviceGroup{
-			EnterpriseID: enterpriseID,
+			EnterpriseID: enterprise.ID,
 			Name:         "Old Name",
 		}
 		require.NoError(t, repo.Create(ctx, group))
@@ -86,7 +92,7 @@ func TestGroupRepository(t *testing.T) {
 
 	t.Run("delete soft-deletes", func(t *testing.T) {
 		group := &models.DeviceGroup{
-			EnterpriseID: enterpriseID,
+			EnterpriseID: enterprise.ID,
 			Name:         "Delete Me",
 		}
 		require.NoError(t, repo.Create(ctx, group))
@@ -101,7 +107,7 @@ func TestGroupRepository(t *testing.T) {
 
 	t.Run("add and list members", func(t *testing.T) {
 		group := &models.DeviceGroup{
-			EnterpriseID: enterpriseID,
+			EnterpriseID: enterprise.ID,
 			Name:         "Members Group",
 		}
 		require.NoError(t, repo.Create(ctx, group))
@@ -118,7 +124,7 @@ func TestGroupRepository(t *testing.T) {
 
 	t.Run("add member duplicate is idempotent", func(t *testing.T) {
 		group := &models.DeviceGroup{
-			EnterpriseID: enterpriseID,
+			EnterpriseID: enterprise.ID,
 			Name:         "Dup Group",
 		}
 		require.NoError(t, repo.Create(ctx, group))
@@ -135,7 +141,7 @@ func TestGroupRepository(t *testing.T) {
 
 	t.Run("remove member", func(t *testing.T) {
 		group := &models.DeviceGroup{
-			EnterpriseID: enterpriseID,
+			EnterpriseID: enterprise.ID,
 			Name:         "Remove Group",
 		}
 		require.NoError(t, repo.Create(ctx, group))
@@ -151,8 +157,8 @@ func TestGroupRepository(t *testing.T) {
 	})
 
 	t.Run("list groups for device", func(t *testing.T) {
-		g1 := &models.DeviceGroup{EnterpriseID: enterpriseID, Name: "DevGroup A"}
-		g2 := &models.DeviceGroup{EnterpriseID: enterpriseID, Name: "DevGroup B"}
+		g1 := &models.DeviceGroup{EnterpriseID: enterprise.ID, Name: "DevGroup A"}
+		g2 := &models.DeviceGroup{EnterpriseID: enterprise.ID, Name: "DevGroup B"}
 		require.NoError(t, repo.Create(ctx, g1))
 		require.NoError(t, repo.Create(ctx, g2))
 		require.NoError(t, repo.AddMember(ctx, g1.ID, device.ID))

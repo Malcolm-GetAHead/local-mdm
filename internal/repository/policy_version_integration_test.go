@@ -15,14 +15,20 @@ import (
 
 func TestPolicyVersionRepository(t *testing.T) {
 	database := testutil.ConnectDB(t)
-	testutil.EnsureTestEnterprise(t, database.Writer)
-	t.Cleanup(func() { testutil.CleanupTestData(t, database.Writer) })
-	enterpriseID := testutil.TestEnterpriseID
+
+	entRepo, err := repository.NewEnterpriseRepository(database.Writer, database.Reader)
+	require.NoError(t, err)
+	enterprise := &models.Enterprise{
+		Name: "pv-test-" + uuid.New().String()[:8],
+		Slug: "pv-test-" + uuid.New().String()[:8],
+	}
+	require.NoError(t, entRepo.Create(context.Background(), enterprise))
+	t.Cleanup(func() { database.Writer.Exec("DELETE FROM enterprises WHERE id = $1", enterprise.ID) })
 
 	policyRepo, err := repository.NewPolicyRepository(database.Writer, database.Reader)
 	require.NoError(t, err)
 	policy := &models.Policy{
-		EnterpriseID: enterpriseID,
+		EnterpriseID: enterprise.ID,
 		Name:         "PV Policy",
 		Platform:     models.PlatformMacOS,
 		PolicyType:   "wifi",

@@ -14,14 +14,20 @@ import (
 
 func TestComplianceRepository(t *testing.T) {
 	database := testutil.ConnectDB(t)
-	testutil.EnsureTestEnterprise(t, database.Writer)
-	t.Cleanup(func() { testutil.CleanupTestData(t, database.Writer) })
-	enterpriseID := testutil.TestEnterpriseID
+
+	entRepo, err := repository.NewEnterpriseRepository(database.Writer, database.Reader)
+	require.NoError(t, err)
+	enterprise := &models.Enterprise{
+		Name: "comp-test-" + uuid.New().String()[:8],
+		Slug: "comp-test-" + uuid.New().String()[:8],
+	}
+	require.NoError(t, entRepo.Create(context.Background(), enterprise))
+	t.Cleanup(func() { database.Writer.Exec("DELETE FROM enterprises WHERE id = $1", enterprise.ID) })
 
 	deviceRepo, err := repository.NewDeviceRepository(database.Writer, database.Reader)
 	require.NoError(t, err)
 	device := &models.Device{
-		EnterpriseID: enterpriseID,
+		EnterpriseID: enterprise.ID,
 		Platform:     models.PlatformWindows,
 		DeviceID:     "comp-dev-" + uuid.New().String()[:8],
 		Status:       models.DeviceStatusEnrolled,
@@ -33,7 +39,7 @@ func TestComplianceRepository(t *testing.T) {
 	policyRepo, err := repository.NewPolicyRepository(database.Writer, database.Reader)
 	require.NoError(t, err)
 	policy := &models.Policy{
-		EnterpriseID: enterpriseID,
+		EnterpriseID: enterprise.ID,
 		Name:         "comp-policy-" + uuid.New().String()[:8],
 		Platform:     models.PlatformWindows,
 		PolicyType:   "security",
@@ -97,7 +103,7 @@ func TestComplianceRepository(t *testing.T) {
 	})
 
 	t.Run("get summary returns enterprise counts", func(t *testing.T) {
-		summary, err := repo.GetSummary(ctx, enterpriseID)
+		summary, err := repo.GetSummary(ctx, enterprise.ID)
 		require.NoError(t, err)
 		assert.GreaterOrEqual(t, summary.Total, 1)
 		assert.GreaterOrEqual(t, summary.NonCompliant, 1) // from upsert update above
