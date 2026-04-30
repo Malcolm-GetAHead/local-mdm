@@ -293,6 +293,33 @@
 - [ ] Wait 2s
 - [ ] Verify "Local MDM API" is visible
 
+## Enrollment Tokens
+
+### Navigate to Enrollment Tokens
+- [ ] Visit `/dashboard/enrollment-tokens` — page contains "Enrollment Tokens"
+- [ ] Verify "Create Token" is visible
+
+### Create Enrollment Token
+- [ ] Click "Create Token"
+- [ ] Wait 0.5s
+- [ ] Fill: Description=`PW Test Token`
+- [ ] Fill: Max Uses=`5`
+- [ ] Click "Create" on "Create Enrollment Token"
+- [ ] Wait 3s
+- [ ] Verify "PW Test Token" is visible
+- [ ] Verify "@localmdm.local" is visible
+
+### Created Token Banner Survives Refresh
+- [ ] Verify "Token created" is visible
+
+### Token Status Badge
+- [ ] Verify "Active" is visible
+
+### Revoke Enrollment Token
+- [ ] Click "Revoke"
+- [ ] Wait 2s
+- [ ] Verify "Revoked" is visible
+
 ## Logout
 
 ### Keycloak Logout

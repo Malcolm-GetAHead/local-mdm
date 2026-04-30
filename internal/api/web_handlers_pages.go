@@ -861,6 +861,35 @@ func (s *Server) handleWebPolicyUnassign(w http.ResponseWriter, r *http.Request)
 	w.WriteHeader(http.StatusOK)
 }
 
+// enrollmentTokenView is the template-friendly representation of an enrollment token.
+type enrollmentTokenView struct {
+	ID            uuid.UUID
+	Token         string
+	Description   string
+	MaxUses       *int
+	UsesRemaining *int
+	ExpiresAt     time.Time
+	CreatedAt     time.Time
+	RevokedAt     *time.Time
+	Expired       bool
+	Exhausted     bool
+}
+
+func toTokenViews(tokens []*models.EnrollmentToken) []enrollmentTokenView {
+	now := time.Now()
+	views := make([]enrollmentTokenView, 0, len(tokens))
+	for _, t := range tokens {
+		views = append(views, enrollmentTokenView{
+			ID: t.ID, Token: t.Token, Description: t.Description,
+			MaxUses: t.MaxUses, UsesRemaining: t.UsesRemaining,
+			ExpiresAt: t.ExpiresAt, CreatedAt: t.CreatedAt, RevokedAt: t.RevokedAt,
+			Expired:   now.After(t.ExpiresAt),
+			Exhausted: t.UsesRemaining != nil && *t.UsesRemaining <= 0,
+		})
+	}
+	return views
+}
+
 // handleWebEnrollmentTokens shows the enrollment tokens list page.
 func (s *Server) handleWebEnrollmentTokens(w http.ResponseWriter, r *http.Request) {
 	sess := getSession(r)
@@ -871,41 +900,15 @@ func (s *Server) handleWebEnrollmentTokens(w http.ResponseWriter, r *http.Reques
 	perPage := 50
 
 	tokens, total, _ := s.enrollmentTokenRepo.List(r.Context(), sess.EnterpriseID, perPage, (page-1)*perPage)
-
-	// Enrich tokens with computed status fields
-	now := time.Now()
-	type tokenView struct {
-		ID            uuid.UUID
-		Token         string
-		Description   string
-		MaxUses       *int
-		UsesRemaining *int
-		ExpiresAt     time.Time
-		CreatedAt     time.Time
-		RevokedAt     *time.Time
-		Expired       bool
-		Exhausted     bool
-	}
-	var views []tokenView
-	for _, t := range tokens {
-		v := tokenView{
-			ID: t.ID, Token: t.Token, Description: t.Description,
-			MaxUses: t.MaxUses, UsesRemaining: t.UsesRemaining,
-			ExpiresAt: t.ExpiresAt, CreatedAt: t.CreatedAt, RevokedAt: t.RevokedAt,
-			Expired:   now.After(t.ExpiresAt),
-			Exhausted: t.UsesRemaining != nil && *t.UsesRemaining <= 0,
-		}
-		views = append(views, v)
-	}
-
 	totalPages := (total + perPage - 1) / perPage
 
 	data := map[string]interface{}{
-		"ActiveNav":   "enrollment-tokens",
-		"Tokens":      views,
-		"TotalPages":  totalPages,
-		"CurrentPage": page,
-		"TotalItems":  total,
+		"ActiveNav":    "enrollment-tokens",
+		"Tokens":       toTokenViews(tokens),
+		"TotalPages":   totalPages,
+		"CurrentPage":  page,
+		"TotalItems":   total,
+		"CreatedToken": r.URL.Query().Get("created"),
 	}
 
 	if isHTMXFragment(r) {
@@ -920,44 +923,39 @@ func (s *Server) handleWebEnrollmentTokenCreate(w http.ResponseWriter, r *http.R
 	sess := getSession(r)
 	r.ParseForm()
 
-	description := r.FormValue("description")
-	maxUsesStr := r.FormValue("max_uses")
-	expiresIn := r.FormValue("expires_in")
-	if expiresIn == "" {
-		expiresIn = "24h"
-	}
-
-	dur, err := time.ParseDuration(expiresIn)
+	dur, err := time.ParseDuration(r.FormValue("expires_in"))
 	if err != nil {
 		dur = 24 * time.Hour
 	}
 
 	var maxUses *int
-	if maxUsesStr != "" {
-		if v, err := strconv.Atoi(maxUsesStr); err == nil && v > 0 {
-			maxUses = &v
-		}
+	if v, err := strconv.Atoi(r.FormValue("max_uses")); err == nil && v > 0 {
+		maxUses = &v
 	}
 
 	tokenStr, err := generateEnrollmentToken()
 	if err != nil {
-		w.Header().Set("HX-Trigger", `{"showToast":{"message":"Failed to generate token","type":"error"}}`)
-		w.WriteHeader(http.StatusInternalServerError)
+		http.Redirect(w, r, "/dashboard/enrollment-tokens", http.StatusFound)
 		return
 	}
 
 	token := &models.EnrollmentToken{
 		EnterpriseID:  sess.EnterpriseID,
 		Token:         tokenStr,
-		Description:   description,
+		Description:   r.FormValue("description"),
 		MaxUses:       maxUses,
 		UsesRemaining: maxUses,
 		ExpiresAt:     time.Now().Add(dur),
 	}
+	// Set created_by if the session user exists in the local users table
+	if sess.UserID != uuid.Nil {
+		if _, err := s.userService.Get(r.Context(), sess.UserID); err == nil {
+			token.CreatedBy = &sess.UserID
+		}
+	}
 
 	if err := s.enrollmentTokenRepo.Create(r.Context(), token); err != nil {
-		w.Header().Set("HX-Trigger", `{"showToast":{"message":"Failed to create token","type":"error"}}`)
-		w.WriteHeader(http.StatusInternalServerError)
+		http.Redirect(w, r, "/dashboard/enrollment-tokens", http.StatusFound)
 		return
 	}
 
@@ -967,49 +965,23 @@ func (s *Server) handleWebEnrollmentTokenCreate(w http.ResponseWriter, r *http.R
 		"expires_at":    token.ExpiresAt,
 	})
 
-	// Re-render the full page with the created token banner
-	r2 := r.Clone(r.Context())
-	r2.Method = "GET"
-	q := r2.URL.Query()
-	q.Del("page")
-	r2.URL.RawQuery = q.Encode()
-	// Fetch fresh list
-	tokens, total, _ := s.enrollmentTokenRepo.List(r.Context(), sess.EnterpriseID, 50, 0)
-	now := time.Now()
-	type tokenView struct {
-		ID            uuid.UUID
-		Token         string
-		Description   string
-		MaxUses       *int
-		UsesRemaining *int
-		ExpiresAt     time.Time
-		CreatedAt     time.Time
-		RevokedAt     *time.Time
-		Expired       bool
-		Exhausted     bool
-	}
-	var views []tokenView
-	for _, t := range tokens {
-		v := tokenView{
-			ID: t.ID, Token: t.Token, Description: t.Description,
-			MaxUses: t.MaxUses, UsesRemaining: t.UsesRemaining,
-			ExpiresAt: t.ExpiresAt, CreatedAt: t.CreatedAt, RevokedAt: t.RevokedAt,
-			Expired:   now.After(t.ExpiresAt),
-			Exhausted: t.UsesRemaining != nil && *t.UsesRemaining <= 0,
+	// For standard browser POST: redirect with ?created= so banner survives refresh
+	// For HTMX-boosted POST: render page directly (redirect loses HX-Target header)
+	if r.Header.Get("HX-Request") == "true" {
+		tokens, total, _ := s.enrollmentTokenRepo.List(r.Context(), sess.EnterpriseID, 50, 0)
+		data := map[string]interface{}{
+			"ActiveNav":    "enrollment-tokens",
+			"Tokens":       toTokenViews(tokens),
+			"TotalPages":   (total + 49) / 50,
+			"CurrentPage":  1,
+			"TotalItems":   total,
+			"CreatedToken": tokenStr,
 		}
-		views = append(views, v)
+		w.Header().Set("HX-Push-Url", "/dashboard/enrollment-tokens?created="+tokenStr)
+		s.renderPage(w, r, "enrollment_tokens", data)
+		return
 	}
-	totalPages := (total + 49) / 50
-
-	data := map[string]interface{}{
-		"ActiveNav":    "enrollment-tokens",
-		"Tokens":       views,
-		"TotalPages":   totalPages,
-		"CurrentPage":  1,
-		"TotalItems":   total,
-		"CreatedToken": tokenStr,
-	}
-	s.renderFragment(w, s.webTemplates["enrollment_tokens"], "enrollment_tokens_table_body", data)
+	http.Redirect(w, r, "/dashboard/enrollment-tokens?created="+tokenStr, http.StatusFound)
 }
 
 // handleWebEnrollmentTokenRevoke revokes an enrollment token from the dashboard.
@@ -1017,54 +989,16 @@ func (s *Server) handleWebEnrollmentTokenRevoke(w http.ResponseWriter, r *http.R
 	sess := getSession(r)
 	id, err := uuid.Parse(mux.Vars(r)["id"])
 	if err != nil {
-		w.Header().Set("HX-Trigger", `{"showToast":{"message":"Invalid token ID","type":"error"}}`)
-		w.WriteHeader(http.StatusBadRequest)
+		http.Redirect(w, r, "/dashboard/enrollment-tokens", http.StatusFound)
 		return
 	}
 
 	if err := s.enrollmentTokenRepo.Revoke(r.Context(), id); err != nil {
-		w.Header().Set("HX-Trigger", `{"showToast":{"message":"Failed to revoke token","type":"error"}}`)
-		w.WriteHeader(http.StatusInternalServerError)
+		http.Redirect(w, r, "/dashboard/enrollment-tokens", http.StatusFound)
 		return
 	}
 
 	s.logAudit(r, "enrollment_token.revoke", "enrollment_token", id, nil)
-
-	// Re-render table
-	tokens, total, _ := s.enrollmentTokenRepo.List(r.Context(), sess.EnterpriseID, 50, 0)
-	now := time.Now()
-	type tokenView struct {
-		ID            uuid.UUID
-		Token         string
-		Description   string
-		MaxUses       *int
-		UsesRemaining *int
-		ExpiresAt     time.Time
-		CreatedAt     time.Time
-		RevokedAt     *time.Time
-		Expired       bool
-		Exhausted     bool
-	}
-	var views []tokenView
-	for _, t := range tokens {
-		v := tokenView{
-			ID: t.ID, Token: t.Token, Description: t.Description,
-			MaxUses: t.MaxUses, UsesRemaining: t.UsesRemaining,
-			ExpiresAt: t.ExpiresAt, CreatedAt: t.CreatedAt, RevokedAt: t.RevokedAt,
-			Expired:   now.After(t.ExpiresAt),
-			Exhausted: t.UsesRemaining != nil && *t.UsesRemaining <= 0,
-		}
-		views = append(views, v)
-	}
-	totalPages := (total + 49) / 50
-
-	data := map[string]interface{}{
-		"ActiveNav":   "enrollment-tokens",
-		"Tokens":      views,
-		"TotalPages":  totalPages,
-		"CurrentPage": 1,
-		"TotalItems":  total,
-	}
-	w.Header().Set("HX-Trigger", `{"showToast":{"message":"Token revoked","type":"success"}}`)
-	s.renderFragment(w, s.webTemplates["enrollment_tokens"], "enrollment_tokens_table_body", data)
+	_ = sess // used for enterprise scoping in list
+	http.Redirect(w, r, "/dashboard/enrollment-tokens", http.StatusFound)
 }

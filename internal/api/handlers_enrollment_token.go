@@ -11,6 +11,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/malcolm-getahead/local-mdm/internal/apperrors"
+	"github.com/malcolm-getahead/local-mdm/internal/auth"
 	"github.com/malcolm-getahead/local-mdm/internal/models"
 )
 
@@ -83,6 +84,15 @@ func (s *Server) handleCreateEnrollmentToken(w http.ResponseWriter, r *http.Requ
 		MaxUses:       req.MaxUses,
 		UsesRemaining: req.MaxUses,
 		ExpiresAt:     time.Now().Add(expiresIn),
+	}
+
+	// Populate created_by from authenticated user (only if user exists in local DB)
+	if authUser, err := auth.UserFromContext(r.Context()); err == nil {
+		if uid, parseErr := uuid.Parse(authUser.ID); parseErr == nil {
+			if _, lookupErr := s.userService.Get(r.Context(), uid); lookupErr == nil {
+				token.CreatedBy = &uid
+			}
+		}
 	}
 
 	if err := s.enrollmentTokenRepo.Create(r.Context(), token); err != nil {

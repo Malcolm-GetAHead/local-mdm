@@ -1179,6 +1179,75 @@ GET /api/v1/windows/ppkg/templates
 
 ---
 
+## Enrollment Tokens
+
+Enrollment tokens control who can enroll devices. Admins create tokens with optional use limits and expiry. The token is distributed as an email address (`<token>@localmdm.local`) that users enter during device enrollment.
+
+### Create Enrollment Token
+
+```http
+POST /api/v1/enrollment-tokens
+Content-Type: application/json
+
+{
+  "enterprise_id": "00000000-0000-0000-0000-000000000001",
+  "description": "IT onboarding batch May 2026",
+  "max_uses": 5,
+  "expires_in": "168h"
+}
+```
+
+**Auth**: admin, super_admin
+
+**Fields**:
+- `enterprise_id` (required): Enterprise the token enrolls devices into
+- `description` (optional): Human-readable label
+- `max_uses` (optional): Maximum enrollments allowed. Omit for unlimited.
+- `expires_in` (optional): Duration string (e.g., `1h`, `24h`, `168h`). Default: `24h`.
+
+**Response**: `201 Created`
+```json
+{
+  "data": {
+    "id": "c39f3d45-ce69-423d-ad8f-b99e84eb2bc0",
+    "enterprise_id": "00000000-0000-0000-0000-000000000001",
+    "token": "5370aa74b9005ce7b52398a2951a3a1b",
+    "email": "5370aa74b9005ce7b52398a2951a3a1b@localmdm.local",
+    "description": "IT onboarding batch May 2026",
+    "max_uses": 5,
+    "uses_remaining": 5,
+    "expires_at": "2026-05-07T10:00:00Z",
+    "created_at": "2026-04-30T10:00:00Z"
+  }
+}
+```
+
+### List Enrollment Tokens
+
+```http
+GET /api/v1/enrollment-tokens?enterprise_id=00000000-0000-0000-0000-000000000001
+```
+
+**Auth**: admin, super_admin
+
+**Query Parameters**:
+- `enterprise_id` (required): Filter by enterprise
+- `limit`, `offset`: Pagination (default: 100, 0)
+
+**Response**: `200 OK` — paginated list of tokens with `max_uses`, `uses_remaining`, `expires_at`, `revoked_at`.
+
+### Revoke Enrollment Token
+
+```http
+DELETE /api/v1/enrollment-tokens/{id}
+```
+
+**Auth**: admin, super_admin
+
+**Response**: `204 No Content`
+
+Revoked tokens immediately stop accepting new enrollments. Existing enrolled devices are not affected.
+
 ## Platform-Specific Endpoints
 
 ### Windows

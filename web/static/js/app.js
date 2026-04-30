@@ -205,22 +205,11 @@
         }
     });
 
-    // ── Enrollment token modal ──
+    // ── Enrollment token create form toggle ──
     document.addEventListener('click', function(e) {
-        var modal = document.getElementById('create-modal');
-        if (!modal) return;
-        if (e.target.id === 'open-create-token' || e.target.closest('#open-create-token')) {
-            modal.classList.remove('hidden');
-        }
-        if (e.target.id === 'cancel-create-token' || e.target.closest('#cancel-create-token')) {
-            modal.classList.add('hidden');
-        }
-    });
-    // Close modal after successful HTMX form submit
-    document.body.addEventListener('htmx:afterRequest', function(e) {
-        if (e.detail.successful && e.detail.target && e.detail.target.id === 'token-table') {
-            var modal = document.getElementById('create-modal');
-            if (modal) modal.classList.add('hidden');
+        if (e.target.id === 'toggle-create-token' || e.target.closest('#toggle-create-token')) {
+            var form = document.getElementById('create-token-form');
+            if (form) form.classList.toggle('hidden');
         }
     });
 

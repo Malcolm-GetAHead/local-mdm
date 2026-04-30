@@ -853,3 +853,27 @@ Retry queue for failed EventBus subscriber actions. Background worker retries wi
 | completed_at | TIMESTAMPTZ | NULL while pending, set on success or exhaustion |
 
 **Index**: `idx_event_queue_pending` on `next_retry_at` WHERE `completed_at IS NULL AND retry_count < max_retries`
+
+### enrollment_tokens (AUT-01)
+
+Short-lived, limited-use codes that authorize device enrollment to a specific enterprise. Admins create tokens and distribute the resulting email address (`<token>@localmdm.local`) to users enrolling devices.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| id | UUID PK | Token identifier |
+| enterprise_id | UUID FK → enterprises | Enterprise the token enrolls devices into |
+| token | VARCHAR(64) UNIQUE | Random hex token, used as email local part |
+| description | TEXT | Human-readable label (e.g., "IT onboarding May 2026") |
+| max_uses | INTEGER | Maximum enrollments allowed (NULL = unlimited) |
+| uses_remaining | INTEGER | Decremented on each use (NULL = unlimited) |
+| expires_at | TIMESTAMPTZ | Token expiration time |
+| created_by | UUID FK → users | Admin who created the token |
+| created_at | TIMESTAMPTZ | Creation timestamp |
+| revoked_at | TIMESTAMPTZ | NULL while active, set on revocation |
+
+**Indexes**:
+- `idx_enrollment_tokens_enterprise` on `enterprise_id`
+- `idx_enrollment_tokens_token` on `token` WHERE `revoked_at IS NULL`
+- `idx_enrollment_tokens_expires` on `expires_at` WHERE `revoked_at IS NULL`
+
+**Migration**: `000014_enrollment_tokens`
