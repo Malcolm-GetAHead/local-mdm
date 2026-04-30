@@ -2,14 +2,14 @@
 {{define "page_title"}}Enrollment Tokens{{end}}
 {{define "content"}}
 <div class="mb-6">
-    <button onclick="document.getElementById('create-modal').classList.remove('hidden')" class="btn-primary">Create Token</button>
+    <button id="open-create-token" class="btn-primary">Create Token</button>
 </div>
 
 <!-- Create Token Modal -->
 <div id="create-modal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center">
     <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-md mx-4 p-6">
         <h2 class="text-lg font-semibold mb-4">Create Enrollment Token</h2>
-        <form hx-post="/dashboard/enrollment-tokens" hx-target="#token-table" hx-swap="innerHTML" hx-on::after-request="if(event.detail.successful) document.getElementById('create-modal').classList.add('hidden')">
+        <form hx-post="/dashboard/enrollment-tokens" hx-target="#token-table" hx-swap="innerHTML">
             {{csrfField .CSRFToken}}
             <div class="space-y-4">
                 <div>
@@ -31,20 +31,19 @@
                 </div>
             </div>
             <div class="flex justify-end gap-3 mt-6">
-                <button type="button" onclick="document.getElementById('create-modal').classList.add('hidden')" class="btn-secondary">Cancel</button>
+                <button type="button" id="cancel-create-token" class="btn-secondary">Cancel</button>
                 <button type="submit" class="btn-primary">Create</button>
             </div>
         </form>
     </div>
 </div>
 
-<!-- Created Token Display (shown after creation) -->
 {{if .CreatedToken}}
 <div id="created-token-banner" class="mb-6 p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
     <p class="font-semibold text-green-800 dark:text-green-200 mb-2">Token created! Copy the enrollment email address:</p>
     <div class="flex items-center gap-2">
         <code id="token-email" class="flex-1 px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-sm font-mono">{{.CreatedToken}}@localmdm.local</code>
-        <button onclick="navigator.clipboard.writeText(document.getElementById('token-email').textContent).then(()=>{this.textContent='Copied!';setTimeout(()=>{this.textContent='Copy'},2000)})" class="btn-secondary text-sm">Copy</button>
+        <button data-copy="#token-email" class="btn-secondary text-sm">Copy</button>
     </div>
     <p class="text-sm text-green-700 dark:text-green-300 mt-2">Give this email address to the user enrolling their device.</p>
 </div>
@@ -74,8 +73,8 @@
             <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
                 <td class="px-6 py-4">
                     <div class="flex items-center gap-2">
-                        <code class="text-sm font-mono">{{.Token}}@localmdm.local</code>
-                        <button onclick="navigator.clipboard.writeText('{{.Token}}@localmdm.local').then(()=>{this.textContent='✓';setTimeout(()=>{this.textContent='📋'},2000)})" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 text-sm" title="Copy email">📋</button>
+                        <code class="text-sm font-mono" data-token-email="{{.Token}}@localmdm.local">{{.Token}}@localmdm.local</code>
+                        <button data-copy-text="{{.Token}}@localmdm.local" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 text-sm" title="Copy email">📋</button>
                     </div>
                 </td>
                 <td class="px-6 py-4 text-sm">{{if .Description}}{{.Description}}{{else}}<span class="text-gray-400">—</span>{{end}}</td>

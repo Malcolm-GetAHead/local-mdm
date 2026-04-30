@@ -205,6 +205,48 @@
         }
     });
 
+    // ── Enrollment token modal ──
+    document.addEventListener('click', function(e) {
+        var modal = document.getElementById('create-modal');
+        if (!modal) return;
+        if (e.target.id === 'open-create-token' || e.target.closest('#open-create-token')) {
+            modal.classList.remove('hidden');
+        }
+        if (e.target.id === 'cancel-create-token' || e.target.closest('#cancel-create-token')) {
+            modal.classList.add('hidden');
+        }
+    });
+    // Close modal after successful HTMX form submit
+    document.body.addEventListener('htmx:afterRequest', function(e) {
+        if (e.detail.successful && e.detail.target && e.detail.target.id === 'token-table') {
+            var modal = document.getElementById('create-modal');
+            if (modal) modal.classList.add('hidden');
+        }
+    });
+
+    // ── Copy to clipboard (data-copy-text or data-copy="#selector") ──
+    document.addEventListener('click', function(e) {
+        var btn = e.target.closest('[data-copy-text]');
+        if (btn) {
+            navigator.clipboard.writeText(btn.getAttribute('data-copy-text')).then(function() {
+                var orig = btn.textContent; btn.textContent = '✓';
+                setTimeout(function() { btn.textContent = orig; }, 2000);
+            });
+            return;
+        }
+        btn = e.target.closest('[data-copy]');
+        if (btn) {
+            var sel = btn.getAttribute('data-copy');
+            var el = document.querySelector(sel);
+            if (el) {
+                navigator.clipboard.writeText(el.textContent.trim()).then(function() {
+                    var orig = btn.textContent; btn.textContent = 'Copied!';
+                    setTimeout(function() { btn.textContent = orig; }, 2000);
+                });
+            }
+        }
+    });
+
     // ── HTMX loading bar ──
     document.body.addEventListener('htmx:beforeRequest', function() {
         var bar = document.getElementById('htmx-progress');
