@@ -14,6 +14,11 @@ INSERT INTO enterprises (id, name, slug, settings) VALUES
   ('00000000-0000-0000-0000-000000000001', 'Acme Corp', 'acme-corp', '{"timezone": "America/New_York", "max_devices": 100}')
 ON CONFLICT (slug) DO UPDATE SET name = EXCLUDED.name, settings = EXCLUDED.settings;
 
+-- Test enterprise — used by Go integration tests. DO NOT DELETE.
+INSERT INTO enterprises (id, name, slug, settings) VALUES
+  ('99999999-9999-9999-9999-999999999999', 'Test Enterprise (DO NOT DELETE)', 'test-enterprise', '{"test": true}')
+ON CONFLICT (slug) DO NOTHING;
+
 -- Admin user (password_hash is nullable since Sprint 5c — OIDC-managed users)
 INSERT INTO users (id, enterprise_id, email, full_name, role, is_active) VALUES
   ('b0000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000001', 'admin@acme.test', 'Alice Admin', 'admin', true),
@@ -190,6 +195,9 @@ BEGIN
   END IF;
   IF (SELECT COUNT(*) FROM devices WHERE enterprise_id = '00000000-0000-0000-0000-000000000001' AND deleted_at IS NULL) = 0 THEN
     RAISE WARNING 'SEED ERROR: No active devices found for seed enterprise!';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM enterprises WHERE id = '99999999-9999-9999-9999-999999999999') THEN
+    RAISE WARNING 'SEED ERROR: Test enterprise 99999999-9999-9999-9999-999999999999 does not exist!';
   END IF;
 END $$;
 
