@@ -33,10 +33,12 @@ func EnsureTestEnterprise(t testing.TB, db *sql.DB) uuid.UUID {
 // are handled automatically by the ON DELETE CASCADE constraints.
 func CleanupTestData(t testing.TB, db *sql.DB) {
 	t.Helper()
-	// Tables with direct enterprise_id FK — delete in child-first order.
+	// Every table with an enterprise_id column, in child-first order.
 	tables := []string{
+		"device_commands",
 		"enrollment_tokens",
 		"audit_logs",
+		"apps",
 		"devices",
 		"policies",
 		"device_groups",

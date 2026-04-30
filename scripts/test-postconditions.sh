@@ -27,7 +27,7 @@ echo ""
 echo "=== Test Postconditions ==="
 
 # Clean up test data under the test enterprise (child rows only, never the enterprise itself)
-for tbl in enrollment_tokens audit_logs devices policies device_groups users; do
+for tbl in device_commands enrollment_tokens audit_logs apps devices policies device_groups users; do
   psql -h "$DB_HOST" -U postgres -d localmdm -t -A -c \
     "DELETE FROM $tbl WHERE enterprise_id = '$TEST_ENT';" 2>/dev/null || true
 done
