@@ -11,8 +11,9 @@ import (
 )
 
 // TestEnterpriseID is the well-known UUID for the dedicated test enterprise.
-// This enterprise is created by seed_data.sql and must never be deleted.
-// All integration tests should use this instead of creating ad-hoc enterprises.
+// This enterprise is created by seed_data.sql and persists across runs.
+// Used by Playwright browser tests and any code needing a stable enterprise reference.
+// Integration tests should use CreateTestEnterprise for per-test isolation instead.
 var TestEnterpriseID = uuid.MustParse("99999999-9999-9999-9999-999999999999")
 
 // EnsureTestEnterprise verifies the test enterprise exists, creating it if needed (idempotent).
@@ -27,35 +28,10 @@ func EnsureTestEnterprise(t testing.TB, db *sql.DB) uuid.UUID {
 	return TestEnterpriseID
 }
 
-// CleanupTestData deletes all child rows under the test enterprise (devices, policies,
-// groups, tokens, etc.) but never deletes the enterprise itself. Safe to call in t.Cleanup().
-func CleanupTestData(t testing.TB, db *sql.DB) {
-	t.Helper()
-	// Delete in FK-safe order (children before parents).
-	tables := []string{
-		"compliance_results",
-		"policy_assignments",
-		"device_group_members",
-		"device_commands",
-		"device_certificates",
-		"enrollment_tokens",
-		"devices",
-		"policies",
-		"device_groups",
-		"users",
-	}
-	for _, table := range tables {
-		_, err := db.Exec(fmt.Sprintf("DELETE FROM %s WHERE enterprise_id = $1", table), TestEnterpriseID)
-		if err != nil {
-			// Table may not exist in all test environments; log but don't fail.
-			t.Logf("CleanupTestData: %s: %v", table, err)
-		}
-	}
-}
-
-// CreateTestEnterprise inserts a test enterprise and registers t.Cleanup to delete it.
-// The CASCADE on the enterprises FK will remove all child rows (devices, policies, etc.).
-// Deprecated: prefer EnsureTestEnterprise + TestEnterpriseID for new tests.
+// CreateTestEnterprise inserts a test enterprise with a "test-" prefixed slug and registers
+// t.Cleanup to hard-DELETE it. The CASCADE on the enterprises FK removes all child rows
+// (devices, policies, groups, etc.). This is the primary pattern for integration tests —
+// each test gets its own enterprise for full isolation.
 func CreateTestEnterprise(t testing.TB, db *sql.DB, name string) uuid.UUID {
 	t.Helper()
 	id := uuid.New()
