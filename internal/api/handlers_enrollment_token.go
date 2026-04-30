@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"net/http"
 	"strings"
 	"time"
@@ -160,7 +161,7 @@ func (s *Server) handleRevokeEnrollmentToken(w http.ResponseWriter, r *http.Requ
 func (s *Server) validateEnrollmentToken(r *http.Request, tokenStr string) (*models.EnrollmentToken, string) {
 	token, err := s.enrollmentTokenRepo.GetByToken(r.Context(), tokenStr)
 	if err != nil {
-		return nil, "Invalid enrollment token"
+		return nil, ""
 	}
 	if token.RevokedAt != nil {
 		return nil, "Enrollment token has been revoked"
@@ -172,4 +173,22 @@ func (s *Server) validateEnrollmentToken(r *http.Request, tokenStr string) (*mod
 		return nil, "Enrollment token has no remaining uses"
 	}
 	return token, ""
+}
+
+// respondSOAPFault sends a SOAP fault response for enrollment errors.
+func respondSOAPFault(w http.ResponseWriter, code, reason string) {
+	fault := fmt.Sprintf(`<?xml version="1.0" encoding="UTF-8"?>
+<s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope"
+            xmlns:a="http://www.w3.org/2005/08/addressing">
+  <s:Body>
+    <s:Fault>
+      <s:Code><s:Value>%s</s:Value></s:Code>
+      <s:Reason><s:Text xml:lang="en">%s</s:Text></s:Reason>
+    </s:Fault>
+  </s:Body>
+</s:Envelope>`, code, reason)
+	w.Header().Set("Content-Type", "application/soap+xml; charset=utf-8")
+	w.Header().Set("Content-Length", fmt.Sprintf("%d", len(fault)))
+	w.WriteHeader(http.StatusForbidden)
+	w.Write([]byte(fault))
 }

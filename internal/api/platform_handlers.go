@@ -209,18 +209,39 @@ func (s *Server) handleWindowsEnrollmentService(w http.ResponseWriter, r *http.R
 		storedDeviceID = hwDeviceID
 	}
 
-	// Determine enterprise ID from URL path, email username (UUID), or fallback
+	// Determine enterprise ID from enrollment token, URL path, email username (UUID), or fallback
 	enterpriseID := uuid.Nil
 	if eidStr := mux.Vars(r)["enterprise_id"]; eidStr != "" {
 		if eid, err := uuid.Parse(eidStr); err == nil {
 			enterpriseID = eid
 		}
 	}
+	// Try enrollment token from email local part
+	var enrollToken *models.EnrollmentToken
 	if enterpriseID == uuid.Nil && env.Header.Security != nil && env.Header.Security.UsernameToken != nil {
 		username := env.Header.Security.UsernameToken.Username
 		if atIdx := strings.Index(username, "@"); atIdx > 0 {
-			if eid, err := uuid.Parse(username[:atIdx]); err == nil {
-				enterpriseID = eid
+			localPart := username[:atIdx]
+			// First try as enrollment token
+			if s.enrollmentTokenRepo != nil {
+				if tok, errMsg := s.validateEnrollmentToken(r, localPart); tok != nil {
+					enrollToken = tok
+					enterpriseID = tok.EnterpriseID
+				} else if errMsg != "" {
+					// Token was found but invalid (expired/revoked/exhausted)
+					// Only reject if it looks like a token (not a UUID)
+					if _, parseErr := uuid.Parse(localPart); parseErr != nil {
+						s.logger.Warn("enrollment token validation failed", "token", localPart, "reason", errMsg)
+						respondSOAPFault(w, "s:Sender", "enrollment token invalid: "+errMsg)
+						return
+					}
+				}
+			}
+			// Fall back to UUID-based enterprise resolution
+			if enterpriseID == uuid.Nil {
+				if eid, parseErr := uuid.Parse(localPart); parseErr == nil {
+					enterpriseID = eid
+				}
 			}
 		}
 	}
@@ -321,6 +342,17 @@ func (s *Server) handleWindowsEnrollmentService(w http.ResponseWriter, r *http.R
 		s.logger.Error("failed to generate enrollment response", "error", err)
 		respondError(w, r, http.StatusInternalServerError, "generation_failed", "Failed to generate enrollment response")
 		return
+	}
+
+	// Decrement enrollment token uses if one was used
+	if enrollToken != nil {
+		if err := s.enrollmentTokenRepo.DecrementUses(r.Context(), enrollToken.ID); err != nil {
+			s.logger.Warn("failed to decrement enrollment token uses", "error", err, "token_id", enrollToken.ID)
+		}
+		s.logAudit(r, "enrollment_token.use", "enrollment_token", enrollToken.ID, map[string]interface{}{
+			"device_id":  deviceID,
+			"platform":   models.PlatformWindows,
+		})
 	}
 
 	s.logAudit(r, "enrollment.windows.complete", "device", deviceID, map[string]interface{}{
