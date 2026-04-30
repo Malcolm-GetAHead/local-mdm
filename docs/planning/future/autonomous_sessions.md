@@ -13,6 +13,48 @@
 - Push after each commit
 - Run `go test -race ./...` after every change
 
+## Live Device Infrastructure
+
+Two real devices are enrolled and available for testing. Use them to validate that
+code changes produce real effects on managed devices.
+
+### macOS VM
+- **SSH**: `ssh testuser@192.168.64.4` (password: `testuser`)
+- **OS**: macOS 26.2, UTM virtual machine
+- **Status**: Enrolled in MDM via NanoMDM, FileVault enabled
+- **Reboot**: `ssh testuser@192.168.64.4 "echo 'testuser' | sudo -S shutdown -r now"`
+- **MDM check-in**: macOS checks in on reboot (no APNs push available). **Reboot is required for new policies/profiles to be applied.**
+- **Useful commands**:
+  - `profiles show -all` — list installed MDM profiles
+  - `system_profiler SPHardwareDataType` — hardware info
+  - `fdesetup status` — FileVault status
+  - `/usr/libexec/mdmclient QueryDeviceInformation` — trigger MDM device info query
+
+### Windows VM
+- **SSH**: `ssh testuser@192.168.65.2` (password: `testuser`)
+- **OS**: Windows 11 Pro ARM64, UTM virtual machine
+- **Status**: Enrolled via Settings UI, OMA-DM syncing
+- **Reboot**: `ssh testuser@192.168.65.2 "shutdown /r /t 5"`
+- **MDM sync**: Windows syncs on its own schedule. Force sync: `ssh testuser@192.168.65.2 "deviceenroller.exe /c /AutoEnrollMDM"`
+- **Useful commands**:
+  - `manage-bde -status` — BitLocker status
+  - `netsh advfirewall show allprofiles` — firewall status
+  - `dsregcmd /status` — MDM enrollment status
+  - `Get-MdmDiagnosticLog` — MDM diagnostic logs (PowerShell)
+
+### MDM Server Access
+- **Dashboard**: `http://localhost:8080/dashboard/` (or `https://192.168.1.102:8443`)
+- **API**: `http://localhost:8080/api/v1/`
+- **Login**: admin / admin123
+
+### Validation Pattern
+When implementing features that affect device state (policies, commands, compliance):
+1. Apply the change via API or dashboard
+2. Trigger a device check-in (reboot macOS VM, or wait for Windows sync)
+3. SSH into the device and verify the change took effect
+4. Check the dashboard to confirm the device data updated
+5. Include the SSH verification commands and expected output in the retrospective
+
 ---
 
 ## Session 1: Enrollment Token System
