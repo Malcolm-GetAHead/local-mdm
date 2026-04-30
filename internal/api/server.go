@@ -880,6 +880,9 @@ func (s *Server) setupRoutes() {
 	dash.HandleFunc("/groups/{id}/members/{device_id}/add", s.handleWebGroupAddMember).Methods("POST")
 	dash.HandleFunc("/groups/{id}/members/{device_id}/remove", s.handleWebGroupRemoveMember).Methods("POST")
 	dash.HandleFunc("/audit", s.handleWebAuditLog).Methods("GET")
+	dash.HandleFunc("/enrollment-tokens", s.handleWebEnrollmentTokens).Methods("GET")
+	dash.HandleFunc("/enrollment-tokens", s.handleWebEnrollmentTokenCreate).Methods("POST")
+	dash.HandleFunc("/enrollment-tokens/{id}/revoke", s.handleWebEnrollmentTokenRevoke).Methods("POST")
 }
 
 // setupMiddleware configures middleware

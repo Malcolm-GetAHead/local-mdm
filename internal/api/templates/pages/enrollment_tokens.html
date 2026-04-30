@@ -1,0 +1,120 @@
+{{define "title"}}Enrollment Tokens — Local MDM{{end}}
+{{define "page_title"}}Enrollment Tokens{{end}}
+{{define "content"}}
+<div class="mb-6">
+    <button onclick="document.getElementById('create-modal').classList.remove('hidden')" class="btn-primary">Create Token</button>
+</div>
+
+<!-- Create Token Modal -->
+<div id="create-modal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center">
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-md mx-4 p-6">
+        <h2 class="text-lg font-semibold mb-4">Create Enrollment Token</h2>
+        <form hx-post="/dashboard/enrollment-tokens" hx-target="#token-table" hx-swap="innerHTML" hx-on::after-request="if(event.detail.successful) document.getElementById('create-modal').classList.add('hidden')">
+            {{csrfField .CSRFToken}}
+            <div class="space-y-4">
+                <div>
+                    <label for="description" class="block text-sm font-medium mb-1">Description</label>
+                    <input type="text" name="description" id="description" placeholder="e.g. IT onboarding batch May 2026" class="input-field w-full">
+                </div>
+                <div>
+                    <label for="max_uses" class="block text-sm font-medium mb-1">Max Uses (blank = unlimited)</label>
+                    <input type="number" name="max_uses" id="max_uses" min="1" placeholder="Unlimited" class="input-field w-full">
+                </div>
+                <div>
+                    <label for="expires_in" class="block text-sm font-medium mb-1">Expires In</label>
+                    <select name="expires_in" id="expires_in" class="input-field w-full">
+                        <option value="1h">1 hour</option>
+                        <option value="24h" selected>24 hours</option>
+                        <option value="168h">7 days</option>
+                        <option value="720h">30 days</option>
+                    </select>
+                </div>
+            </div>
+            <div class="flex justify-end gap-3 mt-6">
+                <button type="button" onclick="document.getElementById('create-modal').classList.add('hidden')" class="btn-secondary">Cancel</button>
+                <button type="submit" class="btn-primary">Create</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Created Token Display (shown after creation) -->
+{{if .CreatedToken}}
+<div id="created-token-banner" class="mb-6 p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
+    <p class="font-semibold text-green-800 dark:text-green-200 mb-2">Token created! Copy the enrollment email address:</p>
+    <div class="flex items-center gap-2">
+        <code id="token-email" class="flex-1 px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-sm font-mono">{{.CreatedToken}}@localmdm.local</code>
+        <button onclick="navigator.clipboard.writeText(document.getElementById('token-email').textContent).then(()=>{this.textContent='Copied!';setTimeout(()=>{this.textContent='Copy'},2000)})" class="btn-secondary text-sm">Copy</button>
+    </div>
+    <p class="text-sm text-green-700 dark:text-green-300 mt-2">Give this email address to the user enrolling their device.</p>
+</div>
+{{end}}
+
+<div id="token-table">
+    {{template "enrollment_tokens_table_body" .}}
+</div>
+{{end}}
+
+{{define "enrollment_tokens_table_body"}}
+<div class="card overflow-hidden p-0">
+    <table class="w-full">
+        <thead>
+            <tr class="table-header">
+                <th class="px-6 py-3">Token</th>
+                <th class="px-6 py-3">Description</th>
+                <th class="px-6 py-3">Uses</th>
+                <th class="px-6 py-3">Expires</th>
+                <th class="px-6 py-3">Status</th>
+                <th class="px-6 py-3">Created</th>
+                <th class="px-6 py-3">Actions</th>
+            </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+            {{range .Tokens}}
+            <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
+                <td class="px-6 py-4">
+                    <div class="flex items-center gap-2">
+                        <code class="text-sm font-mono">{{.Token}}@localmdm.local</code>
+                        <button onclick="navigator.clipboard.writeText('{{.Token}}@localmdm.local').then(()=>{this.textContent='✓';setTimeout(()=>{this.textContent='📋'},2000)})" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 text-sm" title="Copy email">📋</button>
+                    </div>
+                </td>
+                <td class="px-6 py-4 text-sm">{{if .Description}}{{.Description}}{{else}}<span class="text-gray-400">—</span>{{end}}</td>
+                <td class="px-6 py-4 text-sm">
+                    {{if .MaxUses}}{{.UsesRemaining}} / {{.MaxUses}}{{else}}<span class="text-gray-500">Unlimited</span>{{end}}
+                </td>
+                <td class="px-6 py-4 text-sm">{{formatDateTime .ExpiresAt}}</td>
+                <td class="px-6 py-4">
+                    {{if .RevokedAt}}
+                        <span class="badge badge-red">Revoked</span>
+                    {{else if .Expired}}
+                        <span class="badge badge-gray">Expired</span>
+                    {{else if .Exhausted}}
+                        <span class="badge badge-yellow">Exhausted</span>
+                    {{else}}
+                        <span class="badge badge-green">Active</span>
+                    {{end}}
+                </td>
+                <td class="px-6 py-4 text-sm text-gray-500 dark:text-gray-400">{{formatDateTime .CreatedAt}}</td>
+                <td class="px-6 py-4">
+                    {{if and (not .RevokedAt) (not .Expired)}}
+                    <form hx-post="/dashboard/enrollment-tokens/{{.ID}}/revoke" hx-target="#token-table" hx-swap="innerHTML" hx-confirm="Revoke this enrollment token?">
+                        {{csrfField $.CSRFToken}}
+                        <button type="submit" class="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 text-sm font-medium">Revoke</button>
+                    </form>
+                    {{end}}
+                </td>
+            </tr>
+            {{else}}
+            <tr><td colspan="7" class="px-6 py-8">
+                <div class="text-center">
+                    <svg width="48" height="48" class="inline-block mb-2 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/></svg>
+                    <p class="text-gray-500 dark:text-gray-400 font-medium mt-2">No enrollment tokens</p>
+                    <p class="text-sm text-gray-400 dark:text-gray-500 mt-1">Create a token to control who can enroll devices.</p>
+                </div>
+            </td></tr>
+            {{end}}
+        </tbody>
+    </table>
+</div>
+{{template "pagination" dict "TotalPages" .TotalPages "CurrentPage" .CurrentPage "TotalItems" .TotalItems "BaseURL" "/dashboard/enrollment-tokens?" "QueryExtra" "" "Target" "#token-table"}}
+{{end}}
