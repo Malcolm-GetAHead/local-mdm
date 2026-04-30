@@ -13,6 +13,34 @@
 - Push after each commit
 - Run `go test -race ./...` after every change
 
+## Mandatory Verification Gates (All Sessions)
+
+These gates were added after AUT-01 revealed that `go test` alone misses real bugs.
+Every session MUST follow these — no exceptions.
+
+### After every sub-task:
+1. `go test -race ./...` — unit/mock tests pass
+2. `docker compose build localmdm && docker compose up -d localmdm` — rebuild with new code (migrations auto-apply on container start)
+3. **Hit the real endpoint** — curl the API, open the dashboard page in a browser. If it's a UI change, visually confirm it renders.
+
+### After all sub-tasks complete:
+4. `make dev-test` — full integration test suite in Docker (scoped cleanup only — never `DELETE FROM <table>` without a WHERE clause scoped to test data)
+5. Run Playwright browser tests: `cd tests/browser && node run-playbook.js` — all existing tests must still pass, plus new steps for the feature you implemented
+6. Verify documentation is updated: DATABASE.md, API.md, openapi.yaml
+
+### Test requirements:
+- **Repository tests**: MUST be integration tests against Docker PostgreSQL (not mocks). Use `testutil.ConnectDB(t)`.
+- **Handler tests**: Mock-based unit tests for logic, PLUS at least one curl/API test against the running server.
+- **Dashboard tests**: Go-level tests using `newTestServerWithTemplates` + `doWithSession`.
+- **Playwright tests**: Add steps to `tests/browser/browser-playbook.md` for every new dashboard page or feature. Run the full playbook (`node run-playbook.js`) and confirm your new steps pass. The playbook is the source of truth for UI verification.
+- **No inline JavaScript** in templates — CSP blocks it. Use event delegation in `app.js`.
+- **Documentation updates are part of the task**, not a cleanup step.
+
+### Test data cleanup:
+- Integration tests that create data MUST scope cleanup to test-created rows (e.g., `WHERE description LIKE 'inttest-%'`).
+- NEVER run `DELETE FROM <table>` without a WHERE clause — it destroys real device/token data.
+- Use `t.Cleanup()` with enterprise CASCADE deletes for test enterprises.
+
 ## Live Device Infrastructure
 
 Two real devices are enrolled and available for testing. Use them to validate that
@@ -78,34 +106,57 @@ codes that authorize enrollment to a specific enterprise.
 Branch: `feature/aut-01-enrollment-tokens` from `main`.
 Commit per sub-task with `AUT-01:` prefix. Push after each commit.
 Run `go test -race ./...` after every change.
+Follow the Mandatory Verification Gates in the Prerequisites section — rebuild Docker,
+hit real endpoints, and verify dashboard rendering after every sub-task.
 
 Tasks:
 1. Create migration: `enrollment_tokens` table (id, enterprise_id FK, token VARCHAR(64) UNIQUE,
-   description, max_uses, uses_remaining, expires_at, created_by, created_at, revoked_at).
+   description, max_uses, uses_remaining, expires_at, created_by, created_at, revoked_at,
+   status VARCHAR(20) DEFAULT 'active').
+   Apply migration to running Docker PostgreSQL and verify with `\d enrollment_tokens`.
 2. Repository: `EnrollmentTokenRepository` interface + PostgreSQL implementation following
-   Writer/Reader pool pattern. Methods: Create, GetByToken, List, Revoke, DecrementUses.
+   Writer/Reader pool pattern. Methods: Create, GetByToken, List, Revoke, DecrementUses,
+   SetStatus, ExpireTokens.
 3. API endpoints (behind auth middleware):
    - POST /api/v1/enrollment-tokens — create token (enterprise_id, description, max_uses, expires_in)
    - GET /api/v1/enrollment-tokens — list tokens for enterprise
    - DELETE /api/v1/enrollment-tokens/{id} — revoke token
-4. Modify Windows enrollment handler (`handleWindowsDiscoveryService` or enrollment path):
-   extract token from email local part, validate against enrollment_tokens table (not expired,
-   uses_remaining > 0, not revoked), decrement uses_remaining. Reject with clear error if invalid.
-5. Modify macOS enrollment profile handler: accept optional `?token=` query param, validate
-   same way. Include token in SCEP challenge metadata so it can be validated during SCEP enrollment.
-6. Dashboard page: "Enrollment Tokens" nav item. List tokens (token, enterprise, uses remaining,
-   expires, created by, status). Create form (description, max uses, expiry). Revoke button.
-   Copy-to-clipboard for the enrollment email address. Use HTMX patterns matching existing pages.
-7. Tests: repository integration tests (Docker PostgreSQL), handler unit tests with mock repo,
-   token validation edge cases (expired, exhausted, revoked, valid).
-8. Audit logging on create, use, and revoke actions.
+   Response must include: token, email (Windows), macos_enroll_url, status.
+   After implementing, curl each endpoint against the running server to verify.
+4. Modify Windows enrollment handler: extract token from email local part, validate against
+   enrollment_tokens table (status=active, not expired, uses_remaining > 0), decrement
+   uses_remaining. Reject with SOAP fault if invalid. Enrollment MUST fail without a valid token.
+5. Modify macOS enrollment profile handler: require `?token=` query param, validate same way.
+   Enrollment MUST fail without a valid token (403). Include token in SCEP challenge metadata.
+6. Dashboard page: "Enrollment Tokens" nav item. Inline create form (matching groups page pattern,
+   NOT a modal). List tokens with Win/Mac enrollment instructions and copy buttons.
+   Status badge from DB column (active/expired/revoked). Revoke button for active tokens.
+   No inline JavaScript — use event delegation in app.js. Verify in browser after implementing.
+7. Periodic expiry: add status column, periodic cleanup job (hourly) that sets status='expired'
+   for active tokens past expires_at. On-access expiry: if an active token is time-expired,
+   set status='expired' before rejecting.
+8. Tests:
+   - Repository integration tests against Docker PostgreSQL (not mocks) using testutil.ConnectDB(t)
+   - Handler unit tests with mock repo covering all validation paths
+   - Go-level dashboard tests using newTestServerWithTemplates + doWithSession
+   - Token validation edge cases (expired, exhausted, revoked, valid, unlimited, already-expired-status)
+   - Windows enrollment tests (valid token, expired, revoked, no token)
+   - Add Playwright playbook steps for token create, list, revoke
+9. Audit logging on create, use, and revoke actions. Populate created_by from auth context
+   (check user exists in local DB before setting FK).
+10. Update DATABASE.md, API.md, and openapi.yaml with new tables/columns/endpoints.
 
 Acceptance criteria:
-- Creating a token returns a copyable email address (e.g., `abc123@localmdm.local`)
+- Creating a token returns a copyable email address AND macOS enrollment URL
 - Enrolling with a valid token succeeds and decrements uses_remaining
+- Enrolling WITHOUT a token fails (403 for macOS, SOAP fault for Windows)
 - Enrolling with expired/exhausted/revoked token returns a clear error
-- Dashboard shows token list with create/revoke actions
+- Expired tokens show status='expired' in dashboard (not 'active')
+- Dashboard shows token list with inline create form, Win/Mac copy buttons, revoke
 - All tests pass with `go test -race ./...`
+- `make dev-test` passes clean
+- Playwright browser tests pass for enrollment token pages
+- DATABASE.md, API.md, openapi.yaml are updated
 
 When complete, perform this retrospective:
 1. List every task where you made a shortcut, used a stub, skipped a test, or deviated from the spec.
@@ -148,10 +199,13 @@ membership. Dynamic groups extend this with a `type` column and `rules` JSONB co
 Branch: `feature/aut-02-dynamic-groups` from `main`.
 Commit per sub-task with `AUT-02:` prefix. Push after each commit.
 Run `go test -race ./...` after every change.
+Follow the Mandatory Verification Gates in the Prerequisites section — rebuild Docker,
+hit real endpoints, and verify dashboard rendering after every sub-task.
 
 Tasks:
 1. Migration: add `type VARCHAR(10) DEFAULT 'static'` and `rules JSONB` columns to `device_groups`.
    Add CHECK constraint: type IN ('static', 'dynamic'). Dynamic groups must have non-null rules.
+   After rebuild, verify migration applied: `docker exec localmdm-postgres psql -U postgres -d localmdm -c '\d device_groups'`
 2. Rule engine (`internal/service/dynamic_groups.go`): define Rule struct (Field, Operator, Value).
    Supported fields: platform, os_version, status, model, name (from device columns).
    Supported operators: equals, not_equals, contains, starts_with, greater_than, less_than, in.
@@ -166,11 +220,19 @@ Tasks:
    - GET /api/v1/groups/{id} — return rules in response
    - PUT /api/v1/groups/{id} — allow updating rules (triggers re-evaluation)
    - POST /api/v1/groups/{id}/evaluate — manual trigger for re-evaluation
+   After implementing, curl each endpoint against the running server to verify.
 6. Dashboard: extend group create form with type toggle (static/dynamic). When dynamic is selected,
    show a rule builder UI (field dropdown, operator dropdown, value input, add/remove rule buttons).
    Group detail page shows current rules and a "Re-evaluate Now" button. Use HTMX.
-7. Tests: rule evaluation unit tests (all operators, edge cases), integration tests for membership
-   computation, handler tests for CRUD with rules, EventBus subscriber test.
+   No inline JavaScript — use event delegation in app.js. Verify in browser after implementing.
+7. Tests:
+   - Rule evaluation unit tests (all operators, edge cases)
+   - Repository integration tests against Docker PostgreSQL (not mocks) for group CRUD with rules
+   - Handler unit tests for CRUD with rules
+   - Go-level dashboard tests using `newTestServerWithTemplates` + `doWithSession`
+   - EventBus subscriber test
+   - Add Playwright playbook steps for dynamic group create/evaluate
+8. Update DATABASE.md, API.md, and openapi.yaml with the new columns and endpoints.
 
 Acceptance criteria:
 - Creating a dynamic group with rules `[{field: "platform", operator: "equals", value: "macos"}]`
@@ -221,12 +283,15 @@ bulk operations (multi-select devices and perform actions on all selected).
 Branch: `feature/aut-03-tags-bulk-ops` from `main`.
 Commit per sub-task with `AUT-03:` prefix. Push after each commit.
 Run `go test -race ./...` after every change.
+Follow the Mandatory Verification Gates in the Prerequisites section — rebuild Docker,
+hit real endpoints, and verify dashboard rendering after every sub-task.
 
 ### Part A: Custom Device Tags
 
 Tasks:
 1. Migration: create `device_tags` table (device_id FK, key VARCHAR(64), value VARCHAR(256),
    PRIMARY KEY (device_id, key)). Index on (key, value) for filtering.
+   After rebuild, verify migration applied with `\d` in psql.
 2. Repository: `DeviceTagRepository` — SetTags(ctx, deviceID, tags map[string]string),
    GetTags(ctx, deviceID), DeleteTag(ctx, deviceID, key), ListDevicesByTag(ctx, enterpriseID, key, value).
 3. API endpoints:
@@ -234,23 +299,33 @@ Tasks:
    - GET /api/v1/devices/{id}/tags — get all tags
    - DELETE /api/v1/devices/{id}/tags/{key} — remove a tag
    - Extend GET /api/v1/devices with `?tag=key:value` filter parameter
+   After implementing, curl each endpoint against the running server to verify.
 4. Dashboard: add a "Tags" section to device detail page. Inline edit with add/remove.
    Add tag filter to device list page (text input, format `key:value`).
-5. Tests: repository integration tests, handler tests, filter tests.
+   No inline JavaScript — use event delegation in app.js. Verify in browser after implementing.
+5. Tests: repository integration tests against Docker PostgreSQL (not mocks), handler tests,
+   filter tests. Go-level dashboard tests using newTestServerWithTemplates + doWithSession.
+   Add Playwright playbook steps for tag CRUD and tag filtering.
 
 ### Part B: Bulk Operations
 
 Tasks:
 6. Dashboard device list: add checkboxes to each row. "Select All" checkbox in header.
    Selected count indicator. Actions dropdown appears when ≥1 device selected.
+   No inline JavaScript — use event delegation in app.js. Verify in browser after implementing.
 7. Actions dropdown: Lock Selected, Wipe Selected, Add Tag, Remove Tag, Assign Policy.
    Each action shows a confirmation modal (HTMX) listing affected devices.
    Destructive actions (lock, wipe) require typing the action name to confirm.
 8. API endpoint: POST /api/v1/devices/bulk — accepts {action, device_ids[], params}.
    Actions: lock, wipe, add_tag, remove_tag, assign_policy. Returns per-device results.
+   After implementing, curl each endpoint against the running server to verify.
 9. Implementation: bulk handler iterates device_ids, calls existing service methods
    (deviceService.Lock, deviceService.Wipe, etc.), collects results. Audit log per device.
 10. Tests: bulk handler tests (partial success, all fail, all succeed), confirmation UI tests.
+    Repository integration tests against Docker PostgreSQL (not mocks).
+    Go-level dashboard tests using newTestServerWithTemplates + doWithSession for bulk operations UI.
+    Add Playwright playbook steps for bulk select, bulk lock, and confirmation modal.
+11. Update DATABASE.md, API.md, and openapi.yaml with new tables/columns/endpoints.
 
 Acceptance criteria:
 - Tags can be set, viewed, and removed on device detail page
@@ -302,6 +377,8 @@ The system uses the existing PostgreSQL LISTEN/NOTIFY EventBus.
 Branch: `feature/aut-04-webhooks` from `main`.
 Commit per sub-task with `AUT-04:` prefix. Push after each commit.
 Run `go test -race ./...` after every change.
+Follow the Mandatory Verification Gates in the Prerequisites section — rebuild Docker,
+hit real endpoints, and verify dashboard rendering after every sub-task.
 
 Tasks:
 1. Migration: `webhooks` table (id, enterprise_id FK, url, events TEXT[], secret VARCHAR(128)
@@ -309,6 +386,7 @@ Tasks:
    last_failure_at, created_at, updated_at). `webhook_deliveries` table (id, webhook_id FK,
    event_type, payload JSONB, status VARCHAR(20), response_code INT, attempts INT, next_retry_at,
    created_at).
+   After rebuild, verify migration applied with `\d` in psql.
 2. Repository: WebhookRepository — Create, List, GetByID, Update, Delete, ListActiveByEvent,
    RecordDelivery, GetPendingRetries.
 3. Webhook dispatcher (`internal/service/webhook_dispatcher.go`): subscribes to EventBus events.
@@ -325,13 +403,19 @@ Tasks:
    - DELETE /api/v1/webhooks/{id} — delete webhook
    - POST /api/v1/webhooks/{id}/test — send a test event to verify connectivity
    - GET /api/v1/webhooks/{id}/deliveries — list recent deliveries (last 50)
+   After implementing, curl each endpoint against the running server to verify.
 6. Dashboard page: "Webhooks" under settings or as nav item. List webhooks with status
    (active/disabled/failing). Create form with URL, event checkboxes, secret field.
    Detail page shows recent deliveries with status codes. Test button. Enable/disable toggle.
+   No inline JavaScript — use event delegation in app.js. Verify in browser after implementing.
 7. Event types to support: device.enrolled, device.unenrolled, device.wiped, policy.assigned,
    policy.removed, compliance.changed, command.completed.
 8. Tests: dispatcher unit tests (mock HTTP server), retry logic tests, HMAC signature
    verification test, handler tests, auto-disable after consecutive failures test.
+   Repository integration tests against Docker PostgreSQL (not mocks).
+   Go-level dashboard tests using newTestServerWithTemplates + doWithSession for webhook pages.
+   Add Playwright playbook steps for webhook create, test, and delivery history.
+9. Update DATABASE.md, API.md, and openapi.yaml with new tables/columns/endpoints.
 
 Acceptance criteria:
 - Creating a webhook and enrolling a device sends a POST to the configured URL
@@ -384,6 +468,8 @@ and scheduled deployment (apply policies at a future time with optional canary r
 Branch: `feature/aut-05-dryrun-scheduling` from `main`.
 Commit per sub-task with `AUT-05:` prefix. Push after each commit.
 Run `go test -race ./...` after every change.
+Follow the Mandatory Verification Gates in the Prerequisites section — rebuild Docker,
+hit real endpoints, and verify dashboard rendering after every sub-task.
 
 ### Part A: Policy Dry-Run
 
@@ -393,11 +479,15 @@ Tasks:
    Returns per-device results: current state, what would change, predicted compliance status.
 2. API endpoint: POST /api/v1/policies/{id}/dry-run — body: {target_type, target_id}.
    Returns: {devices: [{device_id, name, current_compliance, predicted_compliance, changes: [...]}]}.
+   After implementing, curl each endpoint against the running server to verify.
 3. Dashboard: "Dry Run" button on policy detail page. Opens a modal to select target
    (device, group, or all). Shows results in a table: device name, current vs predicted
    compliance, list of changes that would be applied. Green/red indicators.
+   No inline JavaScript — use event delegation in app.js. Verify in browser after implementing.
 4. Tests: dry-run service tests with mock repos, handler tests, edge cases (empty group,
    already-compliant devices, policy with no applicable settings for platform).
+   Go-level dashboard tests using newTestServerWithTemplates + doWithSession for dry-run modal.
+   Add Playwright playbook steps for dry-run button and results display.
 
 ### Part B: Scheduled Deployment
 
@@ -406,6 +496,7 @@ Tasks:
    scheduled_at TIMESTAMPTZ, strategy VARCHAR(20) — 'immediate' or 'canary',
    canary_percentage INT, status VARCHAR(20) — 'pending'/'in_progress'/'completed'/'cancelled',
    created_by, created_at, completed_at).
+   After rebuild, verify migration applied with `\d` in psql.
 6. Repository: ScheduledDeploymentRepository — Create, List, GetByID, Cancel,
    GetPendingBefore(time), MarkInProgress, MarkCompleted.
 7. Scheduler worker: background goroutine that polls every 60 seconds for deployments
@@ -417,11 +508,16 @@ Tasks:
    - POST /api/v1/policies/{id}/schedule — create scheduled deployment
    - GET /api/v1/scheduled-deployments — list all scheduled deployments
    - DELETE /api/v1/scheduled-deployments/{id} — cancel a pending deployment
+   After implementing, curl each endpoint against the running server to verify.
 9. Dashboard: "Schedule" button on policy assign page. Date/time picker, strategy toggle
    (immediate/canary with percentage slider). Scheduled deployments list page showing
    upcoming and past deployments with status.
+   No inline JavaScript — use event delegation in app.js. Verify in browser after implementing.
 10. Tests: scheduler worker tests (mock time), canary logic tests, cancellation tests,
-    handler tests.
+    handler tests. Repository integration tests against Docker PostgreSQL (not mocks).
+    Go-level dashboard tests using newTestServerWithTemplates + doWithSession for scheduling UI.
+    Add Playwright playbook steps for schedule creation and deployment list.
+11. Update DATABASE.md, API.md, and openapi.yaml with new tables/columns/endpoints.
 
 Acceptance criteria:
 - Dry-run shows accurate predicted compliance without modifying any data
@@ -471,6 +567,8 @@ vulnerability scanning, certificate auto-renewal, and encryption recovery key es
 Branch: `feature/aut-06-security-hardening` from `main`.
 Commit per sub-task with `AUT-06:` prefix. Push after each commit.
 Run `go test -race ./...` after every change.
+Follow the Mandatory Verification Gates in the Prerequisites section — rebuild Docker,
+hit real endpoints, and verify dashboard rendering after every sub-task.
 
 Tasks:
 1. Security audit log: create `security_audit_logs` table (separate from operational audit_logs).
@@ -482,8 +580,10 @@ Tasks:
    — produces a structured report with: executive summary (total devices, compliant %,
    non-compliant count), per-policy breakdown, per-device detail, trend data (if historical
    compliance results exist). Output formats: JSON and CSV. API endpoint:
-   GET /api/v1/reports/compliance?format=json|csv. Dashboard: "Export Report" button on
-   compliance page.
+   GET /api/v1/reports/compliance?format=json|csv.
+   After implementing, curl each endpoint against the running server to verify.
+   Dashboard: "Export Report" button on compliance page.
+   No inline JavaScript — use event delegation in app.js. Verify in browser after implementing.
 3. CI vulnerability scanning: create `.github/workflows/security.yml` with:
    - `govulncheck ./...` (Go vulnerability database)
    - `trivy fs --scanners vuln,secret .` (dependency + secret scanning)
@@ -494,15 +594,23 @@ Tasks:
    (platform-specific: macOS InstallProfile with new SCEP payload, Windows certificate renewal
    CSP). Background worker runs daily. Dashboard: "Expiring Certificates" widget on home page
    showing count of certs expiring in 7/30/90 days.
+   No inline JavaScript — use event delegation in app.js. Verify in browser after implementing.
 5. Recovery key escrow: migration adding `recovery_keys` table (id, device_id FK, key_type
    VARCHAR — 'bitlocker' or 'filevault', encrypted_key TEXT — pgcrypto encrypted, escrowed_at).
+   After rebuild, verify migration applied with `\d` in psql.
    Repository methods. API endpoint to retrieve key (admin only, audit logged).
+   After implementing, curl each endpoint against the running server to verify.
    For macOS: parse FileVault recovery key from SecurityInfo command response and store.
    For Windows: parse BitLocker recovery key from OMA-DM response and store.
    Dashboard: "Recovery Key" button on device detail page (admin only), shows key in a
    modal with copy button. Every access is audit logged.
+   No inline JavaScript — use event delegation in app.js. Verify in browser after implementing.
 6. Tests: security audit log tests, report generation tests (verify CSV output format),
    cert renewal scheduling tests, recovery key encryption/decryption round-trip tests.
+   Repository integration tests against Docker PostgreSQL (not mocks).
+   Go-level dashboard tests using newTestServerWithTemplates + doWithSession for report export and recovery key UI.
+   Add Playwright playbook steps for compliance report export and recovery key retrieval.
+7. Update DATABASE.md, API.md, and openapi.yaml with new tables/columns/endpoints.
 
 Acceptance criteria:
 - Failed login attempts appear in security audit log
@@ -552,6 +660,8 @@ The dashboard uses Go templates + HTMX + Tailwind CSS. No React.
 Branch: `feature/aut-07-a11y-i18n` from `main`.
 Commit per sub-task with `AUT-07:` prefix. Push after each commit.
 Run `go test -race ./...` after every change.
+Follow the Mandatory Verification Gates in the Prerequisites section — rebuild Docker,
+hit real endpoints, and verify dashboard rendering after every sub-task.
 
 ### Part A: WCAG 2.1 AA Compliance
 
@@ -585,8 +695,12 @@ Tasks:
 9. Update base template to include a language switcher (dropdown in header, sets `?lang=` cookie).
 10. Convert 2-3 representative pages (dashboard home, devices list, device detail) to use
     `{{t}}` calls instead of hardcoded English strings. Leave remaining pages for future sessions.
+    No inline JavaScript — use event delegation in app.js. Verify in browser after implementing.
 11. Tests: i18n middleware tests (header parsing, cookie, fallback), translation lookup tests
     (missing key, missing locale), Pa11y test runner.
+    Go-level dashboard tests using newTestServerWithTemplates + doWithSession for i18n rendering.
+    Add Playwright playbook steps for language switcher and a11y verification.
+12. Update DATABASE.md, API.md, and openapi.yaml with new tables/columns/endpoints.
 
 Acceptance criteria:
 - All pages pass Pa11y with zero WCAG 2.1 AA errors
@@ -637,6 +751,8 @@ adds tracing spans to handlers, services, and DB calls.
 Branch: `feature/aut-08-docs-otel` from `main`.
 Commit per sub-task with `AUT-08:` prefix. Push after each commit.
 Run `go test -race ./...` after every change.
+Follow the Mandatory Verification Gates in the Prerequisites section — rebuild Docker,
+hit real endpoints, and verify dashboard rendering after every sub-task.
 
 ### Part A: User Documentation
 
@@ -678,6 +794,9 @@ Tasks:
    Default: disabled. When enabled, exports to configured OTLP endpoint.
 9. Tests: verify tracing doesn't break when disabled (default), verify spans are created
    when enabled (use in-memory exporter in tests).
+   Go-level dashboard tests using newTestServerWithTemplates + doWithSession to verify no regressions.
+   Add Playwright playbook steps for screenshot generation and user guide link verification.
+10. Update DATABASE.md, API.md, and openapi.yaml with new tables/columns/endpoints.
 
 Acceptance criteria:
 - User guide docs are complete and reference correct URLs/paths for the current setup
