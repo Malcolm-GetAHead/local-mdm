@@ -147,7 +147,14 @@ func TestHandleWindowsEnrollmentService(t *testing.T) {
 		ts.server.certService = nil
 		ts.server.router.HandleFunc("/EnrollmentServer/Enrollment.svc", ts.server.handleWindowsEnrollmentService).Methods("POST")
 
-		body := buildEnrollmentSOAP(t)
+		// Create a valid enrollment token
+		ent := &models.Enterprise{Name: "Test", Slug: "test-503"}
+		ts.enterpriseRepo.Create(nil, ent)
+		ts.enrollmentTokenRepo.Create(nil, &models.EnrollmentToken{
+			EnterpriseID: ent.ID, Token: "tok503", ExpiresAt: time.Now().Add(time.Hour),
+		})
+
+		body := buildEnrollmentSOAPWithEmail(t, "tok503@localmdm.local")
 		req := httptest.NewRequest("POST", "/EnrollmentServer/Enrollment.svc", strings.NewReader(body))
 		w := ts.do(req)
 		assert.Equal(t, http.StatusServiceUnavailable, w.Code)
@@ -164,7 +171,16 @@ func TestHandleWindowsEnrollmentService(t *testing.T) {
 
 		ts.server.router.HandleFunc("/EnrollmentServer/Enrollment.svc", ts.server.handleWindowsEnrollmentService).Methods("POST")
 
-		body := buildEnrollmentSOAP(t)
+		// Create a valid enrollment token
+		ent := &models.Enterprise{Name: "Test", Slug: "test-enroll"}
+		ts.enterpriseRepo.Create(nil, ent)
+		maxUses := 5
+		ts.enrollmentTokenRepo.Create(nil, &models.EnrollmentToken{
+			EnterpriseID: ent.ID, Token: "validenroll", MaxUses: &maxUses, UsesRemaining: &maxUses,
+			ExpiresAt: time.Now().Add(time.Hour),
+		})
+
+		body := buildEnrollmentSOAPWithEmail(t, "validenroll@localmdm.local")
 		req := httptest.NewRequest("POST", "/EnrollmentServer/Enrollment.svc", strings.NewReader(body))
 		req.Header.Set("Content-Type", "application/soap+xml; charset=utf-8")
 		w := ts.do(req)
@@ -176,9 +192,27 @@ func TestHandleWindowsEnrollmentService(t *testing.T) {
 		assert.Contains(t, respBody, "RequestSecurityTokenResponseCollection")
 		assert.Contains(t, respBody, "BinarySecurityToken")
 
-		// Verify device was created
+		// Verify device was created under the token's enterprise
 		require.Len(t, ts.deviceRepo.devices, 1)
 		assert.Equal(t, "windows", ts.deviceRepo.devices[0].Platform)
+		assert.Equal(t, ent.ID, ts.deviceRepo.devices[0].EnterpriseID)
+
+		// Verify token uses decremented
+		tok, _ := ts.enrollmentTokenRepo.GetByToken(nil, "validenroll")
+		assert.Equal(t, 4, *tok.UsesRemaining)
+	})
+
+	t.Run("rejects enrollment without token", func(t *testing.T) {
+		ts := newTestServer(t)
+		ts.server.router.HandleFunc("/EnrollmentServer/Enrollment.svc", ts.server.handleWindowsEnrollmentService).Methods("POST")
+
+		body := buildEnrollmentSOAP(t) // uses admin@localmdm.local — not a valid token
+		req := httptest.NewRequest("POST", "/EnrollmentServer/Enrollment.svc", strings.NewReader(body))
+		req.Header.Set("Content-Type", "application/soap+xml; charset=utf-8")
+		w := ts.do(req)
+
+		assert.Equal(t, http.StatusForbidden, w.Code)
+		assert.Contains(t, w.Body.String(), "enrollment token required")
 	})
 }
 
@@ -253,4 +287,11 @@ func buildEnrollmentSOAP(t *testing.T) string {
 	t.Helper()
 	csr := windows.GenerateTestCSR(t)
 	return windows.BuildTestEnrollmentSOAP(t, csr)
+}
+
+func buildEnrollmentSOAPWithEmail(t *testing.T, email string) string {
+	t.Helper()
+	csr := windows.GenerateTestCSR(t)
+	soap := windows.BuildTestEnrollmentSOAP(t, csr)
+	return strings.Replace(soap, "admin@localmdm.local", email, 1)
 }

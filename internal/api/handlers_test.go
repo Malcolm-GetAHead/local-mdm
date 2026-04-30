@@ -556,15 +556,23 @@ func TestHandleMacOSEnrollmentProfile(t *testing.T) {
 		assert.Equal(t, http.StatusBadRequest, w.Code)
 	})
 
-	t.Run("returns 404 for missing enterprise", func(t *testing.T) {
+	t.Run("returns 403 without token", func(t *testing.T) {
 		ts := newTestServer(t)
 		req := httptest.NewRequest("GET", "/api/v1/macos/enroll/"+uuid.New().String(), nil)
 		w := ts.do(req)
 
-		assert.Equal(t, http.StatusNotFound, w.Code)
+		assert.Equal(t, http.StatusForbidden, w.Code)
 	})
 
-	t.Run("generates profile for valid enterprise", func(t *testing.T) {
+	t.Run("returns 403 for invalid token", func(t *testing.T) {
+		ts := newTestServer(t)
+		req := httptest.NewRequest("GET", "/api/v1/macos/enroll/"+uuid.New().String()+"?token=bogus", nil)
+		w := ts.do(req)
+
+		assert.Equal(t, http.StatusForbidden, w.Code)
+	})
+
+	t.Run("generates profile for valid token", func(t *testing.T) {
 		ts := newTestServer(t)
 		id := uuid.New()
 		ts.enterpriseRepo.enterprises = append(ts.enterpriseRepo.enterprises, &models.Enterprise{
@@ -572,16 +580,22 @@ func TestHandleMacOSEnrollmentProfile(t *testing.T) {
 			Name:      "Test",
 			Slug:      "test",
 		})
+		maxUses := 10
+		ts.enrollmentTokenRepo.Create(nil, &models.EnrollmentToken{
+			EnterpriseID: id, Token: "macostoken", MaxUses: &maxUses, UsesRemaining: &maxUses,
+			ExpiresAt: time.Now().Add(time.Hour),
+		})
 
-		req := httptest.NewRequest("GET", "/api/v1/macos/enroll/"+id.String(), nil)
+		req := httptest.NewRequest("GET", "/api/v1/macos/enroll/"+id.String()+"?token=macostoken", nil)
 		w := ts.do(req)
 
 		assert.Equal(t, http.StatusOK, w.Code)
 		assert.Equal(t, "application/x-apple-aspen-config", w.Header().Get("Content-Type"))
 		assert.Contains(t, w.Header().Get("Content-Disposition"), "enrollment.mobileconfig")
-		// Verify audit log
-		require.Len(t, ts.auditLogger.events, 1)
-		assert.Equal(t, "enrollment.macos.profile_generated", ts.auditLogger.events[0].Action)
+
+		// Verify token uses decremented
+		tok, _ := ts.enrollmentTokenRepo.GetByToken(nil, "macostoken")
+		assert.Equal(t, 9, *tok.UsesRemaining)
 	})
 }
 

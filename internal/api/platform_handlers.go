@@ -33,20 +33,23 @@ func (s *Server) handleMacOSEnrollmentProfile(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	// Check for optional enrollment token
+	// Require enrollment token
+	tokenStr := r.URL.Query().Get("token")
+	if tokenStr == "" {
+		respondError(w, r, http.StatusForbidden, "token_required", "Enrollment token is required")
+		return
+	}
 	var enrollToken *models.EnrollmentToken
-	if tokenStr := r.URL.Query().Get("token"); tokenStr != "" && s.enrollmentTokenRepo != nil {
-		tok, errMsg := s.validateEnrollmentToken(r, tokenStr)
-		if tok != nil {
-			enrollToken = tok
-			enterpriseID = tok.EnterpriseID
-		} else if errMsg != "" {
-			respondError(w, r, http.StatusForbidden, "token_invalid", errMsg)
-			return
-		} else {
-			respondError(w, r, http.StatusForbidden, "token_invalid", "Invalid enrollment token")
-			return
-		}
+	tok, errMsg := s.validateEnrollmentToken(r, tokenStr)
+	if tok != nil {
+		enrollToken = tok
+		enterpriseID = tok.EnterpriseID
+	} else if errMsg != "" {
+		respondError(w, r, http.StatusForbidden, "token_invalid", errMsg)
+		return
+	} else {
+		respondError(w, r, http.StatusForbidden, "token_invalid", "Invalid enrollment token")
+		return
 	}
 
 	// Verify enterprise exists
@@ -217,11 +220,6 @@ func (s *Server) handleWindowsEnrollmentService(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	if s.certService == nil {
-		respondError(w, r, http.StatusServiceUnavailable, "ca_unavailable", "Certificate authority not configured")
-		return
-	}
-
 	// Extract device info from AdditionalContext
 	additionalCtx := windows.ExtractAdditionalContext(env)
 	hwDeviceID := ""
@@ -241,51 +239,41 @@ func (s *Server) handleWindowsEnrollmentService(w http.ResponseWriter, r *http.R
 		storedDeviceID = hwDeviceID
 	}
 
-	// Determine enterprise ID from enrollment token, URL path, email username (UUID), or fallback
+	// Require enrollment token from email local part
 	enterpriseID := uuid.Nil
 	if eidStr := mux.Vars(r)["enterprise_id"]; eidStr != "" {
 		if eid, err := uuid.Parse(eidStr); err == nil {
 			enterpriseID = eid
 		}
 	}
-	// Try enrollment token from email local part
 	var enrollToken *models.EnrollmentToken
-	if enterpriseID == uuid.Nil && env.Header.Security != nil && env.Header.Security.UsernameToken != nil {
+	if env.Header.Security != nil && env.Header.Security.UsernameToken != nil {
 		username := env.Header.Security.UsernameToken.Username
 		if atIdx := strings.Index(username, "@"); atIdx > 0 {
 			localPart := username[:atIdx]
-			// First try as enrollment token
-			if s.enrollmentTokenRepo != nil {
-				if tok, errMsg := s.validateEnrollmentToken(r, localPart); tok != nil {
-					enrollToken = tok
-					enterpriseID = tok.EnterpriseID
-				} else if errMsg != "" {
-					// Token was found but invalid (expired/revoked/exhausted)
-					// Only reject if it looks like a token (not a UUID)
-					if _, parseErr := uuid.Parse(localPart); parseErr != nil {
-						s.logger.Warn("enrollment token validation failed", "token", localPart, "reason", errMsg)
-						respondSOAPFault(w, "s:Sender", "enrollment token invalid: "+errMsg)
-						return
-					}
-				}
-			}
-			// Fall back to UUID-based enterprise resolution
-			if enterpriseID == uuid.Nil {
-				if eid, parseErr := uuid.Parse(localPart); parseErr == nil {
-					enterpriseID = eid
-				}
+			tok, errMsg := s.validateEnrollmentToken(r, localPart)
+			if tok != nil {
+				enrollToken = tok
+				enterpriseID = tok.EnterpriseID
+			} else if errMsg != "" {
+				s.logger.Warn("enrollment token validation failed", "token", localPart, "reason", errMsg)
+				respondSOAPFault(w, "s:Sender", "enrollment token invalid: "+errMsg)
+				return
+			} else {
+				s.logger.Warn("enrollment rejected: invalid token", "email", username)
+				respondSOAPFault(w, "s:Sender", "Valid enrollment token required. Contact your IT administrator.")
+				return
 			}
 		}
 	}
-	if enterpriseID == uuid.Nil {
-		if s.config.MacOS.DefaultEnterpriseID != "" {
-			if eid, err := uuid.Parse(s.config.MacOS.DefaultEnterpriseID); err == nil {
-				enterpriseID = eid
-			}
-		}
+	if enrollToken == nil {
+		respondSOAPFault(w, "s:Sender", "Valid enrollment token required. Contact your IT administrator.")
+		return
 	}
-	if enterpriseID == uuid.Nil {
-		enterpriseID = uuid.MustParse("00000000-0000-0000-0000-000000000001") // default
+
+	if s.certService == nil {
+		respondError(w, r, http.StatusServiceUnavailable, "ca_unavailable", "Certificate authority not configured")
+		return
 	}
 
 	// Create device record BEFORE signing CSR (certificates table has FK to devices)
