@@ -29,16 +29,14 @@ func EnsureTestEnterprise(t testing.TB, db *sql.DB) uuid.UUID {
 
 // CleanupTestData deletes all child rows under the test enterprise (devices, policies,
 // groups, tokens, etc.) but never deletes the enterprise itself. Safe to call in t.Cleanup().
+// Deletes in FK-safe order: tables with enterprise_id first, then cascade-dependent tables
+// are handled automatically by the ON DELETE CASCADE constraints.
 func CleanupTestData(t testing.TB, db *sql.DB) {
 	t.Helper()
-	// Delete in FK-safe order (children before parents).
+	// Tables with direct enterprise_id FK — delete in child-first order.
 	tables := []string{
-		"compliance_results",
-		"policy_assignments",
-		"device_group_members",
-		"device_commands",
-		"device_certificates",
 		"enrollment_tokens",
+		"audit_logs",
 		"devices",
 		"policies",
 		"device_groups",
@@ -47,7 +45,6 @@ func CleanupTestData(t testing.TB, db *sql.DB) {
 	for _, table := range tables {
 		_, err := db.Exec(fmt.Sprintf("DELETE FROM %s WHERE enterprise_id = $1", table), TestEnterpriseID)
 		if err != nil {
-			// Table may not exist in all test environments; log but don't fail.
 			t.Logf("CleanupTestData: %s: %v", table, err)
 		}
 	}
