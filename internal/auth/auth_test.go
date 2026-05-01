@@ -1,10 +1,10 @@
 package auth_test
 
 import (
-	"os"
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -12,6 +12,7 @@ import (
 	"github.com/malcolm-getahead/local-mdm/internal/auth"
 	"github.com/malcolm-getahead/local-mdm/internal/config"
 	"github.com/malcolm-getahead/local-mdm/internal/logging"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestKeycloakLogin(t *testing.T) {
@@ -498,6 +499,50 @@ func TestOptionalAuth(t *testing.T) {
 			t.Errorf("Expected anonymous response (invalid token ignored), got %s", body)
 		}
 	})
+}
+
+func TestKeycloakLoginTimeout(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping timeout test in short mode")
+	}
+
+	// Server that hangs longer than the 30s client timeout
+	slowServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		time.Sleep(35 * time.Second)
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer slowServer.Close()
+
+	kc := auth.NewKeycloakClient(slowServer.URL, "test-client", "test-secret")
+
+	start := time.Now()
+	_, err := kc.Login(context.Background(), "user", "pass")
+	elapsed := time.Since(start)
+
+	assert.Error(t, err)
+	// Should fail in ~30s (client timeout), not 35s (server sleep)
+	assert.Less(t, elapsed, 34*time.Second, "should timeout before server responds")
+}
+
+func TestKeycloakLoginContextCancellation(t *testing.T) {
+	// Server that takes 5s — we cancel the context after 500ms
+	slowServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		time.Sleep(5 * time.Second)
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer slowServer.Close()
+
+	kc := auth.NewKeycloakClient(slowServer.URL, "test-client", "test-secret")
+
+	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
+	defer cancel()
+
+	start := time.Now()
+	_, err := kc.Login(ctx, "user", "pass")
+	elapsed := time.Since(start)
+
+	assert.Error(t, err)
+	assert.Less(t, elapsed, 2*time.Second, "should respect context cancellation, not wait for client timeout")
 }
 
 func keycloakTestURL() string {
