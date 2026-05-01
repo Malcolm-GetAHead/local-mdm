@@ -206,101 +206,96 @@ Read `.kiro/steering/STEERING.md` and `.kiro/steering/SESSION_NOTES.md` for proj
 Read `docs/planning/future/F-07-advanced-features.md` §Dynamic Device Groups for the full spec.
 Read `docs/planning/future/autonomous_sessions.md` Session 2 for task list.
 
-Implement dynamic device groups — groups whose membership is automatically computed from
-filter rules instead of manual assignment. Static groups (S4-02) already exist with manual
-membership. Dynamic groups extend this with a `type` column and `rules` JSONB column.
+Problem: Static groups require manual membership management. Admins want groups that
+auto-populate based on device attributes (e.g., "all macOS devices", "all devices running
+OS < 14.0"). The existing group system (S4-02) has manual membership only.
 
 Branch: `feature/aut-02-dynamic-groups` from `main`.
 Commit per sub-task with `AUT-02:` prefix. Push after each commit.
 Run `go test -race ./...` after every change.
-Follow the Mandatory Verification Gates in the Prerequisites section — rebuild Docker,
-hit real endpoints, and verify dashboard rendering after every sub-task.
+Follow the Mandatory Verification Gates in the Prerequisites section.
 
-Tasks:
-1. Migration: add `type VARCHAR(10) DEFAULT 'static'` and `rules JSONB` columns to `device_groups`.
-   Add CHECK constraint: type IN ('static', 'dynamic'). Dynamic groups must have non-null rules.
-   After rebuild, verify migration applied: `docker exec localmdm-postgres psql -U postgres -d localmdm -c '\d device_groups'`
-2. Rule engine (`internal/service/dynamic_groups.go`): define Rule struct (Field, Operator, Value).
-   Supported fields: platform, os_version, status, model, name (from device columns).
-   Supported operators: equals, not_equals, contains, starts_with, greater_than, less_than, in.
-   Evaluate function takes a device and a list of rules, returns bool (AND logic — all must match).
-3. Evaluation service: query all devices for an enterprise, evaluate each against group rules,
-   compute adds/removes vs current membership, apply changes. Log membership changes to audit log.
-4. EventBus subscriber: register a subscriber that re-evaluates dynamic groups when devices are
-   created, updated, or deleted. Also add a periodic re-evaluation (every 15 minutes) using a
-   background goroutine with context cancellation.
-5. API: extend existing group endpoints:
-   - POST /api/v1/groups — accept `type` and `rules` fields
-   - GET /api/v1/groups/{id} — return rules in response
-   - PUT /api/v1/groups/{id} — allow updating rules (triggers re-evaluation)
-   - POST /api/v1/groups/{id}/evaluate — manual trigger for re-evaluation
-   After implementing, curl each endpoint against the running server to verify.
-6. Dashboard: extend group create form with type toggle (static/dynamic). When dynamic is selected,
-   show a rule builder UI (field dropdown, operator dropdown, value input, add/remove rule buttons).
-   Group detail page shows current rules and a "Re-evaluate Now" button. Use HTMX.
-   No inline JavaScript — use event delegation in app.js. Verify in browser after implementing.
-7. Tests:
-   - Rule evaluation unit tests (all operators, edge cases)
-   - Repository integration tests against Docker PostgreSQL (not mocks) for group CRUD with rules
-   - Handler unit tests for CRUD with rules
-   - Go-level dashboard tests using `newTestServerWithTemplates` + `doWithSession`
-   - EventBus subscriber test
-   - Add Playwright playbook steps for dynamic group create/evaluate
-8. Update DATABASE.md, API.md, and openapi.yaml with the new columns and endpoints.
+### Phase 1: Investigation & Design (commit as AUT-02: design doc)
+
+Before writing any feature code, investigate and produce a design document
+(`docs/planning/sprints/aut-02-design.md`) covering:
+
+1. Read `internal/repository/group.go` and `internal/service/group.go` — document the
+   current GroupRepository interface, how membership works (AddMember/RemoveMember/ListMembers),
+   and how groups are used by policy assignments.
+2. Read `migrations/000011_eventbus_triggers.up.sql` — list every event type string that
+   DB triggers actually fire. Map these to the device lifecycle events that should trigger
+   re-evaluation (create, update, delete). If the event types don't match what you need,
+   document what's missing.
+3. Propose a rule schema. Consider:
+   - Should rules support OR logic (any rule matches) or only AND (all must match)?
+   - Should rules filter on JSONB PlatformData fields (e.g., FileVaultEnabled) or only
+     top-level device columns?
+   - Should evaluation happen in Go (load all devices, filter in memory) or in SQL
+     (translate rules to WHERE clauses)? What are the tradeoffs at 100 vs 10,000 devices?
+   - What operators make sense? (equals, contains, greater_than, etc.)
+4. Propose the migration schema (columns on device_groups, or a separate rules table?).
+5. Propose the evaluation trigger strategy: EventBus subscriber, periodic background job,
+   or both? What interval for periodic? What happens if evaluation is slow?
+
+**Stop after Phase 1.** Commit the design doc and present it for review. Do not proceed
+to Phase 2 until the owner has reviewed the design.
+
+### Phase 2: Implementation (after design review)
+
+Implement the approved design. The tasks below are a starting point — adjust based on
+the design decisions made in Phase 1.
+
+1. Migration: add columns to `device_groups` per approved schema.
+2. Rule engine: implement evaluation logic per approved design.
+3. Evaluation service: compute membership changes, apply, audit log.
+4. EventBus subscriber and/or periodic evaluator per approved strategy.
+5. API: extend group CRUD to accept type and rules. Add manual evaluate endpoint.
+6. Dashboard: type toggle, rule builder UI, re-evaluate button. HTMX, no inline JS.
+7. Tests: rule evaluation unit tests, repo integration tests, handler tests, dashboard
+   tests, EventBus subscriber test, Playwright steps.
+8. Update DATABASE.md, API.md, openapi.yaml.
 
 Acceptance criteria:
-- Creating a dynamic group with rules `[{field: "platform", operator: "equals", value: "macos"}]`
-  auto-populates membership with all macOS devices
+- Creating a dynamic group with platform=macos rule auto-populates with macOS devices
 - Adding a new macOS device triggers re-evaluation and adds it to the group
-- Changing a device's platform removes it from the group on next evaluation
-- Manual re-evaluation via API and dashboard button works
-- Static groups are unaffected — no behavioral changes
+- Manual re-evaluation via API and dashboard works
+- Static groups are unaffected
 - All tests pass with `go test -race ./...`
 
-When complete, perform this retrospective:
-1. List every task where you made a shortcut, used a stub, skipped a test, or deviated from the spec.
-2. Does everything align with the existing codebase? Any dependencies broken or gaps?
-3. How's test coverage and documentation? Are they still accurate? Any skipped integration tests?
-
-After the retrospective, provide:
-- Summary of work completed
-- Checklist of how the owner can verify the work (specific URLs to visit, commands to run, behaviors to test)
+When complete, perform the standard retrospective.
 ```
 
 ### Deliverables
-- Migration adding `type` and `rules` columns
-- `internal/service/dynamic_groups.go` + rule engine + tests
-- EventBus subscriber for auto-evaluation
+- Design document with rule schema, evaluation strategy, and migration plan
+- Migration adding dynamic group support
+- Rule engine + evaluation service + tests
+- EventBus subscriber and/or periodic evaluator
 - Extended API handlers and dashboard UI
-- Background periodic evaluator with graceful shutdown
 
 ---
 
-## Session 3: Custom Device Tags & Bulk Operations
+## Session 3a: Custom Device Tags
 
-**ID**: `AUT-03`
-**Effort**: ~1 day
-**Source**: F-07 §Custom Device Attributes, §Bulk Operations UI
-**Branch**: `feature/aut-03-tags-bulk-ops`
+**ID**: `AUT-03a`
+**Effort**: ~0.5 day
+**Source**: F-07 §Custom Device Attributes
+**Branch**: `feature/aut-03a-device-tags`
 **Depends on**: None
 
 ### Prompt
 
 ```
 Read `.kiro/steering/STEERING.md` and `.kiro/steering/SESSION_NOTES.md` for project conventions.
-Read `docs/planning/future/F-07-advanced-features.md` §Custom Device Attributes and §Bulk Operations UI.
-Read `docs/planning/future/autonomous_sessions.md` Session 3 for task list.
+Read `docs/planning/future/F-07-advanced-features.md` §Custom Device Attributes.
+Read `docs/planning/future/autonomous_sessions.md` Session 3a for task list.
 
-Implement two related features: custom device tags (key-value metadata on devices) and
-bulk operations (multi-select devices and perform actions on all selected).
+Implement custom device tags — key-value metadata on devices for filtering and organization.
 
-Branch: `feature/aut-03-tags-bulk-ops` from `main`.
-Commit per sub-task with `AUT-03:` prefix. Push after each commit.
+Branch: `feature/aut-03a-device-tags` from `main`.
+Commit per sub-task with `AUT-03a:` prefix. Push after each commit.
 Run `go test -race ./...` after every change.
-Follow the Mandatory Verification Gates in the Prerequisites section — rebuild Docker,
-hit real endpoints, and verify dashboard rendering after every sub-task.
-
-### Part A: Custom Device Tags
+Follow the Mandatory Verification Gates in the Prerequisites section.
 
 Tasks:
 1. Migration: create `device_tags` table (device_id FK, key VARCHAR(64), value VARCHAR(256),
@@ -320,51 +315,89 @@ Tasks:
 5. Tests: repository integration tests against Docker PostgreSQL (not mocks), handler tests,
    filter tests. Go-level dashboard tests using newTestServerWithTemplates + doWithSession.
    Add Playwright playbook steps for tag CRUD and tag filtering.
-
-### Part B: Bulk Operations
-
-Tasks:
-6. Dashboard device list: add checkboxes to each row. "Select All" checkbox in header.
-   Selected count indicator. Actions dropdown appears when ≥1 device selected.
-   No inline JavaScript — use event delegation in app.js. Verify in browser after implementing.
-7. Actions dropdown: Lock Selected, Wipe Selected, Add Tag, Remove Tag, Assign Policy.
-   Each action shows a confirmation modal (HTMX) listing affected devices.
-   Destructive actions (lock, wipe) require typing the action name to confirm.
-8. API endpoint: POST /api/v1/devices/bulk — accepts {action, device_ids[], params}.
-   Actions: lock, wipe, add_tag, remove_tag, assign_policy. Returns per-device results.
-   After implementing, curl each endpoint against the running server to verify.
-9. Implementation: bulk handler iterates device_ids, calls existing service methods
-   (deviceService.Lock, deviceService.Wipe, etc.), collects results. Audit log per device.
-10. Tests: bulk handler tests (partial success, all fail, all succeed), confirmation UI tests.
-    Repository integration tests against Docker PostgreSQL (not mocks).
-    Go-level dashboard tests using newTestServerWithTemplates + doWithSession for bulk operations UI.
-    Add Playwright playbook steps for bulk select, bulk lock, and confirmation modal.
-11. Update DATABASE.md, API.md, and openapi.yaml with new tables/columns/endpoints.
+6. Update DATABASE.md, API.md, and openapi.yaml.
 
 Acceptance criteria:
 - Tags can be set, viewed, and removed on device detail page
 - Device list can be filtered by tag (e.g., `?tag=department:engineering`)
-- Selecting multiple devices shows action dropdown
-- Bulk lock sends lock command to all selected devices
-- Confirmation modal shows device list and requires typed confirmation for destructive actions
-- Partial failures return per-device results (some succeed, some fail)
 - All tests pass with `go test -race ./...`
 
-When complete, perform this retrospective:
-1. List every task where you made a shortcut, used a stub, skipped a test, or deviated from the spec.
-2. Does everything align with the existing codebase? Any dependencies broken or gaps?
-3. How's test coverage and documentation? Are they still accurate? Any skipped integration tests?
-
-After the retrospective, provide:
-- Summary of work completed
-- Checklist of how the owner can verify the work (specific URLs to visit, commands to run, behaviors to test)
+When complete, perform the standard retrospective.
 ```
 
 ### Deliverables
 - Migration for `device_tags` table
 - Tag repository + API + dashboard UI
+- Tag filtering on device list
+
+---
+
+## Session 3b: Bulk Device Operations
+
+**ID**: `AUT-03b`
+**Effort**: ~0.5 day
+**Source**: F-07 §Bulk Operations UI
+**Branch**: `feature/aut-03b-bulk-ops`
+**Depends on**: AUT-03a (uses tags for Add Tag / Remove Tag actions)
+
+### Prompt
+
+```
+Read `.kiro/steering/STEERING.md` and `.kiro/steering/SESSION_NOTES.md` for project conventions.
+Read `docs/planning/future/F-07-advanced-features.md` §Bulk Operations UI.
+Read `docs/planning/future/autonomous_sessions.md` Session 3b for task list.
+
+Problem: Admins need to perform actions on multiple devices at once (lock all devices in
+a department, wipe all decommissioned devices, tag a batch of new devices). Currently
+every action is one device at a time.
+
+Branch: `feature/aut-03b-bulk-ops` from `main`.
+Commit per sub-task with `AUT-03b:` prefix. Push after each commit.
+Run `go test -race ./...` after every change.
+Follow the Mandatory Verification Gates in the Prerequisites section.
+
+### Phase 1: Design the confirmation UX (commit as AUT-03b: design doc)
+
+Before implementing, investigate and document:
+
+1. Read the device list page template and `app.js` — understand the current table structure
+   and how HTMX interactions work on this page.
+2. Propose the multi-select UX: how do checkboxes interact with pagination? If the admin
+   selects 5 devices on page 1 and navigates to page 2, are the selections preserved?
+   Document the tradeoffs of client-side vs server-side selection tracking.
+3. Propose the confirmation modal pattern for destructive actions (lock, wipe). The spec
+   suggests typed confirmation — is this the right pattern for this dashboard? Look at how
+   other modals work in the existing templates.
+4. Document the proposed API shape for the bulk endpoint.
+
+Commit the design as `docs/planning/sprints/aut-03b-design.md`. **Stop and present for review.**
+
+### Phase 2: Implementation (after design review)
+
+1. Dashboard device list: add checkboxes, select all, selected count, actions dropdown.
+   No inline JavaScript — use event delegation in app.js.
+2. Actions: Lock, Wipe, Add Tag, Remove Tag, Assign Policy. Confirmation modal via HTMX.
+   Destructive actions use the approved confirmation pattern from Phase 1.
+3. API: POST /api/v1/devices/bulk — {action, device_ids[], params}. Returns per-device results.
+4. Implementation: iterate device_ids, call existing service methods, collect results, audit log.
+5. Tests: bulk handler (partial success, all fail, all succeed), confirmation UI, dashboard
+   tests, Playwright steps.
+6. Update DATABASE.md, API.md, openapi.yaml.
+
+Acceptance criteria:
+- Selecting multiple devices shows action dropdown
+- Bulk lock sends lock command to all selected devices
+- Confirmation modal shows device list and requires confirmation for destructive actions
+- Partial failures return per-device results
+- All tests pass with `go test -race ./...`
+
+When complete, perform the standard retrospective.
+```
+
+### Deliverables
+- Design doc for multi-select UX and confirmation pattern
 - Bulk operations API endpoint + dashboard multi-select UI
-- Confirmation modals with typed confirmation for destructive actions
+- Confirmation modals for destructive actions
 
 ---
 
@@ -395,6 +428,11 @@ Follow the Mandatory Verification Gates in the Prerequisites section — rebuild
 hit real endpoints, and verify dashboard rendering after every sub-task.
 
 Tasks:
+0. **Investigation (before any code):** Read `migrations/000011_eventbus_triggers.up.sql` and
+   list every event type string that DB triggers actually fire. Compare with the 7 event types
+   below. If they don't match, adjust the event type list to match what the EventBus actually
+   produces. Also read `internal/service/eventbus.go` to understand the Subscribe() pattern
+   and MDMEvent struct. Commit findings as a comment in the first commit message.
 1. Migration: `webhooks` table (id, enterprise_id FK, url, events TEXT[], secret VARCHAR(128)
    for HMAC-SHA256 signing, active BOOLEAN, description, failure_count INT DEFAULT 0,
    last_failure_at, created_at, updated_at). `webhook_deliveries` table (id, webhook_id FK,
@@ -487,79 +525,61 @@ Read the existing compliance service in `internal/service/compliance.go` and pol
 in `internal/service/policy.go` to understand the current evaluation flow.
 Read `docs/planning/future/autonomous_sessions.md` Session 5 for task list.
 
-Implement two features: policy dry-run (simulate what would happen if a policy were applied)
-and scheduled deployment (apply policies at a future time with optional canary rollout).
+Problem: Admins want to preview the impact of a policy before deploying it (dry-run), and
+schedule policy deployments for a future time with optional gradual rollout (canary).
 
 Branch: `feature/aut-05-dryrun-scheduling` from `main`.
 Commit per sub-task with `AUT-05:` prefix. Push after each commit.
 Run `go test -race ./...` after every change.
-Follow the Mandatory Verification Gates in the Prerequisites section — rebuild Docker,
-hit real endpoints, and verify dashboard rendering after every sub-task.
+Follow the Mandatory Verification Gates in the Prerequisites section.
 
-### Part A: Policy Dry-Run
+### Phase 1: Investigation & Design (commit as AUT-05: design doc)
 
-Tasks:
-1. Service method: `PolicyService.DryRun(ctx, policyID, targetType, targetID)` — evaluates
-   the policy against target devices (device, group, or enterprise) WITHOUT deploying.
-   Returns per-device results: current state, what would change, predicted compliance status.
-2. API endpoint: POST /api/v1/policies/{id}/dry-run — body: {target_type, target_id}.
-   Returns: {devices: [{device_id, name, current_compliance, predicted_compliance, changes: [...]}]}.
-   After implementing, curl each endpoint against the running server to verify.
-3. Dashboard: "Dry Run" button on policy detail page. Opens a modal to select target
-   (device, group, or all). Shows results in a table: device name, current vs predicted
-   compliance, list of changes that would be applied. Green/red indicators.
-   No inline JavaScript — use event delegation in app.js. Verify in browser after implementing.
-4. Tests: dry-run service tests with mock repos, handler tests, edge cases (empty group,
-   already-compliant devices, policy with no applicable settings for platform).
-   Go-level dashboard tests using newTestServerWithTemplates + doWithSession for dry-run modal.
-   Add Playwright playbook steps for dry-run button and results display.
+Before writing any feature code, investigate and produce a design document
+(`docs/planning/sprints/aut-05-design.md`) covering:
 
-### Part B: Scheduled Deployment
+1. Read `internal/service/compliance.go` — find the method that evaluates a single device
+   against a policy. Is it exported? What does it return? Can it be called without persisting
+   results (dry-run mode)? If not, what changes are needed to support dry-run?
+2. Read `internal/service/policy.go` — find how policies are assigned to targets (device,
+   group, enterprise). What method handles assignment? What service methods exist?
+3. Read `internal/repository/policy_assignment.go` — understand GetEffectivePolicies and
+   how priority resolution works. Dry-run needs to simulate "what if this policy were added."
+4. Propose the dry-run implementation: how does it hook into existing compliance evaluation
+   without persisting results? What's the response shape?
+5. For scheduled deployment: propose the canary strategy. Should canary auto-complete, or
+   require manual approval? What happens if a canary deployment has failures — auto-rollback,
+   pause, or continue? Document tradeoffs.
+6. Propose the migration schema for `scheduled_deployments`.
 
-Tasks:
-5. Migration: `scheduled_deployments` table (id, policy_id FK, target_type, target_id,
-   scheduled_at TIMESTAMPTZ, strategy VARCHAR(20) — 'immediate' or 'canary',
-   canary_percentage INT, status VARCHAR(20) — 'pending'/'in_progress'/'completed'/'cancelled',
-   created_by, created_at, completed_at).
-   After rebuild, verify migration applied with `\d` in psql.
-6. Repository: ScheduledDeploymentRepository — Create, List, GetByID, Cancel,
-   GetPendingBefore(time), MarkInProgress, MarkCompleted.
-7. Scheduler worker: background goroutine that polls every 60 seconds for deployments
-   where scheduled_at <= now() and status = 'pending'. Executes deployment using existing
-   policy assignment logic. For canary: deploy to N% of target devices first, mark as
-   in_progress, deploy remainder on next cycle (or after manual approval — for autonomous
-   implementation, auto-complete after 1 hour if no failures).
-8. API endpoints:
-   - POST /api/v1/policies/{id}/schedule — create scheduled deployment
-   - GET /api/v1/scheduled-deployments — list all scheduled deployments
-   - DELETE /api/v1/scheduled-deployments/{id} — cancel a pending deployment
-   After implementing, curl each endpoint against the running server to verify.
-9. Dashboard: "Schedule" button on policy assign page. Date/time picker, strategy toggle
-   (immediate/canary with percentage slider). Scheduled deployments list page showing
-   upcoming and past deployments with status.
-   No inline JavaScript — use event delegation in app.js. Verify in browser after implementing.
-10. Tests: scheduler worker tests (mock time), canary logic tests, cancellation tests,
-    handler tests. Repository integration tests against Docker PostgreSQL (not mocks).
-    Go-level dashboard tests using newTestServerWithTemplates + doWithSession for scheduling UI.
-    Add Playwright playbook steps for schedule creation and deployment list.
-11. Update DATABASE.md, API.md, and openapi.yaml with new tables/columns/endpoints.
+**Stop after Phase 1.** Commit the design doc and present it for review. Do not proceed
+to Phase 2 until the owner has reviewed the design.
+
+### Phase 2: Dry-Run Implementation (after design review)
+
+1. Implement dry-run service method per approved design.
+2. API: POST /api/v1/policies/{id}/dry-run.
+3. Dashboard: "Dry Run" button on policy detail, modal with results.
+4. Tests: service tests, handler tests, edge cases, dashboard tests, Playwright.
+
+### Phase 3: Scheduled Deployment (after dry-run is complete)
+
+5. Migration: `scheduled_deployments` table per approved schema.
+6. Repository: CRUD + GetPendingBefore, MarkInProgress, MarkCompleted.
+7. Scheduler worker: background goroutine per approved strategy.
+8. API: schedule, list, cancel endpoints.
+9. Dashboard: schedule button, deployments list page.
+10. Tests: scheduler, canary logic, cancellation, handler, repo integration, Playwright.
+11. Update DATABASE.md, API.md, openapi.yaml.
 
 Acceptance criteria:
 - Dry-run shows accurate predicted compliance without modifying any data
 - Scheduling a deployment for 5 minutes in the future executes it automatically
-- Canary deployment applies to the configured percentage first
 - Cancelling a pending deployment prevents execution
 - Dashboard shows scheduled deployments with status
 - All tests pass with `go test -race ./...`
 
-When complete, perform this retrospective:
-1. List every task where you made a shortcut, used a stub, skipped a test, or deviated from the spec.
-2. Does everything align with the existing codebase? Any dependencies broken or gaps?
-3. How's test coverage and documentation? Are they still accurate? Any skipped integration tests?
-
-After the retrospective, provide:
-- Summary of work completed
-- Checklist of how the owner can verify the work (specific URLs to visit, commands to run, behaviors to test)
+When complete, perform the standard retrospective.
 ```
 
 ### Deliverables
@@ -570,12 +590,12 @@ After the retrospective, provide:
 
 ---
 
-## Session 6: Security Hardening
+## Session 6a: Security Audit Logging & CI Scanning
 
-**ID**: `AUT-06`
-**Effort**: ~1 day
-**Source**: F-03 §mTLS, §Security Audit Logging, §Compliance Reporting, §Vulnerability Scanning, §Recovery Key Escrow
-**Branch**: `feature/aut-06-security-hardening`
+**ID**: `AUT-06a`
+**Effort**: ~0.5 day
+**Source**: F-03 §Security Audit Logging, §Vulnerability Scanning
+**Branch**: `feature/aut-06a-security-audit`
 **Depends on**: None
 
 ### Prompt
@@ -583,17 +603,14 @@ After the retrospective, provide:
 ```
 Read `.kiro/steering/STEERING.md` and `.kiro/steering/SESSION_NOTES.md` for project conventions.
 Read `docs/planning/future/F-03-advanced-security.md` for the full security spec.
-Read `docs/planning/future/autonomous_sessions.md` Session 6 for task list.
 
-Implement security hardening features that don't require external services (no HSM, no
-cloud accounts). Focus on: security audit logging, compliance report generation, CI
-vulnerability scanning, certificate auto-renewal, and encryption recovery key escrow.
+Implement security audit logging (separate from operational audit_logs) and CI vulnerability
+scanning. These are mechanical, low-risk features.
 
-Branch: `feature/aut-06-security-hardening` from `main`.
-Commit per sub-task with `AUT-06:` prefix. Push after each commit.
+Branch: `feature/aut-06a-security-audit` from `main`.
+Commit per sub-task with `AUT-06a:` prefix. Push after each commit.
 Run `go test -race ./...` after every change.
-Follow the Mandatory Verification Gates in the Prerequisites section — rebuild Docker,
-hit real endpoints, and verify dashboard rendering after every sub-task.
+Follow the Mandatory Verification Gates in the Prerequisites section.
 
 Tasks:
 1. Security audit log: create `security_audit_logs` table (separate from operational audit_logs).
@@ -601,78 +618,149 @@ Tasks:
    cert_issued, cert_revoked, admin_action), severity (info/warning/critical), actor,
    source_ip, details JSONB. Repository + service. Wire into auth middleware (failed logins),
    cert service (issuance/revocation), and admin actions (user role changes).
-2. Compliance report generation: `ReportService.GenerateComplianceReport(ctx, enterpriseID, format)`
-   — produces a structured report with: executive summary (total devices, compliant %,
-   non-compliant count), per-policy breakdown, per-device detail, trend data (if historical
-   compliance results exist). Output formats: JSON and CSV. API endpoint:
-   GET /api/v1/reports/compliance?format=json|csv.
-   After implementing, curl each endpoint against the running server to verify.
-   Dashboard: "Export Report" button on compliance page.
-   No inline JavaScript — use event delegation in app.js. Verify in browser after implementing.
+2. Tests: security audit log repository integration tests, service tests, verify auth
+   middleware integration. Playwright steps if dashboard exposure is added.
 3. CI vulnerability scanning: create `.github/workflows/security.yml` with:
    - `govulncheck ./...` (Go vulnerability database)
    - `trivy fs --scanners vuln,secret .` (dependency + secret scanning)
    - Run on push to main and on PRs
    - Fail the build on HIGH/CRITICAL vulnerabilities
-4. Certificate auto-renewal: `CertRenewalService` that checks device certificate expiry.
-   Query devices where cert expires within 30 days. For each, queue a re-enrollment command
-   (platform-specific: macOS InstallProfile with new SCEP payload, Windows certificate renewal
-   CSP). Background worker runs daily. Dashboard: "Expiring Certificates" widget on home page
-   showing count of certs expiring in 7/30/90 days.
-   No inline JavaScript — use event delegation in app.js. Verify in browser after implementing.
-5. Recovery key escrow: migration adding `recovery_keys` table (id, device_id FK, key_type
-   VARCHAR — 'bitlocker' or 'filevault', encrypted_key TEXT — pgcrypto encrypted, escrowed_at,
-   rotated_at TIMESTAMPTZ).
-   After rebuild, verify migration applied with `\d` in psql.
-   Repository methods. API endpoint to retrieve key (admin only, audit logged).
-   After implementing, curl each endpoint against the running server to verify.
-   For macOS: parse FileVault recovery key from SecurityInfo command response and store.
-   For Windows: parse BitLocker recovery key from OMA-DM response and store.
-   **VM encryption setup**: Before testing escrow, verify BitLocker and FileVault are enabled
-   on the VMs. If not, enable them via SSH:
-   - Windows: `manage-bde -on C: -RecoveryPassword` (check with `manage-bde -status`)
-   - macOS: `sudo fdesetup enable` (check with `fdesetup status`)
-   **Key rotation**: implement a rotation endpoint (POST /api/v1/devices/{id}/recovery-key/rotate)
-   that triggers a new recovery key on the device. For BitLocker this is
-   `manage-bde -protectors -add C: -RecoveryPassword` via OMA-DM CSP. For FileVault, check
-   if rotation is supported via MDM SecurityInfo — if not, document the limitation.
-   **Logging**: Recovery key values may be logged at DEBUG level during development. Ensure
-   production log level (INFO+) never includes key values. The API response and audit log
-   should reference key IDs, not key values.
-   Dashboard: "Recovery Key" button on device detail page (admin only), shows key in a
-   modal with copy button. Every access is audit logged.
-   No inline JavaScript — use event delegation in app.js. Verify in browser after implementing.
-6. Tests: security audit log tests, report generation tests (verify CSV output format),
-   cert renewal scheduling tests, recovery key encryption/decryption round-trip tests.
-   Repository integration tests against Docker PostgreSQL (not mocks).
-   Go-level dashboard tests using newTestServerWithTemplates + doWithSession for report export and recovery key UI.
-   Add Playwright playbook steps for compliance report export and recovery key retrieval.
-7. Update DATABASE.md, API.md, and openapi.yaml with new tables/columns/endpoints.
+4. Update DATABASE.md, API.md, openapi.yaml.
 
 Acceptance criteria:
 - Failed login attempts appear in security audit log
-- Compliance report exports as JSON and CSV with accurate data
-- CI workflow runs govulncheck and trivy (verify YAML is valid)
-- Cert renewal worker identifies expiring certs (test with mock data)
-- Recovery keys are stored encrypted and retrievable by admins only
+- CI workflow YAML is valid (verify with `act` or manual inspection)
 - All tests pass with `go test -race ./...`
 
-When complete, perform this retrospective:
-1. List every task where you made a shortcut, used a stub, skipped a test, or deviated from the spec.
-2. Does everything align with the existing codebase? Any dependencies broken or gaps?
-3. How's test coverage and documentation? Are they still accurate? Any skipped integration tests?
-
-After the retrospective, provide:
-- Summary of work completed
-- Checklist of how the owner can verify the work (specific URLs to visit, commands to run, behaviors to test)
+When complete, perform the standard retrospective.
 ```
 
 ### Deliverables
 - Security audit log table + repository + service + middleware integration
-- Compliance report generation (JSON + CSV) + API + dashboard export button
 - `.github/workflows/security.yml` CI workflow
-- Certificate renewal service + background worker
+
+---
+
+## Session 6b: Compliance Report Generation
+
+**ID**: `AUT-06b`
+**Effort**: ~0.5 day
+**Source**: F-03 §Compliance Reporting
+**Branch**: `feature/aut-06b-compliance-reports`
+**Depends on**: None
+
+### Prompt
+
+```
+Read `.kiro/steering/STEERING.md` and `.kiro/steering/SESSION_NOTES.md` for project conventions.
+Read `docs/planning/future/F-03-advanced-security.md` §Compliance Reporting.
+
+Problem: Admins need exportable compliance reports for auditors and management. Currently
+compliance data is only viewable in the dashboard.
+
+Branch: `feature/aut-06b-compliance-reports` from `main`.
+Commit per sub-task with `AUT-06b:` prefix. Push after each commit.
+Run `go test -race ./...` after every change.
+Follow the Mandatory Verification Gates in the Prerequisites section.
+
+Before implementing, read `internal/reporting/` to understand the existing reporting
+package. Check if a ReportService already exists and what it covers. Build on existing
+patterns rather than creating parallel structures.
+
+Tasks:
+1. `ReportService.GenerateComplianceReport(ctx, enterpriseID, format)` — produces a
+   structured report with: executive summary (total devices, compliant %, non-compliant
+   count), per-policy breakdown, per-device detail. Output formats: JSON and CSV.
+2. API: GET /api/v1/reports/compliance?format=json|csv.
+3. Dashboard: "Export Report" button on compliance page.
+4. Tests: report generation tests (verify CSV output format), handler tests, dashboard tests.
+   Repository integration tests against Docker PostgreSQL (not mocks).
+5. Update DATABASE.md, API.md, openapi.yaml.
+
+Acceptance criteria:
+- Compliance report exports as JSON and CSV with accurate data
+- Dashboard export button triggers download
+- All tests pass with `go test -race ./...`
+
+When complete, perform the standard retrospective.
+```
+
+### Deliverables
+- Compliance report generation (JSON + CSV) + API + dashboard export button
+
+---
+
+## Session 6c: Certificate Renewal & Recovery Key Escrow
+
+**ID**: `AUT-06c`
+**Effort**: ~1 day
+**Source**: F-03 §Certificate Auto-Renewal, §Recovery Key Escrow
+**Branch**: `feature/aut-06c-cert-recovery`
+**Depends on**: None
+
+### Prompt
+
+```
+Read `.kiro/steering/STEERING.md` and `.kiro/steering/SESSION_NOTES.md` for project conventions.
+Read `docs/planning/future/F-03-advanced-security.md` §Certificate Auto-Renewal and §Recovery Key Escrow.
+
+Problem: Device certificates expire without warning, and recovery keys (BitLocker/FileVault)
+are not centrally stored. Both require understanding platform-specific MDM responses.
+
+Branch: `feature/aut-06c-cert-recovery` from `main`.
+Commit per sub-task with `AUT-06c:` prefix. Push after each commit.
+Run `go test -race ./...` after every change.
+Follow the Mandatory Verification Gates in the Prerequisites section.
+
+### Phase 1: Investigation (commit as AUT-06c: investigation)
+
+Before implementing, investigate and document:
+
+1. Read `internal/certs/` — understand the certificate lifecycle: how certs are issued,
+   stored, and what fields track expiry. What repository methods exist for querying by
+   expiry date?
+2. Read `internal/platform/macos/` — find where SecurityInfo command responses are parsed.
+   Is the FileVault recovery key already extracted? If not, what does the response look like?
+3. Read `internal/platform/windows/` — find where OMA-DM sync responses are parsed. Is the
+   BitLocker recovery key already extracted? What CSP path contains it?
+4. Check how DEP tokens are encrypted with pgcrypto — this is the pattern for recovery key
+   encryption. Find the encrypt/decrypt calls.
+5. Document findings and proposed approach in the first commit message.
+
+### Phase 2: Certificate Renewal
+
+1. `CertRenewalService`: query devices where cert expires within 30 days. For each, queue
+   a re-enrollment command (platform-specific). Background worker runs daily.
+2. Dashboard: "Expiring Certificates" widget on home page (7/30/90 day counts).
+3. Tests: cert renewal scheduling tests with mock data.
+
+### Phase 3: Recovery Key Escrow
+
+4. Migration: `recovery_keys` table (id, device_id FK, key_type VARCHAR, encrypted_key TEXT
+   pgcrypto-encrypted, escrowed_at, rotated_at).
+5. Repository + API endpoint to retrieve key (admin only, audit logged).
+6. Parse recovery keys from platform responses (macOS SecurityInfo, Windows OMA-DM).
+7. Key rotation endpoint: POST /api/v1/devices/{id}/recovery-key/rotate.
+8. Dashboard: "Recovery Key" button on device detail (admin only), modal with copy.
+   Every access is audit logged.
+9. **Logging safety**: Recovery key values may appear at DEBUG level during development.
+   Ensure production log level (INFO+) never includes key values.
+10. Tests: encryption/decryption round-trip, repo integration, dashboard, Playwright.
+11. Update DATABASE.md, API.md, openapi.yaml.
+
+Acceptance criteria:
+- Cert renewal worker identifies expiring certs (test with mock data)
+- Recovery keys are stored encrypted and retrievable by admins only
+- Every recovery key access is audit logged
+- All tests pass with `go test -race ./...`
+
+When complete, perform the standard retrospective.
+```
+
+### Deliverables
+- Certificate renewal service + background worker + dashboard widget
 - Recovery key escrow table + encrypted storage + admin retrieval UI
+- Platform-specific response parsing for recovery keys
 
 ---
 
@@ -714,6 +802,8 @@ Tasks:
    **Important**: After modifying each template, rebuild and verify that specific page renders
    correctly in the browser before moving to the next template. Do not batch all template
    changes and test at the end — a broken template breaks the entire dashboard.
+   **Verification**: Take a Playwright screenshot of each modified page and save to
+   `docs/planning/sprints/aut-07-screenshots/`. This proves each page was individually verified.
 2. Add focus-visible styles: ensure keyboard focus is visually distinct (Tailwind `focus-visible:ring-2`)
    on all buttons, links, and form controls.
 3. Add `alt` text to all SVG icons (or `aria-hidden="true"` for decorative ones).
@@ -740,7 +830,14 @@ Tasks:
     (missing key, missing locale), Pa11y test runner.
     Go-level dashboard tests using newTestServerWithTemplates + doWithSession for i18n rendering.
     Add Playwright playbook steps for language switcher and a11y verification.
-12. Update DATABASE.md, API.md, and openapi.yaml with new tables/columns/endpoints.
+12. Translation playbook: create a SEPARATE Playwright playbook (`tests/browser/i18n-playbook.md`)
+    that loads every converted page in each supported locale and verifies:
+    - No raw translation keys visible (e.g., `nav.devices` instead of "Devices")
+    - Language switcher changes the locale
+    - Fallback to English works for missing keys
+    This playbook runs via `node run-i18n-tests.js`, NOT as part of the main `run-playbook.js`.
+    It is slow (loads every page twice per locale) and should not block general testing.
+13. Update DATABASE.md, API.md, and openapi.yaml with new tables/columns/endpoints.
 
 Acceptance criteria:
 - All pages pass Pa11y with zero WCAG 2.1 AA errors
@@ -826,7 +923,14 @@ Tasks:
 ### Part B: OpenTelemetry Instrumentation
 
 Tasks:
-4. Add OpenTelemetry SDK dependency: `go.opentelemetry.io/otel` and the OTLP exporter.
+4. **Investigation (before adding dependencies):** Verify the service methods listed for
+   instrumentation actually exist. Read `internal/service/policy.go`, `internal/service/compliance.go`,
+   and `internal/service/device.go`. List the actual exported method signatures for:
+   PolicyService.AssignToGroup (may not exist — check GroupService), ComplianceService.EvaluateDeviceByID,
+   DeviceService.Lock, DeviceService.Wipe. If method names differ, use the actual names.
+   Also check `internal/tracing/` — a tracing package already exists. Understand what it does
+   before adding OTel alongside it. Commit findings in the first commit message.
+5. Add OpenTelemetry SDK dependency: `go.opentelemetry.io/otel` and the OTLP exporter.
    Pin exact versions in go.mod (not open ranges). Run `go mod tidy` and verify the
    dependency count is reasonable. Check that the binary size increase is acceptable
    (compare `ls -la` of the built binary before and after).
@@ -951,6 +1055,13 @@ CRITICAL: This is a pure refactor. No API behavior changes. No database changes.
 Every existing test must continue to pass. If a test breaks, the refactor is wrong — fix
 the refactor, not the test.
 
+### Phase 0: Verify call counts (before any code changes)
+
+The repo call counts below were estimated at spec time and may be stale. Before starting,
+grep each handler file for direct repo calls and update the counts. If a handler file has
+already been migrated to services (by a previous session), skip it. Commit the verified
+counts as `AUT-09: verified repo call counts` before proceeding.
+
 ### Part A: New Services + Easy Handlers (~2 hours)
 
 1. Create `internal/service/enterprise.go` — `EnterpriseService` wrapping enterprise repo
@@ -1055,6 +1166,9 @@ Read `docs/planning/future/autonomous_sessions.md` Session 10 for task list.
 Fix HTTP calls that lack timeouts and database calls that ignore request context.
 These are production safety issues — if an upstream service (Keycloak, NanoMDM) hangs,
 goroutines block forever.
+
+**Note:** Line numbers below are from the 2026-04-30 code audit and may have shifted.
+Search for the pattern (e.g., `http.Post(`, `context.Background()`) if the line has moved.
 
 Branch: `feature/aut-10-http-timeouts` from `main`.
 Commit per sub-task with `AUT-10:` prefix. Push after each commit.
@@ -1187,38 +1301,44 @@ When complete, provide a summary and verification checklist.
 ## Session Dependency Graph
 
 ```
-AUT-00 (Test Enterprise)       — run first
-AUT-01 (Enrollment Tokens)     — independent ✅
-AUT-02 (Dynamic Groups)        — independent
-AUT-03 (Tags + Bulk Ops)       — independent
-AUT-04 (Webhooks)              — independent
-AUT-05 (Dry-Run + Scheduling)  — independent
-AUT-06 (Security Hardening)    — independent
-AUT-07 (A11y + i18n)           — independent
-AUT-08 (Docs + OTel)           — independent
-AUT-09 (Service Consolidation) — run BEFORE feature sessions (reduces merge conflicts)
-AUT-10 (HTTP Timeouts)         — independent (can run anytime)
-AUT-11 (Re-enrollment Fix)     — independent (can run anytime)
+AUT-00  (Test Enterprise)        — complete ✅
+AUT-01  (Enrollment Tokens)      — complete ✅
+AUT-02  (Dynamic Groups)         — design-first: Phase 1 produces design doc for review
+AUT-03a (Device Tags)            — independent, autonomous
+AUT-03b (Bulk Ops)               — depends on AUT-03a, design-first for confirmation UX
+AUT-04  (Webhooks)               — independent, investigation step then autonomous
+AUT-05  (Dry-Run + Scheduling)   — design-first: Phase 1 produces design doc for review
+AUT-06a (Security Audit + CI)    — independent, autonomous
+AUT-06b (Compliance Reports)     — independent, autonomous
+AUT-06c (Cert Renewal + Escrow)  — investigation-first, then autonomous
+AUT-07  (A11y + i18n)            — independent, screenshot gate per template
+AUT-08  (Docs + OTel)            — investigation step then autonomous
+AUT-09  (Service Consolidation)  — run BEFORE feature sessions (reduces merge conflicts)
+AUT-10  (HTTP Timeouts)          — independent, fully autonomous
+AUT-11  (Re-enrollment Fix)      — independent, fully autonomous
 ```
 
-All sessions are independent and can run in any order. If running multiple sessions
-sequentially, each should merge to `main` before the next starts to avoid conflicts.
-
-AUT-09 is a refactor-only session. Running it before feature sessions (AUT-02 through AUT-08)
-means new features will be written against the consolidated service pattern from the start,
-avoiding further mixed-pattern code.
+Sessions marked "design-first" will stop after Phase 1 and wait for owner review.
+Sessions marked "investigation step" will commit findings before proceeding autonomously.
+Sessions marked "autonomous" can run start-to-finish without human interaction.
 
 ## Recommended Execution Order
 
-0. **AUT-00** (Test Enterprise Isolation) — run first, protects real data for all future sessions
-1. **AUT-01** (Enrollment Tokens) ✅ — highest security value, closes a real gap
-2. **AUT-10** (HTTP Timeouts) — quick safety fix, no dependencies
-3. **AUT-11** (Re-enrollment Fix) — closes multi-tenant gap and soft-delete bug
-4. **AUT-09** (Service Consolidation) — clean up handler patterns before adding features
-5. **AUT-03** (Tags + Bulk Ops) — highest admin UX value
-6. **AUT-04** (Webhooks) — enables external integrations
-7. **AUT-02** (Dynamic Groups) — builds on tags for auto-membership
-8. **AUT-05** (Dry-Run + Scheduling) — policy management maturity
-9. **AUT-06** (Security Hardening) — production readiness
-10. **AUT-07** (A11y + i18n) — compliance and reach
-11. **AUT-08** (Docs + OTel) — operational maturity
+0. **AUT-00** (Test Enterprise Isolation) ✅
+1. **AUT-01** (Enrollment Tokens) ✅
+2. **AUT-10** (HTTP Timeouts) — fully autonomous, quick safety fix
+3. **AUT-11** (Re-enrollment Fix) — fully autonomous, closes multi-tenant gap
+4. **AUT-09** (Service Consolidation) — autonomous, clean up before features
+5. **AUT-06a** (Security Audit + CI) — autonomous, low risk
+6. **AUT-06b** (Compliance Reports) — autonomous, moderate risk
+7. **AUT-03a** (Device Tags) — autonomous, highest admin UX value
+8. **AUT-04** (Webhooks) — investigation step then autonomous
+9. **AUT-03b** (Bulk Ops) — design-first, needs UX review
+10. **AUT-02** (Dynamic Groups) — design-first, needs rule engine review
+11. **AUT-05** (Dry-Run + Scheduling) — design-first, needs compliance integration review
+12. **AUT-06c** (Cert Renewal + Escrow) — investigation-first, needs platform knowledge
+13. **AUT-07** (A11y + i18n) — autonomous with screenshot gates
+14. **AUT-08** (Docs + OTel) — investigation step then autonomous
+
+Autonomous sessions (2-7 above) can run overnight. Design-first sessions (9-12) need
+a morning review of the design doc before implementation proceeds.
