@@ -117,7 +117,7 @@ func (h *Handler) pkiOperation(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "missing challenge password", http.StatusForbidden)
 			return
 		}
-		deviceID, valid := h.store.ValidateChallenge(pw)
+		deviceID, valid := h.store.ValidateChallenge(r.Context(), pw)
 		if !valid {
 			h.logger.Warn("SCEP challenge validation failed")
 			certRep, _ := msg.Fail(caCert, caKey, sceplib.BadRequest)
@@ -155,7 +155,7 @@ func (h *Handler) pkiOperation(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	deviceID, valid := h.store.ValidateChallenge(pw)
+	deviceID, valid := h.store.ValidateChallenge(r.Context(), pw)
 	if !valid {
 		h.logger.Warn("SCEP challenge validation failed")
 		http.Error(w, "invalid or expired challenge", http.StatusForbidden)

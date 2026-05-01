@@ -127,7 +127,7 @@ func TestE2E_Mdmb_ConcurrentEnrollment(t *testing.T) {
 	}
 	setups := make([]deviceSetup, numDevices)
 	for i := 0; i < numDevices; i++ {
-		challenge, err := challengeMgr.GenerateChallenge(fmt.Sprintf("device-%d", i), 5*time.Minute)
+		challenge, err := challengeMgr.GenerateChallenge(context.Background(), fmt.Sprintf("device-%d", i), 5*time.Minute)
 		require.NoError(t, err)
 		profile, err := macos.GenerateEnrollmentProfile(
 			enterprise.ID, "http://localhost:8080", "http://localhost:8080/scep",

@@ -19,9 +19,9 @@ type Challenge struct {
 
 // ChallengeStore is the interface for SCEP challenge operations.
 type ChallengeStore interface {
-	GenerateChallenge(deviceID string, ttl time.Duration) (string, error)
-	ValidateChallenge(password string) (string, bool)
-	CleanupExpired()
+	GenerateChallenge(ctx context.Context, deviceID string, ttl time.Duration) (string, error)
+	ValidateChallenge(ctx context.Context, password string) (string, bool)
+	CleanupExpired(ctx context.Context)
 }
 
 // ChallengeManager manages SCEP enrollment challenges in PostgreSQL.
@@ -35,13 +35,13 @@ func NewChallengeManager(db *sql.DB) *ChallengeManager {
 }
 
 // GenerateChallenge creates a new enrollment challenge stored in PostgreSQL.
-func (cm *ChallengeManager) GenerateChallenge(deviceID string, ttl time.Duration) (string, error) {
+func (cm *ChallengeManager) GenerateChallenge(ctx context.Context, deviceID string, ttl time.Duration) (string, error) {
 	password, err := generateSecurePassword(32)
 	if err != nil {
 		return "", fmt.Errorf("failed to generate challenge: %w", err)
 	}
 
-	_, err = cm.db.ExecContext(context.Background(),
+	_, err = cm.db.ExecContext(ctx,
 		`INSERT INTO scep_challenges (password, device_id, expires_at) VALUES ($1, $2, $3)`,
 		password, deviceID, time.Now().Add(ttl),
 	)
@@ -53,9 +53,9 @@ func (cm *ChallengeManager) GenerateChallenge(deviceID string, ttl time.Duration
 }
 
 // ValidateChallenge validates and marks a challenge as used atomically.
-func (cm *ChallengeManager) ValidateChallenge(password string) (string, bool) {
+func (cm *ChallengeManager) ValidateChallenge(ctx context.Context, password string) (string, bool) {
 	var deviceID string
-	err := cm.db.QueryRowContext(context.Background(),
+	err := cm.db.QueryRowContext(ctx,
 		`UPDATE scep_challenges SET used = true
 		 WHERE password = $1 AND NOT used AND expires_at > NOW()
 		 RETURNING device_id`, password,
@@ -67,8 +67,8 @@ func (cm *ChallengeManager) ValidateChallenge(password string) (string, bool) {
 }
 
 // CleanupExpired removes expired challenges from the database.
-func (cm *ChallengeManager) CleanupExpired() {
-	cm.db.ExecContext(context.Background(),
+func (cm *ChallengeManager) CleanupExpired(ctx context.Context) {
+	cm.db.ExecContext(ctx,
 		`DELETE FROM scep_challenges WHERE expires_at < NOW()`)
 }
 

@@ -2,6 +2,7 @@ package e2e
 
 import (
 	"bytes"
+	"context"
 	"crypto"
 	"crypto/rand"
 	"crypto/rsa"
@@ -77,7 +78,7 @@ func TestE2E_SCEP_FullProtocolFlow(t *testing.T) {
 	t.Logf("✓ GetCACaps: %s", string(capsBody))
 
 	// === Step 3: Generate challenge, build CSR, submit PKIOperation ===
-	challenge, err := challengeMgr.GenerateChallenge("scep-e2e-device", 5*time.Minute)
+	challenge, err := challengeMgr.GenerateChallenge(context.Background(), "scep-e2e-device", 5*time.Minute)
 	require.NoError(t, err)
 
 	csrDER := mustBuildCSRWithChallengeE2E(t, challenge, "scep-e2e-device")

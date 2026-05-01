@@ -1,6 +1,7 @@
 package scep
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -15,19 +16,20 @@ func TestChallengeManager_GenerateChallenge(t *testing.T) {
 	t.Cleanup(func() { db.Exec("DELETE FROM scep_challenges WHERE device_id LIKE 'device%'") })
 	db.Exec("DELETE FROM scep_challenges WHERE device_id LIKE 'device%'")
 	cm := NewChallengeManager(db)
+	ctx := context.Background()
 
 	t.Run("generates unique challenges", func(t *testing.T) {
-		c1, err := cm.GenerateChallenge("device1", 5*time.Minute)
+		c1, err := cm.GenerateChallenge(ctx, "device1", 5*time.Minute)
 		require.NoError(t, err)
 		assert.NotEmpty(t, c1)
 
-		c2, err := cm.GenerateChallenge("device2", 5*time.Minute)
+		c2, err := cm.GenerateChallenge(ctx, "device2", 5*time.Minute)
 		require.NoError(t, err)
 		assert.NotEqual(t, c1, c2)
 	})
 
 	t.Run("generates challenge with correct length", func(t *testing.T) {
-		c, err := cm.GenerateChallenge("device1", 5*time.Minute)
+		c, err := cm.GenerateChallenge(ctx, "device1", 5*time.Minute)
 		require.NoError(t, err)
 		assert.Len(t, c, 32)
 	})
@@ -38,24 +40,25 @@ func TestChallengeManager_ValidateChallenge(t *testing.T) {
 	t.Cleanup(func() { db.Exec("DELETE FROM scep_challenges WHERE device_id LIKE 'device%'") })
 	db.Exec("DELETE FROM scep_challenges WHERE device_id LIKE 'device%'")
 	cm := NewChallengeManager(db)
+	ctx := context.Background()
 
 	t.Run("validates unused challenge", func(t *testing.T) {
-		c, err := cm.GenerateChallenge("device1", 5*time.Minute)
+		c, err := cm.GenerateChallenge(ctx, "device1", 5*time.Minute)
 		require.NoError(t, err)
 
-		deviceID, valid := cm.ValidateChallenge(c)
+		deviceID, valid := cm.ValidateChallenge(ctx, c)
 		assert.True(t, valid)
 		assert.Equal(t, "device1", deviceID)
 	})
 
 	t.Run("rejects used challenge", func(t *testing.T) {
-		c, err := cm.GenerateChallenge("device1", 5*time.Minute)
+		c, err := cm.GenerateChallenge(ctx, "device1", 5*time.Minute)
 		require.NoError(t, err)
 
-		_, valid := cm.ValidateChallenge(c)
+		_, valid := cm.ValidateChallenge(ctx, c)
 		assert.True(t, valid)
 
-		_, valid = cm.ValidateChallenge(c)
+		_, valid = cm.ValidateChallenge(ctx, c)
 		assert.False(t, valid)
 	})
 
@@ -67,12 +70,12 @@ func TestChallengeManager_ValidateChallenge(t *testing.T) {
 			password, "device1", time.Now().Add(-1*time.Second))
 		require.NoError(t, err)
 
-		_, valid := cm.ValidateChallenge(password)
+		_, valid := cm.ValidateChallenge(ctx, password)
 		assert.False(t, valid)
 	})
 
 	t.Run("rejects non-existent challenge", func(t *testing.T) {
-		_, valid := cm.ValidateChallenge("invalid-challenge")
+		_, valid := cm.ValidateChallenge(ctx, "invalid-challenge")
 		assert.False(t, valid)
 	})
 }
@@ -82,6 +85,7 @@ func TestChallengeManager_CleanupExpired(t *testing.T) {
 	t.Cleanup(func() { db.Exec("DELETE FROM scep_challenges WHERE device_id LIKE 'device%'") })
 	db.Exec("DELETE FROM scep_challenges WHERE device_id LIKE 'device%'")
 	cm := NewChallengeManager(db)
+	ctx := context.Background()
 
 	// Insert expired challenge directly
 	password, err := generateSecurePassword(32)
@@ -91,17 +95,17 @@ func TestChallengeManager_CleanupExpired(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create valid challenge
-	validPw, err := cm.GenerateChallenge("device2", 5*time.Minute)
+	validPw, err := cm.GenerateChallenge(ctx, "device2", 5*time.Minute)
 	require.NoError(t, err)
 
-	cm.CleanupExpired()
+	cm.CleanupExpired(ctx)
 
 	// Expired should be gone
-	_, valid := cm.ValidateChallenge(password)
+	_, valid := cm.ValidateChallenge(ctx, password)
 	assert.False(t, valid)
 
 	// Valid should remain
-	_, valid = cm.ValidateChallenge(validPw)
+	_, valid = cm.ValidateChallenge(ctx, validPw)
 	assert.True(t, valid)
 }
 

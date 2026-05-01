@@ -28,13 +28,13 @@ import (
 
 type mockChallengeStore struct{}
 
-func (m *mockChallengeStore) GenerateChallenge(deviceID string, ttl time.Duration) (string, error) {
+func (m *mockChallengeStore) GenerateChallenge(_ context.Context, deviceID string, ttl time.Duration) (string, error) {
 	return "test-challenge-password", nil
 }
-func (m *mockChallengeStore) ValidateChallenge(password string) (string, bool) {
+func (m *mockChallengeStore) ValidateChallenge(_ context.Context, password string) (string, bool) {
 	return "test-device", password == "test-challenge-password"
 }
-func (m *mockChallengeStore) CleanupExpired() {}
+func (m *mockChallengeStore) CleanupExpired(_ context.Context) {}
 
 // Mock user repo for S5-11 handler tests
 type mockUserRepo struct {

@@ -73,7 +73,7 @@ func (s *Server) handleMacOSEnrollmentProfile(w http.ResponseWriter, r *http.Req
 	if enrollToken != nil {
 		challengeDeviceID = enterpriseID.String() + ":token:" + enrollToken.Token
 	}
-	challenge, err := s.challengeManager.GenerateChallenge(challengeDeviceID, challengeTTL)
+	challenge, err := s.challengeManager.GenerateChallenge(r.Context(), challengeDeviceID, challengeTTL)
 	if err != nil {
 		s.logger.Error("failed to generate SCEP challenge", "error", err)
 		respondError(w, r, http.StatusInternalServerError, "challenge_generation_failed", "Failed to generate enrollment challenge")

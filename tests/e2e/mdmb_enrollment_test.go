@@ -222,7 +222,7 @@ func TestE2E_Mdmb_FullEnrollment(t *testing.T) {
 	require.NoError(t, err, "test server must be reachable on :8080")
 
 	// Generate SCEP challenge
-	challenge, err := challengeMgr.GenerateChallenge(enterprise.ID.String(), 5*time.Minute)
+	challenge, err := challengeMgr.GenerateChallenge(context.Background(), enterprise.ID.String(), 5*time.Minute)
 	require.NoError(t, err)
 
 	// Generate enrollment profile

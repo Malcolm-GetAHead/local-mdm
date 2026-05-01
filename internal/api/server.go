@@ -1074,7 +1074,7 @@ func (s *Server) startCleanupTicker() {
 				} else if n > 0 {
 					s.logger.Info("cleaned up expired idempotency keys", "count", n)
 				}
-				s.challengeManager.CleanupExpired()
+				s.challengeManager.CleanupExpired(ctx)
 				s.refreshGaugeMetrics()
 				// Expire enrollment tokens that have passed their expires_at
 				if s.enrollmentTokenRepo != nil {
