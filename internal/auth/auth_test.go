@@ -21,7 +21,7 @@ func TestKeycloakLogin(t *testing.T) {
 		keycloakTestSecret(),
 	)
 	
-	tokenResp, err := kc.Login("admin", "admin123")
+	tokenResp, err := kc.Login(context.Background(), "admin", "admin123")
 	if err != nil {
 		t.Fatalf("Login failed: %v", err)
 	}
@@ -47,7 +47,7 @@ func TestOIDCValidator(t *testing.T) {
 		keycloakTestSecret(),
 	)
 	
-	tokenResp, err := kc.Login("admin", "admin123")
+	tokenResp, err := kc.Login(context.Background(), "admin", "admin123")
 	if err != nil {
 		t.Fatalf("Login failed: %v", err)
 	}
@@ -81,7 +81,7 @@ func TestAuthMiddleware(t *testing.T) {
 		keycloakTestSecret(),
 	)
 	
-	tokenResp, err := kc.Login("admin", "admin123")
+	tokenResp, err := kc.Login(context.Background(), "admin", "admin123")
 	if err != nil {
 		t.Fatalf("Login failed: %v", err)
 	}
@@ -137,7 +137,7 @@ func TestRequireRole(t *testing.T) {
 		keycloakTestSecret(),
 	)
 	
-	tokenResp, _ := kc.Login("admin", "admin123")
+	tokenResp, _ := kc.Login(context.Background(), "admin", "admin123")
 	
 	// Create validator and middleware
 	validator, _ := auth.NewOIDCValidator(keycloakTestURL(), "localmdm-api", nil, 5, 30*time.Second, 5*time.Minute, nil)
@@ -231,7 +231,7 @@ func TestJWKSRefreshRaceCondition(t *testing.T) {
 		keycloakTestSecret(),
 	)
 	
-	tokenResp, err := kc.Login("admin", "admin123")
+	tokenResp, err := kc.Login(context.Background(), "admin", "admin123")
 	if err != nil {
 		t.Fatalf("Login failed: %v", err)
 	}
@@ -421,7 +421,7 @@ func TestOptionalAuth(t *testing.T) {
 		keycloakTestSecret(),
 	)
 	
-	tokenResp, err := kc.Login("admin", "admin123")
+	tokenResp, err := kc.Login(context.Background(), "admin", "admin123")
 	if err != nil {
 		t.Fatalf("Login failed: %v", err)
 	}

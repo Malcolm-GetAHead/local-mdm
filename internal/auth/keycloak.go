@@ -1,13 +1,18 @@
 package auth
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 )
+
+// keycloakHTTPClient is used for all Keycloak token requests.
+var keycloakHTTPClient = &http.Client{Timeout: 30 * time.Second}
 
 // TokenResponse represents the OAuth2 token response from Keycloak.
 // It contains the access token, refresh token, and expiration information.
@@ -62,59 +67,71 @@ func NewKeycloakClient(issuerURL, clientID, clientSecret string) *KeycloakClient
 	}
 }
 
-func (kc *KeycloakClient) Login(username, password string) (*TokenResponse, error) {
+func (kc *KeycloakClient) Login(ctx context.Context, username, password string) (*TokenResponse, error) {
 	tokenURL := fmt.Sprintf("%s/protocol/openid-connect/token", kc.issuerURL)
-	
+
 	data := url.Values{}
 	data.Set("grant_type", "password")
 	data.Set("client_id", kc.clientID)
 	data.Set("client_secret", kc.clientSecret)
 	data.Set("username", username)
 	data.Set("password", password)
-	
-	resp, err := http.Post(tokenURL, "application/x-www-form-urlencoded", strings.NewReader(data.Encode()))
+
+	req, err := http.NewRequestWithContext(ctx, "POST", tokenURL, strings.NewReader(data.Encode()))
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to create login request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+	resp, err := keycloakHTTPClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("login request failed: %w", err)
 	}
 	defer resp.Body.Close()
-	
+
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
 		return nil, fmt.Errorf("login failed: %s", string(body))
 	}
-	
+
 	var tokenResp TokenResponse
 	if err := json.NewDecoder(resp.Body).Decode(&tokenResp); err != nil {
 		return nil, err
 	}
-	
+
 	return &tokenResp, nil
 }
 
-func (kc *KeycloakClient) RefreshToken(refreshToken string) (*TokenResponse, error) {
+func (kc *KeycloakClient) RefreshToken(ctx context.Context, refreshToken string) (*TokenResponse, error) {
 	tokenURL := fmt.Sprintf("%s/protocol/openid-connect/token", kc.issuerURL)
-	
+
 	data := url.Values{}
 	data.Set("grant_type", "refresh_token")
 	data.Set("client_id", kc.clientID)
 	data.Set("client_secret", kc.clientSecret)
 	data.Set("refresh_token", refreshToken)
-	
-	resp, err := http.Post(tokenURL, "application/x-www-form-urlencoded", strings.NewReader(data.Encode()))
+
+	req, err := http.NewRequestWithContext(ctx, "POST", tokenURL, strings.NewReader(data.Encode()))
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to create refresh request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+	resp, err := keycloakHTTPClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("refresh request failed: %w", err)
 	}
 	defer resp.Body.Close()
-	
+
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
 		return nil, fmt.Errorf("refresh failed: %s", string(body))
 	}
-	
+
 	var tokenResp TokenResponse
 	if err := json.NewDecoder(resp.Body).Decode(&tokenResp); err != nil {
 		return nil, err
 	}
-	
+
 	return &tokenResp, nil
 }

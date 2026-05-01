@@ -147,7 +147,7 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		s.config.Keycloak.ClientSecret,
 	)
 
-	tokenResp, err := kc.Login(req.Username, req.Password)
+	tokenResp, err := kc.Login(r.Context(), req.Username, req.Password)
 	if err != nil {
 		respondError(w, r, http.StatusUnauthorized, "login_failed", "Invalid credentials")
 		return
@@ -180,7 +180,7 @@ func (s *Server) handleRefresh(w http.ResponseWriter, r *http.Request) {
 		s.config.Keycloak.ClientSecret,
 	)
 
-	tokenResp, err := kc.RefreshToken(req.RefreshToken)
+	tokenResp, err := kc.RefreshToken(r.Context(), req.RefreshToken)
 	if err != nil {
 		respondError(w, r, http.StatusUnauthorized, "refresh_failed", "Invalid refresh token")
 		return

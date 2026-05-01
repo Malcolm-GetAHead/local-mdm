@@ -28,14 +28,14 @@ func TestKeycloakRefreshToken(t *testing.T) {
 	)
 
 	// Get a valid token pair first
-	tokenResp, err := kc.Login("admin", "admin123")
+	tokenResp, err := kc.Login(context.Background(), "admin", "admin123")
 	if err != nil {
 		t.Skipf("skipping: Keycloak unavailable: %v", err)
 	}
 	require.NotEmpty(t, tokenResp.RefreshToken)
 
 	// Refresh it
-	refreshed, err := kc.RefreshToken(tokenResp.RefreshToken)
+	refreshed, err := kc.RefreshToken(context.Background(), tokenResp.RefreshToken)
 	require.NoError(t, err)
 	assert.NotEmpty(t, refreshed.AccessToken)
 	assert.NotEmpty(t, refreshed.RefreshToken)
@@ -49,7 +49,7 @@ func TestKeycloakRefreshToken_Invalid(t *testing.T) {
 		keycloakTestSecret(),
 	)
 
-	_, err := kc.RefreshToken("invalid-refresh-token")
+	_, err := kc.RefreshToken(context.Background(), "invalid-refresh-token")
 	assert.Error(t, err)
 }
 
@@ -156,7 +156,7 @@ func TestNewOIDCValidator_WithDB(t *testing.T) {
 
 	// Validate a real token — exercises the cache Set path
 	kc := auth.NewKeycloakClient(keycloakTestURL(), "localmdm-api", keycloakTestSecret())
-	tokenResp, err := kc.Login("admin", "admin123")
+	tokenResp, err := kc.Login(context.Background(), "admin", "admin123")
 	require.NoError(t, err)
 
 	user, err := validator.ValidateToken(tokenResp.AccessToken)
@@ -329,7 +329,7 @@ func TestMiddleware_RequireAuth_AuditLogging(t *testing.T) {
 	// Valid token → audit log with "auth.success"
 	al.events = nil
 	kc := auth.NewKeycloakClient(keycloakTestURL(), "localmdm-api", keycloakTestSecret())
-	tokenResp, err := kc.Login("admin", "admin123")
+	tokenResp, err := kc.Login(context.Background(), "admin", "admin123")
 	require.NoError(t, err)
 
 	req3 := httptest.NewRequest("GET", "/test", nil)
@@ -393,7 +393,7 @@ func TestOIDCValidator_ValidateToken_CircuitOpenCacheFallback(t *testing.T) {
 
 	// Get a real token and validate it (populates cache)
 	kc := auth.NewKeycloakClient(keycloakTestURL(), "localmdm-api", keycloakTestSecret())
-	tokenResp, err := kc.Login("admin", "admin123")
+	tokenResp, err := kc.Login(context.Background(), "admin", "admin123")
 	require.NoError(t, err)
 
 	user, err := validator.ValidateToken(tokenResp.AccessToken)
