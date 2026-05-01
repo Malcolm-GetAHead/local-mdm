@@ -4,6 +4,7 @@ import (
 	"context"
 	"log/slog"
 	"sync"
+	"time"
 
 	"github.com/malcolm-getahead/local-mdm/internal/models"
 	"github.com/malcolm-getahead/local-mdm/internal/platform/macos"
@@ -73,7 +74,8 @@ func (d *commandDispatcher) worker() {
 }
 
 func (d *commandDispatcher) dispatch(device *models.Device, cmd *models.DeviceCommand) {
-	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
 
 	switch device.Platform {
 	case models.PlatformMacOS:

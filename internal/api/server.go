@@ -773,7 +773,8 @@ func (s *Server) setupRoutes() {
 				return
 			}
 			tokenStr := parts[1]
-			ctx := context.Background()
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
 			tok, err := s.enrollmentTokenRepo.GetByToken(ctx, tokenStr)
 			if err != nil {
 				return
@@ -1059,7 +1060,7 @@ func (s *Server) startCleanupTicker() {
 	s.cleanupCancel = cancel
 
 	// Refresh metrics once at startup
-	s.refreshGaugeMetrics()
+	s.refreshGaugeMetrics(context.Background())
 
 	go func() {
 		ticker := time.NewTicker(1 * time.Hour)
@@ -1075,10 +1076,10 @@ func (s *Server) startCleanupTicker() {
 					s.logger.Info("cleaned up expired idempotency keys", "count", n)
 				}
 				s.challengeManager.CleanupExpired(ctx)
-				s.refreshGaugeMetrics()
+				s.refreshGaugeMetrics(ctx)
 				// Expire enrollment tokens that have passed their expires_at
 				if s.enrollmentTokenRepo != nil {
-					if n, err := s.enrollmentTokenRepo.ExpireTokens(context.Background()); err != nil {
+					if n, err := s.enrollmentTokenRepo.ExpireTokens(ctx); err != nil {
 						s.logger.Warn("enrollment token expiry failed", "error", err)
 					} else if n > 0 {
 						s.logger.Info("expired enrollment tokens", "count", n)
@@ -1091,11 +1092,11 @@ func (s *Server) startCleanupTicker() {
 }
 
 // refreshGaugeMetrics updates devices_total and certificates_expiring_soon from the database.
-func (s *Server) refreshGaugeMetrics() {
+func (s *Server) refreshGaugeMetrics(parent context.Context) {
 	if s.metrics == nil {
 		return
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(parent, 10*time.Second)
 	defer cancel()
 
 	// devices_total by platform and status

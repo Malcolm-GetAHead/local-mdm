@@ -39,7 +39,7 @@ func (m *Middleware) SetTokenValidator(tv TokenValidator) {
 // ValidateTokenDirect validates a token string and returns the AuthUser.
 // Used by the web dashboard OIDC callback to validate tokens outside of HTTP middleware.
 func (m *Middleware) ValidateTokenDirect(token string) (*AuthUser, error) {
-	return m.validator.ValidateToken(token)
+	return m.validator.ValidateToken(context.Background(), token)
 }
 
 // SetAuditLogger sets the audit logger for the middleware.
@@ -81,7 +81,7 @@ func (m *Middleware) RequireAuth(next http.Handler) http.Handler {
 		}
 		
 		// Fall through to OIDC validation
-		user, err := m.validator.ValidateToken(tokenString)
+		user, err := m.validator.ValidateToken(r.Context(), tokenString)
 		if err != nil {
 			m.logger.Warn("Token validation failed", "error", err, "path", r.URL.Path, "request_id", requestID)
 			if m.auditLogger != nil {
@@ -154,7 +154,7 @@ func (m *Middleware) OptionalAuth(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		tokenString, err := ExtractBearerToken(r)
 		if err == nil {
-			if user, err := m.validator.ValidateToken(tokenString); err == nil {
+			if user, err := m.validator.ValidateToken(r.Context(), tokenString); err == nil {
 				ctx := WithUser(r.Context(), user)
 				next.ServeHTTP(w, r.WithContext(ctx))
 				return

@@ -1,6 +1,7 @@
 package auth_test
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -265,7 +266,7 @@ func TestHTTPClientConcurrentRequests(t *testing.T) {
 		go func() {
 			defer func() { done <- true }()
 			// This will trigger JWKS refresh check
-			validator.ValidateToken("dummy-token") // Will fail but that's ok
+			validator.ValidateToken(context.Background(), "dummy-token") // Will fail but that's ok
 		}()
 	}
 

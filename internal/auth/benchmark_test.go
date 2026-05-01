@@ -44,7 +44,7 @@ func BenchmarkOIDCValidator_ValidateToken(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_, _ = validator.ValidateToken(token)
+		_, _ = validator.ValidateToken(context.Background(), token)
 	}
 }
 

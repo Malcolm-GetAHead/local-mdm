@@ -183,9 +183,7 @@ func (v *OIDCValidator) refreshJWKS() error {
 	return nil
 }
 
-func (v *OIDCValidator) ValidateToken(tokenString string) (*AuthUser, error) {
-	ctx := context.Background()
-	
+func (v *OIDCValidator) ValidateToken(ctx context.Context, tokenString string) (*AuthUser, error) {
 	// Try to validate with Keycloak through circuit breaker
 	var user *AuthUser
 	

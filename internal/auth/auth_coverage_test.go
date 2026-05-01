@@ -133,7 +133,7 @@ func TestOIDCValidator_ValidateToken_Expired(t *testing.T) {
 	}
 
 	// A well-formed but expired JWT
-	_, err = validator.ValidateToken("eyJhbGciOiJSUzI1NiJ9.eyJleHAiOjF9.invalid")
+	_, err = validator.ValidateToken(context.Background(), "eyJhbGciOiJSUzI1NiJ9.eyJleHAiOjF9.invalid")
 	assert.Error(t, err)
 }
 
@@ -143,7 +143,7 @@ func TestOIDCValidator_ValidateToken_Malformed(t *testing.T) {
 		t.Skipf("skipping: Keycloak unavailable: %v", err)
 	}
 
-	_, err = validator.ValidateToken("not-a-jwt")
+	_, err = validator.ValidateToken(context.Background(), "not-a-jwt")
 	assert.Error(t, err)
 }
 
@@ -159,12 +159,12 @@ func TestNewOIDCValidator_WithDB(t *testing.T) {
 	tokenResp, err := kc.Login(context.Background(), "admin", "admin123")
 	require.NoError(t, err)
 
-	user, err := validator.ValidateToken(tokenResp.AccessToken)
+	user, err := validator.ValidateToken(context.Background(), tokenResp.AccessToken)
 	require.NoError(t, err)
 	assert.Equal(t, "admin@localmdm.dev", user.Email)
 
 	// Validate again — should hit cache path
-	user2, err := validator.ValidateToken(tokenResp.AccessToken)
+	user2, err := validator.ValidateToken(context.Background(), tokenResp.AccessToken)
 	require.NoError(t, err)
 	assert.Equal(t, user.Email, user2.Email)
 }
@@ -396,16 +396,16 @@ func TestOIDCValidator_ValidateToken_CircuitOpenCacheFallback(t *testing.T) {
 	tokenResp, err := kc.Login(context.Background(), "admin", "admin123")
 	require.NoError(t, err)
 
-	user, err := validator.ValidateToken(tokenResp.AccessToken)
+	user, err := validator.ValidateToken(context.Background(), tokenResp.AccessToken)
 	require.NoError(t, err)
 	assert.Equal(t, "admin@localmdm.dev", user.Email)
 
 	// Trip the circuit breaker by validating a bad token
-	_, _ = validator.ValidateToken("invalid-token-to-trip-breaker")
+	_, _ = validator.ValidateToken(context.Background(), "invalid-token-to-trip-breaker")
 
 	// Now the circuit is open — validate the good token again
 	// Should fall back to cache
-	user2, err := validator.ValidateToken(tokenResp.AccessToken)
+	user2, err := validator.ValidateToken(context.Background(), tokenResp.AccessToken)
 	require.NoError(t, err)
 	assert.Equal(t, "admin@localmdm.dev", user2.Email)
 }
@@ -419,9 +419,9 @@ func TestOIDCValidator_ValidateToken_CircuitOpenNoCacheMiss(t *testing.T) {
 	}
 
 	// Trip the breaker
-	_, _ = validator.ValidateToken("bad-token")
+	_, _ = validator.ValidateToken(context.Background(), "bad-token")
 
 	// Circuit open, no cache → should return ErrCircuitOpen
-	_, err = validator.ValidateToken("another-token")
+	_, err = validator.ValidateToken(context.Background(), "another-token")
 	assert.ErrorIs(t, err, auth.ErrCircuitOpen)
 }

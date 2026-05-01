@@ -59,7 +59,7 @@ func TestOIDCValidator(t *testing.T) {
 	}
 	
 	// Validate token
-	user, err := validator.ValidateToken(tokenResp.AccessToken)
+	user, err := validator.ValidateToken(context.Background(), tokenResp.AccessToken)
 	if err != nil {
 		t.Fatalf("Token validation failed: %v", err)
 	}
@@ -247,7 +247,7 @@ func TestJWKSRefreshRaceCondition(t *testing.T) {
 			
 			// Validate token multiple times
 			for j := 0; j < 10; j++ {
-				_, err := validator.ValidateToken(tokenResp.AccessToken)
+				_, err := validator.ValidateToken(context.Background(), tokenResp.AccessToken)
 				if err != nil {
 					t.Errorf("Token validation failed: %v", err)
 				}
@@ -278,7 +278,7 @@ func TestRefreshJWKSDoubleCheck(t *testing.T) {
 			defer func() { done <- true }()
 			// Force refresh by calling internal method
 			// In real scenario, this is called from ValidateToken
-			validator.ValidateToken("dummy-token") // Will fail but triggers refresh check
+			validator.ValidateToken(context.Background(), "dummy-token") // Will fail but triggers refresh check
 		}()
 	}
 	
