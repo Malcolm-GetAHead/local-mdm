@@ -3,9 +3,11 @@ package repository
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"strings"
 
+	"github.com/lib/pq"
 	"github.com/malcolm-getahead/local-mdm/internal/apperrors"
 
 	"github.com/google/uuid"
@@ -22,6 +24,7 @@ type DeviceRepository interface {
 	GetByPlatformID(ctx context.Context, platform, deviceID string) (*models.Device, error)
 	List(ctx context.Context, enterpriseID uuid.UUID, limit, offset int) ([]*models.Device, int, error)
 	ListFiltered(ctx context.Context, enterpriseID uuid.UUID, platform, status, search string, sortField, sortDir string, limit, offset int) ([]*models.Device, int, error)
+	GetByPlatformIDIncludeDeleted(ctx context.Context, platform, deviceID string) (*models.Device, error)
 	Update(ctx context.Context, device *models.Device) error
 	Delete(ctx context.Context, id uuid.UUID) error
 }
@@ -61,11 +64,46 @@ func (r *deviceRepository) Create(ctx context.Context, device *models.Device) er
 	}
 	
 	exec := getExecutor(ctx, r.writer)
-	return exec.QueryRowContext(ctx, query,
+	err := exec.QueryRowContext(ctx, query,
 		device.ID, device.EnterpriseID, device.Platform, device.DeviceID,
 		device.SerialNumber, device.Name, device.Model, device.OSVersion,
 		device.Status, device.PlatformData,
 	).Scan(&device.CreatedAt, &device.UpdatedAt)
+
+	if err != nil {
+		// Check for unique constraint violation — a soft-deleted device may occupy the slot
+		var pqErr *pq.Error
+		if errors.As(err, &pqErr) && pqErr.Code == "23505" {
+			return r.restoreSoftDeleted(ctx, device)
+		}
+		return err
+	}
+	return nil
+}
+
+// restoreSoftDeleted finds a soft-deleted device matching the same unique key and restores it.
+// The caller's device struct is updated with the restored record's fields.
+func (r *deviceRepository) restoreSoftDeleted(ctx context.Context, device *models.Device) error {
+	query := `
+		UPDATE devices
+		SET deleted_at = NULL, status = 'enrolled', enrollment_date = NOW(),
+		    serial_number = $1, name = $2, model = $3, os_version = $4, platform_data = $5,
+		    updated_at = NOW()
+		WHERE enterprise_id = $6 AND platform = $7 AND device_id = $8 AND deleted_at IS NOT NULL
+		RETURNING id, created_at, updated_at, enrollment_date`
+
+	exec := getExecutor(ctx, r.writer)
+	err := exec.QueryRowContext(ctx, query,
+		device.SerialNumber, device.Name, device.Model, device.OSVersion, device.PlatformData,
+		device.EnterpriseID, device.Platform, device.DeviceID,
+	).Scan(&device.ID, &device.CreatedAt, &device.UpdatedAt, &device.EnrollmentDate)
+	if err == sql.ErrNoRows {
+		// No soft-deleted row — the unique violation is from an active device
+		return fmt.Errorf("device already exists for this enterprise/platform/device_id")
+	}
+	device.Status = "enrolled"
+	device.DeletedAt = nil
+	return err
 }
 
 func (r *deviceRepository) GetByID(ctx context.Context, id uuid.UUID) (*models.Device, error) {
@@ -116,6 +154,28 @@ func (r *deviceRepository) GetByPlatformID(ctx context.Context, platform, device
 		       enrollment_date, last_seen, status, platform_data, created_at, updated_at, deleted_at
 		FROM devices
 		WHERE platform = $1 AND device_id = $2 AND deleted_at IS NULL`
+
+	device := &models.Device{}
+	err := getReadExecutor(ctx, r.reader).QueryRowContext(ctx, query, platform, deviceID).Scan(
+		&device.ID, &device.EnterpriseID, &device.Platform, &device.DeviceID,
+		&device.SerialNumber, &device.Name, &device.Model, &device.OSVersion,
+		&device.EnrollmentDate, &device.LastSeen, &device.Status, &device.PlatformData,
+		&device.CreatedAt, &device.UpdatedAt, &device.DeletedAt,
+	)
+	if err == sql.ErrNoRows {
+		return nil, fmt.Errorf("device not found: %w", apperrors.ErrNotFound)
+	}
+	return device, err
+}
+
+func (r *deviceRepository) GetByPlatformIDIncludeDeleted(ctx context.Context, platform, deviceID string) (*models.Device, error) {
+	query := `
+		SELECT id, enterprise_id, platform, device_id, serial_number, name, model, os_version,
+		       enrollment_date, last_seen, status, platform_data, created_at, updated_at, deleted_at
+		FROM devices
+		WHERE platform = $1 AND device_id = $2
+		ORDER BY deleted_at NULLS FIRST
+		LIMIT 1`
 
 	device := &models.Device{}
 	err := getReadExecutor(ctx, r.reader).QueryRowContext(ctx, query, platform, deviceID).Scan(

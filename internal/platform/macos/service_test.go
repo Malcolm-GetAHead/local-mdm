@@ -60,6 +60,14 @@ func (m *MockDeviceRepository) GetByPlatformID(ctx context.Context, platform, de
 	return args.Get(0).(*models.Device), args.Error(1)
 }
 
+func (m *MockDeviceRepository) GetByPlatformIDIncludeDeleted(ctx context.Context, platform, deviceID string) (*models.Device, error) {
+	args := m.Called(ctx, platform, deviceID)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*models.Device), args.Error(1)
+}
+
 func (m *MockDeviceRepository) Update(ctx context.Context, device *models.Device) error {
 	args := m.Called(ctx, device)
 	return args.Error(0)
