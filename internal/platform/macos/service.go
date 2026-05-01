@@ -59,6 +59,11 @@ func (s *Service) GetDeviceByUDID(ctx context.Context, udid string) (*models.Dev
 	return s.deviceRepo.GetByPlatformID(ctx, models.PlatformMacOS, udid)
 }
 
+// GetDeviceByUDIDIncludeDeleted finds a macOS device by UDID, including soft-deleted records.
+func (s *Service) GetDeviceByUDIDIncludeDeleted(ctx context.Context, udid string) (*models.Device, error) {
+	return s.deviceRepo.GetByPlatformIDIncludeDeleted(ctx, models.PlatformMacOS, udid)
+}
+
 // UpdateDevice updates a device record.
 func (s *Service) UpdateDevice(ctx context.Context, device *models.Device) error {
 	return s.deviceRepo.Update(ctx, device)

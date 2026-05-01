@@ -24,7 +24,7 @@ import (
 )
 
 // TestE2E_MacOSWebhook simulates NanoMDM forwarding an Authenticate webhook
-// and verifies a device record is created in the database.
+// for a soft-deleted device and verifies the device record is restored.
 func TestE2E_MacOSWebhook(t *testing.T) {
 	database := testutil.ConnectDB(t)
 	ctx := context.Background()
@@ -44,6 +44,20 @@ func TestE2E_MacOSWebhook(t *testing.T) {
 	require.NoError(t, entRepo.Create(ctx, enterprise))
 	t.Cleanup(func() { database.Writer.Exec("DELETE FROM enterprises WHERE id = $1", enterprise.ID) })
 
+	// Pre-create a device (simulating prior SCEP enrollment), then soft-delete it
+	udid := uuid.New().String()
+	device := &models.Device{
+		EnterpriseID: enterprise.ID,
+		Platform:     models.PlatformMacOS,
+		DeviceID:     udid,
+		SerialNumber: "SN" + uuid.New().String()[:8],
+		Status:       "enrolled",
+		PlatformData: models.JSONB{},
+	}
+	require.NoError(t, deviceRepo.Create(ctx, device))
+	originalID := device.ID
+	require.NoError(t, deviceRepo.Delete(ctx, originalID))
+
 	// Create macOS service and webhook handler
 	macosService := macos.NewService(deviceRepo)
 	lifecycleSvc := service.NewLifecycleService(logger)
@@ -52,9 +66,8 @@ func TestE2E_MacOSWebhook(t *testing.T) {
 	nanomdmSvc := macos.NewNanoMDMService("http://localhost:9000", "test-key", cmdRepo, deviceRepo, logger)
 	checkinHandler := macos.NewCheckinHandler(nanomdmSvc, macosService, nil, lifecycleSvc, logger)
 
-	// Simulate NanoMDM Authenticate webhook
-	udid := uuid.New().String()
-	authPlist := fmt.Sprintf(`<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd"><plist version="1.0"><dict><key>MessageType</key><string>Authenticate</string><key>UDID</key><string>%s</string><key>SerialNumber</key><string>SN%s</string></dict></plist>`, udid, uuid.New().String()[:8])
+	// Simulate NanoMDM Authenticate webhook — device should be restored
+	authPlist := fmt.Sprintf(`<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd"><plist version="1.0"><dict><key>MessageType</key><string>Authenticate</string><key>UDID</key><string>%s</string><key>SerialNumber</key><string>SN-REENROLL</string></dict></plist>`, udid)
 	rawPayload := base64.StdEncoding.EncodeToString([]byte(authPlist))
 	webhookEvent := map[string]interface{}{
 		"topic":    "mdm.Authenticate",
@@ -72,14 +85,13 @@ func TestE2E_MacOSWebhook(t *testing.T) {
 
 	assert.Equal(t, http.StatusOK, w.Code)
 
-	// Verify device was created (may be under default enterprise, not test enterprise)
-	device, err := deviceRepo.GetByPlatformID(ctx, models.PlatformMacOS, udid)
+	// Verify device was restored with same UUID
+	restored, err := deviceRepo.GetByPlatformID(ctx, models.PlatformMacOS, udid)
 	require.NoError(t, err)
-	assert.Equal(t, models.PlatformMacOS, device.Platform)
-	assert.Equal(t, "pending", device.Status)
-
-	// Clean up
-	_ = deviceRepo.Delete(ctx, device.ID)
+	assert.Equal(t, originalID, restored.ID, "restored device should have same UUID")
+	assert.Equal(t, enterprise.ID, restored.EnterpriseID, "restored device should be in correct enterprise")
+	assert.Equal(t, "enrolled", restored.Status)
+	assert.Nil(t, restored.DeletedAt)
 }
 
 // TestE2E_MacOSCheckOut simulates a CheckOut webhook and verifies

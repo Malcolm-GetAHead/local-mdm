@@ -84,12 +84,11 @@ type LifecycleNotifier interface {
 
 // CheckinHandler handles MDM check-in requests
 type CheckinHandler struct {
-	nanomdm             *NanoMDMService
-	service             *Service
-	cmdRepo             repository.CommandRepository
-	lifecycle           LifecycleNotifier
-	logger              *slog.Logger
-	defaultEnterpriseID uuid.UUID
+	nanomdm   *NanoMDMService
+	service   *Service
+	cmdRepo   repository.CommandRepository
+	lifecycle LifecycleNotifier
+	logger    *slog.Logger
 	// Auto-query cooldown: track last auto-queue time per UDID to prevent storm cycles
 	lastAutoQuery map[string]time.Time
 	autoQueryMu   sync.Mutex
@@ -98,19 +97,13 @@ type CheckinHandler struct {
 // NewCheckinHandler creates a new check-in handler
 func NewCheckinHandler(nanomdm *NanoMDMService, service *Service, cmdRepo repository.CommandRepository, lifecycle LifecycleNotifier, logger *slog.Logger) *CheckinHandler {
 	return &CheckinHandler{
-		nanomdm:             nanomdm,
-		service:             service,
-		cmdRepo:             cmdRepo,
-		lifecycle:           lifecycle,
-		logger:              logger,
-		defaultEnterpriseID: uuid.MustParse("00000000-0000-0000-0000-000000000001"),
-		lastAutoQuery:       make(map[string]time.Time),
+		nanomdm:       nanomdm,
+		service:       service,
+		cmdRepo:       cmdRepo,
+		lifecycle:     lifecycle,
+		logger:        logger,
+		lastAutoQuery: make(map[string]time.Time),
 	}
-}
-
-// SetDefaultEnterpriseID sets the enterprise ID used for new device registrations.
-func (h *CheckinHandler) SetDefaultEnterpriseID(id uuid.UUID) {
-	h.defaultEnterpriseID = id
 }
 
 // ServeHTTP handles MDM check-in HTTP requests (NanoMDM webhook JSON format)
@@ -207,16 +200,24 @@ func (h *CheckinHandler) handleCheckin(ctx context.Context, messageType, udid st
 			topic = auth.Topic
 		}
 
-		// Use the configured default enterprise ID
-		enterpriseID := h.defaultEnterpriseID
-
 		// Try to update existing device, or create new one
 		device, err := h.service.GetDeviceByUDID(ctx, udid)
 		if err != nil {
-			// Device doesn't exist — create it
-			newDevice, createErr := h.service.CreateDevice(ctx, enterpriseID, udid, serial)
+			// Device doesn't exist in active records — check soft-deleted records
+			// to find the correct enterprise for re-enrollment
+			deletedDevice, delErr := h.service.GetDeviceByUDIDIncludeDeleted(ctx, udid)
+			if delErr != nil {
+				// No record at all (active or deleted) — this is an anomaly.
+				// A device with a valid cert but no record should not happen.
+				h.logger.Warn("authenticate from unknown device with no record — ignoring",
+					"udid", udid, "serial", serial)
+				return
+			}
+			// Found a soft-deleted record — use its enterprise for re-enrollment.
+			// Create will restore the soft-deleted row via the unique constraint handler.
+			newDevice, createErr := h.service.CreateDevice(ctx, deletedDevice.EnterpriseID, udid, serial)
 			if createErr != nil {
-				h.logger.Error("failed to create device on authenticate", "error", createErr, "udid", udid)
+				h.logger.Error("failed to restore device on authenticate", "error", createErr, "udid", udid)
 				return
 			}
 			device = newDevice

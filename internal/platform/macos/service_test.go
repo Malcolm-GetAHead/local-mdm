@@ -321,7 +321,7 @@ func TestCheckinHandler_ServeHTTP(t *testing.T) {
 	svc := NewNanoMDMService("", "", nil, nil, slog.Default())
 	deviceRepo := new(MockDeviceRepository)
 	deviceRepo.On("GetByPlatformID", mock.Anything, "macos", "test").Return(nil, fmt.Errorf("not found"))
-	deviceRepo.On("Create", mock.Anything, mock.Anything).Return(nil)
+	deviceRepo.On("GetByPlatformIDIncludeDeleted", mock.Anything, "macos", "test").Return(nil, fmt.Errorf("not found"))
 	deviceRepo.On("Update", mock.Anything, mock.Anything).Return(nil)
 	service := NewService(deviceRepo)
 	logger := slog.New(slog.NewTextHandler(bytes.NewBuffer(nil), &slog.HandlerOptions{Level: slog.LevelError}))
