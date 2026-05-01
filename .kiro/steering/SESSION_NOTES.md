@@ -1,6 +1,6 @@
 # Session Notes — Working Preferences & Project Knowledge
 
-**Last Updated**: 2026-04-30  
+**Last Updated**: 2026-05-01  
 **Purpose**: Guidance for AI agents working on this codebase. Keep this file lean — patterns and conventions that apply to every session. One-shot implementation details belong in sprint docs, not here.
 
 ## Current State
@@ -71,6 +71,8 @@
 - **The owner has strong opinions about test realism.** Tests that use mock DBs when a real Docker PostgreSQL is available will get called out.
 - **When the owner says "lets fix all these items properly" they mean now, in this session.** Don't propose deferring to a future sprint.
 - **When the owner prescribes a technical approach, validate it against the codebase before agreeing.** If a suggestion doesn't fit the code structure, explain why and propose the alternative.
+- **When a spec prescribes a specific implementation, evaluate whether the existing pattern already solves the problem.** AUT-00 prescribed migrating all tests to a shared enterprise, but the existing per-test enterprise pattern was already working correctly. The migration reduced isolation. Investigate the current state before implementing a prescribed solution — the spec may be solving a problem that doesn't exist, or solving it in a way that creates new problems.
+- **If you discover mid-implementation that the design is wrong, revert and re-approach.** Don't patch forward. `git revert` + clean implementation is faster and less error-prone than layering fixes on a flawed foundation. The owner values honest pivots over sunk-cost persistence.
 - **The owner context-switches during sessions.** Architecture brainstorming may happen mid-implementation. Acknowledge the idea, finish the current task, then address it. Don't interrupt code work to write docs.
 - **The owner has domain knowledge they don't always share upfront.** If they mention a specific tool or project (Fleet DM, dev-deployer), they're telling you to look at it. Ask for details immediately rather than discovering them later.
 
@@ -85,6 +87,7 @@
 - **Don't run commands that can hang.** The shell tool cannot handle background processes. If you need a server running while tests execute, write a self-contained script.
 - **Batch UI feedback requests.** Ask the owner to collect all feedback in one pass rather than reporting issues one at a time.
 - **Restore VMs from template at the start of device testing.** Stale enrollment state from previous sessions causes confusing failures.
+- **Autonomous session prompts have two risk levels.** Mechanical sessions (specific files, specific fixes) can run start-to-finish. Design-heavy sessions (new features, new schemas, new patterns) should stop after an investigation/design phase for owner review. Check the session's risk level in `autonomous_sessions.md` before executing — some are marked "design-first" and must not proceed past Phase 1 without approval.
 
 ## Known Issues
 
@@ -102,7 +105,7 @@
 - **Dashboard**: Go templates + HTMX + Tailwind CSS. Not React.
 - **macOS Platform SSO**: Sprint 7 (Java + Swift, separate from Go work).
 - **Default to ECS Fargate, not Kubernetes.**
-- **Autonomous sessions**: `docs/planning/future/autonomous_sessions.md` contains self-contained session prompts (AUT-00 through AUT-08) with mandatory verification gates. Read the Prerequisites section before executing any session.
+- **Autonomous sessions**: `docs/planning/future/autonomous_sessions.md` contains self-contained session prompts (AUT-00 through AUT-11) with mandatory verification gates. Sessions are categorized as autonomous (run overnight), investigation-first (commit findings then proceed), or design-first (stop after Phase 1 for owner review). Read the Prerequisites section and check the session's risk level before executing.
 - **Microsoft MDM reference**: `MicrosoftDocs/memdocs` repo is indexed as a knowledge base. Search it for Windows CSP definitions (BitLocker, Firewall, DeviceLock, WiFi, VPN, app management, certificate store, Windows Update), Intune compliance policy logic, enrollment flows, and OMA-DM protocol details. The BitLocker CSP bitmask was verified against real device testing — MS doc labels don't always match observed behavior, so verify with actual devices when possible.
 - **Apple MDM reference**: `apple/device-management` repo indexed as KB. Contains MDM command schemas, profile payload definitions, check-in protocol, declarative management specs. Machine-readable YAML — the definitive source for command fields and supported OS versions.
 - **Android MDM reference**: `googleapis/google-api-nodejs-client` (androidmanagement directory) indexed as KB. Contains full API type definitions with JSDoc descriptions for policies, devices, compliance, enrollment tokens, app management. The `v1.ts` file is the complete API reference in code form.
