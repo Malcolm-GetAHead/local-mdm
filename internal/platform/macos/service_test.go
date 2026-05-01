@@ -317,7 +317,10 @@ func TestNanoMDMService(t *testing.T) {
 
 // --- CheckinHandler and CommandHandler Tests ---
 
-func TestCheckinHandler_ServeHTTP(t *testing.T) {
+// TestCheckinHandler_ServeHTTP_RejectsUnknownDevice verifies that an Authenticate
+// webhook for a UDID with no record (active or soft-deleted) is silently ignored —
+// no device is created, no error is returned to NanoMDM.
+func TestCheckinHandler_ServeHTTP_RejectsUnknownDevice(t *testing.T) {
 	svc := NewNanoMDMService("", "", nil, nil, slog.Default())
 	deviceRepo := new(MockDeviceRepository)
 	deviceRepo.On("GetByPlatformID", mock.Anything, "macos", "test").Return(nil, fmt.Errorf("not found"))
