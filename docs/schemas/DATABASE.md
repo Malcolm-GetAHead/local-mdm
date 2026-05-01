@@ -169,6 +169,21 @@ CREATE INDEX idx_devices_deleted_at ON devices(deleted_at);
 - `wiped`: Remote wipe executed
 - `lost`: Marked as lost/stolen
 
+**Soft-Delete & Re-enrollment Behavior**:
+
+Devices use soft-delete (`deleted_at` timestamp). The `UNIQUE(enterprise_id, platform, device_id)` constraint includes soft-deleted rows. When a device is deleted from the dashboard and later re-enrolls into the same enterprise:
+
+1. The `Create` method detects the unique constraint violation (PostgreSQL error code `23505`).
+2. It finds the soft-deleted row matching the same `(enterprise_id, platform, device_id)`.
+3. It restores the row: clears `deleted_at`, resets `status` to `enrolled`, updates `enrollment_date` to `NOW()`, and updates device metadata (serial, name, model, OS version).
+4. The original device UUID is preserved, maintaining the audit trail.
+
+If the same UDID enrolls into a *different* enterprise, a new device record is created (different `enterprise_id` means no constraint conflict).
+
+The macOS Authenticate webhook does **not** use a default enterprise fallback. When a device authenticates with no active record:
+- It checks for a soft-deleted record to determine the correct enterprise.
+- If no record exists at all (active or deleted), the device is rejected with a warning log.
+
 ### policies
 
 Management policies that can be applied to devices.
