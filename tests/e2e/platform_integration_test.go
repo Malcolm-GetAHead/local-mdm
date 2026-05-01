@@ -94,6 +94,77 @@ func TestE2E_MacOSWebhook(t *testing.T) {
 	assert.Nil(t, restored.DeletedAt)
 }
 
+// TestE2E_DeviceReenrollment_FullFlow tests the complete re-enrollment lifecycle:
+// create → soft-delete → re-enroll (same enterprise) → verify restoration
+// Also verifies a second enterprise can independently enroll the same UDID.
+func TestE2E_DeviceReenrollment_FullFlow(t *testing.T) {
+	database := testutil.ConnectDB(t)
+	ctx := context.Background()
+
+	entID1 := testutil.CreateTestEnterprise(t, database.Writer, "inttest-reenroll-e2e-1")
+	entID2 := testutil.CreateTestEnterprise(t, database.Writer, "inttest-reenroll-e2e-2")
+
+	deviceRepo, err := repository.NewDeviceRepository(database.Writer, database.Reader)
+	require.NoError(t, err)
+
+	udid := "e2e-reenroll-" + uuid.New().String()[:8]
+
+	// Step 1: Create device in enterprise 1
+	device := &models.Device{
+		EnterpriseID: entID1,
+		Platform:     models.PlatformMacOS,
+		DeviceID:     udid,
+		SerialNumber: "SN-ORIG",
+		Name:         "Original Device",
+		Status:       "enrolled",
+		PlatformData: models.JSONB{},
+	}
+	require.NoError(t, deviceRepo.Create(ctx, device))
+	originalID := device.ID
+
+	// Step 2: Soft-delete the device
+	require.NoError(t, deviceRepo.Delete(ctx, originalID))
+
+	// Verify it's gone from normal queries
+	_, err = deviceRepo.GetByID(ctx, originalID)
+	require.Error(t, err)
+
+	// Step 3: Re-enroll with same enterprise/platform/device_id
+	reDevice := &models.Device{
+		EnterpriseID: entID1,
+		Platform:     models.PlatformMacOS,
+		DeviceID:     udid,
+		SerialNumber: "SN-REENROLL",
+		Name:         "Re-enrolled Device",
+		Status:       "pending",
+		PlatformData: models.JSONB{"reenrolled": true},
+	}
+	require.NoError(t, deviceRepo.Create(ctx, reDevice))
+
+	// Verify: same UUID restored, correct enterprise, enrolled status
+	assert.Equal(t, originalID, reDevice.ID, "re-enrollment should restore original UUID")
+	assert.Equal(t, "enrolled", reDevice.Status, "restored device should be enrolled")
+
+	fetched, err := deviceRepo.GetByID(ctx, originalID)
+	require.NoError(t, err)
+	assert.Equal(t, entID1, fetched.EnterpriseID)
+	assert.Equal(t, "SN-REENROLL", fetched.SerialNumber)
+	assert.Nil(t, fetched.DeletedAt)
+
+	// Step 4: Second enterprise enrolls the same UDID independently
+	d2 := &models.Device{
+		EnterpriseID: entID2,
+		Platform:     models.PlatformMacOS,
+		DeviceID:     udid,
+		SerialNumber: "SN-ENT2",
+		Status:       "enrolled",
+		PlatformData: models.JSONB{},
+	}
+	require.NoError(t, deviceRepo.Create(ctx, d2))
+	assert.NotEqual(t, originalID, d2.ID, "different enterprise should get a new UUID")
+	assert.Equal(t, entID2, d2.EnterpriseID)
+}
+
 // TestE2E_MacOSCheckOut simulates a CheckOut webhook and verifies
 // the device status is updated to unenrolled.
 func TestE2E_MacOSCheckOut(t *testing.T) {
