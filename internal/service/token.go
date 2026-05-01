@@ -87,7 +87,13 @@ func (s *TokenService) Validate(ctx context.Context, plaintext string) (*models.
 		return nil, nil, fmt.Errorf("user is deactivated")
 	}
 	// Update last_used_at asynchronously (best-effort)
-	go func() { _ = s.tokenRepo.UpdateLastUsed(context.Background(), token.ID) }()
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if err := s.tokenRepo.UpdateLastUsed(ctx, token.ID); err != nil {
+			s.logger.Warn("failed to update token last_used_at", "token_id", token.ID, "error", err)
+		}
+	}()
 	return user, token, nil
 }
 
