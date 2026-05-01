@@ -392,6 +392,9 @@ func validateJWKSURL(urlStr string) error {
 	return nil
 }
 
+// healthCheckClient is used for Keycloak health checks with a 10s timeout.
+var healthCheckClient = &http.Client{Timeout: 10 * time.Second}
+
 // HealthCheck verifies Keycloak connectivity by fetching JWKS
 func (v *OIDCValidator) HealthCheck(ctx context.Context) error {
 	req, err := http.NewRequestWithContext(ctx, "GET", v.jwksURL, nil)
@@ -399,7 +402,7 @@ func (v *OIDCValidator) HealthCheck(ctx context.Context) error {
 		return fmt.Errorf("failed to create health check request: %w", err)
 	}
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := healthCheckClient.Do(req)
 	if err != nil {
 		return fmt.Errorf("keycloak unreachable: %w", err)
 	}
