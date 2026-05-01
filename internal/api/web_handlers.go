@@ -443,7 +443,8 @@ func (s *Server) handleWebDeviceCheckin(w http.ResponseWriter, r *http.Request) 
 	pushURL := s.config.MacOS.NanoMDMURL + "/v1/push/" + device.DeviceID
 	req, _ := http.NewRequestWithContext(r.Context(), http.MethodPost, pushURL, nil)
 	req.SetBasicAuth("nanomdm", s.config.MacOS.NanoMDMAPIKey)
-	resp, err := http.DefaultClient.Do(req)
+	pushClient := &http.Client{Timeout: 10 * time.Second}
+	resp, err := pushClient.Do(req)
 	if err != nil {
 		msg = "Failed to contact NanoMDM: " + err.Error()
 		success = false

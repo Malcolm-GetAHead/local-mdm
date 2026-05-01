@@ -2,6 +2,7 @@ package scep
 
 import (
 	"bytes"
+	"context"
 	"crypto"
 	"crypto/rand"
 	"crypto/rsa"
@@ -28,19 +29,19 @@ type mockStore struct {
 	challenges map[string]string
 }
 
-func (m *mockStore) GenerateChallenge(deviceID string, ttl time.Duration) (string, error) {
+func (m *mockStore) GenerateChallenge(_ context.Context, deviceID string, ttl time.Duration) (string, error) {
 	pw := "test-pw"
 	m.challenges[pw] = deviceID
 	return pw, nil
 }
-func (m *mockStore) ValidateChallenge(password string) (string, bool) {
+func (m *mockStore) ValidateChallenge(_ context.Context, password string) (string, bool) {
 	id, ok := m.challenges[password]
 	if ok {
 		delete(m.challenges, password)
 	}
 	return id, ok
 }
-func (m *mockStore) CleanupExpired() {}
+func (m *mockStore) CleanupExpired(_ context.Context) {}
 
 func setupTestCA(t *testing.T) *certs.CAManager {
 	t.Helper()
