@@ -4,6 +4,21 @@ Sprint-by-sprint development history for Local MDM. For current status, see [REA
 
 ---
 
+## AUT-10 — HTTP Client Timeouts & Context Propagation
+- Replaced bare `http.Post`, `http.PostForm`, `http.DefaultClient` with timeout-aware clients across all non-test code
+- `KeycloakClient.Login`/`RefreshToken` accept `ctx context.Context`; use 30s timeout client
+- OAuth callback token exchange uses `http.NewRequestWithContext(r.Context())` with 30s timeout
+- `OIDCValidator.HealthCheck` uses dedicated 10s timeout client
+- `OIDCValidator.ValidateToken` accepts `ctx context.Context`; auth middleware passes `r.Context()`
+- `ChallengeStore` interface methods (`GenerateChallenge`, `ValidateChallenge`, `CleanupExpired`) accept `ctx context.Context`
+- Command dispatcher uses `context.WithTimeout(30s)` for NanoMDM dispatch
+- SCEP PostIssueHook uses `context.WithTimeout(5s)` for enrollment token DB calls
+- `refreshGaugeMetrics` accepts parent context; respects shutdown cancellation
+- Token `UpdateLastUsed` goroutine uses 5s timeout and logs errors
+- NanoMDM push in web handlers uses 10s timeout client
+- Full codebase audit: all remaining `context.Background()` verified as legitimate (startup, shutdown, or intentionally decoupled workers)
+- Timeout verification tests: Keycloak context cancellation, command dispatcher deadline propagation
+
 ## Sprint 6 (continued) — Cleanup & Test Coverage
 - XML marshaling refactor: discovery response uses struct-based `xml.Marshal` instead of `fmt.Sprintf` template (prevents namespace/formatting bugs)
 - Unique `ActivityId` generated per discovery request (`uuid.New()`)

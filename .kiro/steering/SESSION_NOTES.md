@@ -119,3 +119,6 @@
 | 5-5g | ✅ Complete | Backend polish, platform integration, web dashboard, quality |
 | 6 | ✅ Complete | macOS full data pipeline, Windows enrolled via Settings UI, OMA-DM sync, nginx TLS with CRL |
 | 7 | 🔲 Not Started | macOS Platform SSO (Java/Swift) |
+| AUT-00 | ✅ Complete | Test enterprise isolation, per-test enterprise pattern |
+| AUT-01 | ✅ Complete | Enrollment token system |
+| AUT-10 | ✅ Complete | HTTP client timeouts, context propagation, ChallengeStore/ValidateToken ctx params |

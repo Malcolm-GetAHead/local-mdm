@@ -1152,7 +1152,8 @@ After the retrospective, provide:
 ## Session 10: HTTP Client Timeouts & Context Propagation
 
 **ID**: `AUT-10`
-**Effort**: ~2 hours
+**Status**: COMPLETE
+**Effort**: ~2 hours (actual: ~2 hours implementation + ~1 hour codebase audit follow-up)
 **Source**: Code audit (2026-04-30)
 **Branch**: `feature/aut-10-http-timeouts`
 **Depends on**: None
@@ -1207,7 +1208,14 @@ When complete, provide a summary and verification checklist.
 ### Deliverables
 - All HTTP calls use clients with explicit timeouts
 - SCEP `ChallengeStore` interface accepts context
+- `KeycloakClient.Login`/`RefreshToken` accept context
+- `OIDCValidator.ValidateToken` accepts context; middleware passes `r.Context()`
 - Token update goroutine has timeout and error logging
+- Command dispatcher has 30s timeout context
+- SCEP PostIssueHook has 5s timeout context
+- `refreshGaugeMetrics` accepts parent context
+- Timeout verification tests for Keycloak client and command dispatcher
+- Full codebase audit: all remaining `context.Background()` verified as legitimate
 - Zero behavior changes to API or dashboard
 
 ---
@@ -1314,7 +1322,7 @@ AUT-06c (Cert Renewal + Escrow)  — investigation-first, then autonomous
 AUT-07  (A11y + i18n)            — independent, screenshot gate per template
 AUT-08  (Docs + OTel)            — investigation step then autonomous
 AUT-09  (Service Consolidation)  — run BEFORE feature sessions (reduces merge conflicts)
-AUT-10  (HTTP Timeouts)          — independent, fully autonomous
+AUT-10  (HTTP Timeouts)          — complete ✅
 AUT-11  (Re-enrollment Fix)      — independent, fully autonomous
 ```
 
@@ -1326,7 +1334,7 @@ Sessions marked "autonomous" can run start-to-finish without human interaction.
 
 0. **AUT-00** (Test Enterprise Isolation) ✅
 1. **AUT-01** (Enrollment Tokens) ✅
-2. **AUT-10** (HTTP Timeouts) — fully autonomous, quick safety fix
+2. **AUT-10** (HTTP Timeouts) ✅
 3. **AUT-11** (Re-enrollment Fix) — fully autonomous, closes multi-tenant gap
 4. **AUT-09** (Service Consolidation) — autonomous, clean up before features
 5. **AUT-06a** (Security Audit + CI) — autonomous, low risk
