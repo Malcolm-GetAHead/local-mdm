@@ -9,6 +9,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -215,13 +217,23 @@ func (s *Server) handleWebCallback(w http.ResponseWriter, r *http.Request) {
 
 	// Exchange code for tokens via Keycloak token endpoint
 	tokenURL := fmt.Sprintf("%s/protocol/openid-connect/token", s.config.Keycloak.IssuerURL())
-	resp, err := http.PostForm(tokenURL, map[string][]string{
-		"grant_type":   {"authorization_code"},
-		"client_id":    {s.config.Keycloak.ClientID},
+	formData := url.Values{
+		"grant_type":    {"authorization_code"},
+		"client_id":     {s.config.Keycloak.ClientID},
 		"client_secret": {s.config.Keycloak.ClientSecret},
-		"code":         {code},
-		"redirect_uri": {s.webCallbackURL(r)},
-	})
+		"code":          {code},
+		"redirect_uri":  {s.webCallbackURL(r)},
+	}
+	tokenReq, err := http.NewRequestWithContext(r.Context(), "POST", tokenURL, strings.NewReader(formData.Encode()))
+	if err != nil {
+		s.logger.Error("Token exchange request creation failed", "error", err)
+		http.Error(w, "Authentication failed", http.StatusInternalServerError)
+		return
+	}
+	tokenReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+	tokenClient := &http.Client{Timeout: 30 * time.Second}
+	resp, err := tokenClient.Do(tokenReq)
 	if err != nil {
 		s.logger.Error("Token exchange failed", "error", err)
 		http.Error(w, "Authentication failed", http.StatusInternalServerError)
