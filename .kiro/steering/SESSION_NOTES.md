@@ -77,7 +77,7 @@
 - **If you discover mid-implementation that the design is wrong, revert and re-approach.** Don't patch forward. `git revert` + clean implementation is faster and less error-prone than layering fixes on a flawed foundation. The owner values honest pivots over sunk-cost persistence.
 - **The owner context-switches during sessions.** Architecture brainstorming may happen mid-implementation. Acknowledge the idea, finish the current task, then address it. Don't interrupt code work to write docs.
 - **The owner has domain knowledge they don't always share upfront.** If they mention a specific tool or project (Fleet DM, dev-deployer), they're telling you to look at it. Ask for details immediately rather than discovering them later.
-- **The owner will ask you to fix retro findings in the same session.** When you list shortcuts or gaps in the retrospective, expect "can you fix that?" for each one. Don't list things you aren't prepared to address immediately. If something is genuinely out of scope, say so explicitly with a reason.
+- **The owner will ask you to fix retro findings in the same session.** When you list shortcuts or gaps in the retrospective, expect "can you fix that?" for each one. Be thorough in listing issues — don't hide problems to avoid extra work. The owner values complete honesty over a clean-looking retro.
 - **The owner tests your work live while you're still in session.** They'll delete a device from the dashboard, reboot a VM, and tell you it didn't work. Be ready to debug against the running system, not just against test output. Docker rebuild + curl + SSH into VMs is part of the workflow, not a nice-to-have.
 
 ### Process
