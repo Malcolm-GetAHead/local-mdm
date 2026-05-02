@@ -785,14 +785,14 @@ func (s *Server) setupRoutes() {
 			tokenStr := parts[1]
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 			defer cancel()
-			tok, err := s.enrollmentTokenRepo.GetByToken(ctx, tokenStr)
+			tok, err := s.enrollmentTokenService.GetByToken(ctx, tokenStr)
 			if err != nil {
 				return
 			}
 			if tok.Status != models.EnrollmentTokenStatusActive {
 				return
 			}
-			if err := s.enrollmentTokenRepo.DecrementUses(ctx, tok.ID); err != nil {
+			if err := s.enrollmentTokenService.DecrementUses(ctx, tok.ID); err != nil {
 				s.logger.Warn("failed to decrement enrollment token at SCEP issuance", "error", err, "token_id", tok.ID)
 			}
 		})
@@ -1088,8 +1088,8 @@ func (s *Server) startCleanupTicker() {
 				s.challengeManager.CleanupExpired(ctx)
 				s.refreshGaugeMetrics(ctx)
 				// Expire enrollment tokens that have passed their expires_at
-				if s.enrollmentTokenRepo != nil {
-					if n, err := s.enrollmentTokenRepo.ExpireTokens(ctx); err != nil {
+				if s.enrollmentTokenService != nil {
+					if n, err := s.enrollmentTokenService.ExpireTokens(ctx); err != nil {
 						s.logger.Warn("enrollment token expiry failed", "error", err)
 					} else if n > 0 {
 						s.logger.Info("expired enrollment tokens", "count", n)
