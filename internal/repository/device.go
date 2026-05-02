@@ -106,12 +106,17 @@ func (r *deviceRepository) restoreSoftDeleted(ctx context.Context, device *model
 	return err
 }
 
+// deviceSelectColumns is the standard column list for device queries.
+// COALESCE wraps nullable VARCHAR columns to avoid NULL-to-string scan errors.
+const deviceSelectColumns = `id, enterprise_id, platform, device_id,
+		COALESCE(serial_number, '') as serial_number,
+		COALESCE(name, '') as name,
+		COALESCE(model, '') as model,
+		COALESCE(os_version, '') as os_version,
+		enrollment_date, last_seen, status, platform_data, created_at, updated_at, deleted_at`
+
 func (r *deviceRepository) GetByID(ctx context.Context, id uuid.UUID) (*models.Device, error) {
-	query := `
-		SELECT id, enterprise_id, platform, device_id, serial_number, name, model, os_version,
-		       enrollment_date, last_seen, status, platform_data, created_at, updated_at, deleted_at
-		FROM devices
-		WHERE id = $1 AND deleted_at IS NULL`
+	query := `SELECT ` + deviceSelectColumns + ` FROM devices WHERE id = $1 AND deleted_at IS NULL`
 	
 	device := &models.Device{}
 	exec := getReadExecutor(ctx, r.reader)
@@ -128,11 +133,7 @@ func (r *deviceRepository) GetByID(ctx context.Context, id uuid.UUID) (*models.D
 }
 
 func (r *deviceRepository) GetBySerial(ctx context.Context, enterpriseID uuid.UUID, serial string) (*models.Device, error) {
-	query := `
-		SELECT id, enterprise_id, platform, device_id, serial_number, name, model, os_version,
-		       enrollment_date, last_seen, status, platform_data, created_at, updated_at, deleted_at
-		FROM devices
-		WHERE enterprise_id = $1 AND serial_number = $2 AND deleted_at IS NULL`
+	query := `SELECT ` + deviceSelectColumns + ` FROM devices WHERE enterprise_id = $1 AND serial_number = $2 AND deleted_at IS NULL`
 	
 	device := &models.Device{}
 	exec := getReadExecutor(ctx, r.reader)
@@ -149,11 +150,7 @@ func (r *deviceRepository) GetBySerial(ctx context.Context, enterpriseID uuid.UU
 }
 
 func (r *deviceRepository) GetByPlatformID(ctx context.Context, platform, deviceID string) (*models.Device, error) {
-	query := `
-		SELECT id, enterprise_id, platform, device_id, serial_number, name, model, os_version,
-		       enrollment_date, last_seen, status, platform_data, created_at, updated_at, deleted_at
-		FROM devices
-		WHERE platform = $1 AND device_id = $2 AND deleted_at IS NULL`
+	query := `SELECT ` + deviceSelectColumns + ` FROM devices WHERE platform = $1 AND device_id = $2 AND deleted_at IS NULL`
 
 	device := &models.Device{}
 	err := getReadExecutor(ctx, r.reader).QueryRowContext(ctx, query, platform, deviceID).Scan(
@@ -169,13 +166,7 @@ func (r *deviceRepository) GetByPlatformID(ctx context.Context, platform, device
 }
 
 func (r *deviceRepository) GetByPlatformIDIncludeDeleted(ctx context.Context, platform, deviceID string) (*models.Device, error) {
-	query := `
-		SELECT id, enterprise_id, platform, device_id, serial_number, name, model, os_version,
-		       enrollment_date, last_seen, status, platform_data, created_at, updated_at, deleted_at
-		FROM devices
-		WHERE platform = $1 AND device_id = $2
-		ORDER BY deleted_at NULLS FIRST
-		LIMIT 1`
+	query := `SELECT ` + deviceSelectColumns + ` FROM devices WHERE platform = $1 AND device_id = $2 ORDER BY deleted_at NULLS FIRST LIMIT 1`
 
 	device := &models.Device{}
 	err := getReadExecutor(ctx, r.reader).QueryRowContext(ctx, query, platform, deviceID).Scan(
@@ -198,13 +189,7 @@ func (r *deviceRepository) List(ctx context.Context, enterpriseID uuid.UUID, lim
 	}
 
 	countQuery := `SELECT COUNT(*) FROM devices WHERE enterprise_id = $1 AND deleted_at IS NULL`
-	dataQuery := `
-		SELECT id, enterprise_id, platform, device_id, serial_number, name, model, os_version,
-		       enrollment_date, last_seen, status, platform_data, created_at, updated_at, deleted_at
-		FROM devices
-		WHERE enterprise_id = $1 AND deleted_at IS NULL
-		ORDER BY created_at DESC
-		LIMIT $2 OFFSET $3`
+	dataQuery := `SELECT ` + deviceSelectColumns + ` FROM devices WHERE enterprise_id = $1 AND deleted_at IS NULL ORDER BY created_at DESC LIMIT $2 OFFSET $3`
 
 	scanFn := func(rows *sql.Rows) (*models.Device, error) {
 		device := &models.Device{}
@@ -275,8 +260,7 @@ func (r *deviceRepository) ListFiltered(ctx context.Context, enterpriseID uuid.U
 		return nil, 0, err
 	}
 
-	dataQuery := fmt.Sprintf(`SELECT id, enterprise_id, platform, device_id, serial_number, name, model, os_version,
-		enrollment_date, last_seen, status, platform_data, created_at, updated_at, deleted_at
+	dataQuery := fmt.Sprintf(`SELECT `+deviceSelectColumns+`
 		FROM devices %s ORDER BY %s %s LIMIT $%d OFFSET $%d`, where, orderCol, order, argN, argN+1)
 	args = append(args, limit, offset)
 
