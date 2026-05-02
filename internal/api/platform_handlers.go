@@ -53,7 +53,7 @@ func (s *Server) handleMacOSEnrollmentProfile(w http.ResponseWriter, r *http.Req
 	}
 
 	// Verify enterprise exists
-	if _, err := s.enterpriseRepo.GetByID(r.Context(), enterpriseID); err != nil {
+	if _, err := s.enterpriseService.Get(r.Context(), enterpriseID); err != nil {
 		if errors.Is(err, apperrors.ErrNotFound) {
 			respondError(w, r, http.StatusNotFound, "not_found", "Enterprise not found")
 			return
@@ -270,13 +270,13 @@ func (s *Server) handleWindowsEnrollmentService(w http.ResponseWriter, r *http.R
 	// Create device record BEFORE signing CSR (certificates table has FK to devices)
 	if enterpriseID != uuid.Nil {
 		// Try to find existing device first (re-enrollment)
-		existing, _ := s.deviceRepo.GetByPlatformID(r.Context(), models.PlatformWindows, storedDeviceID)
+		existing, _ := s.deviceService.GetByPlatformID(r.Context(), models.PlatformWindows, storedDeviceID)
 		if existing != nil {
 			deviceID = existing.ID
 			existing.Name = deviceName
 			existing.OSVersion = osVersion
 			existing.Status = models.DeviceStatusEnrolled
-			_ = s.deviceRepo.Update(r.Context(), existing)
+			_ = s.deviceService.UpdateDevice(r.Context(), existing)
 		} else {
 			device := &models.Device{
 				BaseModel:    models.BaseModel{ID: deviceID},
@@ -288,7 +288,7 @@ func (s *Server) handleWindowsEnrollmentService(w http.ResponseWriter, r *http.R
 				Status:       models.DeviceStatusEnrolled,
 				PlatformData: models.JSONB{},
 			}
-			if err := s.deviceRepo.Create(r.Context(), device); err != nil {
+			if err := s.deviceService.Create(r.Context(), device); err != nil {
 				s.logger.Error("failed to create windows device record", "error", err, "device_id", deviceID)
 				respondError(w, r, http.StatusInternalServerError, "device_creation_failed", "Failed to create device record")
 				return
@@ -357,7 +357,7 @@ func (s *Server) handleWindowsEnrollmentService(w http.ResponseWriter, r *http.R
 
 	// Decrement enrollment token uses if one was used
 	if enrollToken != nil {
-		if err := s.enrollmentTokenRepo.DecrementUses(r.Context(), enrollToken.ID); err != nil {
+		if err := s.enrollmentTokenService.DecrementUses(r.Context(), enrollToken.ID); err != nil {
 			s.logger.Warn("failed to decrement enrollment token uses", "error", err, "token_id", enrollToken.ID)
 		}
 		s.logAudit(r, "enrollment_token.use", "enrollment_token", enrollToken.ID, map[string]interface{}{
@@ -491,7 +491,7 @@ func (s *Server) handleAndroidEnrollmentToken(w http.ResponseWriter, r *http.Req
 	}
 
 	// Verify enterprise exists
-	if _, err := s.enterpriseRepo.GetByID(r.Context(), enterpriseID); err != nil {
+	if _, err := s.enterpriseService.Get(r.Context(), enterpriseID); err != nil {
 		if errors.Is(err, apperrors.ErrNotFound) {
 			respondError(w, r, http.StatusNotFound, "not_found", "Enterprise not found")
 			return
@@ -716,10 +716,10 @@ func (s *Server) handleWindowsManagementSync(w http.ResponseWriter, r *http.Requ
 
 	// Update last_seen for the syncing device
 	if deviceID != "" {
-		if device, err := s.deviceRepo.GetByPlatformID(r.Context(), models.PlatformWindows, deviceID); err == nil {
+		if device, err := s.deviceService.GetByPlatformID(r.Context(), models.PlatformWindows, deviceID); err == nil {
 			now := time.Now()
 			device.LastSeen = &now
-			_ = s.deviceRepo.Update(r.Context(), device)
+			_ = s.deviceService.UpdateDevice(r.Context(), device)
 		}
 	}
 

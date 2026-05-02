@@ -54,6 +54,10 @@ func (m *cmdTestDeviceRepo) GetByID(_ context.Context, id uuid.UUID) (*models.De
 	}
 	return nil, fmt.Errorf("not found: %w", apperrors.ErrNotFound)
 }
+func (m *cmdTestDeviceRepo) GetByPlatformID(_ context.Context, _, _ string) (*models.Device, error) {
+	return nil, fmt.Errorf("not found: %w", apperrors.ErrNotFound)
+}
+func (m *cmdTestDeviceRepo) Create(_ context.Context, _ *models.Device) error { return nil }
 func (m *cmdTestDeviceRepo) List(_ context.Context, _ uuid.UUID, _, _ int) ([]*models.Device, int, error) {
 	return m.devices, len(m.devices), nil
 }

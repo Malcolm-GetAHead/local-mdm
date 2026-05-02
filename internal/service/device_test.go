@@ -17,6 +17,13 @@ type mockDeviceRepo struct {
 
 func newMockDeviceRepo() *mockDeviceRepo { return &mockDeviceRepo{devices: map[uuid.UUID]*models.Device{}} }
 
+func (m *mockDeviceRepo) Create(_ context.Context, d *models.Device) error {
+	if d.ID == uuid.Nil {
+		d.ID = uuid.New()
+	}
+	m.devices[d.ID] = d
+	return nil
+}
 func (m *mockDeviceRepo) GetByID(_ context.Context, id uuid.UUID) (*models.Device, error) {
 	if d, ok := m.devices[id]; ok {
 		return d, nil
@@ -34,6 +41,14 @@ func (m *mockDeviceRepo) List(_ context.Context, eid uuid.UUID, limit, offset in
 }
 func (m *mockDeviceRepo) ListFiltered(_ context.Context, _ uuid.UUID, _, _, _, _, _ string, _, _ int) ([]*models.Device, int, error) {
 	return nil, 0, nil
+}
+func (m *mockDeviceRepo) GetByPlatformID(_ context.Context, platform, deviceID string) (*models.Device, error) {
+	for _, d := range m.devices {
+		if d.Platform == platform && d.DeviceID == deviceID {
+			return d, nil
+		}
+	}
+	return nil, fmt.Errorf("device not found")
 }
 func (m *mockDeviceRepo) Update(_ context.Context, d *models.Device) error {
 	m.devices[d.ID] = d

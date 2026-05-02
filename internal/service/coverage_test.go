@@ -245,6 +245,13 @@ func (m *mockEntDeviceRepo) GetByID(_ context.Context, id uuid.UUID) (*models.De
 	}
 	return nil, fmt.Errorf("device not found")
 }
+func (m *mockEntDeviceRepo) GetByPlatformID(_ context.Context, _, _ string) (*models.Device, error) {
+	return nil, fmt.Errorf("device not found")
+}
+func (m *mockEntDeviceRepo) Create(_ context.Context, d *models.Device) error {
+	m.devices[d.ID] = d
+	return nil
+}
 func (m *mockEntDeviceRepo) List(_ context.Context, eid uuid.UUID, _, _ int) ([]*models.Device, int, error) {
 	var out []*models.Device
 	for _, d := range m.devices {

@@ -27,6 +27,13 @@ func (m *mockComplianceDeviceRepo) GetByID(_ context.Context, id uuid.UUID) (*mo
 	}
 	return d, nil
 }
+func (m *mockComplianceDeviceRepo) GetByPlatformID(_ context.Context, _, _ string) (*models.Device, error) {
+	return nil, fmt.Errorf("device not found")
+}
+func (m *mockComplianceDeviceRepo) Create(_ context.Context, d *models.Device) error {
+	m.devices[d.ID] = d
+	return nil
+}
 func (m *mockComplianceDeviceRepo) List(_ context.Context, _ uuid.UUID, _, _ int) ([]*models.Device, int, error) {
 	return nil, 0, nil
 }

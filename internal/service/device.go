@@ -12,7 +12,9 @@ import (
 
 // DeviceRepository is the interface used by DeviceService.
 type DeviceRepository interface {
+	Create(ctx context.Context, device *models.Device) error
 	GetByID(ctx context.Context, id uuid.UUID) (*models.Device, error)
+	GetByPlatformID(ctx context.Context, platform, deviceID string) (*models.Device, error)
 	List(ctx context.Context, enterpriseID uuid.UUID, limit, offset int) ([]*models.Device, int, error)
 	ListFiltered(ctx context.Context, enterpriseID uuid.UUID, platform, status, search string, sortField, sortDir string, limit, offset int) ([]*models.Device, int, error)
 	Update(ctx context.Context, device *models.Device) error
@@ -62,6 +64,21 @@ func (s *DeviceService) List(ctx context.Context, enterpriseID uuid.UUID, limit,
 // ListFiltered returns a filtered, sorted, paginated list of devices.
 func (s *DeviceService) ListFiltered(ctx context.Context, enterpriseID uuid.UUID, platform, status, search string, sortField, sortDir string, limit, offset int) ([]*models.Device, int, error) {
 	return s.deviceRepo.ListFiltered(ctx, enterpriseID, platform, status, search, sortField, sortDir, limit, offset)
+}
+
+// Create creates a new device record.
+func (s *DeviceService) Create(ctx context.Context, device *models.Device) error {
+	return s.deviceRepo.Create(ctx, device)
+}
+
+// GetByPlatformID retrieves a device by platform and platform-specific device ID.
+func (s *DeviceService) GetByPlatformID(ctx context.Context, platform, deviceID string) (*models.Device, error) {
+	return s.deviceRepo.GetByPlatformID(ctx, platform, deviceID)
+}
+
+// UpdateDevice updates a device record directly (for enrollment/sync flows).
+func (s *DeviceService) UpdateDevice(ctx context.Context, device *models.Device) error {
+	return s.deviceRepo.Update(ctx, device)
 }
 
 // Update applies partial updates to a device.
