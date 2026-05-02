@@ -22,7 +22,7 @@ func (s *Server) handleListPolicies(w http.ResponseWriter, r *http.Request) {
 
 	limit, offset := parsePagination(r)
 
-	policies, total, err := s.policyRepo.List(r.Context(), user.EnterpriseID, limit, offset)
+	policies, total, err := s.policyService.List(r.Context(), user.EnterpriseID, limit, offset)
 	if err != nil {
 		s.logger.Error("failed to list policies", "error", err)
 		respondError(w, r, http.StatusInternalServerError, "internal_error", "Failed to list policies")
@@ -96,7 +96,7 @@ func (s *Server) handleGetPolicy(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	policy, err := s.policyRepo.GetByID(r.Context(), id)
+	policy, err := s.policyService.Get(r.Context(), id)
 	if err != nil {
 		if errors.Is(err, apperrors.ErrNotFound) {
 			respondError(w, r, http.StatusNotFound, "not_found", "Policy not found")
@@ -117,7 +117,7 @@ func (s *Server) handleUpdatePolicy(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	policy, err := s.policyRepo.GetByID(r.Context(), id)
+	policy, err := s.policyService.Get(r.Context(), id)
 	if err != nil {
 		if errors.Is(err, apperrors.ErrNotFound) {
 			respondError(w, r, http.StatusNotFound, "not_found", "Policy not found")
@@ -182,7 +182,7 @@ func (s *Server) handleDeletePolicy(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := s.policyRepo.Delete(r.Context(), id); err != nil {
+	if err := s.policyService.Delete(r.Context(), id); err != nil {
 		if errors.Is(err, apperrors.ErrNotFound) {
 			respondError(w, r, http.StatusNotFound, "not_found", "Policy not found")
 			return
@@ -218,7 +218,7 @@ func (s *Server) handleAssignPolicy(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Verify policy exists
-	if _, err := s.policyRepo.GetByID(r.Context(), policyID); err != nil {
+	if _, err := s.policyService.Get(r.Context(), policyID); err != nil {
 		if errors.Is(err, apperrors.ErrNotFound) {
 			respondError(w, r, http.StatusNotFound, "not_found", "Policy not found")
 			return
@@ -229,7 +229,7 @@ func (s *Server) handleAssignPolicy(w http.ResponseWriter, r *http.Request) {
 	}
 
 	for _, deviceID := range req.DeviceIDs {
-		if err := s.policyRepo.AssignToDevice(r.Context(), deviceID, policyID); err != nil {
+		if err := s.policyService.AssignToDevice(r.Context(), deviceID, policyID); err != nil {
 			s.logger.Error("failed to assign policy", "error", err, "policy_id", policyID, "device_id", deviceID)
 			respondError(w, r, http.StatusInternalServerError, "internal_error", "Failed to assign policy")
 			return
@@ -260,7 +260,7 @@ func (s *Server) handleUnassignPolicy(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := s.policyRepo.UnassignFromDevice(r.Context(), deviceID, policyID); err != nil {
+	if err := s.policyService.UnassignFromDevice(r.Context(), deviceID, policyID); err != nil {
 		s.logger.Error("failed to unassign policy", "error", err, "policy_id", policyID, "device_id", deviceID)
 		respondError(w, r, http.StatusInternalServerError, "internal_error", "Failed to unassign policy")
 		return
@@ -340,7 +340,7 @@ func (s *Server) handleTranslatePolicy(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	policy, err := s.policyRepo.GetByID(r.Context(), id)
+	policy, err := s.policyService.Get(r.Context(), id)
 	if err != nil {
 		if errors.Is(err, apperrors.ErrNotFound) {
 			respondError(w, r, http.StatusNotFound, "not_found", "Policy not found")
@@ -373,7 +373,7 @@ func (s *Server) handleListPolicyTemplates(w http.ResponseWriter, r *http.Reques
 	}
 
 	limit, offset := parsePagination(r)
-	templates, total, err := s.policyRepo.ListTemplates(r.Context(), user.EnterpriseID, limit, offset)
+	templates, total, err := s.policyService.ListTemplates(r.Context(), user.EnterpriseID, limit, offset)
 	if err != nil {
 		respondError(w, r, http.StatusInternalServerError, "internal_error", "Failed to list templates")
 		return

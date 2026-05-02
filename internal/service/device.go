@@ -14,6 +14,7 @@ import (
 type DeviceRepository interface {
 	GetByID(ctx context.Context, id uuid.UUID) (*models.Device, error)
 	List(ctx context.Context, enterpriseID uuid.UUID, limit, offset int) ([]*models.Device, int, error)
+	ListFiltered(ctx context.Context, enterpriseID uuid.UUID, platform, status, search string, sortField, sortDir string, limit, offset int) ([]*models.Device, int, error)
 	Update(ctx context.Context, device *models.Device) error
 	Delete(ctx context.Context, id uuid.UUID) error
 }
@@ -56,6 +57,11 @@ func (s *DeviceService) Get(ctx context.Context, id uuid.UUID) (*models.Device, 
 // List returns devices for an enterprise.
 func (s *DeviceService) List(ctx context.Context, enterpriseID uuid.UUID, limit, offset int) ([]*models.Device, int, error) {
 	return s.deviceRepo.List(ctx, enterpriseID, limit, offset)
+}
+
+// ListFiltered returns a filtered, sorted, paginated list of devices.
+func (s *DeviceService) ListFiltered(ctx context.Context, enterpriseID uuid.UUID, platform, status, search string, sortField, sortDir string, limit, offset int) ([]*models.Device, int, error) {
+	return s.deviceRepo.ListFiltered(ctx, enterpriseID, platform, status, search, sortField, sortDir, limit, offset)
 }
 
 // Update applies partial updates to a device.

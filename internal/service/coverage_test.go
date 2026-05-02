@@ -262,6 +262,13 @@ func (m *mockEntDeviceRepo) Delete(_ context.Context, id uuid.UUID) error {
 	delete(m.devices, id)
 	return nil
 }
+func (m *mockEntDeviceRepo) ListFiltered(_ context.Context, _ uuid.UUID, _, _, _, _, _ string, _, _ int) ([]*models.Device, int, error) {
+	var out []*models.Device
+	for _, d := range m.devices {
+		out = append(out, d)
+	}
+	return out, len(out), nil
+}
 
 // ============================================================
 // 6. Pass-through methods

@@ -68,6 +68,17 @@ func (m *mockPolicyRepo) ListByIDs(_ context.Context, ids []uuid.UUID) ([]*model
 	}
 	return result, nil
 }
+func (m *mockPolicyRepo) ListTemplates(_ context.Context, _ uuid.UUID, _, _ int) ([]*models.Policy, int, error) {
+	var templates []*models.Policy
+	for _, p := range m.policies {
+		if p.IsTemplate {
+			templates = append(templates, p)
+		}
+	}
+	return templates, len(templates), nil
+}
+func (m *mockPolicyRepo) AssignToDevice(_ context.Context, _, _ uuid.UUID) error   { return nil }
+func (m *mockPolicyRepo) UnassignFromDevice(_ context.Context, _, _ uuid.UUID) error { return nil }
 
 type mockVersionRepo struct {
 	versions map[uuid.UUID][]*models.PolicyVersion

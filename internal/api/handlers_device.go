@@ -207,7 +207,7 @@ func (s *Server) handleGetDeviceEffectivePolicies(w http.ResponseWriter, r *http
 		respondError(w, r, http.StatusBadRequest, "invalid_id", "Invalid device ID")
 		return
 	}
-	device, err := s.deviceRepo.GetByID(r.Context(), deviceID)
+	device, err := s.deviceService.Get(r.Context(), deviceID)
 	if err != nil {
 		if errors.Is(err, apperrors.ErrNotFound) {
 			respondError(w, r, http.StatusNotFound, "not_found", "Device not found")

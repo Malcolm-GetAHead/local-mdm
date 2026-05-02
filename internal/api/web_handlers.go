@@ -81,7 +81,7 @@ func (s *Server) handleDashboardHome(w http.ResponseWriter, r *http.Request) {
 	sess := getSession(r)
 	ctx := r.Context()
 
-	devices, total, _ := s.deviceRepo.List(ctx, sess.EnterpriseID, 1000, 0)
+	devices, total, _ := s.deviceService.List(ctx, sess.EnterpriseID, 1000, 0)
 
 	enrolled := 0
 	platformCounts := map[string]int{}
@@ -101,7 +101,7 @@ func (s *Server) handleDashboardHome(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	policies, _, _ := s.policyRepo.List(ctx, sess.EnterpriseID, 1000, 0)
+	policies, _, _ := s.policyService.List(ctx, sess.EnterpriseID, 1000, 0)
 	activePolicies := 0
 	for _, p := range policies {
 		if p.IsActive && !p.IsTemplate {
@@ -140,7 +140,7 @@ func (s *Server) handleDashboardHome(w http.ResponseWriter, r *http.Request) {
 		{"Unknown", unknown, "#ca8a04"},
 	})
 
-	auditLogs, _, _ := s.auditLogRepo.Search(ctx, sess.EnterpriseID, "", "", "", 5, 0)
+	auditLogs, _, _ := s.auditLogService.Search(ctx, sess.EnterpriseID, "", "", "", 5, 0)
 
 	// Devices needing attention: non-compliant or not seen in 7 days
 	type attentionItem struct {
@@ -203,10 +203,10 @@ func (s *Server) handleWebDeviceList(w http.ResponseWriter, r *http.Request) {
 	}
 	perPage := 50
 
-	devices, total, _ := s.deviceRepo.ListFiltered(ctx, sess.EnterpriseID, platform, status, query, sortField, sortDir, perPage, (page-1)*perPage)
+	devices, total, _ := s.deviceService.ListFiltered(ctx, sess.EnterpriseID, platform, status, query, sortField, sortDir, perPage, (page-1)*perPage)
 
 	// Get pending enrollment count (reuse ListFiltered to avoid new interface method)
-	_, pendingCount, _ := s.deviceRepo.ListFiltered(ctx, sess.EnterpriseID, "", "pending", "", "name", "asc", 1, 0)
+	_, pendingCount, _ := s.deviceService.ListFiltered(ctx, sess.EnterpriseID, "", "pending", "", "name", "asc", 1, 0)
 
 	totalPages := (total + perPage - 1) / perPage
 
@@ -239,7 +239,7 @@ func (s *Server) handleWebDeviceDetail(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	device, err := s.deviceRepo.GetByID(ctx, id)
+	device, err := s.deviceService.Get(ctx, id)
 	if err != nil {
 		http.Error(w, "Device not found", http.StatusNotFound)
 		return
@@ -257,7 +257,7 @@ func (s *Server) handleWebDeviceDetail(w http.ResponseWriter, r *http.Request) {
 	groups, _ := s.groupService.GetDeviceGroups(ctx, id)
 
 	// Commands
-	commands, _, _ := s.cmdRepo.ListByDevice(ctx, id, 20, 0)
+	commands, _, _ := s.commandService.ListCommands(ctx, id, 20, 0)
 
 	// Assigned policies — all effective (direct + group + enterprise)
 	effectiveAssignments, _ := s.groupService.GetEffectivePolicies(ctx, id, device.EnterpriseID)
@@ -266,7 +266,7 @@ func (s *Server) handleWebDeviceDetail(w http.ResponseWriter, r *http.Request) {
 		policyIDs = append(policyIDs, a.PolicyID)
 	}
 	policiesByID := map[uuid.UUID]*models.Policy{}
-	if batchPolicies, err := s.policyRepo.ListByIDs(ctx, policyIDs); err == nil {
+	if batchPolicies, err := s.policyService.ListByIDs(ctx, policyIDs); err == nil {
 		for _, p := range batchPolicies {
 			policiesByID[p.ID] = p
 		}
@@ -428,7 +428,7 @@ func (s *Server) handleWebDeviceCheckin(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	device, err := s.deviceRepo.GetByID(r.Context(), id)
+	device, err := s.deviceService.Get(r.Context(), id)
 	if err != nil {
 		s.renderFragment(w, s.webTemplates["device_detail"], "action_result", map[string]interface{}{
 			"Success": false, "Message": "Device not found",
@@ -506,7 +506,7 @@ func buildComplianceRows(ctx context.Context, results []*models.ComplianceResult
 		policyIDs = append(policyIDs, id)
 	}
 	policiesByID := map[uuid.UUID]*models.Policy{}
-	if batchPolicies, err := s.policyRepo.ListByIDs(ctx, policyIDs); err == nil {
+	if batchPolicies, err := s.policyService.ListByIDs(ctx, policyIDs); err == nil {
 		for _, p := range batchPolicies {
 			policiesByID[p.ID] = p
 		}

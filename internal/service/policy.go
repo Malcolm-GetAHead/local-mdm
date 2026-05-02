@@ -20,6 +20,9 @@ type PolicyRepository interface {
 	Update(ctx context.Context, policy *models.Policy) error
 	Delete(ctx context.Context, id uuid.UUID) error
 	ListByIDs(ctx context.Context, ids []uuid.UUID) ([]*models.Policy, error)
+	ListTemplates(ctx context.Context, enterpriseID uuid.UUID, limit, offset int) ([]*models.Policy, int, error)
+	AssignToDevice(ctx context.Context, deviceID, policyID uuid.UUID) error
+	UnassignFromDevice(ctx context.Context, deviceID, policyID uuid.UUID) error
 }
 
 // PolicyVersionRepository stores policy version snapshots.
@@ -133,6 +136,41 @@ func (s *PolicyService) Rollback(ctx context.Context, policyID uuid.UUID, versio
 // ListVersions returns version history for a policy.
 func (s *PolicyService) ListVersions(ctx context.Context, policyID uuid.UUID, limit, offset int) ([]*models.PolicyVersion, int, error) {
 	return s.versionRepo.ListByPolicy(ctx, policyID, limit, offset)
+}
+
+// Get retrieves a policy by ID.
+func (s *PolicyService) Get(ctx context.Context, id uuid.UUID) (*models.Policy, error) {
+	return s.policyRepo.GetByID(ctx, id)
+}
+
+// List returns policies for an enterprise.
+func (s *PolicyService) List(ctx context.Context, enterpriseID uuid.UUID, limit, offset int) ([]*models.Policy, int, error) {
+	return s.policyRepo.List(ctx, enterpriseID, limit, offset)
+}
+
+// Delete deletes a policy.
+func (s *PolicyService) Delete(ctx context.Context, id uuid.UUID) error {
+	return s.policyRepo.Delete(ctx, id)
+}
+
+// ListByIDs returns policies matching the given IDs.
+func (s *PolicyService) ListByIDs(ctx context.Context, ids []uuid.UUID) ([]*models.Policy, error) {
+	return s.policyRepo.ListByIDs(ctx, ids)
+}
+
+// ListTemplates returns policy templates for an enterprise.
+func (s *PolicyService) ListTemplates(ctx context.Context, enterpriseID uuid.UUID, limit, offset int) ([]*models.Policy, int, error) {
+	return s.policyRepo.ListTemplates(ctx, enterpriseID, limit, offset)
+}
+
+// AssignToDevice assigns a policy directly to a device.
+func (s *PolicyService) AssignToDevice(ctx context.Context, deviceID, policyID uuid.UUID) error {
+	return s.policyRepo.AssignToDevice(ctx, deviceID, policyID)
+}
+
+// UnassignFromDevice removes a direct policy assignment from a device.
+func (s *PolicyService) UnassignFromDevice(ctx context.Context, deviceID, policyID uuid.UUID) error {
+	return s.policyRepo.UnassignFromDevice(ctx, deviceID, policyID)
 }
 
 // CloneTemplate creates a new policy from a template.

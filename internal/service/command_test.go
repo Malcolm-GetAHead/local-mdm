@@ -57,6 +57,9 @@ func (m *cmdTestDeviceRepo) GetByID(_ context.Context, id uuid.UUID) (*models.De
 func (m *cmdTestDeviceRepo) List(_ context.Context, _ uuid.UUID, _, _ int) ([]*models.Device, int, error) {
 	return m.devices, len(m.devices), nil
 }
+func (m *cmdTestDeviceRepo) ListFiltered(_ context.Context, _ uuid.UUID, _, _, _, _, _ string, _, _ int) ([]*models.Device, int, error) {
+	return m.devices, len(m.devices), nil
+}
 func (m *cmdTestDeviceRepo) Update(_ context.Context, _ *models.Device) error { return nil }
 func (m *cmdTestDeviceRepo) Delete(_ context.Context, _ uuid.UUID) error      { return nil }
 

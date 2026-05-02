@@ -27,7 +27,7 @@ func (s *Server) handleWebPolicyList(w http.ResponseWriter, r *http.Request) {
 		sortDir = "asc"
 	}
 
-	policies, _, _ := s.policyRepo.List(ctx, sess.EnterpriseID, 1000, 0)
+	policies, _, _ := s.policyService.List(ctx, sess.EnterpriseID, 1000, 0)
 
 	if platform != "" {
 		var filtered []*models.Policy
@@ -106,7 +106,7 @@ func (s *Server) handleWebPolicyCreate(w http.ResponseWriter, r *http.Request) {
 		IsActive:     r.FormValue("is_active") == "on",
 	}
 
-	if err := s.policyRepo.Create(ctx, policy); err != nil {
+	if err := s.policyService.Create(ctx, policy, sess.UserID.String()); err != nil {
 		s.renderPage(w, r, "policy_form", map[string]interface{}{
 			"ActiveNav":      "policies",
 			"IsEdit":         false,
@@ -130,7 +130,7 @@ func (s *Server) handleWebPolicyEdit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	policy, err := s.policyRepo.GetByID(ctx, id)
+	policy, err := s.policyService.Get(ctx, id)
 	if err != nil {
 		http.Error(w, "Policy not found", http.StatusNotFound)
 		return
@@ -155,6 +155,7 @@ func (s *Server) handleWebPolicyEdit(w http.ResponseWriter, r *http.Request) {
 
 // handleWebPolicyUpdate handles POST to update an existing policy.
 func (s *Server) handleWebPolicyUpdate(w http.ResponseWriter, r *http.Request) {
+	sess := getSession(r)
 	ctx := r.Context()
 	id, err := uuid.Parse(mux.Vars(r)["id"])
 	if err != nil {
@@ -162,7 +163,7 @@ func (s *Server) handleWebPolicyUpdate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	policy, err := s.policyRepo.GetByID(ctx, id)
+	policy, err := s.policyService.Get(ctx, id)
 	if err != nil {
 		http.Error(w, "Policy not found", http.StatusNotFound)
 		return
@@ -194,7 +195,7 @@ func (s *Server) handleWebPolicyUpdate(w http.ResponseWriter, r *http.Request) {
 	policy.PolicyConfig = config
 	policy.IsActive = r.FormValue("is_active") == "on"
 
-	if err := s.policyRepo.Update(ctx, policy); err != nil {
+	if err := s.policyService.Update(ctx, policy, sess.UserID.String()); err != nil {
 		s.renderPage(w, r, "policy_form", map[string]interface{}{
 			"ActiveNav":      "policies",
 			"IsEdit":         true,
@@ -410,7 +411,7 @@ func (s *Server) handleWebAuditLog(w http.ResponseWriter, r *http.Request) {
 	}
 	perPage := 50
 
-	logs, total, _ := s.auditLogRepo.Search(ctx, sess.EnterpriseID, action, startDate, endDate, 1000, 0)
+	logs, total, _ := s.auditLogService.Search(ctx, sess.EnterpriseID, action, startDate, endDate, 1000, 0)
 
 	// Batch-resolve user emails (single pass instead of O(n) queries)
 	userIDs := make(map[uuid.UUID]bool)
@@ -580,7 +581,7 @@ func (s *Server) handleWebGroupDetail(w http.ResponseWriter, r *http.Request) {
 		memberSet[m.ID] = true
 	}
 
-	allDevices, _, _ := s.deviceRepo.List(ctx, sess.EnterpriseID, 1000, 0)
+	allDevices, _, _ := s.deviceService.List(ctx, sess.EnterpriseID, 1000, 0)
 
 	type deviceRow struct {
 		ID       string
@@ -671,7 +672,7 @@ func (s *Server) renderGroupMemberList(w http.ResponseWriter, r *http.Request, g
 		memberSet[m.ID] = true
 	}
 
-	allDevices, _, _ := s.deviceRepo.List(ctx, sess.EnterpriseID, 1000, 0)
+	allDevices, _, _ := s.deviceService.List(ctx, sess.EnterpriseID, 1000, 0)
 
 	type deviceRow struct {
 		ID       string
@@ -743,7 +744,7 @@ func (s *Server) handleWebPolicyDelete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := s.policyRepo.Delete(ctx, id); err != nil {
+	if err := s.policyService.Delete(ctx, id); err != nil {
 		http.Error(w, "Failed to delete policy", http.StatusInternalServerError)
 		return
 	}
@@ -758,14 +759,14 @@ func (s *Server) handleWebPolicyAssignPage(w http.ResponseWriter, r *http.Reques
 	ctx := r.Context()
 	id, _ := uuid.Parse(mux.Vars(r)["id"])
 
-	policy, err := s.policyRepo.GetByID(ctx, id)
+	policy, err := s.policyService.Get(ctx, id)
 	if err != nil {
 		http.Error(w, "Policy not found", http.StatusNotFound)
 		return
 	}
 
 	groups, _, _ := s.groupService.ListGroups(ctx, sess.EnterpriseID, 100, 0)
-	devices, _, _ := s.deviceRepo.List(ctx, sess.EnterpriseID, 1000, 0)
+	devices, _, _ := s.deviceService.List(ctx, sess.EnterpriseID, 1000, 0)
 	assignments, _ := s.groupService.ListAssignmentsByPolicy(ctx, id)
 
 	// Build assigned set to filter out
@@ -785,7 +786,7 @@ func (s *Server) handleWebPolicyAssignPage(w http.ResponseWriter, r *http.Reques
 				name = g.Name
 			}
 		} else if a.TargetType == "device" {
-			if d, err := s.deviceRepo.GetByID(ctx, a.TargetID); err == nil {
+			if d, err := s.deviceService.Get(ctx, a.TargetID); err == nil {
 				name = d.Name
 			}
 		} else if a.TargetType == "enterprise" {
@@ -896,7 +897,7 @@ func (s *Server) handleWebEnrollmentTokens(w http.ResponseWriter, r *http.Reques
 	}
 	perPage := 50
 
-	tokens, total, _ := s.enrollmentTokenRepo.List(r.Context(), sess.EnterpriseID, perPage, (page-1)*perPage)
+	tokens, total, _ := s.enrollmentTokenService.List(r.Context(), sess.EnterpriseID, perPage, (page-1)*perPage)
 	totalPages := (total + perPage - 1) / perPage
 
 	// Build macOS enrollment base URL for the template
@@ -959,7 +960,7 @@ func (s *Server) handleWebEnrollmentTokenCreate(w http.ResponseWriter, r *http.R
 		}
 	}
 
-	if err := s.enrollmentTokenRepo.Create(r.Context(), token); err != nil {
+	if err := s.enrollmentTokenService.Create(r.Context(), token); err != nil {
 		http.Redirect(w, r, "/dashboard/enrollment-tokens", http.StatusFound)
 		return
 	}
@@ -979,7 +980,7 @@ func (s *Server) handleWebEnrollmentTokenCreate(w http.ResponseWriter, r *http.R
 	macosBaseURL := fmt.Sprintf("%s://%s/api/v1/macos/enroll/%s?token=", scheme, r.Host, sess.EnterpriseID)
 
 	if r.Header.Get("HX-Request") == "true" {
-		tokens, total, _ := s.enrollmentTokenRepo.List(r.Context(), sess.EnterpriseID, 50, 0)
+		tokens, total, _ := s.enrollmentTokenService.List(r.Context(), sess.EnterpriseID, 50, 0)
 		data := map[string]interface{}{
 			"ActiveNav":    "enrollment-tokens",
 			"Tokens":       toTokenViews(tokens),
@@ -1005,7 +1006,7 @@ func (s *Server) handleWebEnrollmentTokenRevoke(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	if err := s.enrollmentTokenRepo.Revoke(r.Context(), id); err != nil {
+	if err := s.enrollmentTokenService.Revoke(r.Context(), id); err != nil {
 		http.Redirect(w, r, "/dashboard/enrollment-tokens", http.StatusFound)
 		return
 	}
