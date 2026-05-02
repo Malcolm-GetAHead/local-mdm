@@ -91,6 +91,26 @@ func (s *DeviceService) Delete(ctx context.Context, id uuid.UUID) error {
 	if err != nil {
 		return err
 	}
+
+	// For macOS devices, send RemoveProfile to unenroll from MDM before soft-deleting.
+	// The enrollment profile has CheckOutWhenRemoved=true, so the device will send a
+	// CheckOut to NanoMDM on next check-in, completing the unenrollment.
+	if device.Platform == models.PlatformMacOS {
+		profileID := fmt.Sprintf("com.localmdm.%s", device.EnterpriseID.String())
+		cmd := &models.DeviceCommand{
+			DeviceID:    device.ID,
+			CommandType: models.CommandTypeRemoveProfile,
+			CommandData: models.JSONB{"identifier": profileID},
+			Status:      models.CommandStatusPending,
+		}
+		if err := s.cmdRepo.Create(ctx, cmd); err != nil {
+			s.logger.Warn("failed to create remove-profile command, proceeding with delete",
+				"error", err, "device_id", id)
+		} else {
+			s.dispatcher.Enqueue(device, cmd)
+		}
+	}
+
 	if err := s.deviceRepo.Delete(ctx, id); err != nil {
 		return err
 	}
