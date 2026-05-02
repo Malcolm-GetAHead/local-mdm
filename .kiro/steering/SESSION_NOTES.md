@@ -40,6 +40,8 @@
 - **Verify CSP/protocol values on real devices, not just docs.** MS doc labels for BitLocker DeviceEncryptionStatus bitmask didn't match observed behavior. Three commits were wasted guessing from docs before SSH'ing into the VM and testing each state. Always test on the device first.
 - **Check if the running container has your code.** After pushing code, the Docker container still runs the old image until rebuilt. If something "doesn't work" after a code change, check `docker ps` creation time before investigating.
 - **When a mock-based test passes but the feature doesn't work, write an integration test.** The device ID resolution passed all mock tests but failed in production because `deviceRepository.Update()` didn't include `device_id` in the SQL UPDATE. The integration test caught it instantly.
+- **When fixing a bug, check the full lifecycle — not just the broken step.** AUT-11 fixed re-enrollment (Create) but the owner discovered that Delete didn't tell NanoMDM to unenroll the device. The fix was incomplete because it only looked at one direction of the lifecycle. Always trace: what creates this state? What consumes it? What cleans it up?
+- **Rate limiters reset on container restart.** If API calls start returning 401/429 after multiple test iterations, restart the localmdm container. The in-memory rate limiter doesn't persist.
 
 ### Code Quality
 
@@ -75,6 +77,8 @@
 - **If you discover mid-implementation that the design is wrong, revert and re-approach.** Don't patch forward. `git revert` + clean implementation is faster and less error-prone than layering fixes on a flawed foundation. The owner values honest pivots over sunk-cost persistence.
 - **The owner context-switches during sessions.** Architecture brainstorming may happen mid-implementation. Acknowledge the idea, finish the current task, then address it. Don't interrupt code work to write docs.
 - **The owner has domain knowledge they don't always share upfront.** If they mention a specific tool or project (Fleet DM, dev-deployer), they're telling you to look at it. Ask for details immediately rather than discovering them later.
+- **The owner will ask you to fix retro findings in the same session.** When you list shortcuts or gaps in the retrospective, expect "can you fix that?" for each one. Don't list things you aren't prepared to address immediately. If something is genuinely out of scope, say so explicitly with a reason.
+- **The owner tests your work live while you're still in session.** They'll delete a device from the dashboard, reboot a VM, and tell you it didn't work. Be ready to debug against the running system, not just against test output. Docker rebuild + curl + SSH into VMs is part of the workflow, not a nice-to-have.
 
 ### Process
 
