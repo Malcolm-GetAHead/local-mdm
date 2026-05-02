@@ -94,7 +94,7 @@
 - **Enrollment requires tokens (AUT-01)** — both Windows and macOS enrollment require a valid enrollment token. Create tokens via dashboard or API. macOS uses_remaining decrements at SCEP certificate issuance, not profile download. VM re-enrollment after snapshot restore requires a fresh token.
 - **CRL is static** — served from a file generated once. Cert revocations won't be reflected until CRL regeneration is implemented.
 - **NanoMDM config uses host IP** — `configs/config.docker.yaml` has `nanomdm_url` with env var override (`NANOMDM_URL`), but enrollment profiles use the host IP which must be reachable from VMs.
-- **macOS webhook enterprise ID is hardcoded** — Authenticate handler uses configurable `default_enterprise_id`. Multi-tenant requires passing enterprise ID through the enrollment flow.
+- **macOS device delete sends RemoveProfile** — deleting a macOS device sends a `RemoveProfile` command to NanoMDM before soft-deleting. The device unenrolls on next check-in. If the device is offline, the command stays queued. The `remove_profile` command record stays in `sent` status (not `completed`) because the device is soft-deleted before the Acknowledge arrives.
 - **Container rebuilds regenerate the CA unless certs are volume-mounted.** Without the `./internal/api/certs:/app/certs` mount, every `docker compose build` creates a new CA, breaking all enrolled devices.
 
 ## Project-Specific Knowledge
@@ -122,3 +122,4 @@
 | AUT-00 | ✅ Complete | Test enterprise isolation, per-test enterprise pattern |
 | AUT-01 | ✅ Complete | Enrollment token system |
 | AUT-10 | ✅ Complete | HTTP client timeouts, context propagation, ChallengeStore/ValidateToken ctx params |
+| AUT-11 | ✅ Complete | Device re-enrollment after soft-delete, defaultEnterpriseID removed, RemoveProfile on delete, NULL scan fix |

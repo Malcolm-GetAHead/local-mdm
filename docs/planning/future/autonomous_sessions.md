@@ -1223,7 +1223,8 @@ When complete, provide a summary and verification checklist.
 ## Session 11: Device Re-enrollment & Soft-Delete Fix
 
 **ID**: `AUT-11`
-**Effort**: ~2 hours
+**Status**: COMPLETE
+**Effort**: ~2 hours (actual: ~3 hours including follow-up fixes for NULL scan, RemoveProfile-on-delete, real device testing)
 **Source**: Code audit (2026-04-30) — unique constraint blocks re-enrollment of deleted devices
 **Branch**: `feature/aut-11-reenrollment-fix`
 **Depends on**: None
@@ -1299,10 +1300,17 @@ When complete, provide a summary and verification checklist.
 ```
 
 ### Deliverables
-- Device repository handles re-enrollment of soft-deleted devices
-- macOS webhook uses correct enterprise for deleted device re-authentication
-- Integration tests covering both re-enrollment scenarios
-- DATABASE.md updated
+- Device repository handles re-enrollment of soft-deleted devices (unique constraint → restore)
+- `GetByPlatformIDIncludeDeleted` added to DeviceRepository interface
+- macOS webhook uses correct enterprise for deleted device re-authentication; `defaultEnterpriseID` removed
+- Unknown devices (no record active or deleted) rejected with warning log
+- NULL column scan fix: `COALESCE` on nullable VARCHAR columns via shared `deviceSelectColumns` constant
+- `DeviceService.Delete` sends `RemoveProfile` to NanoMDM for macOS devices before soft-deleting
+- `RemoveProfile` added to command dispatcher's macOS switch
+- Integration tests: re-enrollment after soft-delete, duplicate active rejection, multi-enterprise UDID, `GetByPlatformIDIncludeDeleted`
+- E2E test: full re-enrollment lifecycle (create → delete → re-enroll → verify UUID preserved)
+- DATABASE.md: soft-delete re-enrollment behavior, Delete vs Unenroll flows documented
+- Real device verified: delete from dashboard → VM reboot → RemoveProfile delivered → device unenrolled
 
 ---
 
@@ -1323,7 +1331,7 @@ AUT-07  (A11y + i18n)            — independent, screenshot gate per template
 AUT-08  (Docs + OTel)            — investigation step then autonomous
 AUT-09  (Service Consolidation)  — run BEFORE feature sessions (reduces merge conflicts)
 AUT-10  (HTTP Timeouts)          — complete ✅
-AUT-11  (Re-enrollment Fix)      — independent, fully autonomous
+AUT-11  (Re-enrollment Fix)      — complete ✅
 ```
 
 Sessions marked "design-first" will stop after Phase 1 and wait for owner review.
@@ -1335,7 +1343,7 @@ Sessions marked "autonomous" can run start-to-finish without human interaction.
 0. **AUT-00** (Test Enterprise Isolation) ✅
 1. **AUT-01** (Enrollment Tokens) ✅
 2. **AUT-10** (HTTP Timeouts) ✅
-3. **AUT-11** (Re-enrollment Fix) — fully autonomous, closes multi-tenant gap
+3. **AUT-11** (Re-enrollment Fix) ✅
 4. **AUT-09** (Service Consolidation) — autonomous, clean up before features
 5. **AUT-06a** (Security Audit + CI) — autonomous, low risk
 6. **AUT-06b** (Compliance Reports) — autonomous, moderate risk
