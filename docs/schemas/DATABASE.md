@@ -184,6 +184,30 @@ The macOS Authenticate webhook does **not** use a default enterprise fallback. W
 - It checks for a soft-deleted record to determine the correct enterprise.
 - If no record exists at all (active or deleted), the device is rejected with a warning log.
 
+**Delete vs Unenroll — Device Removal Flows**:
+
+There are two distinct admin actions for removing a device from management:
+
+| Action | Intent | Dashboard behavior | MDM behavior | Status |
+|--------|--------|-------------------|--------------|--------|
+| **Delete** | "Remove from my view now" | Device disappears immediately (soft-delete) | Best-effort `RemoveProfile` sent to NanoMDM | `deleted_at` set |
+| **Unenroll** (future) | "Cleanly remove from management" | Device stays visible, status updates in real-time | `RemoveProfile` sent; waits for `CheckOut` confirmation | `enrolled` → `unenrolling` → `unenrolled` |
+
+**Delete flow** (implemented):
+1. `DeviceService.Delete` sends a `RemoveProfile` command for the enrollment profile (`com.localmdm.<enterprise_id>`) via NanoMDM.
+2. The device record is soft-deleted immediately — the admin sees it disappear.
+3. On the device's next check-in, NanoMDM delivers the `RemoveProfile` command.
+4. The device removes the MDM profile. Because the enrollment profile has `CheckOutWhenRemoved=true`, the device sends a `CheckOut` to NanoMDM, completing the unenrollment.
+5. If the device is offline or unreachable, the command stays queued in NanoMDM indefinitely. The device is already hidden from the dashboard.
+
+**Unenroll flow** (future — not yet implemented):
+1. Send `RemoveProfile` without soft-deleting. Set status to `unenrolling`.
+2. Device stays visible in the dashboard with `unenrolling` status.
+3. On `CheckOut` webhook, status changes to `unenrolled`.
+4. Admin sees the transition and has confirmation the device is cleanly removed.
+
+**Re-enrollment after either flow**: If a deleted or unenrolled device re-enrolls (new SCEP cert + Authenticate), the soft-deleted record is restored with the original UUID, preserving the audit trail.
+
 ### policies
 
 Management policies that can be applied to devices.
