@@ -14,7 +14,7 @@ import (
 func (s *Server) handleListEnterprises(w http.ResponseWriter, r *http.Request) {
 	limit, offset := parsePagination(r)
 
-	enterprises, total, err := s.enterpriseRepo.List(r.Context(), limit, offset)
+	enterprises, total, err := s.enterpriseService.List(r.Context(), limit, offset)
 	if err != nil {
 		s.logger.Error("failed to list enterprises", "error", err)
 		respondError(w, r, http.StatusInternalServerError, "internal_error", "Failed to list enterprises")
@@ -50,7 +50,7 @@ func (s *Server) handleCreateEnterprise(w http.ResponseWriter, r *http.Request) 
 		Settings: req.Settings,
 	}
 
-	if err := s.enterpriseRepo.Create(r.Context(), enterprise); err != nil {
+	if err := s.enterpriseService.Create(r.Context(), enterprise); err != nil {
 		if isDuplicateError(err) {
 			respondError(w, r, http.StatusConflict, "conflict", "Enterprise with this slug already exists")
 			return
@@ -75,7 +75,7 @@ func (s *Server) handleGetEnterprise(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	enterprise, err := s.enterpriseRepo.GetByID(r.Context(), id)
+	enterprise, err := s.enterpriseService.Get(r.Context(), id)
 	if err != nil {
 		if errors.Is(err, apperrors.ErrNotFound) {
 			respondError(w, r, http.StatusNotFound, "not_found", "Enterprise not found")
@@ -96,7 +96,7 @@ func (s *Server) handleUpdateEnterprise(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	enterprise, err := s.enterpriseRepo.GetByID(r.Context(), id)
+	enterprise, err := s.enterpriseService.Get(r.Context(), id)
 	if err != nil {
 		if errors.Is(err, apperrors.ErrNotFound) {
 			respondError(w, r, http.StatusNotFound, "not_found", "Enterprise not found")
@@ -127,7 +127,7 @@ func (s *Server) handleUpdateEnterprise(w http.ResponseWriter, r *http.Request) 
 		enterprise.Settings = *req.Settings
 	}
 
-	if err := s.enterpriseRepo.Update(r.Context(), enterprise); err != nil {
+	if err := s.enterpriseService.Update(r.Context(), enterprise); err != nil {
 		s.logger.Error("failed to update enterprise", "error", err, "id", id)
 		respondError(w, r, http.StatusInternalServerError, "internal_error", "Failed to update enterprise")
 		return
@@ -147,7 +147,7 @@ func (s *Server) handleDeleteEnterprise(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	if err := s.enterpriseRepo.Delete(r.Context(), id); err != nil {
+	if err := s.enterpriseService.Delete(r.Context(), id); err != nil {
 		if errors.Is(err, apperrors.ErrNotFound) {
 			respondError(w, r, http.StatusNotFound, "not_found", "Enterprise not found")
 			return

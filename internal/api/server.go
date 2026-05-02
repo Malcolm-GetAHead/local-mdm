@@ -84,6 +84,10 @@ type Server struct {
 	policyVersionRepo repository.PolicyVersionRepository
 	groupService     *service.GroupService
 	complianceService *service.ComplianceService
+	enterpriseService *service.EnterpriseService
+	commandService    *service.CommandService
+	enrollmentTokenService *service.EnrollmentTokenService
+	auditLogService   *service.AuditLogService
 	eventBus              *service.EventBus
 	cleanupCancel         context.CancelFunc
 	webTemplates          map[string]*template.Template
@@ -130,6 +134,7 @@ func New(cfg *config.Config, database *db.DB, logger *slog.Logger) (*Server, err
 		return nil, fmt.Errorf("failed to create enterprise repository: %w", err)
 	}
 	s.enterpriseRepo = enterpriseRepo
+	s.enterpriseService = service.NewEnterpriseService(enterpriseRepo, logger)
 
 	policyRepo, err := repository.NewPolicyRepository(database.Writer, database.Reader)
 	if err != nil {
@@ -166,6 +171,10 @@ func New(cfg *config.Config, database *db.DB, logger *slog.Logger) (*Server, err
 		return nil, fmt.Errorf("failed to create app repository: %w", err)
 	}
 	s.appRepo = appRepo
+
+	// Initialize new services wrapping repos
+	s.commandService = service.NewCommandService(cmdRepo, deviceRepo, certRepo, logger)
+	s.auditLogService = service.NewAuditLogService(auditLogRepo, logger)
 
 	// Initialize certificate service
 	var caManager *certs.CAManager
@@ -369,6 +378,7 @@ func New(cfg *config.Config, database *db.DB, logger *slog.Logger) (*Server, err
 		return nil, fmt.Errorf("failed to create enrollment token repository: %w", err)
 	}
 	s.enrollmentTokenRepo = enrollmentTokenRepo
+	s.enrollmentTokenService = service.NewEnrollmentTokenService(enrollmentTokenRepo, logger)
 
 	// Wire API token auth into middleware
 	s.authMiddleware.SetTokenValidator(&tokenAuthAdapter{tokenService: s.tokenService})

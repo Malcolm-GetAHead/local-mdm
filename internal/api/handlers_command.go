@@ -19,7 +19,7 @@ func (s *Server) handleSendCommand(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	device, err := s.deviceRepo.GetByID(r.Context(), deviceID)
+	device, err := s.commandService.GetDevice(r.Context(), deviceID)
 	if err != nil {
 		if errors.Is(err, apperrors.ErrNotFound) {
 			respondError(w, r, http.StatusNotFound, "not_found", "Device not found")
@@ -48,7 +48,7 @@ func (s *Server) handleSendCommand(w http.ResponseWriter, r *http.Request) {
 		CommandType: req.CommandType,
 		CommandData: req.CommandData,
 	}
-	if err := s.cmdRepo.Create(r.Context(), cmd); err != nil {
+	if err := s.commandService.CreateCommand(r.Context(), cmd); err != nil {
 		s.logger.Error("failed to create command", "error", err)
 		respondError(w, r, http.StatusInternalServerError, "internal_error", "Failed to create command")
 		return
@@ -70,7 +70,7 @@ func (s *Server) handleListCommands(w http.ResponseWriter, r *http.Request) {
 	}
 
 	limit, offset := parsePagination(r)
-	cmds, total, err := s.cmdRepo.ListByDevice(r.Context(), deviceID, limit, offset)
+	cmds, total, err := s.commandService.ListCommands(r.Context(), deviceID, limit, offset)
 	if err != nil {
 		s.logger.Error("failed to list commands", "error", err)
 		respondError(w, r, http.StatusInternalServerError, "internal_error", "Failed to list commands")
@@ -87,7 +87,7 @@ func (s *Server) handleInstallProfile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	device, err := s.deviceRepo.GetByID(r.Context(), deviceID)
+	device, err := s.commandService.GetDevice(r.Context(), deviceID)
 	if err != nil {
 		if errors.Is(err, apperrors.ErrNotFound) {
 			respondError(w, r, http.StatusNotFound, "not_found", "Device not found")
@@ -119,7 +119,7 @@ func (s *Server) handleInstallProfile(w http.ResponseWriter, r *http.Request) {
 			"profile_data": req.ProfileData,
 		},
 	}
-	if err := s.cmdRepo.Create(r.Context(), cmd); err != nil {
+	if err := s.commandService.CreateCommand(r.Context(), cmd); err != nil {
 		s.logger.Error("failed to create install profile command", "error", err)
 		respondError(w, r, http.StatusInternalServerError, "internal_error", "Failed to install profile")
 		return
@@ -146,7 +146,7 @@ func (s *Server) handleRemoveProfile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	device, err := s.deviceRepo.GetByID(r.Context(), deviceID)
+	device, err := s.commandService.GetDevice(r.Context(), deviceID)
 	if err != nil {
 		if errors.Is(err, apperrors.ErrNotFound) {
 			respondError(w, r, http.StatusNotFound, "not_found", "Device not found")
@@ -163,7 +163,7 @@ func (s *Server) handleRemoveProfile(w http.ResponseWriter, r *http.Request) {
 			"profile_identifier": profileID,
 		},
 	}
-	if err := s.cmdRepo.Create(r.Context(), cmd); err != nil {
+	if err := s.commandService.CreateCommand(r.Context(), cmd); err != nil {
 		s.logger.Error("failed to create remove profile command", "error", err)
 		respondError(w, r, http.StatusInternalServerError, "internal_error", "Failed to remove profile")
 		return
@@ -192,7 +192,7 @@ func (s *Server) handleListCertificates(w http.ResponseWriter, r *http.Request) 
 		deviceID = &id
 	}
 
-	certs, total, err := s.certRepo.List(r.Context(), deviceID, limit, offset)
+	certs, total, err := s.commandService.ListCertificates(r.Context(), deviceID, limit, offset)
 	if err != nil {
 		s.logger.Error("failed to list certificates", "error", err)
 		respondError(w, r, http.StatusInternalServerError, "internal_error", "Failed to list certificates")

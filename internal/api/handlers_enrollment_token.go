@@ -42,7 +42,7 @@ func (s *Server) handleCreateEnrollmentToken(w http.ResponseWriter, r *http.Requ
 	}
 
 	// Verify enterprise exists
-	if _, err := s.enterpriseRepo.GetByID(r.Context(), enterpriseID); err != nil {
+	if _, err := s.enterpriseService.Get(r.Context(), enterpriseID); err != nil {
 		if errors.Is(err, apperrors.ErrNotFound) {
 			respondError(w, r, http.StatusNotFound, "not_found", "Enterprise not found")
 			return
@@ -95,7 +95,7 @@ func (s *Server) handleCreateEnrollmentToken(w http.ResponseWriter, r *http.Requ
 		}
 	}
 
-	if err := s.enrollmentTokenRepo.Create(r.Context(), token); err != nil {
+	if err := s.enrollmentTokenService.Create(r.Context(), token); err != nil {
 		s.logger.Error("failed to create enrollment token", "error", err)
 		respondError(w, r, http.StatusInternalServerError, "internal_error", "Failed to create enrollment token")
 		return
@@ -142,7 +142,7 @@ func (s *Server) handleListEnrollmentTokens(w http.ResponseWriter, r *http.Reque
 	}
 
 	limit, offset := parsePagination(r)
-	tokens, total, err := s.enrollmentTokenRepo.List(r.Context(), enterpriseID, limit, offset)
+	tokens, total, err := s.enrollmentTokenService.List(r.Context(), enterpriseID, limit, offset)
 	if err != nil {
 		s.logger.Error("failed to list enrollment tokens", "error", err)
 		respondError(w, r, http.StatusInternalServerError, "internal_error", "Failed to list enrollment tokens")
@@ -159,7 +159,7 @@ func (s *Server) handleRevokeEnrollmentToken(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	if err := s.enrollmentTokenRepo.Revoke(r.Context(), id); err != nil {
+	if err := s.enrollmentTokenService.Revoke(r.Context(), id); err != nil {
 		if errors.Is(err, apperrors.ErrNotFound) {
 			respondError(w, r, http.StatusNotFound, "not_found", "Enrollment token not found or already revoked")
 			return
@@ -178,25 +178,7 @@ func (s *Server) handleRevokeEnrollmentToken(w http.ResponseWriter, r *http.Requ
 // Returns the token if valid, or nil and an error message if not.
 // If an active token is time-expired, updates its status to expired before rejecting.
 func (s *Server) validateEnrollmentToken(r *http.Request, tokenStr string) (*models.EnrollmentToken, string) {
-	token, err := s.enrollmentTokenRepo.GetByToken(r.Context(), tokenStr)
-	if err != nil {
-		return nil, ""
-	}
-	if token.Status == models.EnrollmentTokenStatusRevoked {
-		return nil, "Enrollment token has been revoked"
-	}
-	if token.Status == models.EnrollmentTokenStatusExpired {
-		return nil, "Enrollment token has expired"
-	}
-	// Active token but time-expired — update status before rejecting
-	if time.Now().After(token.ExpiresAt) {
-		_ = s.enrollmentTokenRepo.SetStatus(r.Context(), token.ID, models.EnrollmentTokenStatusExpired)
-		return nil, "Enrollment token has expired"
-	}
-	if token.UsesRemaining != nil && *token.UsesRemaining <= 0 {
-		return nil, "Enrollment token has no remaining uses"
-	}
-	return token, ""
+	return s.enrollmentTokenService.Validate(r.Context(), tokenStr)
 }
 
 // respondSOAPFault sends a SOAP fault response for enrollment errors.

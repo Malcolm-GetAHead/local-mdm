@@ -813,6 +813,10 @@ func newTestServer(t *testing.T) *testServer {
 		lifecycleService: service.NewLifecycleService(slog.New(slog.NewTextHandler(bytes.NewBuffer(nil), nil))),
 		policyService:    service.NewPolicyService(pr, &mockPolicyVersionRepo{}, slog.New(slog.NewTextHandler(bytes.NewBuffer(nil), nil))),
 		groupService:     service.NewGroupService(&mockGroupRepo{}, &mockAssignmentRepo{}, slog.New(slog.NewTextHandler(bytes.NewBuffer(nil), nil))),
+		enterpriseService: service.NewEnterpriseService(er, slog.New(slog.NewTextHandler(bytes.NewBuffer(nil), nil))),
+		commandService:    service.NewCommandService(cmdr, dr, cr, slog.New(slog.NewTextHandler(bytes.NewBuffer(nil), nil))),
+		enrollmentTokenService: service.NewEnrollmentTokenService(etr, slog.New(slog.NewTextHandler(bytes.NewBuffer(nil), nil))),
+		auditLogService:   service.NewAuditLogService(ar, slog.New(slog.NewTextHandler(bytes.NewBuffer(nil), nil))),
 	}
 
 	gs := s.groupService

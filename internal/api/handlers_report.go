@@ -103,9 +103,9 @@ func (s *Server) handleListAuditLogs(w http.ResponseWriter, r *http.Request) {
 	var total int
 
 	if action != "" || startDate != "" || endDate != "" {
-		logs, total, err = s.auditLogRepo.Search(r.Context(), user.EnterpriseID, action, startDate, endDate, limit, offset)
+		logs, total, err = s.auditLogService.Search(r.Context(), user.EnterpriseID, action, startDate, endDate, limit, offset)
 	} else {
-		logs, total, err = s.auditLogRepo.List(r.Context(), user.EnterpriseID, limit, offset)
+		logs, total, err = s.auditLogService.List(r.Context(), user.EnterpriseID, limit, offset)
 	}
 	if err != nil {
 		s.logger.Error("failed to list audit logs", "error", err)
