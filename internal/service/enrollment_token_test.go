@@ -76,6 +76,64 @@ func (m *mockEnrollmentTokenRepo) SetStatus(_ context.Context, id uuid.UUID, sta
 }
 func (m *mockEnrollmentTokenRepo) ExpireTokens(_ context.Context) (int64, error) { return 0, nil }
 
+func TestEnrollmentTokenService_CreateToken(t *testing.T) {
+	repo := &mockEnrollmentTokenRepo{}
+	svc := NewEnrollmentTokenService(repo, slog.Default())
+	ctx := context.Background()
+	eid := uuid.New()
+
+	// Happy path — default expiry
+	maxUses := 5
+	tok, err := svc.CreateToken(ctx, CreateTokenRequest{
+		EnterpriseID: eid,
+		Description:  "  test token  ",
+		MaxUses:      &maxUses,
+	})
+	require.NoError(t, err)
+	assert.NotEqual(t, uuid.Nil, tok.ID)
+	assert.Equal(t, eid, tok.EnterpriseID)
+	assert.Equal(t, "test token", tok.Description) // trimmed
+	assert.Len(t, tok.Token, 32)                   // 16 bytes hex-encoded
+	assert.Equal(t, &maxUses, tok.MaxUses)
+	assert.Equal(t, &maxUses, tok.UsesRemaining)
+	assert.WithinDuration(t, time.Now().Add(24*time.Hour), tok.ExpiresAt, 5*time.Second)
+
+	// Custom expiry
+	tok2, err := svc.CreateToken(ctx, CreateTokenRequest{
+		EnterpriseID: eid,
+		ExpiresIn:    2 * time.Hour,
+	})
+	require.NoError(t, err)
+	assert.WithinDuration(t, time.Now().Add(2*time.Hour), tok2.ExpiresAt, 5*time.Second)
+
+	// Validation: expires_in too short
+	_, err = svc.CreateToken(ctx, CreateTokenRequest{
+		EnterpriseID: eid,
+		ExpiresIn:    30 * time.Second,
+	})
+	require.Error(t, err)
+	assert.ErrorIs(t, err, apperrors.ErrValidation)
+	assert.Contains(t, err.Error(), "at least 1 minute")
+
+	// Validation: max_uses < 1
+	zero := 0
+	_, err = svc.CreateToken(ctx, CreateTokenRequest{
+		EnterpriseID: eid,
+		MaxUses:      &zero,
+	})
+	require.Error(t, err)
+	assert.ErrorIs(t, err, apperrors.ErrValidation)
+	assert.Contains(t, err.Error(), "at least 1")
+
+	// Nil max_uses = unlimited (no error)
+	tok3, err := svc.CreateToken(ctx, CreateTokenRequest{
+		EnterpriseID: eid,
+	})
+	require.NoError(t, err)
+	assert.Nil(t, tok3.MaxUses)
+	assert.Nil(t, tok3.UsesRemaining)
+}
+
 func TestEnrollmentTokenService_CRUD(t *testing.T) {
 	repo := &mockEnrollmentTokenRepo{}
 	svc := NewEnrollmentTokenService(repo, slog.Default())

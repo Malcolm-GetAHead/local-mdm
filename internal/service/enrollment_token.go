@@ -2,11 +2,15 @@ package service
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"fmt"
 	"log/slog"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/malcolm-getahead/local-mdm/internal/apperrors"
 	"github.com/malcolm-getahead/local-mdm/internal/models"
 )
 
@@ -30,6 +34,56 @@ type EnrollmentTokenService struct {
 // NewEnrollmentTokenService creates a new enrollment token service.
 func NewEnrollmentTokenService(repo EnrollmentTokenRepository, logger *slog.Logger) *EnrollmentTokenService {
 	return &EnrollmentTokenService{repo: repo, logger: logger}
+}
+
+// generateToken produces a cryptographically random 32-character hex token.
+func generateToken() (string, error) {
+	b := make([]byte, 16)
+	if _, err := rand.Read(b); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(b), nil
+}
+
+// CreateTokenRequest is the input DTO for creating an enrollment token.
+type CreateTokenRequest struct {
+	EnterpriseID uuid.UUID
+	Description  string
+	MaxUses      *int
+	ExpiresIn    time.Duration // 0 = default 24h
+	CreatedBy    *uuid.UUID
+}
+
+// CreateToken validates input, generates a token string, and persists the enrollment token.
+func (s *EnrollmentTokenService) CreateToken(ctx context.Context, req CreateTokenRequest) (*models.EnrollmentToken, error) {
+	if req.ExpiresIn == 0 {
+		req.ExpiresIn = 24 * time.Hour
+	}
+	if req.ExpiresIn < time.Minute {
+		return nil, fmt.Errorf("expires_in must be at least 1 minute: %w", apperrors.ErrValidation)
+	}
+	if req.MaxUses != nil && *req.MaxUses < 1 {
+		return nil, fmt.Errorf("max_uses must be at least 1: %w", apperrors.ErrValidation)
+	}
+
+	tokenStr, err := generateToken()
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate token: %w", err)
+	}
+
+	token := &models.EnrollmentToken{
+		EnterpriseID:  req.EnterpriseID,
+		Token:         tokenStr,
+		Description:   strings.TrimSpace(req.Description),
+		MaxUses:       req.MaxUses,
+		UsesRemaining: req.MaxUses,
+		ExpiresAt:     time.Now().Add(req.ExpiresIn),
+		CreatedBy:     req.CreatedBy,
+	}
+	if err := s.repo.Create(ctx, token); err != nil {
+		return nil, fmt.Errorf("failed to create enrollment token: %w", err)
+	}
+	return token, nil
 }
 
 // Create creates a new enrollment token.

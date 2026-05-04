@@ -11,6 +11,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/gorilla/mux"
 	"github.com/malcolm-getahead/local-mdm/internal/models"
+	"github.com/malcolm-getahead/local-mdm/internal/service"
 )
 
 // handleWebPolicyList shows the policy list with filtering.
@@ -931,7 +932,7 @@ func (s *Server) handleWebEnrollmentTokenCreate(w http.ResponseWriter, r *http.R
 
 	dur, err := time.ParseDuration(r.FormValue("expires_in"))
 	if err != nil {
-		dur = 24 * time.Hour
+		dur = 0 // service defaults to 24h
 	}
 
 	var maxUses *int
@@ -939,28 +940,22 @@ func (s *Server) handleWebEnrollmentTokenCreate(w http.ResponseWriter, r *http.R
 		maxUses = &v
 	}
 
-	tokenStr, err := generateEnrollmentToken()
-	if err != nil {
-		http.Redirect(w, r, "/dashboard/enrollment-tokens", http.StatusFound)
-		return
-	}
-
-	token := &models.EnrollmentToken{
-		EnterpriseID:  sess.EnterpriseID,
-		Token:         tokenStr,
-		Description:   r.FormValue("description"),
-		MaxUses:       maxUses,
-		UsesRemaining: maxUses,
-		ExpiresAt:     time.Now().Add(dur),
-	}
-	// Set created_by if the session user exists in the local users table
+	// Resolve created_by if the session user exists in the local users table
+	var createdBy *uuid.UUID
 	if sess.UserID != uuid.Nil {
 		if _, err := s.userService.Get(r.Context(), sess.UserID); err == nil {
-			token.CreatedBy = &sess.UserID
+			createdBy = &sess.UserID
 		}
 	}
 
-	if err := s.enrollmentTokenService.Create(r.Context(), token); err != nil {
+	token, err := s.enrollmentTokenService.CreateToken(r.Context(), service.CreateTokenRequest{
+		EnterpriseID: sess.EnterpriseID,
+		Description:  r.FormValue("description"),
+		MaxUses:      maxUses,
+		ExpiresIn:    dur,
+		CreatedBy:    createdBy,
+	})
+	if err != nil {
 		http.Redirect(w, r, "/dashboard/enrollment-tokens", http.StatusFound)
 		return
 	}
@@ -987,14 +982,14 @@ func (s *Server) handleWebEnrollmentTokenCreate(w http.ResponseWriter, r *http.R
 			"TotalPages":   (total + 49) / 50,
 			"CurrentPage":  1,
 			"TotalItems":   total,
-			"CreatedToken": tokenStr,
+			"CreatedToken": token.Token,
 			"MacOSBaseURL": macosBaseURL,
 		}
-		w.Header().Set("HX-Push-Url", "/dashboard/enrollment-tokens?created="+tokenStr)
+		w.Header().Set("HX-Push-Url", "/dashboard/enrollment-tokens?created="+token.Token)
 		s.renderPage(w, r, "enrollment_tokens", data)
 		return
 	}
-	http.Redirect(w, r, "/dashboard/enrollment-tokens?created="+tokenStr, http.StatusFound)
+	http.Redirect(w, r, "/dashboard/enrollment-tokens?created="+token.Token, http.StatusFound)
 }
 
 // handleWebEnrollmentTokenRevoke revokes an enrollment token from the dashboard.

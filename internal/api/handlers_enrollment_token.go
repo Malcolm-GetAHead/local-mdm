@@ -1,27 +1,17 @@
 package api
 
 import (
-	"crypto/rand"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/malcolm-getahead/local-mdm/internal/apperrors"
 	"github.com/malcolm-getahead/local-mdm/internal/auth"
 	"github.com/malcolm-getahead/local-mdm/internal/models"
+	"github.com/malcolm-getahead/local-mdm/internal/service"
 )
-
-func generateEnrollmentToken() (string, error) {
-	b := make([]byte, 16)
-	if _, err := rand.Read(b); err != nil {
-		return "", err
-	}
-	return hex.EncodeToString(b), nil
-}
 
 func (s *Server) handleCreateEnrollmentToken(w http.ResponseWriter, r *http.Request) {
 	var req struct {
@@ -52,50 +42,38 @@ func (s *Server) handleCreateEnrollmentToken(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	expiresIn := 24 * time.Hour // default 24h
+	// Parse expires_in duration from string
+	var expiresIn time.Duration
 	if req.ExpiresIn != "" {
 		expiresIn, err = time.ParseDuration(req.ExpiresIn)
 		if err != nil {
 			respondError(w, r, http.StatusBadRequest, "validation_failed", "invalid expires_in duration")
 			return
 		}
-		if expiresIn < time.Minute {
-			respondError(w, r, http.StatusBadRequest, "validation_failed", "expires_in must be at least 1 minute")
-			return
-		}
 	}
 
-	if req.MaxUses != nil && *req.MaxUses < 1 {
-		respondError(w, r, http.StatusBadRequest, "validation_failed", "max_uses must be at least 1")
-		return
-	}
-
-	tokenStr, err := generateEnrollmentToken()
-	if err != nil {
-		s.logger.Error("failed to generate enrollment token", "error", err)
-		respondError(w, r, http.StatusInternalServerError, "internal_error", "Failed to generate token")
-		return
-	}
-
-	token := &models.EnrollmentToken{
-		EnterpriseID:  enterpriseID,
-		Token:         tokenStr,
-		Description:   strings.TrimSpace(req.Description),
-		MaxUses:       req.MaxUses,
-		UsesRemaining: req.MaxUses,
-		ExpiresAt:     time.Now().Add(expiresIn),
-	}
-
-	// Populate created_by from authenticated user (only if user exists in local DB)
+	// Resolve created_by from authenticated user (only if user exists in local DB)
+	var createdBy *uuid.UUID
 	if authUser, err := auth.UserFromContext(r.Context()); err == nil {
 		if uid, parseErr := uuid.Parse(authUser.ID); parseErr == nil {
 			if _, lookupErr := s.userService.Get(r.Context(), uid); lookupErr == nil {
-				token.CreatedBy = &uid
+				createdBy = &uid
 			}
 		}
 	}
 
-	if err := s.enrollmentTokenService.Create(r.Context(), token); err != nil {
+	token, err := s.enrollmentTokenService.CreateToken(r.Context(), service.CreateTokenRequest{
+		EnterpriseID: enterpriseID,
+		Description:  req.Description,
+		MaxUses:      req.MaxUses,
+		ExpiresIn:    expiresIn,
+		CreatedBy:    createdBy,
+	})
+	if err != nil {
+		if errors.Is(err, apperrors.ErrValidation) {
+			respondError(w, r, http.StatusBadRequest, "validation_failed", err.Error())
+			return
+		}
 		s.logger.Error("failed to create enrollment token", "error", err)
 		respondError(w, r, http.StatusInternalServerError, "internal_error", "Failed to create enrollment token")
 		return

@@ -11,6 +11,11 @@ import (
 // Handlers check with: errors.Is(err, ErrNotFound)
 var ErrNotFound = errors.New("not found")
 
+// ErrValidation is a sentinel error for input validation failures.
+// Services wrap this with context: fmt.Errorf("max_uses must be at least 1: %w", ErrValidation)
+// Handlers check with: errors.Is(err, ErrValidation) to return 400 instead of 500.
+var ErrValidation = errors.New("validation error")
+
 // ErrorCode represents a machine-readable error code
 type ErrorCode string
 
