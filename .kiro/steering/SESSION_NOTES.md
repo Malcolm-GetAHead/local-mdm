@@ -1,6 +1,6 @@
 # Session Notes — Working Preferences & Project Knowledge
 
-**Last Updated**: 2026-05-01  
+**Last Updated**: 2026-05-04  
 **Purpose**: Guidance for AI agents working on this codebase. Keep this file lean — patterns and conventions that apply to every session. One-shot implementation details belong in sprint docs, not here.
 
 ## Current State
@@ -94,7 +94,6 @@
 - **Enrollment requires tokens (AUT-01)** — both Windows and macOS enrollment require a valid enrollment token. Create tokens via dashboard or API. macOS uses_remaining decrements at SCEP certificate issuance, not profile download. VM re-enrollment after snapshot restore requires a fresh token.
 - **CRL is static** — served from a file generated once. Cert revocations won't be reflected until CRL regeneration is implemented.
 - **NanoMDM config uses host IP** — `configs/config.docker.yaml` has `nanomdm_url` with env var override (`NANOMDM_URL`), but enrollment profiles use the host IP which must be reachable from VMs.
-- **macOS webhook enterprise ID is hardcoded** — Authenticate handler uses configurable `default_enterprise_id`. Multi-tenant requires passing enterprise ID through the enrollment flow.
 - **Container rebuilds regenerate the CA unless certs are volume-mounted.** Without the `./internal/api/certs:/app/certs` mount, every `docker compose build` creates a new CA, breaking all enrolled devices.
 
 ## Project-Specific Knowledge

@@ -1,7 +1,7 @@
 # Development Steering Guide
 
 **Project**: Local MDM  
-**Last Updated**: 2026-04-20  
+**Last Updated**: 2026-05-04  
 **Purpose**: Guide for AI agents and developers working on this codebase
 
 ---
@@ -32,7 +32,6 @@
 
 ### Testing Approach
 - **Mock-first**: All platform-specific code (NanoMDM, Android Management API, Windows WNS) should be tested with mock services and simulated device responses. No real devices or external APIs required for unit/integration tests.
-- **Real device testing** is a future phase (F-01) — Windows VMs, macOS VMs, Android emulators. Not required for sprint work.
 - **Handler tests** use mock repos in `handler_test_helpers_test.go` — no infrastructure needed.
 - **Platform tests** use testify mocks for repository interfaces.
 - **Integration tests** need Docker services (PostgreSQL, Keycloak) but not real MDM devices.
@@ -212,10 +211,12 @@ func (s *Server) handleAssignPolicyToGroup(w http.ResponseWriter, r *http.Reques
 ```
 
 **Rules:**
-- New business logic (Sprint 4+) goes in `internal/service/`
-- Existing simple handlers (CRUD, lock/wipe) stay as-is — no refactor for its own sake
+- All handler business logic goes in `internal/service/`
+- Handlers are thin: parse request → call service → format response
 - Services accept interfaces via constructor (dependency injection)
 - Services never import `net/http`
+- Services return `apperrors.ErrValidation` for input validation failures, `apperrors.ErrNotFound` for missing resources — handlers map these to HTTP status codes
+- For complex creation workflows, services accept a DTO (e.g., `CreateTokenRequest`) and own validation, generation, and model construction
 
 ### Event Bus (Sprint 4+)
 - PostgreSQL `LISTEN`/`NOTIFY` for decoupled event-driven communication
@@ -442,7 +443,7 @@ sleep 45
 make migrate-up
 
 # Run tests
-make test
+make dev-test
 
 # Start server
 make run
@@ -532,10 +533,12 @@ The owner drives a structured retrospective after each sprint. Wait for explicit
 ### Service Layer
 - `internal/service/` — business logic between handlers and repos. Transport-agnostic (no `net/http`).
 - Services accept repository interfaces via constructor (dependency injection).
-- New business logic goes in services. Existing simple handlers (CRUD) stay as-is.
+- All handlers go through services (AUT-09 consolidated this — zero direct repo calls in handlers).
+- Services: `EnterpriseService`, `EnrollmentTokenService`, `CommandService`, `AuditLogService`, `PolicyService`, `DeviceService`, `ComplianceService`, `GroupService`, `AppService`, `UserService`, `TokenService`, `LifecycleService`.
 
 ### Error Handling
 - Not-found detection: `errors.Is(err, apperrors.ErrNotFound)` — repos wrap with `fmt.Errorf("xxx not found: %w", apperrors.ErrNotFound)`, handlers check with `errors.Is()`.
+- Validation errors: `errors.Is(err, apperrors.ErrValidation)` — services wrap with `fmt.Errorf("field invalid: %w", apperrors.ErrValidation)`, handlers return 400.
 - Audit logging: `s.logAudit(r, action, resourceType, resourceID, details)` on all mutations.
 
 ### Testing
@@ -550,6 +553,7 @@ The owner drives a structured retrospective after each sprint. Wait for explicit
 - **2026-02-07**: Initial steering guide created
 - **2026-04-20**: Updated for Sprint 4b (Writer/Reader pool pattern, repo constructor changes)
 - **2026-04-23**: Consolidated stable sections from SESSION_NOTES (owner background, git workflow, session closeout, production architecture, implementation patterns)
+- **2026-05-04**: Updated for AUT-09 (all handlers through services, ErrValidation sentinel, DTO pattern, verification checklist consolidated)
 
 ---
 
