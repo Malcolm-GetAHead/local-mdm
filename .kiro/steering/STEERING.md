@@ -44,30 +44,39 @@
 
 ### Before Making Changes
 ```bash
-# 1. Ensure tests pass
-go test ./...
-
-# 2. Check for race conditions
-go test -race ./...
-
-# 3. Verify coverage baseline
-go test -cover ./... | grep -v "no test files"
+# Establish green baseline
+make dev-test
 ```
 
-### After Making Changes
+### After Every Sub-Task
 ```bash
-# 1. Run tests with race detector
+# 1. Unit/mock tests with race detector
 go test -race ./...
 
-# 2. Check coverage improved or maintained
-go test -cover ./...
+# 2. Rebuild container (embedded templates/static files require this)
+docker compose build localmdm && docker compose up -d localmdm
 
-# 3. Verify no vet warnings
-go vet ./...
-
-# 4. Run full test suite
-make test
+# 3. Hit the real endpoint — curl the API or open the dashboard page.
+#    go test passing does NOT mean the feature works.
 ```
+
+### After All Sub-Tasks Complete
+```bash
+# 1. Full integration test suite in Docker
+make dev-test
+
+# 2. Playwright browser tests (if UI changes)
+cd tests/browser && node run-playbook.js
+
+# 3. Sanity check the changeset
+git diff main --stat
+
+# 4. Verify no vet warnings
+go vet ./...
+```
+
+See `docs/planning/future/autonomous_sessions.md` §Mandatory Verification Gates for the
+full checklist including test requirements, test data cleanup rules, and Playwright conventions.
 
 ---
 
@@ -408,7 +417,7 @@ docs/planning/
 ```bash
 # Development
 make run                    # Start server
-make test                   # Run tests
+make dev-test               # Full test suite in Docker (use this, not make test)
 make test-coverage          # Generate coverage report
 
 # Testing
