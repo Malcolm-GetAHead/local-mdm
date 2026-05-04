@@ -1029,10 +1029,41 @@ with CASCADE cleanup is the correct approach.
 ## Session 9: Service Layer Consolidation
 
 **ID**: `AUT-09`
-**Effort**: ~1 day (3 parts, ~2-3 hours each)
+**Status**: COMPLETE
+**Effort**: ~1 day (actual: ~3 hours implementation + ~30 min review follow-up)
 **Source**: Maintainability analysis (2026-04-30)
 **Branch**: `feature/aut-09-service-consolidation`
 **Depends on**: None (refactor only — no new features)
+
+### Design Decisions
+
+- **No EnrollmentService created.** The spec called for `internal/service/enrollment.go`.
+  After reading platform_handlers.go, the enrollment logic is deeply interleaved with
+  protocol-specific code (SOAP XML parsing, CSR signing, certificate handling). Extracting
+  only the business logic would create a service with 3 methods that each call one repo
+  method — a thin wrapper with no added value. Instead, existing services (`enterpriseService`,
+  `deviceService`, `enrollmentTokenService`) were used directly in platform_handlers.go.
+
+- **AuditLogService instead of ReportService extension.** The spec said "extend
+  `internal/service/report.go`" but the existing `reportService` is backed by
+  `internal/reporting/` (a separate package with its own store pattern). Created a new
+  `AuditLogService` in `internal/service/` to wrap the audit log repo, keeping the
+  reporting package untouched.
+
+- **EnrollmentTokenService.CreateToken with DTO.** Post-implementation review found that
+  `handleCreateEnrollmentToken` (API) and `handleWebEnrollmentTokenCreate` (dashboard)
+  both duplicated token generation, validation, and model construction. Added
+  `CreateTokenRequest` DTO and `CreateToken` method to own the creation workflow. Both
+  handlers now follow "parse → call service → respond." The old thin `Create` wrapper
+  was removed as dead code.
+
+- **ErrValidation sentinel added to apperrors.** Services need to return validation
+  failures that handlers can distinguish from internal errors (400 vs 500). Added
+  `apperrors.ErrValidation` alongside the existing `apperrors.ErrNotFound`.
+
+- **Repo fields remain on Server struct.** Repos are still needed for passing to platform
+  services (macos.NewService, windows.NewService) and service constructors. Handlers no
+  longer reference them — only initialization code does.
 
 ### Prompt
 
@@ -1140,12 +1171,15 @@ After the retrospective, provide:
 ```
 
 ### Deliverables
-- New services: `EnterpriseService`, `EnrollmentTokenService`, `CommandService`, `ReportService`, `EnrollmentService`
-- Extended services: `PolicyService` (read methods), `DeviceService` (if needed)
-- All handlers rewired to use services exclusively
-- Service-level tests for every new service
-- Server struct cleaned up — holds services, not repos
-- Zero behavior changes to API or dashboard
+- New services: `EnterpriseService`, `EnrollmentTokenService` (with `CreateToken` DTO), `CommandService`, `AuditLogService`
+- Extended services: `PolicyService` (+7 methods: Get, List, Delete, ListByIDs, ListTemplates, AssignToDevice, UnassignFromDevice), `DeviceService` (+4 methods: Create, GetByPlatformID, UpdateDevice, ListFiltered)
+- All 10 handler files rewired — 67 direct repo calls eliminated, zero remain
+- SCEP PostIssueHook and cleanup ticker migrated from repo to service calls
+- `apperrors.ErrValidation` sentinel for service-layer validation errors
+- Service-level tests for every new service (EnterpriseService, EnrollmentTokenService including CreateToken, CommandService, AuditLogService)
+- No EnrollmentService — existing services used directly in platform_handlers.go
+- Server struct repo fields retained for initialization only (platform services, service constructors)
+- Zero behavior changes to API or dashboard (two minor improvements: dashboard policy create/update now gets version tracking via policyService, and policy updates record updatedBy from session)
 
 ---
 
@@ -1321,9 +1355,9 @@ AUT-06b (Compliance Reports)     — independent, autonomous
 AUT-06c (Cert Renewal + Escrow)  — investigation-first, then autonomous
 AUT-07  (A11y + i18n)            — independent, screenshot gate per template
 AUT-08  (Docs + OTel)            — investigation step then autonomous
-AUT-09  (Service Consolidation)  — run BEFORE feature sessions (reduces merge conflicts)
+AUT-09  (Service Consolidation)  — complete ✅
 AUT-10  (HTTP Timeouts)          — complete ✅
-AUT-11  (Re-enrollment Fix)      — independent, fully autonomous
+AUT-11  (Re-enrollment Fix)      — complete ✅
 ```
 
 Sessions marked "design-first" will stop after Phase 1 and wait for owner review.
@@ -1335,8 +1369,8 @@ Sessions marked "autonomous" can run start-to-finish without human interaction.
 0. **AUT-00** (Test Enterprise Isolation) ✅
 1. **AUT-01** (Enrollment Tokens) ✅
 2. **AUT-10** (HTTP Timeouts) ✅
-3. **AUT-11** (Re-enrollment Fix) — fully autonomous, closes multi-tenant gap
-4. **AUT-09** (Service Consolidation) — autonomous, clean up before features
+3. **AUT-11** (Re-enrollment Fix) ✅
+4. **AUT-09** (Service Consolidation) ✅
 5. **AUT-06a** (Security Audit + CI) — autonomous, low risk
 6. **AUT-06b** (Compliance Reports) — autonomous, moderate risk
 7. **AUT-03a** (Device Tags) — autonomous, highest admin UX value

@@ -122,3 +122,5 @@
 | AUT-00 | ✅ Complete | Test enterprise isolation, per-test enterprise pattern |
 | AUT-01 | ✅ Complete | Enrollment token system |
 | AUT-10 | ✅ Complete | HTTP client timeouts, context propagation, ChallengeStore/ValidateToken ctx params |
+| AUT-11 | ✅ Complete | Device re-enrollment after soft-delete, defaultEnterpriseID removed, NULL scan fix |
+| AUT-09 | ✅ Complete | Service layer consolidation — 67 repo calls in handlers → 0, 4 new services, ErrValidation sentinel |
