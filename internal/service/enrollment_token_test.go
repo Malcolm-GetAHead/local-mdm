@@ -149,7 +149,8 @@ func TestEnrollmentTokenService_CRUD(t *testing.T) {
 		UsesRemaining: &maxUses,
 		ExpiresAt:     time.Now().Add(24 * time.Hour),
 	}
-	require.NoError(t, svc.Create(ctx, tok))
+	// Seed directly via repo (CreateToken is tested separately)
+	require.NoError(t, repo.Create(ctx, tok))
 	assert.NotEqual(t, uuid.Nil, tok.ID)
 
 	got, err := svc.GetByToken(ctx, "abc123")

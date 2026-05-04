@@ -86,14 +86,6 @@ func (s *EnrollmentTokenService) CreateToken(ctx context.Context, req CreateToke
 	return token, nil
 }
 
-// Create creates a new enrollment token.
-func (s *EnrollmentTokenService) Create(ctx context.Context, token *models.EnrollmentToken) error {
-	if err := s.repo.Create(ctx, token); err != nil {
-		return fmt.Errorf("failed to create enrollment token: %w", err)
-	}
-	return nil
-}
-
 // GetByToken retrieves an enrollment token by its token string.
 func (s *EnrollmentTokenService) GetByToken(ctx context.Context, token string) (*models.EnrollmentToken, error) {
 	return s.repo.GetByToken(ctx, token)
