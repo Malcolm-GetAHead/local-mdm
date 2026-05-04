@@ -106,6 +106,10 @@ func (d *commandDispatcher) dispatchMacOS(ctx context.Context, device *models.De
 		if profileData, ok := cmd.CommandData["raw_profile"].(string); ok {
 			plist, _ = macos.BuildInstallProfileCommand([]byte(profileData))
 		}
+	case models.CommandTypeRemoveProfile:
+		if identifier, ok := cmd.CommandData["identifier"].(string); ok {
+			plist, _ = macos.BuildRemoveProfileCommand(identifier)
+		}
 	case models.CommandTypeInstallApp:
 		if id, ok := cmd.CommandData["identifier"].(string); ok {
 			plist, _ = macos.BuildInstallApplicationCommand(0, id)

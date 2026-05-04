@@ -170,6 +170,14 @@ func (m *mockDeviceRepoForMgmt) GetByPlatformID(_ context.Context, platform, dev
 	}
 	return nil, fmt.Errorf("device not found: not found")
 }
+func (m *mockDeviceRepoForMgmt) GetByPlatformIDIncludeDeleted(_ context.Context, platform, deviceID string) (*models.Device, error) {
+	for _, d := range m.devices {
+		if d.Platform == platform && d.DeviceID == deviceID {
+			return d, nil
+		}
+	}
+	return nil, fmt.Errorf("device not found: not found")
+}
 func (m *mockDeviceRepoForMgmt) List(_ context.Context, _ uuid.UUID, _, _ int) ([]*models.Device, int, error) {
 	return nil, 0, nil
 }

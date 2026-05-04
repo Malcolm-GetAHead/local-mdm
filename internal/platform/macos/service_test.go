@@ -60,6 +60,14 @@ func (m *MockDeviceRepository) GetByPlatformID(ctx context.Context, platform, de
 	return args.Get(0).(*models.Device), args.Error(1)
 }
 
+func (m *MockDeviceRepository) GetByPlatformIDIncludeDeleted(ctx context.Context, platform, deviceID string) (*models.Device, error) {
+	args := m.Called(ctx, platform, deviceID)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*models.Device), args.Error(1)
+}
+
 func (m *MockDeviceRepository) Update(ctx context.Context, device *models.Device) error {
 	args := m.Called(ctx, device)
 	return args.Error(0)
@@ -309,11 +317,14 @@ func TestNanoMDMService(t *testing.T) {
 
 // --- CheckinHandler and CommandHandler Tests ---
 
-func TestCheckinHandler_ServeHTTP(t *testing.T) {
+// TestCheckinHandler_ServeHTTP_RejectsUnknownDevice verifies that an Authenticate
+// webhook for a UDID with no record (active or soft-deleted) is silently ignored —
+// no device is created, no error is returned to NanoMDM.
+func TestCheckinHandler_ServeHTTP_RejectsUnknownDevice(t *testing.T) {
 	svc := NewNanoMDMService("", "", nil, nil, slog.Default())
 	deviceRepo := new(MockDeviceRepository)
 	deviceRepo.On("GetByPlatformID", mock.Anything, "macos", "test").Return(nil, fmt.Errorf("not found"))
-	deviceRepo.On("Create", mock.Anything, mock.Anything).Return(nil)
+	deviceRepo.On("GetByPlatformIDIncludeDeleted", mock.Anything, "macos", "test").Return(nil, fmt.Errorf("not found"))
 	deviceRepo.On("Update", mock.Anything, mock.Anything).Return(nil)
 	service := NewService(deviceRepo)
 	logger := slog.New(slog.NewTextHandler(bytes.NewBuffer(nil), &slog.HandlerOptions{Level: slog.LevelError}))

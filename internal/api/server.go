@@ -817,11 +817,6 @@ func (s *Server) setupRoutes() {
 		http.HandlerFunc(s.handleDEPDevices),
 	)).Methods("GET")
 	checkinHandler := macos.NewCheckinHandler(s.nanomdmService, s.macosService, s.cmdRepo, s.lifecycleService, s.logger)
-	if s.config.MacOS.DefaultEnterpriseID != "" {
-		if eid, err := uuid.Parse(s.config.MacOS.DefaultEnterpriseID); err == nil {
-			checkinHandler.SetDefaultEnterpriseID(eid)
-		}
-	}
 	commandHandler := macos.NewCommandHandler(s.nanomdmService, s.logger)
 	s.router.Handle("/mdm", commandHandler).Methods("PUT")
 	s.router.Handle("/checkin", checkinHandler).Methods("PUT")

@@ -30,6 +30,25 @@ func (m *mockDeviceRepo) GetByID(_ context.Context, id uuid.UUID) (*models.Devic
 	}
 	return nil, fmt.Errorf("device not found")
 }
+func (m *mockDeviceRepo) GetBySerial(_ context.Context, _ uuid.UUID, _ string) (*models.Device, error) {
+	return nil, fmt.Errorf("device not found")
+}
+func (m *mockDeviceRepo) GetByPlatformID(_ context.Context, platform, deviceID string) (*models.Device, error) {
+	for _, d := range m.devices {
+		if d.Platform == platform && d.DeviceID == deviceID {
+			return d, nil
+		}
+	}
+	return nil, fmt.Errorf("device not found")
+}
+func (m *mockDeviceRepo) GetByPlatformIDIncludeDeleted(_ context.Context, platform, deviceID string) (*models.Device, error) {
+	for _, d := range m.devices {
+		if d.Platform == platform && d.DeviceID == deviceID {
+			return d, nil
+		}
+	}
+	return nil, fmt.Errorf("device not found")
+}
 func (m *mockDeviceRepo) List(_ context.Context, eid uuid.UUID, limit, offset int) ([]*models.Device, int, error) {
 	var out []*models.Device
 	for _, d := range m.devices {

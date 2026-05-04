@@ -4,6 +4,19 @@ Sprint-by-sprint development history for Local MDM. For current status, see [REA
 
 ---
 
+## AUT-11 — Device Re-enrollment & Soft-Delete Fix
+- Device repository `Create` handles re-enrollment of soft-deleted devices: on unique constraint violation, restores the soft-deleted row (clears `deleted_at`, resets status to `enrolled`, updates `enrollment_date`), preserving the original device UUID
+- `GetByPlatformIDIncludeDeleted` added to `DeviceRepository` interface — queries without `deleted_at IS NULL` filter
+- macOS Authenticate webhook no longer uses `defaultEnterpriseID` fallback — looks up soft-deleted records for correct enterprise; rejects unknown devices with warning log
+- `SetDefaultEnterpriseID` method and caller removed; config field retained for backward compatibility
+- NULL column scan fix: `COALESCE` wraps nullable VARCHAR columns (`serial_number`, `name`, `model`, `os_version`) in all device SELECT queries via shared `deviceSelectColumns` constant
+- `DeviceService.Delete` sends `RemoveProfile` command to NanoMDM for macOS devices before soft-deleting — device unenrolls on next check-in
+- `RemoveProfile` command type added to command dispatcher's macOS switch
+- Integration tests: re-enrollment after soft-delete, duplicate active device rejection, multi-enterprise same UDID, `GetByPlatformIDIncludeDeleted`
+- E2E test: full re-enrollment lifecycle (create → soft-delete → re-enroll → verify same UUID)
+- DATABASE.md: documented soft-delete re-enrollment behavior and Delete vs Unenroll device removal flows
+- Real device verified: dashboard delete → VM reboot → NanoMDM delivers RemoveProfile → macOS shows unenrollment notification → CheckOut sent
+
 ## AUT-10 — HTTP Client Timeouts & Context Propagation
 - Replaced bare `http.Post`, `http.PostForm`, `http.DefaultClient` with timeout-aware clients across all non-test code
 - `KeycloakClient.Login`/`RefreshToken` accept `ctx context.Context`; use 30s timeout client

@@ -571,20 +571,30 @@ func TestMaybeAutoQueue_Cooldown(t *testing.T) {
 // device records are created/updated with the correct fields from plist payloads.
 
 func TestWebhookFlow_Authenticate_CreatesDevice(t *testing.T) {
-	// Simulate: NanoMDM sends Authenticate webhook → device created with name/serial/model
+	// Simulate: NanoMDM sends Authenticate webhook for a soft-deleted device → device restored
 	udid := "FLOW-AUTH-UDID"
+	enterpriseID := uuid.New()
 	var updatedDevice *models.Device
 
 	repo := &MockDeviceRepository{}
-	// First call: device not found (new enrollment)
+	// First call: device not found in active records
 	repo.On("GetByPlatformID", mock.Anything, "macos", udid).Return(nil, assert.AnError).Once()
-	// Create succeeds
+	// Soft-deleted record found — provides the correct enterprise ID
+	deletedDevice := &models.Device{
+		BaseModel:    models.BaseModel{ID: uuid.New()},
+		EnterpriseID: enterpriseID,
+		DeviceID:     udid,
+		Platform:     "macos",
+	}
+	repo.On("GetByPlatformIDIncludeDeleted", mock.Anything, "macos", udid).Return(deletedDevice, nil)
+	// Create succeeds (restores the soft-deleted device)
 	repo.On("Create", mock.Anything, mock.AnythingOfType("*models.Device")).Return(nil)
 	// After create, return a device for subsequent lookups (last_seen update)
 	repo.On("GetByPlatformID", mock.Anything, "macos", udid).Return(&models.Device{
-		BaseModel: models.BaseModel{ID: uuid.New()},
-		DeviceID:  udid,
-		Platform:  "macos",
+		BaseModel:    models.BaseModel{ID: uuid.New()},
+		EnterpriseID: enterpriseID,
+		DeviceID:     udid,
+		Platform:     "macos",
 	}, nil)
 	// Capture the device passed to Update (this is where the plist fields land)
 	repo.On("Update", mock.Anything, mock.MatchedBy(func(d *models.Device) bool {
@@ -626,7 +636,7 @@ func TestWebhookFlow_Authenticate_CreatesDevice(t *testing.T) {
 	h.ServeHTTP(w, req)
 	assert.Equal(t, http.StatusOK, w.Code)
 
-	// Verify device was created and updated with plist data
+	// Verify device was restored and updated with plist data
 	require.NotNil(t, updatedDevice)
 	assert.Equal(t, udid, updatedDevice.DeviceID)
 	assert.Equal(t, "ZL9QG3C3RR", updatedDevice.SerialNumber)
@@ -635,6 +645,46 @@ func TestWebhookFlow_Authenticate_CreatesDevice(t *testing.T) {
 	assert.Equal(t, "26.2", updatedDevice.OSVersion)
 	assert.Equal(t, "25F79", updatedDevice.PlatformData["build_version"])
 	assert.Equal(t, "com.apple.mgmt.External.test", updatedDevice.PlatformData["topic"])
+}
+
+func TestWebhookFlow_Authenticate_UnknownDevice_Rejected(t *testing.T) {
+	// Simulate: NanoMDM sends Authenticate for a device with no record at all → rejected
+	udid := "FLOW-UNKNOWN-UDID"
+
+	repo := &MockDeviceRepository{}
+	// Not found in active records
+	repo.On("GetByPlatformID", mock.Anything, "macos", udid).Return(nil, assert.AnError)
+	// Not found in deleted records either
+	repo.On("GetByPlatformIDIncludeDeleted", mock.Anything, "macos", udid).Return(nil, assert.AnError)
+	repo.On("Update", mock.Anything, mock.Anything).Return(nil)
+
+	svc := &Service{deviceRepo: repo}
+	logger := slog.New(slog.NewTextHandler(&bytes.Buffer{}, &slog.HandlerOptions{Level: slog.LevelError}))
+	h := NewCheckinHandler(testNanoMDMService(t), svc, nil, nil, logger)
+
+	plistPayload := `<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+	<key>MessageType</key><string>Authenticate</string>
+	<key>UDID</key><string>FLOW-UNKNOWN-UDID</string>
+</dict></plist>`
+
+	event := WebhookEvent{
+		Topic: "mdm.Authenticate",
+		CheckinEvent: &CheckinEvent{
+			UDID:       &udid,
+			RawPayload: plistPayload,
+		},
+	}
+	body, _ := json.Marshal(event)
+	req := httptest.NewRequest("PUT", "/checkin", bytes.NewReader(body))
+	w := httptest.NewRecorder()
+
+	h.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusOK, w.Code)
+
+	// Verify no device was created — Create should NOT be called
+	repo.AssertNotCalled(t, "Create", mock.Anything, mock.Anything)
 }
 
 func TestWebhookFlow_TokenUpdate_SetsEnrolled(t *testing.T) {
